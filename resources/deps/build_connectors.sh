@@ -44,10 +44,28 @@ build_repo "aiven-jdbc" \
     "$JDBC_TAG" \
     "./gradlew clean assemble"
 
-# Build Aiven S3
+# Build Aiven S3 (We build both, but will only extract the Sink)
 build_repo "aiven-s3" \
     "https://github.com/Aiven-Open/cloud-storage-connectors-for-apache-kafka.git" \
     "$S3_TAG" \
     "./gradlew clean assemble"
+
+if [ "$DRY_RUN" -eq 0 ]; then
+    echo "▶️  Extracting Targeted Aiven Distributions..."
+    # Notice: We intentionally do NOT create a folder for the S3 Source
+    mkdir -p /build/dist/aiven-jdbc /build/dist/aiven-s3-sink
+    
+    # Extract JDBC
+    tar -xf aiven-jdbc/build/distributions/*.tar -C /build/dist/aiven-jdbc --strip-components=1
+    
+    # Extract ONLY the S3 Sink
+    tar -xf aiven-s3/s3-sink-connector/build/distributions/*.tar -C /build/dist/aiven-s3-sink --strip-components=1
+
+    echo "▶️  Purging non-Postgres JDBC drivers..."
+    cd /build/dist/aiven-jdbc
+    # Delete Snowflake, Oracle, MySQL, SQL Server, and SQLite drivers to save ~85MB
+    rm -f snowflake-jdbc-*.jar sqlite-jdbc-*.jar ojdbc8-*.jar mysql-connector-j-*.jar mssql-jdbc-*.jar jtds-*.jar
+    cd /tmp
+fi
 
 echo "✅ Script execution complete!"

@@ -19,7 +19,7 @@ fetch_artifact() {
         if [[ -z "$url" ]]; then echo "    ❌ Error: URL is empty"; exit 1; fi
         if curl -sL -I -f "$url" > /dev/null; then echo "    ✅ Found"; else echo "    ❌ Missing: $url"; exit 1; fi
     else
-        echo " ⬇️  Downloading: $url"
+        echo " ⬇️ Downloading: $url"
         curl -sL -f -o "$output_path" "$url"
     fi
 }
@@ -32,7 +32,6 @@ get_maven_version() {
 }
 
 ## Version Resolution
-# Maven Resolvers
 ICEBERG_V=$(get_maven_version "org/apache/iceberg/iceberg-core" "[0-9]+\.[0-9]+\.[0-9]+")
 FLINK_V=$(get_maven_version "org/apache/flink/flink-core" "1\.[0-9]+\.[0-9]+")
 FLINK_MINOR=$(echo "$FLINK_V" | grep -Eo '^[0-9]+\.[0-9]+' || true)
@@ -43,24 +42,26 @@ SPARK_COMPAT_MINOR=$(curl -sL "https://repo1.maven.org/maven2/org/apache/iceberg
     sed "s/iceberg-spark-runtime-//;s/_${SCALA_V}//" | sort -V | tail -1)
 SPARK_V=$(get_maven_version "org/apache/spark/spark-core_${SCALA_V}" "${SPARK_COMPAT_MINOR}\.[0-9]+")
 
-# HADOOP_V=$(get_maven_version "org/apache/hadoop/hadoop-common" "3\.[0-9]+\.[0-9]+")
-# AWS_SDK_V1=$(get_maven_version "com/amazonaws/aws-java-sdk-bundle" "1\.11\.[0-9]+")
 POSTGRES_V=$(get_maven_version "org/postgresql/postgresql" "42\.[0-9]+\.[0-9]+")
 DEB_V=$(get_maven_version "io/debezium/debezium-connector-postgres" "[0-9]+\.[0-9]+\.[0-9]+\.Final")
 OL_SPARK_V=$(get_maven_version "io/openlineage/openlineage-spark_${SCALA_V}" "[0-9]+\.[0-9]+\.[0-9]+")
 
-# GitHub Resolvers (Using grep/awk)
 OM_JSON=$(curl -s https://api.github.com/repos/open-metadata/openmetadata-spark-agent/releases/latest)
 OM_V=$(echo "$OM_JSON" | grep -Eo '"tag_name":\s*"[^"]+"' | head -1 | awk -F'"' '{print $4}' | sed 's/^v//')
 OM_SPARK_URL=$(echo "$OM_JSON" | grep -Eo '"browser_download_url":\s*"[^"]+\.jar"' | head -1 | awk -F'"' '{print $4}' || true)
+
+# Iceberg Kafka Connect (Databricks/Tabular)
+ICEBERG_KC_JSON=$(curl -s https://api.github.com/repos/databricks/iceberg-kafka-connect/releases/latest)
+ICEBERG_KC_V=$(echo "$ICEBERG_KC_JSON" | grep -Eo '"tag_name":\s*"[^"]+"' | head -1 | awk -F'"' '{print $4}' | sed 's/^v//')
+# grep -v 'hive' ensures we drop the hive distribution
+ICEBERG_KC_URL=$(echo "$ICEBERG_KC_JSON" | grep -Eo '"browser_download_url":\s*"[^"]+\.zip"' | grep -v 'hive' | head -1 | awk -F'"' '{print $4}' || true)
 
 echo "-------------------------------------------------------"
 echo "✅ Resolved Versions for Open DataML Stack:"
 echo " - Flink:        $FLINK_V"
 echo " - Spark:        $SPARK_V (Scala $SCALA_V)"
 echo " - Iceberg:      $ICEBERG_V"
-# echo " - Hadoop:       $HADOOP_V"
-# echo " - AWS SDK:      $AWS_SDK_V1 (V1 Bundle)"
+echo " - Iceberg Sink: $ICEBERG_KC_V (No Hive)"
 echo " - Debezium:     $DEB_V"
 echo " - Postgres:     $POSTGRES_V (JDBC Driver)"
 echo " - OpenMetadata: $OM_V (Spark Agent)"
@@ -71,6 +72,7 @@ make_dir "connect/clickhouse-sink"
 make_dir "connect/msk-datagen"
 make_dir "connect/debezium-postgres"
 make_dir "connect/redis"
+make_dir "connect/iceberg-sink"
 
 CH_URL=$(curl -s https://api.github.com/repos/ClickHouse/clickhouse-kafka-connect/releases/latest | grep -Eo '"browser_download_url":\s*"[^"]+\.zip"' | head -1 | awk -F'"' '{print $4}' || true)
 fetch_artifact "ch.zip" "$CH_URL"
@@ -82,6 +84,10 @@ fetch_artifact "connect/msk-datagen/msk-generator.jar" "$MSK_URL"
 REDIS_URL=$(curl -s https://api.github.com/repos/redis-field-engineering/redis-kafka-connect/releases/latest | grep -Eo '"browser_download_url":\s*"[^"]+\.zip"' | head -1 | awk -F'"' '{print $4}' || true)
 fetch_artifact "redis.zip" "$REDIS_URL"
 [ "$DRY_RUN" -eq 0 ] && unzip -qq redis.zip -d connect/redis && rm redis.zip
+
+# Databricks Iceberg Sink
+fetch_artifact "iceberg-sink.zip" "$ICEBERG_KC_URL"
+[ "$DRY_RUN" -eq 0 ] && unzip -qq iceberg-sink.zip -d connect/iceberg-sink && rm iceberg-sink.zip
 
 # Debezium & OpenLineage Core
 fetch_artifact "deb.tar.gz" "https://repo1.maven.org/maven2/io/debezium/debezium-connector-postgres/${DEB_V}/debezium-connector-postgres-${DEB_V}-plugin.tar.gz"
@@ -110,8 +116,5 @@ echo "▶️  Fetching Shared Iceberg Dependencies..."
 make_dir "shared"
 fetch_artifact "shared/iceberg-aws-bundle.jar" "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_V}/iceberg-aws-bundle-${ICEBERG_V}.jar"
 fetch_artifact "shared/postgresql.jar" "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_V}/postgresql-${POSTGRES_V}.jar"
-# fetch_artifact "shared/hadoop-common.jar" "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/${HADOOP_V}/hadoop-common-${HADOOP_V}.jar"
-# fetch_artifact "shared/hadoop-aws.jar" "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_V}/hadoop-aws-${HADOOP_V}.jar"
-# fetch_artifact "shared/aws-java-sdk-bundle.jar" "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_V1}/aws-java-sdk-bundle-${AWS_SDK_V1}.jar"
 
 echo "✅ Script execution complete!"
