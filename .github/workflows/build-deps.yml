@@ -1,0 +1,68 @@
+name: Build DataML Dependencies Image
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+    paths:
+      - "resources/deps/**"
+      - ".github/workflows/build-deps.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "resources/deps/**"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/deps
+
+jobs:
+  validate:
+    name: Dry Run Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run Script Dry Run
+        run: |
+          chmod +x resources/deps/prep_dependencies.sh
+          ./resources/deps/prep_dependencies.sh --dry-run
+
+  build-and-push:
+    name: Build & Push
+    needs: validate
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name ==
+      'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: resources/deps
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME
+            }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME
+            }}:buildcache,mode=max
