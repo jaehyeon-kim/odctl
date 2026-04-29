@@ -26,8 +26,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Script Dry Run
         run: |
-          chmod +x resources/deps/prep_dependencies.sh
-          ./resources/deps/prep_dependencies.sh --dry-run
+          cd resources/deps
+          chmod +x build_connectors.sh fetch_dependencies.sh
+          ./build_connectors.sh --dry-run
+          ./fetch_dependencies.sh --dry-run
 
   build-and-push:
     name: Build & Push

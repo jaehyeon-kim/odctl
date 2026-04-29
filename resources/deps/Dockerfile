@@ -22,12 +22,10 @@ RUN chmod +x fetch_dependencies.sh && ./fetch_dependencies.sh
 FROM debian:bookworm-slim
 WORKDIR /workspace
 
-# 1. Copy Aiven JARs from Builder
-COPY --from=builder /build/aiven-jdbc/build/libs/*-all.jar /workspace/connect/aiven-jdbc/
-COPY --from=builder /build/aiven-s3/s3-sink-connector/build/libs/*-all.jar /workspace/connect/aiven-s3-sink/
-COPY --from=builder /build/aiven-s3/s3-source-connector/build/libs/*-all.jar /workspace/connect/aiven-s3-source/
+# 1. Copy Aiven JARs from Builder (Now correctly formatted from dist folder)
+COPY --from=builder /build/dist/ /workspace/connect/
 
-# 2. Copy ALL downloaded binaries from Downloader
+# 2. Copy ALL downloaded binaries from Downloader (Includes new Iceberg Sink)
 COPY --from=downloader /downloads/connect /workspace/connect/
 COPY --from=downloader /downloads/flink /workspace/flink/
 COPY --from=downloader /downloads/spark /workspace/spark/
