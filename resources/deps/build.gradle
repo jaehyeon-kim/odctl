@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://packages.confluent.io/maven/"
+    }
+}
+
+ext {
+    confluentVersion = '8.2.0'
+}
+
+dependencies {
+    implementation "io.confluent:kafka-connect-avro-converter:${confluentVersion}"
+    implementation "io.confluent:kafka-connect-protobuf-converter:${confluentVersion}"
+    implementation "io.confluent:kafka-connect-json-schema-converter:${confluentVersion}"
+    
+    // The logging binding
+    implementation "org.apache.logging.log4j:log4j-slf4j2-impl:2.23.1"
+}
+
+// A simple task to copy all resolved JARs into a single folder
+task copyDependencies(type: Copy) {
+    from configurations.runtimeClasspath
+    into "${buildDir}/confluent-converters"
+}
