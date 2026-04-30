@@ -38,16 +38,17 @@ RUN chmod +x *.sh \
 FROM debian:bookworm-slim
 WORKDIR /workspace
 
-# 1. Grab source-built Aiven JARs
+# Grab source-built Aiven JARs
 COPY --from=source-builder /build/dist/ /workspace/connect/
 
-# 2. Grab perfectly resolved Schema Converters
+# Grab perfectly resolved Schema Converters
 COPY --from=gradle-resolver /app/build/confluent-converters/ /workspace/connect/confluent-converters/
 
-# 3. Grab standalone Uber JARs & ZIPs
+# Grab standalone Uber JARs & ZIPs
 COPY --from=downloader /downloads/connect /workspace/connect/
 COPY --from=downloader /downloads/flink /workspace/flink/
 COPY --from=downloader /downloads/spark /workspace/spark/
+COPY --from=downloader /downloads/shared /workspace/shared/
 
 # Final cleanup
 RUN find /workspace -type f -name "*hadoop-core*" -delete
