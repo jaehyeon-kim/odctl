@@ -22,36 +22,55 @@ x-common-environment: &kafka_broker_common_env_vars # KRaft settings
 
 services:
   # ==========================================
-  # Open Source Schema Registry (Aiven Karapace)
+  # Apache Kafka Brokers
   # ==========================================
-  karapace:
-    image: ghcr.io/aiven-open/karapace:6.1.3
-    container_name: karapace
-    entrypoint:
-      - python3
-      - -m
-      - karapace
+  kafka-1:
+    image: apache/kafka:4.2.0
+    container_name: kafka-1
     ports:
-      - "8081:8081"
+      - "9092:9092"
+      - "29092:29092"
     networks:
       - dml
-    depends_on:
-      - kafka-1
-      - kafka-2
-      - kafka-3
+    profiles:
+      - kafka
     environment:
-      KARAPACE_KARAPACE_REGISTRY: true
-      KARAPACE_ADVERTISED_HOSTNAME: karapace
-      KARAPACE_ADVERTISED_PROTOCOL: http
-      KARAPACE_BOOTSTRAP_URI: kafka-1:19092,kafka-2:19093,kafka-3:19094
-      KARAPACE_PORT: 8081
-      KARAPACE_HOST: 0.0.0.0
-      KARAPACE_CLIENT_ID: karapace-0
-      KARAPACE_GROUP_ID: karapace
-      KARAPACE_MASTER_ELECTION_STRATEGY: highest
-      KARAPACE_MASTER_ELIGIBILITY: true
-      KARAPACE_TOPIC_NAME: _schema
-      KARAPACE_COMPATIBILITY: "BACKWARD"
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: CONTROLLER://kafka-1:19091,LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092,LISTENER_MINIKUBE://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,LISTENER_MINIKUBE://host.minikube.internal:29092
+      <<: *kafka_broker_common_env_vars
+
+  kafka-2:
+    image: apache/kafka:4.2.0
+    container_name: kafka-2
+    ports:
+      - "9093:9093"
+      - "29093:29093"
+    networks:
+      - dml
+    profiles:
+      - kafka
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: CONTROLLER://kafka-2:19091,LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9093,LISTENER_MINIKUBE://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093,LISTENER_MINIKUBE://host.minikube.internal:29093
+      <<: *kafka_broker_common_env_vars
+
+  kafka-3:
+    image: apache/kafka:4.2.0
+    container_name: kafka-3
+    ports:
+      - "9094:9094"
+      - "29094:29094"
+    networks:
+      - dml
+    profiles:
+      - kafka
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: CONTROLLER://kafka-3:19091,LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9094,LISTENER_MINIKUBE://0.0.0.0:29094
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094,LISTENER_MINIKUBE://host.minikube.internal:29094
+      <<: *kafka_broker_common_env_vars
 
   # ==========================================
   # Open Source Kafka Connect (Apache Native)
@@ -68,6 +87,8 @@ services:
       - "8083:8083"
     networks:
       - dml
+    profiles:
+      - kafka
     volumes:
       # Mount the optimized JARs from the init-deps container
       - dml-shared-deps:/mnt/shared-deps
@@ -99,6 +120,40 @@ services:
       start_period: 10s
 
   # ==========================================
+  # Open Source Schema Registry (Aiven Karapace)
+  # ==========================================
+  karapace:
+    image: ghcr.io/aiven-open/karapace:6.1.3
+    container_name: karapace
+    entrypoint:
+      - python3
+      - -m
+      - karapace
+    ports:
+      - "8081:8081"
+    networks:
+      - dml
+    profiles:
+      - kafka
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    environment:
+      KARAPACE_KARAPACE_REGISTRY: true
+      KARAPACE_ADVERTISED_HOSTNAME: karapace
+      KARAPACE_ADVERTISED_PROTOCOL: http
+      KARAPACE_BOOTSTRAP_URI: kafka-1:19092,kafka-2:19093,kafka-3:19094
+      KARAPACE_PORT: 8081
+      KARAPACE_HOST: 0.0.0.0
+      KARAPACE_CLIENT_ID: karapace-0
+      KARAPACE_GROUP_ID: karapace
+      KARAPACE_MASTER_ELECTION_STRATEGY: highest
+      KARAPACE_MASTER_ELIGIBILITY: true
+      KARAPACE_TOPIC_NAME: _schema
+      KARAPACE_COMPATIBILITY: "BACKWARD"
+
+  # ==========================================
   # Open Source Kafka UI (Kafbat)
   # ==========================================
   kafka-ui:
@@ -110,6 +165,8 @@ services:
       - "8080:8080"
     networks:
       - dml
+    profiles:
+      - kafka
     depends_on:
       connect:
         condition: service_healthy
@@ -123,51 +180,6 @@ services:
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: "http://karapace:8081"
       KAFKA_CLUSTERS_0_READONLY: "false"
       DYNAMIC_CONFIG_ENABLED: "true"
-
-  # ==========================================
-  # Apache Kafka Brokers
-  # ==========================================
-  kafka-1:
-    image: apache/kafka:4.2.0
-    container_name: kafka-1
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-    networks:
-      - dml
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_LISTENERS: CONTROLLER://kafka-1:19091,LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092,LISTENER_MINIKUBE://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,LISTENER_MINIKUBE://host.minikube.internal:29092
-      <<: *kafka_broker_common_env_vars
-
-  kafka-2:
-    image: apache/kafka:4.2.0
-    container_name: kafka-2
-    ports:
-      - "9093:9093"
-      - "29093:29093"
-    networks:
-      - dml
-    environment:
-      KAFKA_NODE_ID: 2
-      KAFKA_LISTENERS: CONTROLLER://kafka-2:19091,LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9093,LISTENER_MINIKUBE://0.0.0.0:29093
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093,LISTENER_MINIKUBE://host.minikube.internal:29093
-      <<: *kafka_broker_common_env_vars
-
-  kafka-3:
-    image: apache/kafka:4.2.0
-    container_name: kafka-3
-    ports:
-      - "9094:9094"
-      - "29094:29094"
-    networks:
-      - dml
-    environment:
-      KAFKA_NODE_ID: 3
-      KAFKA_LISTENERS: CONTROLLER://kafka-3:19091,LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9094,LISTENER_MINIKUBE://0.0.0.0:29094
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094,LISTENER_MINIKUBE://host.minikube.internal:29094
-      <<: *kafka_broker_common_env_vars
 
 networks:
   dml:
