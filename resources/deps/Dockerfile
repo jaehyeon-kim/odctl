@@ -1,56 +1,53 @@
 # ==========================================
-# Stage 1: Builder (Aiven Source Connectors)
+# Stage 1: Source Builder (Aiven Connectors)
 # ==========================================
-FROM debian:bookworm-slim AS builder
-
+FROM debian:bookworm-slim AS source-builder
 RUN apt-get update && apt-get install -y openjdk-17-jdk git curl maven unzip && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /build
-
 COPY build_connectors.sh .
-
 RUN chmod +x build_connectors.sh && ./build_connectors.sh
 
 # ==========================================
-# Stage 2: Downloader (All Pre-compiled Binaries)
+# Stage 2: Gradle Resolver (Schema Converters)
+# ==========================================
+FROM gradle:8.6-jdk17 AS gradle-resolver
+WORKDIR /app
+COPY build.gradle .
+# Let Gradle do the heavy transitive lifting!
+RUN gradle copyDependencies --no-daemon
+
+# ==========================================
+# Stage 3: Direct Downloader (Uber JARs & ZIPs)
 # ==========================================
 FROM debian:bookworm-slim AS downloader
-
 RUN apt-get update && apt-get install -y curl tar unzip && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /downloads
-
-# Copy all individual fetch scripts
+# Copy the standalone fetch scripts
+COPY fetch_standalone_plugins.sh .
 COPY fetch_flink_dependencies.sh .
 COPY fetch_spark_dependencies.sh .
-COPY fetch_shared_dependencies.sh .
-COPY fetch_schema_dependencies.sh .
-
-# Make them executable and run them
+# Execute the direct downloads
 RUN chmod +x *.sh \
-    && ./fetch_shared_dependencies.sh \
+    && ./fetch_standalone_plugins.sh \
     && ./fetch_flink_dependencies.sh \
-    && ./fetch_spark_dependencies.sh \
-    && ./fetch_schema_dependencies.sh
+    && ./fetch_spark_dependencies.sh
 
 # ==========================================
-# Stage 3: Final Ephemeral Runtime
+# Stage 4: Final Ephemeral Runtime
 # ==========================================
 FROM debian:bookworm-slim
-
 WORKDIR /workspace
 
-# Copy Aiven JARs from Builder
-COPY --from=builder /build/dist/ /workspace/connect/
+# 1. Grab source-built Aiven JARs
+COPY --from=source-builder /build/dist/ /workspace/connect/
 
-# Copy ALL downloaded binaries from Downloader
+# 2. Grab perfectly resolved Schema Converters
+COPY --from=gradle-resolver /app/build/confluent-converters/ /workspace/connect/confluent-converters/
+
+# 3. Grab standalone Uber JARs & ZIPs
 COPY --from=downloader /downloads/connect /workspace/connect/
 COPY --from=downloader /downloads/flink /workspace/flink/
 COPY --from=downloader /downloads/spark /workspace/spark/
-COPY --from=downloader /downloads/shared /workspace/shared/
-
-# Move Confluent Converters into the Connect plugin directory
-RUN mv /workspace/shared/confluent-converters /workspace/connect/confluent-converters
 
 # Final cleanup
 RUN find /workspace -type f -name "*hadoop-core*" -delete
