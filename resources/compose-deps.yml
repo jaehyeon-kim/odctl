@@ -1,0 +1,22 @@
+name: dml-deps
+
+services:
+  # ==========================================
+  # Init Container: Populates the Shared Volume
+  # ==========================================
+  init-deps:
+    image: open-dataml-stack/deps:${TAG:-local}
+    container_name: dml-init-deps
+    networks:
+      - dml
+    volumes:
+      # Mounts the named volume to the export path defined in the Dockerfile
+      - dml-shared-deps:/mnt/shared-deps/
+
+networks:
+  dml:
+    name: dml
+
+volumes:
+  dml-shared-deps:
+    name: dml-shared-deps
