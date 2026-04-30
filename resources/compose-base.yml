@@ -1,0 +1,195 @@
+name: dml-base
+
+services:
+  # ==========================================
+  # Unified Metadata & Vector DB (Postgres 18)
+  # ==========================================
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg18-trixie
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - dml
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dml}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      TZ: ${TZ:-UTC}
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=4"
+      - "-c"
+      - "max_wal_senders=4"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "log_statement=all"
+      # Marquez Requirements
+      - "-c"
+      - "pg_stat_statements.max=10000"
+      - "-c"
+      - "track_activity_query_size=2048"
+      # OpenMetadata Requirements
+      - "-c"
+      - "work_mem=10MB"
+    volumes:
+      # We use a .sh script so we can inject the dynamic POSTGRES_USER vars!
+      - ./postgres/01-init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh
+    healthcheck:
+      # Updated healthcheck to use the new default user and the 'vector' database
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d vector"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ==========================================
+  # Object Storage (SeaweedFS - Single Node)
+  # ==========================================
+  seaweed:
+    image: chrislusf/seaweedfs:4.22
+    container_name: seaweed
+    ports:
+      - "8333:8333" # S3 API
+      - "8888:8888" # Filer UI
+      - "9333:9333" # Master UI
+    networks:
+      dml:
+        aliases:
+          - warehouse.seaweed
+    volumes:
+      # Mount the S3 credentials configuration
+      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
+    # Explicitly tell the S3 gateway to enforce the config file
+    command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  seaweed-init:
+    image: chrislusf/seaweedfs:4.22
+    container_name: seaweed-init
+    depends_on:
+      seaweed:
+        condition: service_healthy
+    networks:
+      - dml
+    # Change the '>' to a '|' right here to preserve newlines!
+    entrypoint: |
+      sh -c "
+      echo '...waiting for SeaweedFS Master...'
+      sleep 2
+
+      BUCKETS='warehouse dml-dev flink-checkpoints flink-savepoints'
+      for bucket in \$$BUCKETS; do
+        echo \"--- Creating S3 bucket natively: \$$bucket ---\"
+        echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333
+      done
+
+      echo '--- SeaweedFS Native Setup Complete ---'
+      exit 0
+      "
+
+  # ==========================================
+  # Iceberg REST Catalog
+  # ==========================================
+  catalog:
+    image: tabulario/iceberg-rest:1.6.0
+    container_name: iceberg-catalog
+    ports:
+      - "8181:8181"
+    networks:
+      - dml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweed-init:
+        condition: service_completed_successfully
+    environment:
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://seaweed:8333
+      - CATALOG_S3_ACCESS_KEY_ID=user
+      - CATALOG_S3_SECRET_ACCESS_KEY=password
+
+      - CATALOG_S3_PATH_STYLE_ACCESS=true
+      - CATALOG_IO__S3_PATH_STYLE_ACCESS=true
+
+      # 2. The explicit AWS SDK overrides (just in case)
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=user
+      - AWS_SECRET_ACCESS_KEY=password
+
+      # Database Backend (Postgres)
+      - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
+      - CATALOG_URI=jdbc:postgresql://postgres:5432/iceberg
+      - CATALOG_JDBC_USER=${POSTGRES_USER:-user}
+      - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
+
+  # ==========================================
+  # [PROFILE: cache] Valkey (Redis Alternative)
+  # ==========================================
+  valkey:
+    image: valkey/valkey:9.1-alpine
+    container_name: valkey
+    ports:
+      - "6379:6379"
+    networks:
+      - dml
+    command:
+      - valkey-server
+      - --user
+      - default
+      - off
+      - --user
+      - user
+      - "on"
+      - ">password"
+      - "~*"
+      - "+@all"
+      - --save
+      - "60"
+      - "1"
+      - --loglevel
+      - warning
+
+  # ==========================================
+  # [PROFILE: ui] DbGate (DB Inspection)
+  # ==========================================
+  dbgate:
+    image: dbgate/dbgate:7.1.9
+    container_name: dbgate
+    ports:
+      - "8282:3000"
+    networks:
+      - dml
+    environment:
+      - CONNECTIONS=pg,vk
+      # PostgreSQL Auto-connection
+      - LABEL_pg=Postgres
+      - ENGINE_pg=postgres@dbgate-plugin-postgres
+      - SERVER_pg=postgres
+      - USER_pg=${POSTGRES_USER:-user}
+      - PASSWORD_pg=${POSTGRES_PASSWORD:-password}
+      # Valkey Auto-connection
+      - LABEL_vk=Cache
+      - ENGINE_vk=redis@dbgate-plugin-redis
+      - SERVER_vk=valkey
+      - USER_vk=user
+      - PASSWORD_vk=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  dml:
+    name: dml
+    external: true

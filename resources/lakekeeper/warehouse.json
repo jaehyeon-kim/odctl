@@ -1,0 +1,13 @@
+{
+  "warehouse-name": "default",
+  "project-id": "00000000-0000-0000-0000-000000000000",
+  "storage-profile": {
+    "type": "s3",
+    "bucket": "warehouse",
+    "endpoint": "http://seaweed:8333",
+    "region": "us-east-1",
+    "access-key-id": "user",
+    "secret-access-key": "password",
+    "path-style-access": true
+  }
+}
