@@ -11,6 +11,8 @@ services:
       - "5432:5432"
     networks:
       - dml
+    profiles:
+      - core
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-dml}
       POSTGRES_USER: ${POSTGRES_USER:-user}
@@ -30,19 +32,15 @@ services:
       - "pg_stat_statements.track=all"
       - "-c"
       - "log_statement=all"
-      # Marquez Requirements
       - "-c"
       - "pg_stat_statements.max=10000"
       - "-c"
       - "track_activity_query_size=2048"
-      # OpenMetadata Requirements
       - "-c"
       - "work_mem=10MB"
     volumes:
-      # We use a .sh script so we can inject the dynamic POSTGRES_USER vars!
       - ./postgres/01-init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh
     healthcheck:
-      # Updated healthcheck to use the new default user and the 'vector' database
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d vector"]
       interval: 5s
       timeout: 5s
@@ -63,6 +61,8 @@ services:
       dml:
         aliases:
           - warehouse.seaweed
+    profiles:
+      - core
     volumes:
       # Mount the S3 credentials configuration
       - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
@@ -82,7 +82,8 @@ services:
         condition: service_healthy
     networks:
       - dml
-    # Change the '>' to a '|' right here to preserve newlines!
+    profiles:
+      - core
     entrypoint: |
       sh -c "
       echo '...waiting for SeaweedFS Master...'
@@ -108,6 +109,8 @@ services:
       - "8181:8181"
     networks:
       - dml
+    profiles:
+      - core
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,6 +147,8 @@ services:
       - "6379:6379"
     networks:
       - dml
+    profiles:
+      - cache
     command:
       - valkey-server
       - --user
@@ -171,6 +176,8 @@ services:
       - "8282:3000"
     networks:
       - dml
+    profiles:
+      - ui
     environment:
       - CONNECTIONS=pg,vk
       # PostgreSQL Auto-connection
