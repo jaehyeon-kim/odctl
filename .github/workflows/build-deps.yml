@@ -27,9 +27,16 @@ jobs:
       - name: Run Script Dry Run
         run: |
           cd resources/deps
-          chmod +x build_connectors.sh fetch_dependencies.sh
+          # Make all scripts executable
+          chmod +x *.sh
+
+          # Run the Aiven builder dry-run
           ./build_connectors.sh --dry-run
-          ./fetch_dependencies.sh --dry-run
+
+          # Run the standalone plugin and Uber-JAR fetchers dry-runs
+          ./fetch_standalone_plugins.sh --dry-run
+          ./fetch_flink_dependencies.sh --dry-run
+          ./fetch_spark_dependencies.sh --dry-run
 
   build-and-push:
     name: Build & Push
