@@ -1,0 +1,93 @@
+name: dml-flink
+
+x-flink-common: &flink-common
+  networks:
+    - dml
+  volumes:
+    - ./flink/flink1-conf.yaml:/opt/flink/conf/config.yaml:ro
+    - dml-shared-deps:/mnt/shared-deps:ro
+
+x-flink1-base: &flink1-base
+  <<: *flink-common
+  image: flink:1.20.3-java17
+  profiles:
+    - flink1
+  environment:
+    TZ: ${TZ:-UTC}
+  entrypoint:
+    - /bin/bash
+    - -c
+    - |
+      # Load dependencies
+      mkdir -p /opt/flink/usrlib
+      cp /mnt/shared-deps/shared/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+      cp /mnt/shared-deps/flink/1.x/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+      cp /mnt/shared-deps/connect/confluent-converters/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+
+      exec /docker-entrypoint.sh "$$@"
+    - --
+
+services:
+  # ------------------------------------------
+  # FLINK 1.x SERVICES (Profile: flink1)
+  # ------------------------------------------
+  jobmanager-1:
+    <<: *flink1-base
+    container_name: flink-jobmanager-1
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/config"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  taskmanager-1-a:
+    <<: *flink1-base
+    container_name: flink-taskmanager-1-a
+    command: taskmanager
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+  taskmanager-1-b:
+    <<: *flink1-base
+    container_name: flink-taskmanager-1-b
+    command: taskmanager
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+  taskmanager-1-c:
+    <<: *flink1-base
+    container_name: flink-taskmanager-1-c
+    command: taskmanager
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+  sql-gateway-1:
+    <<: *flink1-base
+    container_name: flink-sql-gateway-1
+    command: >
+      bin/sql-gateway.sh start-foreground
+      -Dsql-gateway.endpoint.rest.address=0.0.0.0
+      -Dsql-gateway.endpoint.rest.port=8083
+      -Djobmanager.rpc.address=jobmanager-1
+      -Drest.address=jobmanager-1
+    ports:
+      - "8083:8083" # REST API
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+networks:
+  dml:
+    name: dml
+    external: true
+
+volumes:
+  dml-shared-deps:
+    name: dml-shared-deps
+    external: true
