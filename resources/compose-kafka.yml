@@ -125,7 +125,7 @@ services:
       DYNAMIC_CONFIG_ENABLED: "true"
 
   # ==========================================
-  # Open Source Apache Kafka 4.2 Brokers
+  # Apache Kafka Brokers
   # ==========================================
   kafka-1:
     image: apache/kafka:4.2.0
