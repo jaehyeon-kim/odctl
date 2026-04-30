@@ -9,6 +9,8 @@ services:
     container_name: dml-init-deps
     networks:
       - dml
+    profiles:
+      - deps
     volumes:
       # Mounts the named volume to the export path defined in the Dockerfile
       - dml-shared-deps:/mnt/shared-deps/
