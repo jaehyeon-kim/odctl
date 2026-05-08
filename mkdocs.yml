@@ -1,0 +1,13 @@
+site_name: DML CLI
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+
+plugins:
+  - search
