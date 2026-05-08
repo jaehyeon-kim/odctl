@@ -4,12 +4,12 @@ x-flink-common: &flink-common
   networks:
     - dml
   volumes:
-    - ./flink/flink1-conf.yaml:/opt/flink/conf/config.yaml:ro
+    - ./flink/flink1-conf.yml:/opt/flink/conf/config.yaml:ro
     - dml-shared-deps:/mnt/shared-deps:ro
 
 x-flink1-base: &flink1-base
   <<: *flink-common
-  image: flink:1.20.3-java17
+  image: flink:1.20.4-java17
   profiles:
     - flink1
   environment:
