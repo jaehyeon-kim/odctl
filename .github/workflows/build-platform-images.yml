@@ -5,12 +5,12 @@ on:
     branches: ["main"]
     tags: ["v*"]
     paths:
-      - "resources/docker/**"
+      - "src/dml/resources/docker/**"
       - ".github/workflows/build-platform-images.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "resources/docker/**"
+      - "src/dml/resources/docker/**"
   workflow_dispatch:
 
 env:
@@ -34,7 +34,7 @@ jobs:
       - name: Build Dry Run
         uses: docker/build-push-action@v5
         with:
-          context: resources/docker/${{ matrix.component }}
+          context: src/dml/resources/docker/${{ matrix.component }}
           push: false
           # Use the cache to speed up PR checks, but don't write to it
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}:buildcache
@@ -77,7 +77,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: resources/docker/${{ matrix.component }}
+          context: src/dml/resources/docker/${{ matrix.component }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

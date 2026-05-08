@@ -2,15 +2,15 @@ name: Build DataML Dependencies Image
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ "v*" ]
+    branches: ["main"]
+    tags: ["v*"]
     paths:
-      - "resources/deps/**"
+      - "src/dml/resources/deps/**"
       - ".github/workflows/build-deps.yml"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - "resources/deps/**"
+      - "src/dml/resources/deps/**"
   workflow_dispatch:
 
 env:
@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Script Dry Run
         run: |
-          cd resources/deps
+          cd src/dml/resources/deps
           # Make all scripts executable
           chmod +x *.sh
 
@@ -41,8 +41,7 @@ jobs:
   build-and-push:
     name: Build & Push
     needs: validate
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name ==
-      'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -67,11 +66,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: resources/deps
+          context: src/dml/resources/deps
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME
-            }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME
-            }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
