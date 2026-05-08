@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from python_on_whales import DockerClient
 from dml.config import get_compose_path
 
@@ -13,25 +13,32 @@ def is_docker_running() -> bool:
         return False
 
 
-def get_stack_ports(compose_filename: str, profiles: List[str]) -> List[str]:
-    """Resolves host port mappings via Docker Compose config."""
+def get_stack_details(
+    compose_filename: str, profiles: List[str]
+) -> Tuple[List[str], List[str]]:
+    """Resolves services and host port mappings via Docker Compose config."""
     path = get_compose_path(compose_filename)
     if not path.exists():
-        return ["File Error"]
+        return ["File Error"], ["File Error"]
 
     stack_client = DockerClient(
-        host="unix:///var/run/docker.sock", compose_files=[str(path)]
+        host="unix:///var/run/docker.sock",
+        compose_files=[str(path)],
+        compose_profiles=profiles,
     )
 
     try:
-        cfg = stack_client.compose.config(profiles=profiles)
+        cfg = stack_client.compose.config()
+        services = []
         ports = []
         if cfg and cfg.services:
             for name, service in cfg.services.items():
+                services.append(name)
                 if service.ports:
                     for p in service.ports:
                         if p.published:
                             ports.append(f"{name}:{p.published}")
-        return sorted(list(set(ports)))
+        return sorted(list(set(services))), sorted(list(set(ports)))
     except Exception as e:
-        return [f"Err: {type(e).__name__}"]
+        err = f"Err: {type(e).__name__}"
+        return [err], [err]
