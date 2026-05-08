@@ -18,55 +18,54 @@ capacities:
 stacks:
   base:
     file: "compose-base.yml"
-    description: "Core unified database, object storage, and caching layer."
+    description: "Core infrastructure for unified metadata, object storage, and caching."
     profiles: ["core"]
     capacities: []
 
   kafka:
     file: "compose-kafka.yml"
-    description: "Event Streaming & Schema Registry."
+    description: "Distributed event streaming and schema registry."
     profiles: ["kafka"]
     capacities: ["messaging"]
 
   flink:
     file: "compose-flink.yml"
-    description: "Stateful Stream Processing Engine."
+    description: "Stateful, real-time stream processing engine."
     profiles: ["flink1"]
     capacities: ["stream_processing"]
-    depends_on: ["kafka"]
 
   spark:
     file: "compose-spark.yml"
-    description: "Distributed Batch & Micro-batch Data Processing."
+    description: "Distributed batch and micro-batch data processing."
     profiles: ["spark"]
     capacities: ["data_processing"]
 
   store:
     file: "compose-store.yml"
-    description: "Real-Time OLAP (ClickHouse) and Streaming Storage (Fluss)."
+    description: "Real-time OLAP analytics and streaming storage."
     profiles: ["clickhouse", "fluss"]
     capacities: ["analytics", "messaging"]
 
   analytics:
     file: "compose-analytics.yml"
-    description: "Federated SQL Engine (Trino), BI (Metabase), and IDE (Jupyter)."
+    description: "Federated SQL engine, BI dashboards, and data science IDE."
     profiles: ["trino", "metabase", "jupyterlab"]
     capacities: ["analytics"]
 
   mlops:
     file: "compose-mlops.yml"
-    description: "ML Experiment Tracking (MLflow), Feature Store (Feast), and Orchestration (Airflow)."
+    description: "Workflow orchestration, feature store, and experiment tracking."
     profiles: ["airflow", "mlflow", "feast"]
     capacities: ["mlops", "orchestration"]
 
   obsv:
     file: "compose-obsv.yml"
-    description: "Telemetry (Prometheus/Grafana) and Lineage (Marquez)."
+    description: "System telemetry, monitoring, and data lineage."
     profiles: ["lineage", "telemetry"]
     capacities: ["observability", "lineage"]
 
   metadata:
     file: "compose-metadata.yml"
-    description: "Data Catalog and Governance (OpenMetadata)."
+    description: "Data catalog, discovery, and governance platform."
     profiles: ["metadata"]
     capacities: ["metadata"]
