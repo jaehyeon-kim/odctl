@@ -1,1 +1,88 @@
 name: dml-spark
+
+x-spark-base: &spark-base
+  image: ghcr.io/jaehyeon-kim/open-dataml-stack/spark:${TAG:-local}
+  networks:
+    - dml
+  profiles:
+    - spark
+  volumes:
+    - dml-shared-deps:/mnt/shared-deps:ro
+    - spark-events-data:/tmp/spark-events
+    - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+    - ./spark/log4j2.properties:/opt/spark/conf/log4j2.properties:ro
+  environment:
+    TZ: ${TZ:-UTC}
+    SPARK_DIST_CLASSPATH: "/mnt/shared-deps/shared/*:/mnt/shared-deps/spark/*"
+
+services:
+  # ==========================================
+  # Spark Master (Cluster Coordinator)
+  # ==========================================
+  spark-master:
+    <<: *spark-base
+    container_name: spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
+    ports:
+      - "8080:8080" # Web UI
+      - "7077:7077" # RPC
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Spark Workers (Scalable Compute Nodes)
+  # ==========================================
+  spark-worker-1:
+    <<: *spark-base
+    container_name: spark-worker-1
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "8081:8081" # Worker 1 UI
+
+  spark-worker-2:
+    <<: *spark-base
+    container_name: spark-worker-2
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "8082:8081" # Worker 2 UI mapped to host 8082
+
+  spark-worker-3:
+    <<: *spark-base
+    container_name: spark-worker-3
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "8083:8081" # Worker 3 UI mapped to host 8083
+
+  # ==========================================
+  # Spark History Server
+  # ==========================================
+  spark-history:
+    <<: *spark-base
+    container_name: spark-history
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+    ports:
+      - "18080:18080" # History Server UI
+
+networks:
+  dml:
+    name: dml
+    external: true
+
+volumes:
+  dml-shared-deps:
+    name: dml-shared-deps
+    external: true
+  spark-events-data:
+    name: spark-events-data
