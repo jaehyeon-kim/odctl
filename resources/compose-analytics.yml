@@ -1,1 +1,34 @@
 name: dml-analytics
+
+services:
+  # ==========================================
+  # [PROFILE: jupyterlab] Data Science IDE
+  # ==========================================
+  jupyterlab:
+    build:
+      context: ./docker/jupyter
+      dockerfile: Dockerfile
+    image: open-dataml-stack/jupyterlab:local
+    container_name: jupyterlab
+    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
+    profiles:
+      - jupyterlab
+    networks:
+      - dml
+    ports:
+      - "8888:8888"
+    environment:
+      # Automatically enable the modern JupyterLab UI
+      JUPYTER_ENABLE_LAB: "yes"
+      # Pre-configure connections so notebooks work out-of-the-box
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+      AWS_DEFAULT_REGION: us-east-1
+      # Optional: Grant sudo access inside the container for quick experiments
+      GRANT_SUDO: "yes"
+
+networks:
+  dml:
+    name: dml
+    external: true
