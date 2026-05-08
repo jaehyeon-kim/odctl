@@ -2,7 +2,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from dml.registry import load_registry
-from dml.docker import is_docker_running, get_stack_details
+from dml.docker import (
+    is_docker_running,
+    get_stack_details,
+    pull_stack_images,
+    launch_stack,
+)
+from dml.workspace import init_workspace
 
 app = typer.Typer(
     help="DML CLI: Semantic Orchestrator for DataML Stacks",
@@ -75,12 +81,50 @@ def list_stacks(
 
 
 @app.command()
+def init():
+    """Initialize a local .dml workspace for custom configurations."""
+    init_workspace()
+    console.print(
+        "[bold green]✓ Workspace initialized![/bold green] You can now edit any file in ./.dml/"
+    )
+
+
+@app.command()
 def up(stack_name: str):
-    """Launch a stack (Placeholder for Ticket 3)."""
+    """Launch a DataML stack."""
     if not is_docker_running():
         console.print("[bold red]Error:[/bold red] Docker is not reachable.")
         raise typer.Exit(1)
-    console.print(f"🚀 Preparing {stack_name}...")
+
+    registry = load_registry()
+    if stack_name not in registry.stacks:
+        console.print(f"[bold red]Error:[/bold red] Stack '{stack_name}' not found.")
+        raise typer.Exit(1)
+
+    stack = registry.stacks[stack_name]
+
+    # Boot Sequencing: Ensure base is up if we are starting something else
+    if stack_name != "base":
+        console.print("📦 Checking [cyan]base[/cyan] infrastructure layer...")
+        base_stack = registry.stacks["base"]
+
+        # Pull and launch base
+        pull_stack_images(base_stack.file, base_stack.profiles)
+        launch_stack(base_stack.file, base_stack.profiles)
+        console.print("[green]✓ Base layer is ready.[/green]")
+
+    # Pull Target Images
+    console.print(f"📥 Pulling images for [bold cyan]{stack_name}[/bold cyan]...")
+    pull_stack_images(stack.file, stack.profiles)
+
+    # Launch Target Stack
+    console.print(f"🚀 Launching [bold cyan]{stack_name}[/bold cyan]...")
+    try:
+        launch_stack(stack.file, stack.profiles)
+        console.print(f"[bold green]✓ {stack_name} successfully started![/bold green]")
+    except Exception as e:
+        console.print(f"[bold red]Failed to start {stack_name}:[/bold red] {e}")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
