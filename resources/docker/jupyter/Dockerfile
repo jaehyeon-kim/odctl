@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir \
     'dataclasses-avroschema[pydantic]' \
     'pyiceberg[s3]>=0.8.0' \
     'feast[redis,aws,spark,postgres,clickhouse]' \
-    'mlflow>=2.10.0' \
+    'mlflow~=3.12.0' \
     'clickhouse-connect' \
     'psycopg2-binary' \
     'trino' \
