@@ -1,12 +1,34 @@
+import os
+import platform
 from typing import List, Tuple
+
 from python_on_whales import DockerClient
+
 from dml.config import get_compose_path
 
-# Initialize with the explicit Unix socket for Linux stability
-client = DockerClient(host="unix:///var/run/docker.sock")
+
+def get_docker_host() -> str:
+    """Detects the correct Docker host based on the OS or environment variables."""
+    # 1. Priority: Manual environment override
+    env_host = os.getenv("DOCKER_HOST")
+    if env_host:
+        return env_host
+
+    # 2. OS-specific defaults
+    system = platform.system()
+    if system == "Windows":
+        return "npipe:////./pipe/docker_engine"
+
+    # macOS (Darwin) and Linux default
+    return "unix:///var/run/docker.sock"
+
+
+# Global client used for basic checks (like ping)
+client = DockerClient(host=get_docker_host())
 
 
 def is_docker_running() -> bool:
+    """Checks if the Docker daemon is reachable."""
     try:
         return client.ping()
     except Exception:
@@ -22,7 +44,7 @@ def get_stack_details(
         return ["File Error"], ["File Error"]
 
     stack_client = DockerClient(
-        host="unix:///var/run/docker.sock",
+        host=get_docker_host(),
         compose_files=[str(path)],
         compose_profiles=profiles,
     )
@@ -47,18 +69,24 @@ def get_stack_details(
 def pull_stack_images(compose_filename: str, profiles: List[str]):
     """Pulls required images for the stack."""
     path = get_compose_path(compose_filename)
-    stack_client = DockerClient(
-        host="unix:///var/run/docker.sock", compose_files=[str(path)]
-    )
-    # python-on-whales handles the output streaming automatically!
+    stack_client = DockerClient(host=get_docker_host(), compose_files=[str(path)])
+    # python-on-whales handles the output streaming automatically
     stack_client.compose.pull(profiles=profiles)
 
 
 def launch_stack(compose_filename: str, profiles: List[str]):
     """Starts the stack via docker compose up."""
     path = get_compose_path(compose_filename)
-    stack_client = DockerClient(
-        host="unix:///var/run/docker.sock", compose_files=[str(path)]
-    )
-    # detach=True runs it in the background, wait=True waits for healthchecks
+    stack_client = DockerClient(host=get_docker_host(), compose_files=[str(path)])
+    # detach=True runs in background, wait=True waits for healthchecks
     stack_client.compose.up(profiles=profiles, detach=True, wait=True)
+
+
+def stop_stack(
+    compose_filename: str, profiles: List[str], remove_volumes: bool = False
+):
+    """Stops and removes containers and networks for a stack."""
+    path = get_compose_path(compose_filename)
+    stack_client = DockerClient(host=get_docker_host(), compose_files=[str(path)])
+    # volumes=True will remove named volumes defined in the compose file
+    stack_client.compose.down(profiles=profiles, volumes=remove_volumes)

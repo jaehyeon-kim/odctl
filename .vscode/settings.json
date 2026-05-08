@@ -8,13 +8,16 @@
   "[python]": {
     "editor.tabSize": 4,
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "charliermarsh.ruff"
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": null,
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false
   },
   "python.terminal.activateEnvironment": false,
-  "[kotlin]": {
-    "editor.defaultFormatter": "fwcd.kotlin"
-  },
-  "terminal.integrated.suggest.enabled": false,
-  "java.server.launchMode": "LightWeight",
-  "java.errors.incompleteClasspath.severity": "ignore"
+  "terminal.integrated.suggest.enabled": false
 }
