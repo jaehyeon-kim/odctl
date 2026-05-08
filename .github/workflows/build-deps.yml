@@ -2,13 +2,13 @@ name: Build DataML Dependencies Image
 
 on:
   push:
-    branches: ["main"]
-    tags: ["v*"]
+    branches: [ "main" ]
+    tags: [ "v*" ]
     paths:
       - "resources/deps/**"
       - ".github/workflows/build-deps.yml"
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
     paths:
       - "resources/deps/**"
   workflow_dispatch:
@@ -71,5 +71,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME
+            }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME
+            }}:buildcache,mode=max
