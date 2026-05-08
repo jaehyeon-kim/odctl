@@ -1,18 +1,23 @@
+from typing import Optional
+
 import typer
 from rich.console import Console
 from rich.table import Table
-from dml.registry import load_registry
+
 from dml.docker import (
-    is_docker_running,
     get_stack_details,
-    pull_stack_images,
+    is_docker_running,
     launch_stack,
+    pull_stack_images,
+    stop_stack,
 )
+from dml.registry import load_registry
 from dml.workspace import init_workspace
 
 app = typer.Typer(
     help="DML CLI: Semantic Orchestrator for DataML Stacks",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 console = Console()
 
@@ -124,6 +129,57 @@ def up(stack_name: str):
         console.print(f"[bold green]✓ {stack_name} successfully started![/bold green]")
     except Exception as e:
         console.print(f"[bold red]Failed to start {stack_name}:[/bold red] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def down(
+    stack_name: Optional[str] = typer.Argument(None, help="Stack to stop"),
+    all: bool = typer.Option(
+        False, "--all", help="Stop all stacks defined in registry"
+    ),
+    volumes: bool = typer.Option(
+        False, "--volumes", "-v", help="Remove named volumes (wipes data!)"
+    ),
+):
+    """Stop and remove stack containers and networks."""
+    if not is_docker_running():
+        console.print("[bold red]Error:[/bold red] Docker is not reachable.")
+        raise typer.Exit(1)
+
+    registry = load_registry()
+
+    # 1. Handle "Stop All" logic
+    if all:
+        # Reverse the order so dependent stacks stop before the base layer
+        stack_ids = list(registry.stacks.keys())[::-1]
+        console.print("[bold yellow]Stopping all stacks...[/bold yellow]")
+        for s_id in stack_ids:
+            stack = registry.stacks[s_id]
+            console.print(f"⠋ Stopping {s_id}...")
+            stop_stack(stack.file, stack.profiles, remove_volumes=volumes)
+        console.print("[bold green]✓ All stacks stopped.[/bold green]")
+        return
+
+    # 2. Handle single stack logic
+    if not stack_name:
+        console.print(
+            "[bold red]Error:[/bold red] Please specify a stack name or use --all"
+        )
+        raise typer.Exit(1)
+
+    if stack_name not in registry.stacks:
+        console.print(f"[bold red]Error:[/bold red] Stack '{stack_name}' not found.")
+        raise typer.Exit(1)
+
+    stack = registry.stacks[stack_name]
+    console.print(f"🛑 Stopping [bold cyan]{stack_name}[/bold cyan]...")
+
+    try:
+        stop_stack(stack.file, stack.profiles, remove_volumes=volumes)
+        console.print(f"[bold green]✓ {stack_name} stopped successfully.[/bold green]")
+    except Exception as e:
+        console.print(f"[bold red]Failed to stop {stack_name}:[/bold red] {e}")
         raise typer.Exit(1)
 
 

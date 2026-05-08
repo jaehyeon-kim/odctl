@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "flink"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "jobmanager-1:9249"
+          - "taskmanager-1-a:9249"
+          - "taskmanager-1-b:9249"
+          - "taskmanager-1-c:9249"
+
+  - job_name: "clickhouse"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["clickhouse:9363"]
