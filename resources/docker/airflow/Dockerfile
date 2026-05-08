@@ -2,7 +2,8 @@ FROM apache/airflow:3.2.1
 
 # Install Lean DataML SDKs and Providers
 # Pinning PySpark strictly to 4.0.x for Iceberg compatibility
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir \
     apache-airflow-providers-apache-flink \
     apache-airflow-providers-amazon \
     apache-airflow-providers-postgres \
