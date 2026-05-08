@@ -6,7 +6,7 @@ USER root
 # Only install libraries required for distributed UDFs
 RUN pip install --no-cache-dir \
     'feast[clickhouse,redis,aws,postgres]' \
-    'mlflow>=2.10.0' \
+    'mlflow~=3.12.0' \
     'boto3'
 
 # Revert to the official Apache Spark non-root user ID
