@@ -41,7 +41,7 @@ services:
     volumes:
       - ./postgres/01-init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d metabase"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d vector"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -89,7 +89,7 @@ services:
       echo '...waiting for SeaweedFS Master...'
       sleep 2
 
-      BUCKETS='warehouse dml-dev flink-checkpoints flink-savepoints airflow'
+      BUCKETS='warehouse dml-dev flink-checkpoints flink-savepoints'
       for bucket in \$$BUCKETS; do
         echo \"--- Creating S3 bucket natively: \$$bucket ---\"
         echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333
@@ -138,7 +138,7 @@ services:
       - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
 
   # ==========================================
-  # [PROFILE: core] Valkey (Redis Alternative)
+  # [PROFILE: cache] Valkey (Redis Alternative)
   # ==========================================
   valkey:
     image: valkey/valkey:9.1-alpine
@@ -148,7 +148,7 @@ services:
     networks:
       - dml
     profiles:
-      - core
+      - cache
     command:
       - valkey-server
       - --user
@@ -167,7 +167,7 @@ services:
       - warning
 
   # ==========================================
-  # [PROFILE: core] DbGate (DB Inspection)
+  # [PROFILE: ui] DbGate (DB Inspection)
   # ==========================================
   dbgate:
     image: dbgate/dbgate:7.1.9
@@ -177,9 +177,9 @@ services:
     networks:
       - dml
     profiles:
-      - core
+      - ui
     environment:
-      - CONNECTIONS=pg,vk,ch
+      - CONNECTIONS=pg,vk
       # PostgreSQL Auto-connection
       - LABEL_pg=Postgres
       - ENGINE_pg=postgres@dbgate-plugin-postgres
@@ -190,14 +190,8 @@ services:
       - LABEL_vk=Cache
       - ENGINE_vk=redis@dbgate-plugin-redis
       - SERVER_vk=valkey
-      - USER_vk=${VALKEY_USER:-user}
-      - PASSWORD_vk=${VALKEY_PASSWORD:-password}
-      # ClickHouse Auto-connection
-      - LABEL_ch=ClickHouse
-      - ENGINE_ch=clickhouse@dbgate-plugin-clickhouse
-      - URL_ch=http://clickhouse:8123
-      - USER_ch=${CLICKHOUSE_USER:-user}
-      - PASSWORD_ch=${CLICKHOUSE_PASSWORD:-password}
+      - USER_vk=user
+      - PASSWORD_vk=password
     depends_on:
       postgres:
         condition: service_healthy
