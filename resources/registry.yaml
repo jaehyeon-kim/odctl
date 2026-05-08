@@ -1,0 +1,72 @@
+# ==========================================
+# Semantic Capacities (The Engine's Vocabulary)
+# ==========================================
+capacities:
+  data_processing: "batch processing distributed computing large scale data transformation pipelines"
+  stream_processing: "real-time stream processing stateful streaming continuous data flows"
+  analytics: "querying dashboards OLAP BI SQL reporting data visualization"
+  mlops: "machine learning training pipelines model serving feature store experiments tracking"
+  messaging: "event delivery pub sub queues streaming storage message broker"
+  orchestration: "workflow scheduling DAGs pipeline execution automation"
+  metadata: "data catalog governance discovery search data dictionary"
+  observability: "metrics monitoring alerting grafana prometheus telemetry dashboards"
+  lineage: "data lineage provenance data flow troubleshooting tracing marquez"
+
+# ==========================================
+# Stack Registry (The Execution Map)
+# ==========================================
+stacks:
+  base:
+    file: "compose-base.yml"
+    description: "Core unified database, object storage, and caching layer."
+    profiles: ["core"]
+    capacities: []
+
+  kafka:
+    file: "compose-kafka.yml"
+    description: "Event Streaming & Schema Registry."
+    profiles: ["kafka"]
+    capacities: ["messaging"]
+
+  flink:
+    file: "compose-flink.yml"
+    description: "Stateful Stream Processing Engine."
+    profiles: ["flink1"]
+    capacities: ["stream_processing"]
+    depends_on: ["kafka"]
+
+  spark:
+    file: "compose-spark.yml"
+    description: "Distributed Batch & Micro-batch Data Processing."
+    profiles: ["spark"]
+    capacities: ["data_processing"]
+
+  store:
+    file: "compose-store.yml"
+    description: "Real-Time OLAP (ClickHouse) and Streaming Storage (Fluss)."
+    profiles: ["clickhouse", "fluss"]
+    capacities: ["analytics", "messaging"]
+
+  analytics:
+    file: "compose-analytics.yml"
+    description: "Federated SQL Engine (Trino), BI (Metabase), and IDE (Jupyter)."
+    profiles: ["trino", "metabase", "jupyterlab"]
+    capacities: ["analytics"]
+
+  mlops:
+    file: "compose-mlops.yml"
+    description: "ML Experiment Tracking (MLflow), Feature Store (Feast), and Orchestration (Airflow)."
+    profiles: ["airflow", "mlflow", "feast"]
+    capacities: ["mlops", "orchestration"]
+
+  obsv:
+    file: "compose-obsv.yml"
+    description: "Telemetry (Prometheus/Grafana) and Lineage (Marquez)."
+    profiles: ["lineage", "telemetry"]
+    capacities: ["observability", "lineage"]
+
+  metadata:
+    file: "compose-metadata.yml"
+    description: "Data Catalog and Governance (OpenMetadata)."
+    profiles: ["metadata"]
+    capacities: ["metadata"]
