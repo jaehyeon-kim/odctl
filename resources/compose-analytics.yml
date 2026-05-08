@@ -8,7 +8,7 @@ services:
     build:
       context: ./docker/jupyter
       dockerfile: Dockerfile
-    image: open-dataml-stack/jupyterlab:local
+    image: ghcr.io/jaehyeon-kim/open-dataml-stack/jupyter:${TAG:-local}
     container_name: jupyterlab
     command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
     profiles:
@@ -18,15 +18,65 @@ services:
     ports:
       - "8888:8888"
     environment:
-      # Automatically enable the modern JupyterLab UI
       JUPYTER_ENABLE_LAB: "yes"
-      # Pre-configure connections so notebooks work out-of-the-box
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      GRANT_SUDO: "yes"
+      # Credentials
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
       AWS_DEFAULT_REGION: us-east-1
-      # Optional: Grant sudo access inside the container for quick experiments
-      GRANT_SUDO: "yes"
+      # Global Connection Strings for Notebooks
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      TRINO_URL: http://user@trino:8080
+      CLICKHOUSE_URL: clickhouse://user:password@clickhouse:8123/dml
+      POSTGRES_URL: postgresql://user:password@postgres:5432/dml
+      VALKEY_URL: redis://user:password@valkey:6379/0
+
+  # ==========================================
+  # [PROFILE: trino] Federated SQL Engine
+  # ==========================================
+  trino:
+    image: trinodb/trino:480
+    container_name: trino
+    profiles:
+      - trino
+    networks:
+      - dml
+    ports:
+      - "8080:8080" # Trino UI & JDBC connection port
+    volumes:
+      # Mount the static catalogs
+      - ./trino/catalog:/etc/trino/catalog:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # [PROFILE: metabase] BI & Dashboarding
+  # ==========================================
+  metabase:
+    image: metabase/metabase:v0.61.x
+    container_name: metabase
+    profiles:
+      - metabase
+    networks:
+      - dml
+    ports:
+      - "3000:3000"
+    environment:
+      # Map Metabase's internal state to our unified Postgres instance
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER:-user}
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-password}
+      MB_DB_HOST: postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   dml:
