@@ -23,8 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow]
-        # component: [airflow, jupyter, feast, spark, mlflow]
+        component: [airflow, jupyter, feast, spark, mlflow]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
