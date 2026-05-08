@@ -5,7 +5,7 @@ services:
   # Init Container: Populates the Shared Volume
   # ==========================================
   init-deps:
-    image: ghcr.io/jaehyeon-kim/open-dataml-stack/deps:${TAG:-local}
+    image: open-dataml-stack/deps:${TAG:-local}
     container_name: dml-init-deps
     networks:
       - dml
