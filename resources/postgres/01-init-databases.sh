@@ -19,15 +19,20 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 
     ALTER DATABASE "$POSTGRES_DB" SET search_path TO cdc, dev, public;
 
-    -- Standardized Databases (Removing lakekeeper, adding iceberg)
+    -- Standardized Databases
     CREATE DATABASE marquez OWNER "$POSTGRES_USER";
     CREATE DATABASE omt OWNER "$POSTGRES_USER";
     CREATE DATABASE vector OWNER "$POSTGRES_USER";
     CREATE DATABASE iceberg OWNER "$POSTGRES_USER";
+
+    -- MLOps & Analytics Databases
+    CREATE DATABASE airflow OWNER "$POSTGRES_USER";
+    CREATE DATABASE mlflow OWNER "$POSTGRES_USER";
+    CREATE DATABASE metabase OWNER "$POSTGRES_USER";
 EOSQL
 
 # Loop through and add pg_stat_statements to all
-for db in marquez omt vector iceberg; do
+for db in marquez omt vector iceberg airflow mlflow metabase; do
     echo "Configuring database: $db"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$db" <<-EOSQL
         CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
