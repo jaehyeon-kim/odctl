@@ -1,7 +1,7 @@
 import yaml
 from typing import Dict, List
 from pydantic import BaseModel, Field
-from dml.config import REGISTRY_PATH
+from dml.config import get_registry_path
 
 
 class StackConfig(BaseModel):
@@ -18,11 +18,13 @@ class Registry(BaseModel):
 
 
 def load_registry() -> Registry:
-    """Loads and validates the registry.yaml file."""
-    if not REGISTRY_PATH.exists():
-        raise FileNotFoundError(f"Registry file not found at {REGISTRY_PATH}")
+    """Loads and validates the registry.yaml file from the active directory."""
+    path = get_registry_path()
 
-    with open(REGISTRY_PATH, "r") as f:
+    if not path.exists():
+        raise FileNotFoundError(f"Registry file not found at {path}")
+
+    with open(path, "r") as f:
         data = yaml.safe_load(f)
 
     return Registry(**data)

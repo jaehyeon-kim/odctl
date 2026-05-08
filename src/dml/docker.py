@@ -42,3 +42,23 @@ def get_stack_details(
     except Exception as e:
         err = f"Err: {type(e).__name__}"
         return [err], [err]
+
+
+def pull_stack_images(compose_filename: str, profiles: List[str]):
+    """Pulls required images for the stack."""
+    path = get_compose_path(compose_filename)
+    stack_client = DockerClient(
+        host="unix:///var/run/docker.sock", compose_files=[str(path)]
+    )
+    # python-on-whales handles the output streaming automatically!
+    stack_client.compose.pull(profiles=profiles)
+
+
+def launch_stack(compose_filename: str, profiles: List[str]):
+    """Starts the stack via docker compose up."""
+    path = get_compose_path(compose_filename)
+    stack_client = DockerClient(
+        host="unix:///var/run/docker.sock", compose_files=[str(path)]
+    )
+    # detach=True runs it in the background, wait=True waits for healthchecks
+    stack_client.compose.up(profiles=profiles, detach=True, wait=True)
