@@ -24,7 +24,7 @@ services:
     container_name: spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
     ports:
-      - "8080:8080" # Web UI
+      - "9080:8080" # Web UI
       - "7077:7077" # RPC
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
@@ -43,7 +43,7 @@ services:
       spark-master:
         condition: service_healthy
     ports:
-      - "8081:8081" # Worker 1 UI
+      - "9081:8081" # Worker 1 UI
 
   spark-worker-2:
     <<: *spark-base
@@ -53,7 +53,7 @@ services:
       spark-master:
         condition: service_healthy
     ports:
-      - "8082:8081" # Worker 2 UI mapped to host 8082
+      - "9082:8081" # Worker 2 UI mapped to host 8082
 
   spark-worker-3:
     <<: *spark-base
@@ -63,7 +63,7 @@ services:
       spark-master:
         condition: service_healthy
     ports:
-      - "8083:8081" # Worker 3 UI mapped to host 8083
+      - "9083:8081" # Worker 3 UI mapped to host 8083
 
   # ==========================================
   # Spark History Server

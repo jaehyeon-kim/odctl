@@ -55,7 +55,7 @@ services:
     container_name: seaweed
     ports:
       - "8333:8333" # S3 API
-      - "8888:8888" # Filer UI
+      - "8889:8888" # Filer UI
       - "9333:9333" # Master UI
     networks:
       dml:
