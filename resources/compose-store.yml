@@ -35,6 +35,67 @@ services:
       timeout: 5s
       retries: 5
 
+  # ==========================================
+  # [PROFILE: fluss] Streaming Storage Engine
+  # ==========================================
+  zookeeper:
+    image: zookeeper:3.9.2
+    container_name: zookeeper
+    profiles:
+      - fluss
+    networks:
+      - dml
+    ports:
+      - "2181:2181"
+    restart: always
+
+  fluss-coordinator:
+    image: apache/fluss:0.9.0-incubating
+    container_name: fluss-coordinator
+    command: coordinatorServer
+    profiles:
+      - fluss
+    ports:
+      - "9123:9123"
+    networks:
+      - dml
+    depends_on:
+      - zookeeper
+    environment:
+      - |
+        FLUSS_PROPERTIES=
+        zookeeper.address: zookeeper:2181
+        bind.listeners: INTERNAL://fluss-coordinator:0, CLIENT://fluss-coordinator:9123
+        # Use container name so Flink inside the 'dml' network can resolve it
+        advertised.listeners: CLIENT://fluss-coordinator:9123
+        internal.listener.name: INTERNAL
+        remote.data.dir: /tmp/fluss/remote-data
+
+  fluss-tablet:
+    image: apache/fluss:0.9.0-incubating
+    container_name: fluss-tablet
+    command: tabletServer
+    profiles:
+      - fluss
+    ports:
+      - "9124:9123"
+    networks:
+      - dml
+    depends_on:
+      - fluss-coordinator
+    environment:
+      - |
+        FLUSS_PROPERTIES=
+        zookeeper.address: zookeeper:2181
+        bind.listeners: INTERNAL://fluss-tablet:0, CLIENT://fluss-tablet:9123
+        # Use container name so Flink inside the 'dml' network can resolve it
+        advertised.listeners: CLIENT://fluss-tablet:9123
+        internal.listener.name: INTERNAL
+        tablet-server.id: 0
+        kv.snapshot.interval: 0s
+        data.dir: /tmp/fluss/data
+        remote.data.dir: /tmp/fluss/remote-data
+
 networks:
   dml:
     name: dml
