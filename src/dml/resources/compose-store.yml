@@ -2,11 +2,29 @@ name: dml-store
 
 services:
   # ==========================================
-  # [PROFILE: clickhouse] Real-Time OLAP
+  # [PROFILE: clickhouse, fluss] Zookeeper
   # ==========================================
-  clickhouse:
+  zookeeper:
+    image: zookeeper:3.9.2
+    container_name: zookeeper
+    profiles:
+      - clickhouse
+      - fluss
+    networks:
+      - dml
+    ports:
+      - "2181:2181"
+    mem_limit: 1g
+    environment:
+      - JVMFLAGS=-Xmx512m -Xms512m
+    restart: always
+
+  # ==========================================
+  # [PROFILE: clickhouse] Real-Time OLAP (2 Shards, 1 Replica)
+  # ==========================================
+  clickhouse-1:
     image: clickhouse/clickhouse-server:26.3-alpine
-    container_name: clickhouse
+    container_name: clickhouse-1
     restart: on-failure
     profiles:
       - clickhouse
@@ -18,9 +36,47 @@ services:
     mem_limit: 4g
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    depends_on:
+      - zookeeper
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ./clickhouse/macros-1.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8123/ping",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse-2:
+    image: clickhouse/clickhouse-server:26.3-alpine
+    container_name: clickhouse-2
+    restart: on-failure
+    profiles:
+      - clickhouse
+    networks:
+      - dml
+    ports:
+      - "8124:8123" # HTTP API offset
+      - "9001:9000" # Native TCP offset
+    mem_limit: 4g
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    depends_on:
+      - zookeeper
+    volumes:
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ./clickhouse/macros-2.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test:
@@ -39,20 +95,6 @@ services:
   # ==========================================
   # [PROFILE: fluss] Streaming Storage Engine
   # ==========================================
-  zookeeper:
-    image: zookeeper:3.9.2
-    container_name: zookeeper
-    profiles:
-      - fluss
-    networks:
-      - dml
-    ports:
-      - "2181:2181"
-    mem_limit: 1g
-    environment:
-      - JVM_ARGS=-Xmx512m
-    restart: always
-
   fluss-coordinator:
     image: apache/fluss:0.9.0-incubating
     container_name: fluss-coordinator
@@ -65,19 +107,20 @@ services:
       - dml
     depends_on:
       - zookeeper
+    mem_limit: 1g
     environment:
+      - JVM_ARGS=-Xmx512m
       - |
         FLUSS_PROPERTIES=
         zookeeper.address: zookeeper:2181
         bind.listeners: INTERNAL://fluss-coordinator:0, CLIENT://fluss-coordinator:9123
-        # Use container name so Flink inside the 'dml' network can resolve it
         advertised.listeners: CLIENT://fluss-coordinator:9123
         internal.listener.name: INTERNAL
         remote.data.dir: /tmp/fluss/remote-data
 
-  fluss-tablet:
+  fluss-tablet-1:
     image: apache/fluss:0.9.0-incubating
-    container_name: fluss-tablet
+    container_name: fluss-tablet-1
     command: tabletServer
     profiles:
       - fluss
@@ -93,11 +136,36 @@ services:
       - |
         FLUSS_PROPERTIES=
         zookeeper.address: zookeeper:2181
-        bind.listeners: INTERNAL://fluss-tablet:0, CLIENT://fluss-tablet:9123
-        # Use container name so Flink inside the 'dml' network can resolve it
-        advertised.listeners: CLIENT://fluss-tablet:9123
+        bind.listeners: INTERNAL://fluss-tablet-1:0, CLIENT://fluss-tablet-1:9123
+        advertised.listeners: CLIENT://fluss-tablet-1:9123
         internal.listener.name: INTERNAL
         tablet-server.id: 0
+        kv.snapshot.interval: 0s
+        data.dir: /tmp/fluss/data
+        remote.data.dir: /tmp/fluss/remote-data
+
+  fluss-tablet-2:
+    image: apache/fluss:0.9.0-incubating
+    container_name: fluss-tablet-2
+    command: tabletServer
+    profiles:
+      - fluss
+    ports:
+      - "9125:9123"
+    networks:
+      - dml
+    depends_on:
+      - fluss-coordinator
+    mem_limit: 2g
+    environment:
+      - JVM_ARGS=-Xmx1500m
+      - |
+        FLUSS_PROPERTIES=
+        zookeeper.address: zookeeper:2181
+        bind.listeners: INTERNAL://fluss-tablet-2:0, CLIENT://fluss-tablet-2:9123
+        advertised.listeners: CLIENT://fluss-tablet-2:9123
+        internal.listener.name: INTERNAL
+        tablet-server.id: 1
         kv.snapshot.interval: 0s
         data.dir: /tmp/fluss/data
         remote.data.dir: /tmp/fluss/remote-data
