@@ -48,8 +48,8 @@ stacks:
 
   analytics:
     file: "compose-analytics.yml"
-    description: "Federated SQL engine, BI dashboards, and data science IDE."
-    profiles: ["trino", "metabase", "jupyterlab"]
+    description: "Federated SQL engine and BI dashboards."
+    profiles: ["trino", "metabase"]
     capacities: ["analytics"]
 
   mlops:
