@@ -154,7 +154,7 @@ def init(
     """Initialize a local .dml workspace for custom configurations."""
     if force and get_workspace_dir().exists():
         typer.confirm(
-            "⚠️ This will wipe out all local modifications in your .dml/ directory. Are you sure?",
+            "⚠️  This will wipe out all local modifications in your .dml/ directory. Are you sure?",
             abort=True,
         )
     init_workspace(force=force)
@@ -232,11 +232,24 @@ def up(
         )
         pull_stack_images(file, profs)
 
-        console.print(f"⚙️ Launching {prefix} ([cyan]{', '.join(profs)}[/cyan])...")
+        console.print(f"⚙️  Launching {prefix} ([cyan]{', '.join(profs)}[/cyan])...")
         try:
             launch_stack(file, profs)
         except Exception as e:
-            console.print(f"[bold red]Failed to start {file}:[/bold red] {e}")
+            err_msg = str(e)
+            console.print(f"\n[bold red]❌ Failed to start {file}[/bold red]")
+
+            # Hide the messy python-on-whales exception string and give actionable advice
+            if "The command executed was" in err_msg:
+                console.print(
+                    "[yellow]Tip:[/yellow] A container failed to reach a healthy state or crashed on startup."
+                )
+                console.print(
+                    "Run [cyan]docker ps -a[/cyan] or check Docker Desktop to inspect the logs."
+                )
+            else:
+                console.print(f"[red]Details:[/red] {err_msg}")
+
             raise typer.Exit(1)
 
     console.print(
@@ -264,7 +277,7 @@ def down(
 
     if all and volumes and not dry_run:
         typer.confirm(
-            "⚠️ This will destroy ALL profiles and WIPE ALL LOCAL DATA. Are you sure?",
+            "⚠️  This will destroy ALL profiles and WIPE ALL LOCAL DATA. Are you sure?",
             abort=True,
         )
 
