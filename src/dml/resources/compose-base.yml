@@ -180,7 +180,7 @@ services:
     profiles:
       - base
     environment:
-      - CONNECTIONS=pg,vk,ch
+      - CONNECTIONS=pg,vk,ch1,ch2
       # PostgreSQL Auto-connection
       - LABEL_pg=Postgres
       - ENGINE_pg=postgres@dbgate-plugin-postgres
@@ -193,12 +193,18 @@ services:
       - SERVER_vk=valkey
       - USER_vk=${VALKEY_USER:-user}
       - PASSWORD_vk=${VALKEY_PASSWORD:-password}
-      # ClickHouse Auto-connection
-      - LABEL_ch=ClickHouse
-      - ENGINE_ch=clickhouse@dbgate-plugin-clickhouse
-      - URL_ch=http://clickhouse:8123
-      - USER_ch=${CLICKHOUSE_USER:-user}
-      - PASSWORD_ch=${CLICKHOUSE_PASSWORD:-password}
+      # ClickHouse Node 1 Auto-connection
+      - LABEL_ch1=ClickHouse-01
+      - ENGINE_ch1=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch1=http://clickhouse-1:8123
+      - USER_ch1=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch1=${CLICKHOUSE_PASSWORD:-password}
+      # ClickHouse Node 2 Auto-connection
+      - LABEL_ch2=ClickHouse-02
+      - ENGINE_ch2=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch2=http://clickhouse-2:8123
+      - USER_ch2=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch2=${CLICKHOUSE_PASSWORD:-password}
     mem_limit: 512m
     depends_on:
       postgres:
