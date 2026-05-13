@@ -1,7 +1,7 @@
 name: dml-spark
 
 x-spark-base: &spark-base
-  image: ghcr.io/jaehyeon-kim/open-dataml-stack/spark:${TAG:-local}
+  image: ghcr.io/jaehyeon-kim/open-dataml-stack/spark:${TAG:-latest}
   networks:
     - dml
   profiles:
