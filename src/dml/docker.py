@@ -87,8 +87,15 @@ def launch_stack(compose_filename: str, profiles: List[str]):
     """Starts the stack via docker compose up."""
     path = get_compose_path(compose_filename)
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
-    # detach=True runs in background, wait=True waits for healthchecks
-    stack_client.compose.up(detach=True, wait=True)
+
+    # The 'deps' profile contains an ephemeral container that exits after copying files.
+    # Docker Compose's --wait flag fails if it sees a container exit (even with code 0).
+    if "deps" in profiles:
+        # detach=False blocks until the init container gracefully finishes its job
+        stack_client.compose.up(detach=False)
+    else:
+        # For all other long-running services, we detach and wait for healthchecks
+        stack_client.compose.up(detach=True, wait=True)
 
 
 def stop_stack(
