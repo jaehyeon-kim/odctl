@@ -16,7 +16,7 @@ def get_active_dir() -> Path:
 
 
 def get_registry_path() -> Path:
-    return get_active_dir() / "registry.yaml"
+    return get_active_dir() / "registry.yml"
 
 
 def get_compose_path(filename: str) -> Path:
