@@ -41,6 +41,7 @@ jobs:
   build-and-push:
     name: Build & Push
     needs: validate
+    # Still allows the job to run manually so you can test caching, but it won't push unless it's a tag
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -49,12 +50,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Set up Buildx to enable registry caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -63,11 +70,13 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: src/dml/resources/deps
-          push: true
+          # Strictly enforce push only on 'v' tags
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
