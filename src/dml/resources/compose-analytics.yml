@@ -13,6 +13,9 @@ services:
       - dml
     ports:
       - "8080:8080" # Trino UI & JDBC connection port
+    mem_limit: 4g
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx3G"
     volumes:
       # Mount the static catalogs
       - ./trino/catalog:/etc/trino/catalog:ro
@@ -34,7 +37,9 @@ services:
       - dml
     ports:
       - "3000:3000"
+    mem_limit: 1500m
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx1G"
       # Map Metabase's internal state to our unified Postgres instance
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabase
