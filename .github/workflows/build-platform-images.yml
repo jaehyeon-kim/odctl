@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, jupyter, feast, spark, mlflow]
+        component: [airflow, feast, spark, mlflow]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, jupyter, feast, spark, mlflow]
+        component: [airflow, feast, spark, mlflow]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
