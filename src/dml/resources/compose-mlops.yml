@@ -15,6 +15,7 @@ x-airflow-common: &airflow-common
     - dml
   profiles:
     - airflow
+  mem_limit: 1500m
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/airflow
@@ -42,6 +43,7 @@ services:
       - airflow
     networks:
       - dml
+    mem_limit: 256m
     environment:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
@@ -118,6 +120,7 @@ services:
       - dml
     ports:
       - "5000:5000"
+    mem_limit: 1g
     environment:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
@@ -148,6 +151,7 @@ services:
       - dml
     ports:
       - "6566:6566"
+    mem_limit: 1g
     volumes:
       - ./feast:/opt/feast/feature_repo
     environment:

@@ -14,6 +14,7 @@ services:
     ports:
       - "9200:9200"
       - "9300:9300"
+    mem_limit: 2g
     environment:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms1024m -Xmx1024m
@@ -39,6 +40,7 @@ services:
       - metadata
     networks:
       - dml
+    mem_limit: 1g
     environment:
       # Leveraging the Unified Postgres container
       DB_HOST: postgres
@@ -71,7 +73,9 @@ services:
     ports:
       - "8585:8585"
       - "8586:8586"
+    mem_limit: 2g
     environment:
+      JAVA_OPTS: "-Xms1G -Xmx1500m"
       # Database
       DB_HOST: postgres
       DB_PORT: 5432
@@ -144,6 +148,8 @@ services:
       AIRFLOW__LINEAGE__BACKEND: airflow_provider_openmetadata.lineage.backend.OpenMetadataLineageBackend
       AIRFLOW__LINEAGE__AIRFLOW_SERVICE_NAME: local_airflow
       AIRFLOW__LINEAGE__OPENMETADATA_API_ENDPOINT: http://openmetadata-server:8585/api
+      # Application Limit
+      mem_limit: 1500m
     depends_on:
       openmetadata-server:
         condition: service_healthy

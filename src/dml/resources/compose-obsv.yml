@@ -14,6 +14,7 @@ services:
     ports:
       - "5002:5000" # API
       - "5001:5001" # Admin
+    mem_limit: 1g
     environment:
       # Leverage the unified Postgres instance from compose-base.yml
       POSTGRES_HOST: postgres
@@ -37,6 +38,7 @@ services:
       - dml
     ports:
       - "3003:3000"
+    mem_limit: 512m
     environment:
       MARQUEZ_HOST: marquez-api
       MARQUEZ_PORT: 5000
@@ -55,6 +57,7 @@ services:
       - dml
     ports:
       - "19090:9090"
+    mem_limit: 1g
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
@@ -75,6 +78,7 @@ services:
       - dml
     ports:
       - "19093:9093"
+    mem_limit: 256m
     volumes:
       - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     command:
@@ -92,6 +96,7 @@ services:
       - dml
     ports:
       - "3004:3000"
+    mem_limit: 1g
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}

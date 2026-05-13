@@ -37,6 +37,7 @@ services:
     command: jobmanager
     ports:
       - "8082:8081"
+    mem_limit: 1500m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/config"]
       interval: 5s
@@ -47,6 +48,7 @@ services:
     <<: *flink1-base
     container_name: flink-taskmanager-1-a
     command: taskmanager
+    mem_limit: 3500m
     depends_on:
       jobmanager-1:
         condition: service_healthy
@@ -55,6 +57,7 @@ services:
     <<: *flink1-base
     container_name: flink-taskmanager-1-b
     command: taskmanager
+    mem_limit: 3500m
     depends_on:
       jobmanager-1:
         condition: service_healthy
@@ -63,6 +66,7 @@ services:
     <<: *flink1-base
     container_name: flink-taskmanager-1-c
     command: taskmanager
+    mem_limit: 3500m
     depends_on:
       jobmanager-1:
         condition: service_healthy
@@ -76,6 +80,7 @@ services:
       -Dsql-gateway.endpoint.rest.port=8083
       -Djobmanager.rpc.address=jobmanager-1
       -Drest.address=jobmanager-1
+    mem_limit: 1g
     ports:
       - "8084:8083" # REST API
     depends_on:
