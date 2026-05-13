@@ -1,11 +1,17 @@
 import shutil
 from pathlib import Path
+
 from dml.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
 
 
-def init_workspace():
+def init_workspace(force: bool = False):
     """Copies all internal resources to the local workspace."""
     workspace = get_workspace_dir()
+
+    # Nuke the existing workspace if force is True
+    if force and workspace.exists():
+        shutil.rmtree(workspace)
+        print(f"🗑️  Removed existing workspace at {workspace.relative_to(Path.cwd())}/")
 
     if not workspace.exists():
         workspace.mkdir(parents=True)
@@ -15,7 +21,7 @@ def init_workspace():
     for item in INTERNAL_RESOURCES_DIR.iterdir():
         dest = workspace / item.name
 
-        # Only copy if it doesn't exist so we don't overwrite user edits
+        # Only copy if it doesn't exist (or was just deleted by force)
         if not dest.exists():
             if item.is_dir():
                 shutil.copytree(item, dest)
