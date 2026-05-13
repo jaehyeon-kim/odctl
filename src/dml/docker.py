@@ -43,11 +43,11 @@ def is_docker_running() -> bool:
 
 def get_stack_details(
     compose_filename: str, profiles: List[str]
-) -> Tuple[List[str], List[str]]:
-    """Resolves services and host port mappings via Docker Compose config."""
+) -> Tuple[List[str], List[str], List[str]]:
+    """Resolves services, host port mappings, and images via Docker Compose config."""
     path = get_compose_path(compose_filename)
     if not path.exists():
-        return ["File Error"], ["File Error"]
+        return ["File Error"], ["File Error"], ["File Error"]
 
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
 
@@ -55,17 +55,25 @@ def get_stack_details(
         cfg = stack_client.compose.config()
         services = []
         ports = []
+        images = []
         if cfg and cfg.services:
             for name, service in cfg.services.items():
                 services.append(name)
+                # Capture the image
+                if service.image:
+                    images.append(f"{name} -> {service.image}")
                 if service.ports:
                     for p in service.ports:
                         if p.published:
                             ports.append(f"{name}:{p.published}")
-        return sorted(list(set(services))), sorted(list(set(ports)))
+        return (
+            sorted(list(set(services))),
+            sorted(list(set(ports))),
+            sorted(list(set(images))),
+        )
     except Exception as e:
         err = f"Err: {type(e).__name__}"
-        return [err], [err]
+        return [err], [err], [err]
 
 
 def pull_stack_images(compose_filename: str, profiles: List[str]):
