@@ -44,18 +44,11 @@ services:
       - ./clickhouse/macros-1.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8123/ping",
-        ]
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   clickhouse-2:
     image: clickhouse/clickhouse-server:26.3-alpine
@@ -79,18 +72,11 @@ services:
       - ./clickhouse/macros-2.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8123/ping",
-        ]
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   # ==========================================
   # [PROFILE: fluss] Streaming Storage Engine
