@@ -180,6 +180,78 @@ def init(
 
 
 @app.command()
+def pull(
+    profiles: Optional[List[str]] = typer.Argument(
+        None, help="Profiles to pull images for"
+    ),
+    all: bool = typer.Option(
+        False, "--all", help="Pull all images for all profiles in the registry"
+    ),
+):
+    """Pre-fetch Docker images without starting the containers."""
+    if not is_docker_running():
+        console.print("[bold red]Error:[/bold red] Docker is not reachable.")
+        raise typer.Exit(1)
+
+    registry = load_registry()
+    profile_map = _get_profile_map()
+
+    execution_plan = {}
+
+    if all:
+        # Group all profiles by file
+        for stack_id, config in registry.stacks.items():
+            if config.file not in execution_plan:
+                execution_plan[config.file] = []
+            execution_plan[config.file].extend(config.profiles)
+    else:
+        if not profiles:
+            console.print(
+                "[bold red]Error:[/bold red] Please specify profile names or use --all"
+            )
+            raise typer.Exit(1)
+
+        invalid_profiles = [p for p in profiles if p not in profile_map]
+        if invalid_profiles:
+            console.print(
+                f"[bold red]Error:[/bold red] Unknown profiles: {', '.join(invalid_profiles)}"
+            )
+            raise typer.Exit(1)
+
+        # Resolve dependencies just like `up`
+        resolved_profiles = set(profiles)
+        queue = list(profiles)
+
+        while queue:
+            current = queue.pop(0)
+            stack_id = profile_map[current]["stack_id"]
+            stack = registry.stacks[stack_id]
+            for dep in stack.depends_on:
+                if dep not in resolved_profiles:
+                    resolved_profiles.add(dep)
+                    queue.append(dep)
+
+        for p in resolved_profiles:
+            file = profile_map[p]["file"]
+            if file not in execution_plan:
+                execution_plan[file] = []
+            execution_plan[file].append(p)
+
+    console.print("[bold cyan]📥 Pre-fetching Docker images...[/bold cyan]")
+    for file, profs in execution_plan.items():
+        console.print(
+            f"Fetching images for [yellow]{file}[/yellow] (profiles: {', '.join(profs)})..."
+        )
+        try:
+            pull_stack_images(file, profs)
+        except Exception as e:
+            console.print(f"[bold red]Failed to pull images for {file}:[/bold red] {e}")
+            raise typer.Exit(1)
+
+    console.print("[bold green]✓ All images pulled successfully![/bold green]")
+
+
+@app.command()
 def up(
     profiles: List[str] = typer.Argument(..., help="One or more profiles to launch"),
     dry_run: bool = typer.Option(
