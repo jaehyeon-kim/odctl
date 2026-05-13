@@ -10,7 +10,6 @@
     <listen_host>0.0.0.0</listen_host>
     <http_port>8123</http_port>
     <tcp_port>9000</tcp_port>
-    <interserver_http_host>clickhouse</interserver_http_host>
     <interserver_http_port>9009</interserver_http_port>
 
     <max_connections>4096</max_connections>
@@ -42,6 +41,13 @@
         <asynchronous_metrics>true</asynchronous_metrics>
         <errors>true</errors>
     </prometheus>
+
+    <zookeeper>
+        <node>
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
 
     <query_log>
         <database>system</database>
@@ -117,14 +123,22 @@
     </query_views_log>
 
     <remote_servers>
-        <hdx_cluster>
+        <dml_cluster>
             <shard>
+                <internal_replication>false</internal_replication>
                 <replica>
-                    <host>clickhouse</host>
+                    <host>clickhouse-1</host>
                     <port>9000</port>
                 </replica>
             </shard>
-        </hdx_cluster>
+            <shard>
+                <internal_replication>false</internal_replication>
+                <replica>
+                    <host>clickhouse-2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </dml_cluster>
     </remote_servers>
 
     <distributed_ddl>
