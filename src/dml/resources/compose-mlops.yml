@@ -27,6 +27,8 @@ x-airflow-common: &airflow-common
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
     AWS_DEFAULT_REGION: us-east-1
+    # For quick experiments
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
   volumes:
     - airflow-dags:/opt/airflow/dags
     - airflow-plugins:/opt/airflow/plugins
@@ -126,6 +128,8 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
       AWS_DEFAULT_REGION: us-east-1
       MLFLOW_S3_ENDPOINT_URL: http://seaweed:8333
+      # For quick experiments
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     command: >
       mlflow server
       --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
@@ -165,6 +169,8 @@ services:
       VALKEY_PASSWORD: ${VALKEY_PASSWORD:-password}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-user}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
+      # For quick experiments
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     command: >
       bash -c "
       echo 'Waiting for infrastructure (Postgres, Valkey, ClickHouse) to be available...'
