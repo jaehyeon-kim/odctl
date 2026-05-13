@@ -1,6 +1,8 @@
-import yaml
 from typing import Dict, List
+
+import yaml
 from pydantic import BaseModel, Field
+
 from dml.config import get_registry_path
 
 
@@ -18,7 +20,7 @@ class Registry(BaseModel):
 
 
 def load_registry() -> Registry:
-    """Loads and validates the registry.yaml file from the active directory."""
+    """Loads and validates the registry.yml file from the active directory."""
     path = get_registry_path()
 
     if not path.exists():
