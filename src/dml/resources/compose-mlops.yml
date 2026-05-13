@@ -10,7 +10,7 @@ volumes:
     name: airflow-plugins
 
 x-airflow-common: &airflow-common
-  image: ghcr.io/jaehyeon-kim/open-dataml-stack/airflow:${TAG:-local}
+  image: ghcr.io/jaehyeon-kim/open-dataml-stack/airflow:${TAG:-latest}
   networks:
     - dml
   profiles:
@@ -114,7 +114,7 @@ services:
   # [PROFILE: mlflow] Experiment Tracking
   # ==========================================
   mlflow:
-    image: ghcr.io/jaehyeon-kim/open-dataml-stack/mlflow:${TAG:-local}
+    image: ghcr.io/jaehyeon-kim/open-dataml-stack/mlflow:${TAG:-latest}
     container_name: mlflow
     profiles:
       - mlflow
@@ -147,7 +147,7 @@ services:
   # [PROFILE: feast] Feature Store
   # ==========================================
   feast:
-    image: ghcr.io/jaehyeon-kim/open-dataml-stack/feast:${TAG:-local}
+    image: ghcr.io/jaehyeon-kim/open-dataml-stack/feast:${TAG:-latest}
     container_name: feast
     profiles:
       - feast
