@@ -2,36 +2,6 @@ name: dml-analytics
 
 services:
   # ==========================================
-  # [PROFILE: jupyterlab] Data Science IDE
-  # ==========================================
-  jupyterlab:
-    build:
-      context: ./docker/jupyter
-      dockerfile: Dockerfile
-    image: ghcr.io/jaehyeon-kim/open-dataml-stack/jupyter:${TAG:-local}
-    container_name: jupyterlab
-    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
-    profiles:
-      - jupyterlab
-    networks:
-      - dml
-    ports:
-      - "8888:8888"
-    environment:
-      JUPYTER_ENABLE_LAB: "yes"
-      GRANT_SUDO: "yes"
-      # Credentials
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
-      AWS_DEFAULT_REGION: us-east-1
-      # Global Connection Strings for Notebooks
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      TRINO_URL: http://user@trino:8080
-      CLICKHOUSE_URL: clickhouse://user:password@clickhouse:8123/dml
-      POSTGRES_URL: postgresql://user:password@postgres:5432/dml
-      VALKEY_URL: redis://user:password@valkey:6379/0
-
-  # ==========================================
   # [PROFILE: trino] Federated SQL Engine
   # ==========================================
   trino:
