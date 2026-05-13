@@ -1,7 +1,7 @@
 [project]
 name = "dml-cli"
 version = "0.1.0"
-description = "A semantic orchestrator for the Open DataML Stack."
+description = "Orchestrator for the Open DataML Stack"
 readme = "README.md"
 authors = [
     { name = "Jaehyeon Kim", email = "dottami@gmail.com" }
@@ -11,10 +11,7 @@ dependencies = [
     "typer>=0.12.0",
     "rich>=13.7.0",
     "pyyaml>=6.0.1",
-    "sentence-transformers>=3.0.0",
-    "scikit-learn>=1.5.0",
-    "python-on-whales>=0.70.0",
-    "torch"
+    "python-on-whales>=0.70.0"
 ]
 
 [project.scripts]
@@ -33,16 +30,3 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dml"]
-
-# ========================================================
-# Force PyTorch to use the CPU-only wheels to save space
-# ========================================================
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }
-torchvision = { index = "pytorch-cpu" }
-torchaudio = { index = "pytorch-cpu" }
