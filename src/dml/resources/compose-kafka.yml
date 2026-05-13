@@ -5,7 +5,6 @@ x-common-environment: &kafka_broker_common_env_vars # KRaft settings
   KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
   KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:19091,2@kafka-2:19091,3@kafka-3:19091"
   CLUSTER_ID: ${KAFKA_CLUSTER_ID:-42RglGpZQwy9D5VzTVpCWA}
-
   # Common Kafka settings
   KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT,LISTENER_MINIKUBE:PLAINTEXT
   KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
@@ -16,9 +15,10 @@ x-common-environment: &kafka_broker_common_env_vars # KRaft settings
   KAFKA_LOG_RETENTION_BYTES: "524288000" # 500 MB
   KAFKA_LOG_SEGMENT_BYTES: "67108864" # 64 MB segments
   KAFKA_LOG_RETENTION_MS: "86400000" # 1 day
-
   # Modern Consumer & Share Group Protocols (KIP-848 & KIP-932 GA)
   KAFKA_GROUP_COORDINATOR_REBALANCE_PROTOCOLS: "classic,consumer,share"
+  # Application Limit: Restrict JVM so OS has RAM left for Page Cache
+  KAFKA_HEAP_OPTS: "-Xmx750m -Xms750m"
 
 services:
   # ==========================================
@@ -39,6 +39,7 @@ services:
       KAFKA_LISTENERS: CONTROLLER://kafka-1:19091,LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092,LISTENER_MINIKUBE://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,LISTENER_MINIKUBE://host.minikube.internal:29092
       <<: *kafka_broker_common_env_vars
+    mem_limit: 1500m
 
   kafka-2:
     image: apache/kafka:4.2.0
@@ -55,6 +56,7 @@ services:
       KAFKA_LISTENERS: CONTROLLER://kafka-2:19091,LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9093,LISTENER_MINIKUBE://0.0.0.0:29093
       KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093,LISTENER_MINIKUBE://host.minikube.internal:29093
       <<: *kafka_broker_common_env_vars
+    mem_limit: 1500m
 
   kafka-3:
     image: apache/kafka:4.2.0
@@ -71,6 +73,7 @@ services:
       KAFKA_LISTENERS: CONTROLLER://kafka-3:19091,LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9094,LISTENER_MINIKUBE://0.0.0.0:29094
       KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094,LISTENER_MINIKUBE://host.minikube.internal:29094
       <<: *kafka_broker_common_env_vars
+    mem_limit: 1500m
 
   # ==========================================
   # Open Source Kafka Connect (Apache Native)
@@ -112,6 +115,9 @@ services:
       EOF
       /opt/kafka/bin/connect-distributed.sh /tmp/connect.properties
       '
+    mem_limit: 2g
+    environment:
+      KAFKA_HEAP_OPTS: "-Xmx1500m -Xms1500m"
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8083' || exit 1"]
       interval: 5s
@@ -139,6 +145,7 @@ services:
       - kafka-1
       - kafka-2
       - kafka-3
+    mem_limit: 512m
     environment:
       KARAPACE_KARAPACE_REGISTRY: true
       KARAPACE_ADVERTISED_HOSTNAME: karapace
@@ -170,6 +177,7 @@ services:
     depends_on:
       connect:
         condition: service_healthy
+    mem_limit: 512m
     environment:
       KAFKA_CLUSTERS_0_NAME: dml-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-1:19092,kafka-2:19093,kafka-3:19094"

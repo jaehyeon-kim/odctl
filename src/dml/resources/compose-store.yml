@@ -15,6 +15,7 @@ services:
     ports:
       - "8123:8123" # HTTP API
       - "9000:9000" # Native TCP
+    mem_limit: 4g
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
@@ -47,6 +48,9 @@ services:
       - dml
     ports:
       - "2181:2181"
+    mem_limit: 1g
+    environment:
+      - JVM_ARGS=-Xmx512m
     restart: always
 
   fluss-coordinator:
@@ -83,7 +87,9 @@ services:
       - dml
     depends_on:
       - fluss-coordinator
+    mem_limit: 2g
     environment:
+      - JVM_ARGS=-Xmx1500m
       - |
         FLUSS_PROPERTIES=
         zookeeper.address: zookeeper:2181

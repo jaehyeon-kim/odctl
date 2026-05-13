@@ -26,6 +26,9 @@ services:
     ports:
       - "9080:8080" # Web UI
       - "7077:7077" # RPC
+    mem_limit: 1g
+    environment:
+      SPARK_WORKER_MEMORY: "1500m"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 10s
@@ -39,31 +42,40 @@ services:
     <<: *spark-base
     container_name: spark-worker-1
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    ports:
+      - "9081:8081" # Worker 1 UI
+    mem_limit: 2g
+    environment:
+      SPARK_WORKER_MEMORY: "1500m"
     depends_on:
       spark-master:
         condition: service_healthy
-    ports:
-      - "9081:8081" # Worker 1 UI
 
   spark-worker-2:
     <<: *spark-base
     container_name: spark-worker-2
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    ports:
+      - "9082:8081" # Worker 2 UI mapped to host 8082
+    mem_limit: 2g
+    environment:
+      SPARK_WORKER_MEMORY: "1500m"
     depends_on:
       spark-master:
         condition: service_healthy
-    ports:
-      - "9082:8081" # Worker 2 UI mapped to host 8082
 
   spark-worker-3:
     <<: *spark-base
     container_name: spark-worker-3
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    ports:
+      - "9083:8081" # Worker 3 UI mapped to host 8083
+    mem_limit: 2g
+    environment:
+      SPARK_WORKER_MEMORY: "1500m"
     depends_on:
       spark-master:
         condition: service_healthy
-    ports:
-      - "9083:8081" # Worker 3 UI mapped to host 8083
 
   # ==========================================
   # Spark History Server
@@ -74,6 +86,7 @@ services:
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
     ports:
       - "18080:18080" # History Server UI
+    mem_limit: 1g
 
 networks:
   dml:
