@@ -164,9 +164,8 @@ services:
   # Open Source Kafka UI (Kafbat)
   # ==========================================
   kafka-ui:
-    image: ghcr.io/kafbat/kafka-ui:latest
+    image: ghcr.io/kafbat/kafka-ui:v1.5.0
     container_name: kafka-ui
-    pull_policy: always
     restart: always
     ports:
       - "8086:8080"

@@ -108,6 +108,9 @@ def pull(
 def up(
     profiles: List[str] = typer.Argument(...),
     dry_run: bool = typer.Option(False, "--dry-run"),
+    pull: bool = typer.Option(
+        False, "--pull", help="Force pull latest images from registry before starting"
+    ),
 ):
     """Launch DataML profiles."""
     if not dry_run and not is_docker_running():
@@ -123,17 +126,22 @@ def up(
         is_base = any(x in profs for x in ["base", "deps"])
         prefix = "🧱 Infrastructure" if is_base else "🚀 Target"
 
-        ui.print_info(
-            f"📥 Pulling images for {prefix} ([cyan]{', '.join(profs)}[/cyan])..."
-        )
-        pull_stack_images(file, profs)
+        # ONLY pull if the user explicitly asks for it!
+        if pull:
+            ui.print_info(
+                f"📥 Pulling images for {prefix} ([cyan]{', '.join(profs)}[/cyan])..."
+            )
+            pull_stack_images(file, profs)
 
         ui.print_info(f"⚙️  Launching {prefix} ([cyan]{', '.join(profs)}[/cyan])...")
         try:
+            # If the image is missing entirely, Docker Compose will still
+            # natively pull it here (pull_policy: missing)
             launch_stack(file, profs)
         except Exception as e:
             ui.print_error(f"Failed to start {file}", details=str(e), show_tip=True)
             raise typer.Exit(1)
+
     ui.print_success("All requested profiles successfully started!")
 
 
