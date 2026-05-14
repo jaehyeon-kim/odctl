@@ -14,6 +14,7 @@ x-flink1-base: &flink1-base
     - flink1
   environment:
     TZ: ${TZ:-UTC}
+    ENABLE_BUILT_IN_PLUGINS: flink-s3-fs-hadoop
   entrypoint:
     - /bin/bash
     - -c
