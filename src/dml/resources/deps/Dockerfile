@@ -8,13 +8,13 @@ COPY build_connectors.sh .
 RUN chmod +x build_connectors.sh && ./build_connectors.sh
 
 # ==========================================
-# Stage 2: Gradle Resolver (Schema Converters)
+# Stage 2: Gradle Resolver (Schema Converters & Flink Parquet)
 # ==========================================
 FROM gradle:8.6-jdk17 AS gradle-resolver
 WORKDIR /app
 COPY build.gradle .
-# Let Gradle do the heavy transitive lifting!
-RUN gradle copyDependencies --no-daemon
+# Let Gradle do the heavy transitive lifting for both Connect and Flink!
+RUN gradle copyAllDependencies --no-daemon
 
 # ==========================================
 # Stage 3: Direct Downloader (Uber JARs & ZIPs)
@@ -44,13 +44,16 @@ COPY --from=source-builder /build/dist/ /workspace/connect/
 # Grab perfectly resolved Schema Converters
 COPY --from=gradle-resolver /app/build/confluent-converters/ /workspace/connect/confluent-converters/
 
-# Grab standalone Uber JARs & ZIPs
+# Grab Gradle-resolved Flink Parquet & Hadoop JARs
+COPY --from=gradle-resolver /app/build/flink-jars/ /workspace/flink/1.x/
+
+# Grab standalone Uber JARs & ZIPs (Docker safely merges flink/1.x/ folders)
 COPY --from=downloader /downloads/connect /workspace/connect/
 COPY --from=downloader /downloads/flink /workspace/flink/
 COPY --from=downloader /downloads/spark /workspace/spark/
 COPY --from=downloader /downloads/shared /workspace/shared/
 
-# Final cleanup
+# Final cleanup (hadoop-client replaces legacy hadoop-core, so this delete is perfectly safe)
 RUN find /workspace -type f -name "*hadoop-core*" -delete
 
 RUN echo "✅ DataML Stack Dependencies populated."
