@@ -25,11 +25,15 @@ Provides commands to inspect, provision, and tear down curated Docker Compose st
     no_args_is_help=True,
     rich_markup_mode="rich",
     epilog="""
-[bold]Examples:[/bold]\n
-  $ [cyan]dml list --deep[/cyan]                     # View all profiles and exposed ports\n
-  $ [cyan]dml explain kafka[/cyan]                   # See exactly what the airflow profile provisions\n
-  $ [cyan]dml up flink1 kafka spark[/cyan]           # Launch specific profiles and their dependencies\n
-  $ [cyan]dml down --all --volumes[/cyan]            # Complete teardown and wipe all data\n
+[bold underline]Examples:[/bold underline]\n
+  [dim]# View all profiles and exposed ports[/dim]\n
+  $ [bold cyan]dml list --deep[/bold cyan]\n\n
+  [dim]# See exactly what the airflow profile provisions[/dim]\n
+  $ [bold cyan]dml explain kafka[/bold cyan]\n\n
+  [dim]# Launch specific profiles and their dependencies[/dim]\n
+  $ [bold cyan]dml up flink1 kafka spark[/bold cyan]\n\n
+  [dim]# Complete teardown and wipe all data[/dim]\n
+  $ [bold cyan]dml down --all --volumes[/bold cyan]
 """,
 )
 
@@ -43,11 +47,14 @@ def main():
     name="list",
     rich_help_panel="Inspection & Info",
     epilog="""
-[bold]Examples:[/bold]\n
-  $ [cyan]dml list[/cyan]                  # View all basic profiles\n
-  $ [cyan]dml list --deep[/cyan]           # View profiles, underlying services, and ports
+[bold underline]Examples:[/bold underline]\n
+  [dim]# View all basic profiles[/dim]\n
+  $ [bold cyan]dml list[/bold cyan]\n\n
+  [dim]# View profiles, underlying services, and ports[/dim]\n
+  $ [bold cyan]dml list --deep[/bold cyan]
 """,
 )
+@app.command(name="ls", hidden=True)
 def list_profiles(
     deep: bool = typer.Option(
         False,
@@ -73,8 +80,9 @@ def list_profiles(
 @app.command(
     rich_help_panel="Inspection & Info",
     epilog="""
-[bold]Examples:[/bold]\n
-$ [cyan]dml explain spark[/cyan]           # See what the Spark profile provisions
+[bold underline]Examples:[/bold underline]\n
+  [dim]# See what the Spark profile provisions[/dim]\n
+  $ [bold cyan]dml explain spark[/bold cyan]
 """,
 )
 def explain(
@@ -114,9 +122,11 @@ def explain(
 @app.command(
     rich_help_panel="Workspace",
     epilog="""
-[bold]Examples:[/bold]\n
-$ [cyan]dml init[/cyan]                    # Initialize a new workspace in ./.dml/\n
-$ [cyan]dml init --force[/cyan]            # Recreate workspace, overwriting any local changes
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Initialize a new workspace in ./.dml/[/dim]\n
+  $ [bold cyan]dml init[/bold cyan]\n\n
+  [dim]# Recreate workspace, overwriting any local changes[/dim]\n
+  $ [bold cyan]dml init --force[/bold cyan]
 """,
 )
 def init(
@@ -144,9 +154,11 @@ def init(
 @app.command(
     rich_help_panel="Cluster Lifecycle",
     epilog="""
-[bold]Examples:[/bold]\n
-$ [cyan]dml pull --all[/cyan]                   # Pre-fetch images for all profiles\n
-$ [cyan]dml pull flink1 kafka[/cyan]            # Pre-fetch images just for Flink 1.x and Spark
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Pre-fetch images for all profiles[/dim]\n
+  $ [bold cyan]dml pull --all[/bold cyan]\n\n
+  [dim]# Pre-fetch images just for Flink 1.x and Spark[/dim]\n
+  $ [bold cyan]dml pull flink1 kafka[/bold cyan]
 """,
 )
 def pull(
@@ -186,10 +198,13 @@ def pull(
 @app.command(
     rich_help_panel="Cluster Lifecycle",
     epilog="""
-[bold]Examples:[/bold]\n
-$ [cyan]dml up clickhouse flink1[/cyan]            # Launch Clickhouse, Flink 1.x, and their dependencies\n
-$ [cyan]dml up airflow --dry-run[/cyan]            # Preview what would be launched for Airflow\n
-$ [cyan]dml up kafka --pull[/cyan]                 # Force pull latest images before launching
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Launch Clickhouse, Flink 1.x, and their dependencies[/dim]\n
+  $ [bold cyan]dml up clickhouse flink1[/bold cyan]\n\n
+  [dim]# Preview what would be launched for Airflow[/dim]\n
+  $ [bold cyan]dml up airflow --dry-run[/bold cyan]\n\n
+  [dim]# Force pull latest images before launching[/dim]\n
+  $ [bold cyan]dml up kafka --pull[/bold cyan]
 """,
 )
 def up(
@@ -245,10 +260,13 @@ def up(
 @app.command(
     rich_help_panel="Cluster Lifecycle",
     epilog="""
-[bold]Examples:[/bold]\n
-$ [cyan]dml down kafka[/cyan]                  # Stop specific profile(s)\n
-$ [cyan]dml down --all[/cyan]                  # Stop all running profiles\n
-$ [cyan]dml down --all -v[/cyan]               # Complete teardown and wipe all data\n
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Stop specific profile(s)[/dim]\n
+  $ [bold cyan]dml down kafka[/bold cyan]\n\n
+  [dim]# Stop all running profiles[/dim]\n
+  $ [bold cyan]dml down --all[/bold cyan]\n\n
+  [dim]# Complete teardown and wipe all data[/dim]\n
+  $ [bold cyan]dml down --all -v[/bold cyan]
 """,
 )
 def down(
