@@ -1,6 +1,7 @@
 import os
 from typing import List, Tuple
 
+import yaml
 from python_on_whales import DockerClient
 
 from dml.config import get_compose_path
@@ -44,28 +45,38 @@ def is_docker_running() -> bool:
 def get_stack_details(
     compose_filename: str, profiles: List[str]
 ) -> Tuple[List[str], List[str], List[str]]:
-    """Resolves services, host port mappings, and images via Docker Compose config."""
+    """Resolves services, host port mappings, and images via direct YAML parsing."""
     path = get_compose_path(compose_filename)
     if not path.exists():
         return ["File Error"], ["File Error"], ["File Error"]
 
-    stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
-
     try:
-        cfg = stack_client.compose.config()
+        with open(path, "r") as f:
+            compose_dict = yaml.safe_load(f)
+
         services = []
         ports = []
         images = []
-        if cfg and cfg.services:
-            for name, service in cfg.services.items():
-                services.append(name)
-                # Capture the image
-                if service.image:
-                    images.append(f"{name} -> {service.image}")
-                if service.ports:
-                    for p in service.ports:
-                        if p.published:
-                            ports.append(f"{name}:{p.published}")
+
+        # Parse the raw dictionary directly
+        for svc_name, svc_data in compose_dict.get("services", {}).items():
+            svc_profiles = svc_data.get("profiles", [])
+
+            # Check if this service belongs to the profiles we are querying
+            if any(p in profiles for p in svc_profiles):
+                services.append(svc_name)
+
+                if "image" in svc_data:
+                    images.append(f"{svc_name} -> {svc_data['image']}")
+
+                if "ports" in svc_data:
+                    for p in svc_data["ports"]:
+                        # Handle both string array "8080:8080" and long-form dict ports
+                        if isinstance(p, str):
+                            ports.append(f"{svc_name}:{p}")
+                        elif isinstance(p, dict) and "published" in p:
+                            ports.append(f"{svc_name}:{p['published']}")
+
         return (
             sorted(list(set(services))),
             sorted(list(set(ports))),
