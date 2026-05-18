@@ -25,10 +25,21 @@ stacks:
 
   base:
     file: "compose-base.yml"
-    description: "Core infrastructure for unified metadata, object storage, and caching."
+    description: "PostgreSQL metadata backend and DbGate UI."
     profiles: ["base"]
-    capacities: []
     depends_on: ["deps"]
+
+  storage:
+    file: "compose-base.yml"
+    description: "SeaweedFS S3-compatible object storage."
+    profiles: ["storage"]
+    depends_on: ["deps"]
+
+  catalog:
+    file: "compose-base.yml"
+    description: "Iceberg REST Catalog and PyIceberg CLI."
+    profiles: ["catalog"]
+    depends_on: ["base", "storage"]
 
   kafka:
     file: "compose-kafka.yml"
@@ -42,20 +53,19 @@ stacks:
     description: "Stateful, real-time stream processing engine."
     profiles: ["flink1"]
     capacities: ["stream_processing"]
-    depends_on: ["deps", "base"]
+    depends_on: ["deps", "storage", "catalog"]
 
   spark:
     file: "compose-spark.yml"
     description: "Distributed batch and micro-batch data processing."
     profiles: ["spark"]
     capacities: ["data_processing"]
-    depends_on: ["deps", "base"]
+    depends_on: ["deps", "storage", "catalog"]
 
   store:
     file: "compose-store.yml"
-    description: "Real-time OLAP analytics and streaming storage."
-    profiles: ["clickhouse1", "clickhouse2", "fluss"]
-    capacities: ["analytics", "messaging"]
+    description: "ClickHouse, Fluss, and Valkey cache."
+    profiles: ["clickhouse1", "clickhouse2", "fluss", "valkey"]
     depends_on: ["deps"]
 
   analytics:
@@ -70,7 +80,7 @@ stacks:
     description: "Workflow orchestration, feature store, and experiment tracking."
     profiles: ["airflow", "mlflow", "feast"]
     capacities: ["mlops", "orchestration"]
-    depends_on: ["deps", "base"]
+    depends_on: ["deps", "base", "storage", "catalog", "valkey"]
 
   obsv:
     file: "compose-obsv.yml"
