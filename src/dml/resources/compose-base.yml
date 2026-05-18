@@ -182,7 +182,7 @@ services:
       - CATALOG_IO__S3_PATH_STYLE_ACCESS=true
       # Explicit AWS SDK overrides (just in case)
       - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID= ${AWS_ACCESS_KEY_ID:-user}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-user}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-password}
       # Database Backend (Postgres)
       - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
@@ -190,6 +190,9 @@ services:
       - CATALOG_JDBC_USER=${POSTGRES_USER:-user}
       - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
 
+  # ==========================================
+  # [PROFILE: catalog] PyIceberg CLI Sidecar
+  # ==========================================
   pyiceberg:
     image: ghcr.io/jaehyeon-kim/open-dataml-stack/pyiceberg:${TAG:-latest}
     container_name: dml-pyiceberg
