@@ -49,125 +49,6 @@ services:
       start_period: 10s
 
   # ==========================================
-  # Object Storage (SeaweedFS - Single Node)
-  # ==========================================
-  seaweed:
-    image: chrislusf/seaweedfs:4.22
-    container_name: seaweed
-    ports:
-      - "8333:8333" # S3 API
-      - "8889:8888" # Filer UI
-      - "9333:9333" # Master UI
-    networks:
-      dml:
-        aliases:
-          - warehouse.seaweed
-    profiles:
-      - base
-    volumes:
-      # Mount the S3 credentials configuration
-      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
-    # Explicitly tell the S3 gateway to enforce the config file
-    command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed"
-    mem_limit: 512m
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8888/ || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  seaweed-init:
-    image: chrislusf/seaweedfs:4.22
-    container_name: seaweed-init
-    depends_on:
-      seaweed:
-        condition: service_healthy
-    networks:
-      - dml
-    profiles:
-      - base
-    entrypoint: |
-      sh -c "
-      echo '...waiting for SeaweedFS Master...'
-      sleep 2
-
-      BUCKETS='warehouse dml-dev flink-checkpoints flink-savepoints airflow'
-      for bucket in \$$BUCKETS; do
-        echo \"--- Creating S3 bucket natively: \$$bucket ---\"
-        echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333
-      done
-
-      echo '--- SeaweedFS Native Setup Complete ---'
-      exit 0
-      "
-
-  # ==========================================
-  # Iceberg REST Catalog
-  # ==========================================
-  catalog:
-    image: tabulario/iceberg-rest:1.6.0
-    container_name: iceberg-catalog
-    ports:
-      - "8181:8181"
-    networks:
-      - dml
-    profiles:
-      - base
-    depends_on:
-      postgres:
-        condition: service_healthy
-      seaweed-init:
-        condition: service_completed_successfully
-    mem_limit: 512m
-    environment:
-      - CATALOG_WAREHOUSE=s3://warehouse/
-      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
-      - CATALOG_S3_ENDPOINT=http://seaweed:8333
-      - CATALOG_S3_ACCESS_KEY_ID=user
-      - CATALOG_S3_SECRET_ACCESS_KEY=password
-      - CATALOG_S3_PATH_STYLE_ACCESS=true
-      - CATALOG_IO__S3_PATH_STYLE_ACCESS=true
-      # Explicit AWS SDK overrides (just in case)
-      - AWS_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=user
-      - AWS_SECRET_ACCESS_KEY=password
-      # Database Backend (Postgres)
-      - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
-      - CATALOG_URI=jdbc:postgresql://postgres:5432/iceberg
-      - CATALOG_JDBC_USER=${POSTGRES_USER:-user}
-      - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
-
-  # ==========================================
-  # Valkey (Redis Alternative)
-  # ==========================================
-  valkey:
-    image: valkey/valkey:9.1-alpine
-    container_name: valkey
-    ports:
-      - "6379:6379"
-    networks:
-      - dml
-    profiles:
-      - base
-    command:
-      - valkey-server
-      - --user
-      - default
-      - off
-      - --user
-      - user
-      - "on"
-      - ">password"
-      - "~*"
-      - "+@all"
-      - --save
-      - "60"
-      - "1"
-      - --loglevel
-      - warning
-    mem_limit: 512m
-
-  # ==========================================
   # DbGate (DB Inspection)
   # ==========================================
   dbgate:
@@ -219,6 +100,112 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ==========================================
+  # Object Storage (SeaweedFS - Single Node)
+  # ==========================================
+  seaweed:
+    image: chrislusf/seaweedfs:4.22
+    container_name: seaweed
+    ports:
+      - "8333:8333" # S3 API
+      - "8889:8888" # Filer UI
+      - "9333:9333" # Master UI
+    networks:
+      dml:
+        aliases:
+          - warehouse.seaweed
+    profiles:
+      - storage
+    volumes:
+      # Mount the S3 credentials configuration
+      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
+    # Explicitly tell the S3 gateway to enforce the config file
+    command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  seaweed-init:
+    image: chrislusf/seaweedfs:4.22
+    container_name: seaweed-init
+    depends_on:
+      seaweed:
+        condition: service_healthy
+    networks:
+      - dml
+    profiles:
+      - storage
+    entrypoint: |
+      sh -c "
+      echo '...waiting for SeaweedFS Master...'
+      sleep 2
+
+      BUCKETS='warehouse dml-dev flink-checkpoints flink-savepoints airflow'
+      for bucket in \$$BUCKETS; do
+        echo \"--- Creating S3 bucket natively: \$$bucket ---\"
+        echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333
+      done
+
+      echo '--- SeaweedFS Native Setup Complete ---'
+      exit 0
+      "
+
+  # ==========================================
+  # Iceberg REST Catalog
+  # ==========================================
+  catalog:
+    image: tabulario/iceberg-rest:1.6.0
+    container_name: iceberg-catalog
+    ports:
+      - "8181:8181"
+    networks:
+      - dml
+    profiles:
+      - catalog
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweed-init:
+        condition: service_completed_successfully
+    mem_limit: 512m
+    environment:
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://seaweed:8333
+      - CATALOG_S3_ACCESS_KEY_ID=user
+      - CATALOG_S3_SECRET_ACCESS_KEY=password
+      - CATALOG_S3_PATH_STYLE_ACCESS=true
+      - CATALOG_IO__S3_PATH_STYLE_ACCESS=true
+      # Explicit AWS SDK overrides (just in case)
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID= ${AWS_ACCESS_KEY_ID:-user}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-password}
+      # Database Backend (Postgres)
+      - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
+      - CATALOG_URI=jdbc:postgresql://postgres:5432/iceberg
+      - CATALOG_JDBC_USER=${POSTGRES_USER:-user}
+      - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
+
+  pyiceberg:
+    image: ghcr.io/jaehyeon-kim/open-dataml-stack/pyiceberg:${TAG:-latest}
+    container_name: dml-pyiceberg
+    profiles:
+      - catalog
+    networks:
+      - dml
+    depends_on:
+      catalog:
+        condition: service_started
+    environment:
+      PYICEBERG_CATALOG__DEFAULT__TYPE: rest
+      PYICEBERG_CATALOG__DEFAULT__URI: http://catalog:8181
+      PYICEBERG_CATALOG__DEFAULT__S3__ENDPOINT: http://seaweed:8333
+      PYICEBERG_CATALOG__DEFAULT__S3__ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+      PYICEBERG_CATALOG__DEFAULT__S3__SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
 
 networks:
   dml:
