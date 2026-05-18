@@ -1,7 +1,18 @@
+import sys
 from pathlib import Path
 
-# The internal immutable resources bundled with the CLI
-INTERNAL_RESOURCES_DIR = Path(__file__).parent.resolve() / "resources"
+
+def get_internal_resources_dir() -> Path:
+    """Determine the path to the bundled compose files, supporting PyInstaller."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        # Running as a compiled PyInstaller binary
+        return Path(sys._MEIPASS) / "dml" / "resources"
+    # Running as a normal Python script
+    return Path(__file__).parent.resolve() / "resources"
+
+
+# Internal immutable resources bundled with the CLI
+INTERNAL_RESOURCES_DIR = get_internal_resources_dir()
 
 
 def get_workspace_dir() -> Path:

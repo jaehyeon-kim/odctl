@@ -17,7 +17,7 @@ online_store:
 # Offline Store (ClickHouse Dedicated DB)
 offline_store:
   type: clickhouse
-  host: clickhouse
+  host: clickhouse-11
   port: 8123
   user: ${CLICKHOUSE_USER:-user}
   password: ${CLICKHOUSE_PASSWORD:-password}

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional
 
 import typer
@@ -38,9 +39,24 @@ Provides commands to inspect, provision, and tear down curated Docker Compose st
 )
 
 
-@app.callback()
-def main():
-    pass
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        help="Enable debug-level logging across all commands.",
+        rich_help_panel="Global Options",
+    ),
+    workspace: Path = typer.Option(
+        "./.dml",
+        "--workspace",
+        "-w",
+        help="Path to the DML workspace directory.",
+        rich_help_panel="Global Options",
+    ),
+):
+    ctx.obj = {"verbose": verbose, "workspace": workspace}
 
 
 @app.command(
@@ -200,7 +216,7 @@ def pull(
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# Launch Clickhouse, Flink 1.x, and their dependencies[/dim]\n
-  $ [bold cyan]dml up clickhouse flink1[/bold cyan]\n\n
+  $ [bold cyan]dml up clickhouse1 flink1[/bold cyan]\n\n
   [dim]# Preview what would be launched for Airflow[/dim]\n
   $ [bold cyan]dml up airflow --dry-run[/bold cyan]\n\n
   [dim]# Force pull latest images before launching[/dim]\n
@@ -209,7 +225,7 @@ def pull(
 )
 def up(
     profiles: List[str] = typer.Argument(
-        ..., help="One or more profiles to launch (e.g., 'clickhouse', 'kafka')."
+        ..., help="One or more profiles to launch (e.g., 'clickhouse1', 'kafka')."
     ),
     dry_run: bool = typer.Option(
         False,
