@@ -1,0 +1,68 @@
+name: Release DML CLI
+
+on:
+  # push:
+  #   tags:
+  #     - "v*"
+  workflow_dispatch:
+
+jobs:
+  pypi-publish:
+    name: Upload release to PyPI
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # Mandatory for PyPI Trusted Publishing
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip build hatch
+      - name: Build Wheel & SDist
+        run: python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  binary-publish:
+    name: Build & Attach Standalone Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary_name: dml-linux
+            separator: ":"
+          - os: macos-latest
+            binary_name: dml-macos
+            separator: ":"
+          - os: windows-latest
+            binary_name: dml.exe
+            separator: ";"
+    permissions:
+      contents: write # Needed to upload assets to GitHub Releases
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python Requirements
+        run: |
+          pip install -e .
+          pip install pyinstaller
+      - name: Compile Binary with PyInstaller
+        # PyInstaller uses specific OS separators (; for Windows, : for Unix) to map source:dest
+        run: |
+          pyinstaller --name ${{ matrix.binary_name }} \
+          --onefile \
+          --add-data "src/dml/resources${{ matrix.separator }}dml/resources" \
+          src/dml/main.py
+      - name: Upload Binary to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/${{ matrix.binary_name }}

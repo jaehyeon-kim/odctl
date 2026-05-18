@@ -180,7 +180,7 @@ services:
     profiles:
       - base
     environment:
-      - CONNECTIONS=pg,vk,ch1,ch2
+      - CONNECTIONS=pg,vk,ch1,ch2,ch3,ch4
       # PostgreSQL Auto-connection
       - LABEL_pg=Postgres
       - ENGINE_pg=postgres@dbgate-plugin-postgres
@@ -193,18 +193,28 @@ services:
       - SERVER_vk=valkey
       - USER_vk=${VALKEY_USER:-user}
       - PASSWORD_vk=${VALKEY_PASSWORD:-password}
-      # ClickHouse Node 1 Auto-connection
-      - LABEL_ch1=ClickHouse-01
+      # ClickHouse Shard 1
+      - LABEL_ch1=ClickHouse-S1R1
       - ENGINE_ch1=clickhouse@dbgate-plugin-clickhouse
-      - URL_ch1=http://clickhouse-1:8123
+      - URL_ch1=http://clickhouse-11:8123
       - USER_ch1=${CLICKHOUSE_USER:-user}
       - PASSWORD_ch1=${CLICKHOUSE_PASSWORD:-password}
-      # ClickHouse Node 2 Auto-connection
-      - LABEL_ch2=ClickHouse-02
+      - LABEL_ch2=ClickHouse-S1R2
       - ENGINE_ch2=clickhouse@dbgate-plugin-clickhouse
-      - URL_ch2=http://clickhouse-2:8123
+      - URL_ch2=http://clickhouse-12:8123
       - USER_ch2=${CLICKHOUSE_USER:-user}
       - PASSWORD_ch2=${CLICKHOUSE_PASSWORD:-password}
+      # ClickHouse Shard 2
+      - LABEL_ch3=ClickHouse-S2R1
+      - ENGINE_ch3=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch3=http://clickhouse-21:8123
+      - USER_ch3=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch3=${CLICKHOUSE_PASSWORD:-password}
+      - LABEL_ch4=ClickHouse-S2R2
+      - ENGINE_ch4=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch4=http://clickhouse-22:8123
+      - USER_ch4=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch4=${CLICKHOUSE_PASSWORD:-password}
     mem_limit: 512m
     depends_on:
       postgres:

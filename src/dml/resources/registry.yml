@@ -54,7 +54,7 @@ stacks:
   store:
     file: "compose-store.yml"
     description: "Real-time OLAP analytics and streaming storage."
-    profiles: ["clickhouse", "fluss"]
+    profiles: ["clickhouse1", "clickhouse2", "fluss"]
     capacities: ["analytics", "messaging"]
     depends_on: ["deps"]
 
