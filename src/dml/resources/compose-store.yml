@@ -39,9 +39,9 @@ services:
   # ==========================================
   # [PROFILE: clickhouse1] Shard 1 (Replicas 1 & 2)
   # ==========================================
-  clickhouse-1:
+  clickhouse-11:
     <<: *clickhouse-base
-    container_name: clickhouse-1
+    container_name: clickhouse-11
     profiles: ["clickhouse1"]
     ports:
       - "8123:8123"
@@ -49,12 +49,12 @@ services:
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
-      - ./clickhouse/macros-1.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/macros-11.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  clickhouse-2:
+  clickhouse-12:
     <<: *clickhouse-base
-    container_name: clickhouse-2
+    container_name: clickhouse-12
     profiles: ["clickhouse1"]
     ports:
       - "8124:8123"
@@ -62,15 +62,15 @@ services:
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
-      - ./clickhouse/macros-2.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/macros-12.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # ==========================================
   # [PROFILE: clickhouse2] Shard 2 (Replicas 1 & 2)
   # ==========================================
-  clickhouse-3:
+  clickhouse-21:
     <<: *clickhouse-base
-    container_name: clickhouse-3
+    container_name: clickhouse-21
     profiles: ["clickhouse2"]
     ports:
       - "8125:8123"
@@ -78,12 +78,12 @@ services:
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
-      - ./clickhouse/macros-3.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/macros-21.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  clickhouse-4:
+  clickhouse-22:
     <<: *clickhouse-base
-    container_name: clickhouse-4
+    container_name: clickhouse-22
     profiles: ["clickhouse2"]
     ports:
       - "8126:8123"
@@ -91,7 +91,7 @@ services:
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
-      - ./clickhouse/macros-4.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/macros-22.xml:/etc/clickhouse-server/config.d/macros.xml
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # ==========================================
