@@ -12,15 +12,18 @@ def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
     table = Table(header_style="bold")
     table.add_column("Profile", style="green", no_wrap=True, vertical="middle")
     table.add_column("Parent Stack", style="cyan", vertical="middle")
-    table.add_column("Description", max_width=75, vertical="middle")
+    table.add_column("Description", max_width=60, vertical="middle")
 
     if deep:
         table.add_column("Services", style="magenta", max_width=45, vertical="middle")
-        table.add_column("Port Mappings", style="blue", max_width=45, vertical="middle")
+        table.add_column("Port Mappings", style="blue", max_width=55, vertical="middle")
 
     for stack_id, config in registry.stacks.items():
+        # Decide the display name: Use config.parent if it exists, otherwise use stack_id
+        display_group_name = config.parent if config.parent else stack_id
+
         for i, profile in enumerate(config.profiles):
-            display_stack = stack_id if i == 0 else ""
+            display_stack = display_group_name if i == 0 else ""
             display_desc = config.description if i == 0 else ""
             row = [profile, display_stack, display_desc]
 

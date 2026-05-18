@@ -18,7 +18,7 @@ capacities:
 stacks:
   deps:
     file: "compose-deps.yml"
-    description: "Shared dependencies, JARs, data connectors, and Docker network"
+    description: "Shared dependencies, JARs, connectors, and Docker network"
     profiles: ["deps"]
     capacities: []
     depends_on: []
@@ -27,18 +27,23 @@ stacks:
     file: "compose-base.yml"
     description: "PostgreSQL metadata backend and DbGate UI."
     profiles: ["base"]
+    capacities: []
     depends_on: ["deps"]
 
   storage:
     file: "compose-base.yml"
     description: "SeaweedFS S3-compatible object storage."
     profiles: ["storage"]
+    parent: "base"
+    capacities: []
     depends_on: ["deps"]
 
   catalog:
     file: "compose-base.yml"
     description: "Iceberg REST Catalog and PyIceberg CLI."
     profiles: ["catalog"]
+    parent: "base"
+    capacities: []
     depends_on: ["base", "storage"]
 
   kafka:

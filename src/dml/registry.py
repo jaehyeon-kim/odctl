@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -10,8 +10,9 @@ class StackConfig(BaseModel):
     file: str
     description: str
     profiles: List[str]
-    capacities: List[str]
+    capacities: List[str] = Field(default_factory=list)
     depends_on: List[str] = Field(default_factory=list)
+    parent: Optional[str] = None
 
 
 class Registry(BaseModel):
