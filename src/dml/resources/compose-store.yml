@@ -144,6 +144,36 @@ services:
         data.dir: /tmp/fluss/data
         remote.data.dir: /tmp/fluss/remote-data
 
+  # ==========================================
+  # Valkey (Redis Alternative)
+  # ==========================================
+  valkey:
+    image: valkey/valkey:9.1-alpine
+    container_name: valkey
+    ports:
+      - "6379:6379"
+    networks:
+      - dml
+    profiles:
+      - valkey
+    command:
+      - valkey-server
+      - --user
+      - default
+      - off
+      - --user
+      - user
+      - "on"
+      - ">password"
+      - "~*"
+      - "+@all"
+      - --save
+      - "60"
+      - "1"
+      - --loglevel
+      - warning
+    mem_limit: 512m
+
 networks:
   dml:
     name: dml
