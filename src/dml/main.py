@@ -121,7 +121,15 @@ def explain(
 
     stack_id = profile_map[profile]["stack_id"]
     stack = registry.stacks[stack_id]
-    services, ports, images = get_stack_details(stack.file, [profile])
+
+    # Extract all 4 values returned by the updated get_stack_details
+    services, ports, images, volumes = get_stack_details(stack.file, [profile])
+
+    usage_text = stack.usage
+    if isinstance(usage_text, dict):
+        usage_text = usage_text.get(
+            profile, f"• No specific usage guide for profile: {profile}"
+        )
 
     ui.print_explain_panel(
         profile,
@@ -132,6 +140,9 @@ def explain(
         services,
         ports,
         images,
+        volumes,
+        stack.role,
+        usage_text,
     )
 
 

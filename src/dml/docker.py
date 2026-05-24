@@ -44,11 +44,11 @@ def is_docker_running() -> bool:
 
 def get_stack_details(
     compose_filename: str, profiles: List[str]
-) -> Tuple[List[str], List[str], List[str]]:
-    """Resolves services, host port mappings, and images via direct YAML parsing."""
+) -> Tuple[List[str], List[str], List[str], List[str]]:
+    """Resolves services, host port mappings, images, and volumes via direct YAML parsing."""
     path = get_compose_path(compose_filename)
     if not path.exists():
-        return ["File Error"], ["File Error"], ["File Error"]
+        return ["File Error"], ["File Error"], ["File Error"], ["File Error"]
 
     try:
         with open(path, "r") as f:
@@ -57,6 +57,7 @@ def get_stack_details(
         services = []
         ports = []
         images = []
+        volumes = []
 
         # Parse the raw dictionary directly
         for svc_name, svc_data in compose_dict.get("services", {}).items():
@@ -71,20 +72,31 @@ def get_stack_details(
 
                 if "ports" in svc_data:
                     for p in svc_data["ports"]:
-                        # Handle both string array "8080:8080" and long-form dict ports
                         if isinstance(p, str):
                             ports.append(f"{svc_name}:{p}")
                         elif isinstance(p, dict) and "published" in p:
-                            ports.append(f"{svc_name}:{p['published']}")
+                            target = p.get("target", p["published"])
+                            ports.append(f"{svc_name}:{p['published']}:{target}")
+
+                if "volumes" in svc_data:
+                    for v in svc_data["volumes"]:
+                        if isinstance(v, str):
+                            vol_name = v.split(":")[0]
+                            # Only track named volumes, ignore local host bind mounts (./ or /)
+                            if not vol_name.startswith((".", "/")):
+                                volumes.append(vol_name)
+                        elif isinstance(v, dict) and v.get("type") == "volume":
+                            volumes.append(v.get("source"))
 
         return (
             sorted(list(set(services))),
             sorted(list(set(ports))),
             sorted(list(set(images))),
+            sorted(list(set(volumes))),
         )
     except Exception as e:
         err = f"Err: {type(e).__name__}"
-        return [err], [err], [err]
+        return [err], [err], [err], [err]
 
 
 def pull_stack_images(compose_filename: str, profiles: List[str]):

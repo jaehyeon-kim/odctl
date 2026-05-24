@@ -19,7 +19,6 @@ def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
         table.add_column("Port Mappings", style="blue", max_width=55, vertical="middle")
 
     for stack_id, config in registry.stacks.items():
-        # Decide the display name: Use config.parent if it exists, otherwise use stack_id
         display_group_name = config.parent if config.parent else stack_id
 
         for i, profile in enumerate(config.profiles):
@@ -28,7 +27,8 @@ def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
             row = [profile, display_stack, display_desc]
 
             if deep:
-                services, ports, _ = get_details_func(config.file, [profile])
+                # Absorb the newly returned volumes with an underscore
+                services, ports, _, _ = get_details_func(config.file, [profile])
                 row.append(", ".join(services) if services else "N/A")
                 row.append(", ".join(ports) if ports else "N/A")
 
@@ -46,34 +46,59 @@ def print_explain_panel(
     services: List[str],
     ports: List[str],
     images: List[str],
+    volumes: List[str],
     role: Optional[str] = None,
     usage: Optional[str] = None,
 ):
     """Formats and prints the detailed Profile Inspector panel."""
 
-    # Dependency Context
     deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
 
-    # Container Context (Mapping images to their roles)
+    # Container Context (Substring matching)
     container_roles = {
-        "apache/kafka": "Event Broker / Connect Worker",
-        "ghcr.io/kafbat/kafka-ui": "Web Dashboard",
-        "ghcr.io/aiven-open/karapace": "Schema Registry API",
-        "chrislusf/seaweedfs": "Object Storage Engine",
-        "tabulario/iceberg-rest": "REST API Gateway",
-        "ghcr.io/jaehyeon-kim/open-dataml-stack/pyiceberg": "Headless CLI Proxy",
-        "postgres": "Metadata Database",
-        "getdbgate/dbgate": "Database Web UI",
+        "pgvector": "Unified Metadata & Vector DB",
+        "dbgate": "Database Inspection UI",
+        "seaweedfs": "Object Storage (S3 API)",
+        "iceberg-rest": "Iceberg REST Catalog",
+        "open-dataml-stack/pyiceberg": "PyIceberg CLI Proxy",
+        "open-dataml-stack/deps": "Dependency Initializer",
+        "flink": "Flink Stream Processing Node",
+        "apache/kafka": "Event Broker / Kafka Connect",
+        "karapace": "Schema Registry",
+        "kafka-ui": "Kafka Dashboard",
+        "elasticsearch": "OpenMetadata Search Backend",
+        "openmetadata/server": "OpenMetadata Server",
+        "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
+        "amazon/aws-cli": "Airflow DAG S3 Sync",
+        "open-dataml-stack/airflow": "Airflow Orchestrator",
+        "open-dataml-stack/mlflow": "MLflow Tracking Server",
+        "open-dataml-stack/feast": "Feast Feature Server",
+        "marquez-web": "Lineage Dashboard",
+        "marquezproject/marquez": "Lineage API Server",
+        "prometheus": "Telemetry Metrics Server",
+        "alertmanager": "Alerting Server",
+        "grafana": "Observability Dashboard",
+        "open-dataml-stack/spark": "Spark Processing Node",
+        "clickhouse-keeper": "Consensus Node",
+        "clickhouse-server": "Analytical Database (OLAP)",
+        "fluss": "Streaming Storage Engine",
+        "valkey": "In-Memory Cache",
+        "trinodb/trino": "Federated SQL Engine",
+        "metabase": "BI Dashboard",
     }
 
     if images and " -> " in images[0]:
         services_list = []
         for item in images:
             name, img = item.split(" -> ")
-            base_img = img.split(":")[0]  # Strip the tag for matching
-            role_desc = container_roles.get(base_img, "Service Container")
+            role_desc = "Service Container"
+            for key, desc in container_roles.items():
+                if key in img:
+                    role_desc = desc
+                    break
+
             services_list.append(
-                f"  📦 [magenta]{name.ljust(15, ' ')}[/magenta] ([green]{img}[/green]) ➡️ [dim]{role_desc}[/dim]"
+                f"  📦 [magenta]{name.ljust(22, ' ')}[/magenta] ([green]{img}[/green])\n      ↳ [dim]{role_desc}[/dim]"
             )
         services_str = "\n".join(services_list)
     else:
@@ -83,36 +108,37 @@ def print_explain_panel(
             else "  None"
         )
 
-    # 3. Port Context
-    port_context = {
-        "8333": "S3 API Endpoint (Boto3/Spark)",
-        "8888": "Filer Web UI (Browser)",
-        "9333": "Master Server API",
-        "8181": "Iceberg REST API",
-        "5432": "PostgreSQL DB Port",
-        "3000": "DbGate Web UI",
-        "8086": "Kafka Web UI",
-        "8081": "Karapace Schema Registry API",
-        "8083": "Kafka Connect API",
-        "9092": "Kafka Broker 1 (External)",
-        "9093": "Kafka Broker 2 (External)",
-        "9094": "Kafka Broker 3 (External)",
-        "29092": "Kafka Broker 1 (Minikube/Internal)",
-        "29093": "Kafka Broker 2 (Minikube/Internal)",
-        "29094": "Kafka Broker 3 (Minikube/Internal)",
-    }
+    # Volumes Context
+    volumes_str = (
+        "\n".join(f"  💾 [green]{v}[/green]" for v in volumes) if volumes else "  None"
+    )
+    if volumes:
+        volumes_str += (
+            "\n  [dim italic](Use 'dml down -v' to wipe these volumes)[/dim italic]"
+        )
 
+    # Port Context (Host vs Internal Routing)
     ports_list = []
     for p in ports:
-        # Example p: "seaweed:8333:8333" -> extract the last part
-        host_port = p.split(":")[-1]
-        context = port_context.get(host_port, "Mapped Port")
+        parts = p.split(":")
+        svc_name = parts[0]
+
+        # Parse Host vs Container mapping (e.g., flink-sql-gateway:8084:8083)
+        if len(parts) >= 3:
+            host_port = parts[1]
+            container_port = parts[2]
+        elif len(parts) == 2:
+            host_port = parts[1]
+            container_port = parts[1]
+        else:
+            continue
+
         ports_list.append(
-            f"  🔌 [blue]{p.ljust(25, ' ')}[/blue] ➡️ [dim]{context}[/dim]"
+            f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] ➡️  Container [cyan]{svc_name}:{container_port}[/cyan]"
         )
     ports_str = "\n".join(ports_list) if ports_list else "  None"
 
-    # 4. Constructing the Output
+    # Constructing the Output
     role_section = f"\n[bold]Architecture Role:[/bold]\n{role}\n" if role else ""
     usage_section = (
         f"\n[bold green]🚀 How to Use It:[/bold green]\n{usage}\n" if usage else ""
@@ -128,10 +154,13 @@ def print_explain_panel(
 [bold]Requires Dependencies:[/bold] 
   {deps_str}
 
+[bold]Persistent Volumes:[/bold]
+{volumes_str}
+
 [bold]Containers (Images):[/bold]
 {services_str}
 
-[bold]Exposed Host Ports:[/bold]
+[bold]Network Mapping (Host ➡️  Docker):[/bold]
 {ports_str}
 {usage_section}"""
 
