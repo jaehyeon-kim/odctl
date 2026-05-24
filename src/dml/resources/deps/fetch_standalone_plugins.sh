@@ -14,19 +14,16 @@ get_maven_version() {
 }
 
 echo "▶️  Resolving Shared & Connector Versions..."
-ICEBERG_V=$(get_maven_version "org/apache/iceberg/iceberg-core" "[0-9]+\.[0-9]+\.[0-9]+")
-if [ -z "$ICEBERG_V" ]; then echo "❌ Error: Could not resolve Iceberg core version!"; exit 1; fi
 
-POSTGRES_V=$(get_maven_version "org/postgresql/postgresql" "42\.[0-9]+\.[0-9]+")
-if [ -z "$POSTGRES_V" ]; then echo "❌ Error: Could not resolve PostgreSQL driver version!"; exit 1; fi
+# 🔒 HARDCODED: Lock core dependencies to ensure absolute stack stability (May 2026)
+ICEBERG_V="1.11.0"
+DEB_V="3.5.1.Final"
+POSTGRES_V="42.7.3"  # Latest stable JDBC 42.x series
 
-DEB_V=$(get_maven_version "io/debezium/debezium-connector-postgres" "[0-9]+\.[0-9]+\.[0-9]+\.Final")
-if [ -z "$DEB_V" ]; then echo "❌ Error: Could not resolve Debezium version!"; exit 1; fi
-
-# Fetch GitHub metadata
-ICEBERG_KC_JSON=$(curl -sL https://api.github.com/repos/databricks/iceberg-kafka-connect/releases/latest)
+# Fetch GitHub metadata for connectors we still want to dynamically track
+ICEBERG_KC_JSON=$(curl -sL https://api.github.com/repos/tabular-io/iceberg-kafka-connect/releases/latest)
 ICEBERG_KC_URL=$(echo "$ICEBERG_KC_JSON" | grep -Eo '"browser_download_url":\s*"[^"]+\.zip"' | grep -v 'hive' | head -1 | awk -F'"' '{print $4}' || true)
-if [ -z "$ICEBERG_KC_URL" ]; then echo "❌ Error: Could not resolve Databricks Iceberg Kafka Connect URL! (Check GitHub rate limits)"; exit 1; fi
+if [ -z "$ICEBERG_KC_URL" ]; then echo "❌ Error: Could not resolve Tabular Iceberg Kafka Connect URL! (Check GitHub rate limits)"; exit 1; fi
 
 echo "▶️  Fetching Kafka Connectors..."
 make_dir "connect/clickhouse-sink"

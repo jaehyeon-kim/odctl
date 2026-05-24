@@ -16,13 +16,11 @@ get_maven_version() {
 echo "▶️  Resolving Spark Versions..."
 SCALA_V="2.13"
 
-# Clever: Resolves the Spark version based on what Iceberg actually supports!
-SPARK_COMPAT_MINOR=$(curl -sL "https://repo1.maven.org/maven2/org/apache/iceberg/" | grep -Eo "iceberg-spark-runtime-[0-9]+\.[0-9]+_${SCALA_V}" | sed "s/iceberg-spark-runtime-//;s/_${SCALA_V}//" | sort -V | tail -1)
-if [ -z "$SPARK_COMPAT_MINOR" ]; then echo "❌ Error: Could not resolve Spark compatibility version from Iceberg!"; exit 1; fi
+# 🔒 HARDCODED: Lock to Spark 4.1.x and Iceberg 1.11.0 to ensure stack stability
+SPARK_COMPAT_MINOR="4.1"
+ICEBERG_V="1.11.0"
 
-ICEBERG_V=$(get_maven_version "org/apache/iceberg/iceberg-core" "[0-9]+\.[0-9]+\.[0-9]+")
-if [ -z "$ICEBERG_V" ]; then echo "❌ Error: Could not resolve Iceberg core version!"; exit 1; fi
-
+# Keep OpenLineage dynamic as it relies on frequent patch updates
 OL_SPARK_V=$(get_maven_version "io/openlineage/openlineage-spark_${SCALA_V}" "[0-9]+\.[0-9]+\.[0-9]+")
 if [ -z "$OL_SPARK_V" ]; then echo "❌ Error: Could not resolve OpenLineage Spark version!"; exit 1; fi
 

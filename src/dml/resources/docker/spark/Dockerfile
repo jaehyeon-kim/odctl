@@ -1,4 +1,4 @@
-FROM apache/spark:4.0.2
+FROM apache/spark:4.1.2
 
 # Switch to root to install system-wide packages
 USER root
