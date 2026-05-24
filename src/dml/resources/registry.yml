@@ -22,56 +22,120 @@ stacks:
     profiles: ["deps"]
     capacities: []
     depends_on: []
+    role: "Ephemeral init-container. It populates the shared Docker volume with downloaded JARs (Iceberg, Flink, Spark) and Kafka connectors before shutting down."
+    usage: |
+      • Runs automatically on 'dml up'. 
+      • No persistent UI or ports exposed.
 
-  base:
-    file: "compose-base.yml"
-    description: "PostgreSQL metadata backend and DbGate UI."
-    profiles: ["base"]
-    capacities: []
+  infra:
+    file: "compose-infra.yml"
+    description: "Core Data Platform Infrastructure (Postgres, SeaweedFS, Iceberg Catalog)."
+    profiles: ["base", "storage", "catalog"]
+    capacities: ["metadata", "storage"]
     depends_on: ["deps"]
-
-  storage:
-    file: "compose-base.yml"
-    description: "SeaweedFS S3-compatible object storage."
-    profiles: ["storage"]
-    parent: "base"
-    capacities: []
-    depends_on: ["deps"]
-
-  catalog:
-    file: "compose-base.yml"
-    description: "Iceberg REST Catalog and PyIceberg CLI."
-    profiles: ["catalog"]
-    parent: "base"
-    capacities: []
-    depends_on: ["base", "storage"]
+    role: "Provides the foundational layer of the local data lake. Manages long-lived persistence (pgvector), file storage (SeaweedFS), and the structural access interface (Iceberg REST Catalog)."
+    usage:
+      base: |
+        • Postgres JDBC: 
+          * External (Localhost): jdbc:postgresql://localhost:5432/dml
+          * Internal (Docker): jdbc:postgresql://postgres:5432/dml
+          * Credentials: user / password
+        • DbGate UI: 
+          * External (Localhost): http://localhost:8282
+          * Internal (Docker): http://dbgate:3000
+      storage: |
+        • S3 Browser UI: 
+          * External (Localhost): http://localhost:8889
+          * Internal (Docker): http://seaweed:8888
+        • S3 API Endpoint: 
+          * External (Localhost): http://localhost:8333
+          * Internal (Docker): http://seaweed:8333
+        • Default AWS Keys: user / password
+      catalog: |
+        • REST API Endpoint: 
+          * External (Localhost): http://localhost:8181
+          * Internal (Docker): http://catalog:8181
+        • CLI Access: Use 'dml iceberg' to interact via the headless sidecar wrapper.
 
   kafka:
     file: "compose-kafka.yml"
     description: "Distributed event streaming and schema registry."
     profiles: ["kafka"]
     capacities: ["messaging"]
-    depends_on: ["deps", "base"]
+    depends_on: ["deps", "infra"]
+    role: "3-node KRaft broker with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion."
+    usage: |
+      • Bootstrap Servers:
+        - External (Localhost): localhost:9092, localhost:9093, localhost:9094
+        - Internal (Docker): kafka-1:19092, kafka-2:19093, kafka-3:19094
+        - Minikube: host.minikube.internal:29092, host.minikube.internal:29093, host.minikube.internal:29094
+      • Connect API: 
+        - External (Localhost): http://localhost:8083
+        - Internal (Docker): http://connect:8083
+      • Schema Registry: 
+        - External (Localhost): http://localhost:8081
+        - Internal (Docker): http://karapace:8081
+      • Kafka UI: 
+        - External (Localhost): http://localhost:8086
+        - Internal (Docker): http://kafka-ui:8080
 
   flink:
     file: "compose-flink.yml"
     description: "Stateful, real-time stream processing engine."
     profiles: ["flink1"]
     capacities: ["stream_processing"]
-    depends_on: ["deps", "storage", "catalog"]
+    depends_on: ["deps", "infra"]
+    role: "Executes continuous streaming pipelines across a JobManager and 3 TaskManagers."
+    usage:
+      flink1: |
+        • Flink JobManager UI:
+          - External (Localhost): http://localhost:8082
+          - Internal (Docker): http://jobmanager-1:8081
+        • SQL Gateway REST:
+          - External (Localhost): http://localhost:8084
+          - Internal (Docker): http://flink-sql-gateway-1:8083
 
   spark:
     file: "compose-spark.yml"
     description: "Distributed batch and micro-batch data processing."
     profiles: ["spark"]
     capacities: ["data_processing"]
-    depends_on: ["deps", "storage", "catalog"]
+    depends_on: ["deps", "infra"]
+    role: "Distributed batch engine for data preparation and large-scale ETL."
+    usage: |
+      • Spark Master UI: 
+        - External (Localhost): http://localhost:9080
+        - Internal (Docker): http://spark-master:8080
+      • Master RPC: 
+        - External (Localhost): spark://localhost:7077
+        - Internal (Docker): spark://spark-master:7077
+      • Spark History Server: 
+        - External (Localhost): http://localhost:18080
+        - Internal (Docker): http://spark-history:18080
 
   store:
     file: "compose-store.yml"
     description: "ClickHouse, Fluss, and Valkey cache."
     profiles: ["clickhouse1", "clickhouse2", "fluss", "valkey"]
     depends_on: ["deps"]
+    role: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey)."
+    usage:
+      clickhouse1: |
+        • ClickHouse HTTP (Shard 1 / Replica 1 & 2): 
+          * External (Localhost): http://localhost:8123, http://localhost:8124
+          * Internal (Docker): http://clickhouse-11:8123, http://clickhouse-12:8123
+      clickhouse2: |
+        • ClickHouse HTTP (Shard 2 / Replica 1 & 2): 
+          * External (Localhost): http://localhost:8125, http://localhost:8126
+          * Internal (Docker): http://clickhouse-21:8123, http://clickhouse-22:8123
+      fluss: |
+        • Fluss Coordinator API: 
+          * External (Localhost): localhost:9123
+          * Internal (Docker): fluss-coordinator:9123
+      valkey: |
+        • Valkey Port (In-Memory Key-Value Cache): 
+          * External (Localhost): localhost:6379
+          * Internal (Docker): valkey:6379
 
   analytics:
     file: "compose-analytics.yml"
@@ -79,24 +143,73 @@ stacks:
     profiles: ["trino", "metabase"]
     capacities: ["analytics"]
     depends_on: ["deps"]
+    role: "Trino federates queries across Iceberg/Postgres; Metabase handles visualization."
+    usage:
+      trino: |
+        • Trino UI & JDBC connection (user: admin, password: none): 
+          * External (Localhost): http://localhost:8080
+          * Internal (Docker): http://trino:8080
+      metabase: |
+        • Metabase Dashboard Engine: 
+          * External (Localhost): http://localhost:3000
+          * Internal (Docker): http://metabase:3000
 
   mlops:
     file: "compose-mlops.yml"
     description: "Workflow orchestration, feature store, and experiment tracking."
     profiles: ["airflow", "mlflow", "feast"]
     capacities: ["mlops", "orchestration"]
-    depends_on: ["deps", "base", "storage", "catalog", "valkey"]
+    depends_on: ["deps", "infra", "valkey"]
+    role: "Pipeline scheduling (Airflow), model registry (MLflow), and feature serving (Feast)."
+    usage:
+      airflow: |
+        • Airflow Web UI (Credentials: user / password): 
+          * External (Localhost): http://localhost:8085
+          * Internal (Docker): http://airflow-webserver:8080
+      mlflow: |
+        • MLflow Tracking UI & Artifact Registry Server: 
+          * External (Localhost): http://localhost:5000
+          * Internal (Docker): http://mlflow:5000
+      feast: |
+        • Feast Feature Server API: 
+          * External (Localhost): http://localhost:6566
+          * Internal (Docker): http://feast:6566
 
   obsv:
     file: "compose-obsv.yml"
     description: "System telemetry, monitoring, and data lineage."
     profiles: ["lineage", "telemetry"]
     capacities: ["observability", "lineage"]
-    depends_on: ["deps", "base"]
+    depends_on: ["deps", "infra"]
+    role: "Data provenance tracking (Marquez) and metric dashboards (Grafana)."
+    usage:
+      lineage: |
+        • Marquez API Metadata Endpoint:
+          * External (Localhost): http://localhost:5002
+          * Internal (Docker): http://marquez-api:5000
+        • Marquez Lineage Graph Web UI:
+          * External (Localhost): http://localhost:3003
+          * Internal (Docker): http://marquez-web:3000
+      telemetry: |
+        • Prometheus Time Series Engine:
+          * External (Localhost): http://localhost:19090
+          * Internal (Docker): http://prometheus:9090
+        • Grafana Metrics Dashboard (Credentials: user / password): 
+          * External (Localhost): http://localhost:3004
+          * Internal (Docker): http://grafana:3000
 
   metadata:
     file: "compose-metadata.yml"
     description: "Data catalog, discovery, and governance platform."
     profiles: ["metadata"]
     capacities: ["metadata"]
-    depends_on: ["deps", "base"]
+    depends_on: ["deps", "infra"]
+    role: "Enterprise data catalog utilizing Elasticsearch and Postgres backends."
+    usage: |
+      • OpenMetadata UI & REST API: 
+        - External (Localhost): http://localhost:8585
+        - Internal (Docker): http://openmetadata-server:8585
+      • Ingestion Pipeline UI:
+        - External (Localhost): http://localhost:8087
+        - Internal (Docker): http://openmetadata-ingestion:8080
+      • Default Admin: admin@dataml.local / admin
