@@ -46,15 +46,36 @@ def print_explain_panel(
     services: List[str],
     ports: List[str],
     images: List[str],
+    role: Optional[str] = None,
+    usage: Optional[str] = None,
 ):
     """Formats and prints the detailed Profile Inspector panel."""
+
+    # Dependency Context
     deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
 
+    # Container Context (Mapping images to their roles)
+    container_roles = {
+        "apache/kafka": "Event Broker / Connect Worker",
+        "ghcr.io/kafbat/kafka-ui": "Web Dashboard",
+        "ghcr.io/aiven-open/karapace": "Schema Registry API",
+        "chrislusf/seaweedfs": "Object Storage Engine",
+        "tabulario/iceberg-rest": "REST API Gateway",
+        "ghcr.io/jaehyeon-kim/open-dataml-stack/pyiceberg": "Headless CLI Proxy",
+        "postgres": "Metadata Database",
+        "getdbgate/dbgate": "Database Web UI",
+    }
+
     if images and " -> " in images[0]:
-        services_str = "\n".join(
-            f"  📦 [magenta]{item.split(' -> ')[0].ljust(20, ' ')}[/magenta] ([green]{item.split(' -> ')[1]}[/green])"
-            for item in images
-        )
+        services_list = []
+        for item in images:
+            name, img = item.split(" -> ")
+            base_img = img.split(":")[0]  # Strip the tag for matching
+            role_desc = container_roles.get(base_img, "Service Container")
+            services_list.append(
+                f"  📦 [magenta]{name.ljust(15, ' ')}[/magenta] ([green]{img}[/green]) ➡️ [dim]{role_desc}[/dim]"
+            )
+        services_str = "\n".join(services_list)
     else:
         services_str = (
             "\n".join(f"  📦 [magenta]{s}[/magenta]" for s in services)
@@ -62,8 +83,39 @@ def print_explain_panel(
             else "  None"
         )
 
-    ports_str = (
-        "\n".join(f"  🔌 [blue]{p}[/blue]" for p in ports) if ports else "  None"
+    # 3. Port Context
+    port_context = {
+        "8333": "S3 API Endpoint (Boto3/Spark)",
+        "8888": "Filer Web UI (Browser)",
+        "9333": "Master Server API",
+        "8181": "Iceberg REST API",
+        "5432": "PostgreSQL DB Port",
+        "3000": "DbGate Web UI",
+        "8086": "Kafka Web UI",
+        "8081": "Karapace Schema Registry API",
+        "8083": "Kafka Connect API",
+        "9092": "Kafka Broker 1 (External)",
+        "9093": "Kafka Broker 2 (External)",
+        "9094": "Kafka Broker 3 (External)",
+        "29092": "Kafka Broker 1 (Minikube/Internal)",
+        "29093": "Kafka Broker 2 (Minikube/Internal)",
+        "29094": "Kafka Broker 3 (Minikube/Internal)",
+    }
+
+    ports_list = []
+    for p in ports:
+        # Example p: "seaweed:8333:8333" -> extract the last part
+        host_port = p.split(":")[-1]
+        context = port_context.get(host_port, "Mapped Port")
+        ports_list.append(
+            f"  🔌 [blue]{p.ljust(25, ' ')}[/blue] ➡️ [dim]{context}[/dim]"
+        )
+    ports_str = "\n".join(ports_list) if ports_list else "  None"
+
+    # 4. Constructing the Output
+    role_section = f"\n[bold]Architecture Role:[/bold]\n{role}\n" if role else ""
+    usage_section = (
+        f"\n[bold green]🚀 How to Use It:[/bold green]\n{usage}\n" if usage else ""
     )
 
     details = f"""
@@ -72,7 +124,7 @@ def print_explain_panel(
 
 [bold]Description:[/bold] 
 {description}
-
+{role_section}
 [bold]Requires Dependencies:[/bold] 
   {deps_str}
 
@@ -81,7 +133,8 @@ def print_explain_panel(
 
 [bold]Exposed Host Ports:[/bold]
 {ports_str}
-"""
+{usage_section}"""
+
     console.print(
         Panel(
             details.strip(),

@@ -13,6 +13,8 @@ class StackConfig(BaseModel):
     capacities: List[str] = Field(default_factory=list)
     depends_on: List[str] = Field(default_factory=list)
     parent: Optional[str] = None
+    role: Optional[str] = None
+    usage: Optional[str] = None
 
 
 class Registry(BaseModel):
