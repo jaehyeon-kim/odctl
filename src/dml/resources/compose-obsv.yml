@@ -16,7 +16,7 @@ services:
       - "5001:5001" # Admin
     mem_limit: 1g
     environment:
-      # Leverage the unified Postgres instance from compose-base.yml
+      # Leverage the unified Postgres instance from compose-infra.yml
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-user}
@@ -98,8 +98,8 @@ services:
       - "3004:3000"
     mem_limit: 1g
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-user}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-password}
     volumes:
       - ./grafana:/etc/grafana/provisioning
     depends_on:
