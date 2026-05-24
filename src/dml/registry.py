@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ class StackConfig(BaseModel):
     depends_on: List[str] = Field(default_factory=list)
     parent: Optional[str] = None
     role: Optional[str] = None
-    usage: Optional[str] = None
+    usage: Optional[Union[str, Dict[str, str]]] = None
 
 
 class Registry(BaseModel):
