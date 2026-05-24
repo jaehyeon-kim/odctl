@@ -97,7 +97,7 @@ services:
       # Security & Auth
       AUTHORIZER_CLASS_NAME: org.openmetadata.service.security.DefaultAuthorizer
       AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
-      AUTHORIZER_ADMIN_PRINCIPALS: "[user]"
+      AUTHORIZER_ADMIN_PRINCIPALS: "[admin,user]"
       AUTHORIZER_PRINCIPAL_DOMAIN: "dataml.local"
       AUTHORIZER_INGESTION_PRINCIPALS: "[ingestion-bot]"
       AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
