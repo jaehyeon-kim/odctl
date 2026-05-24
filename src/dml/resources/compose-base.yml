@@ -209,6 +209,8 @@ services:
       PYICEBERG_CATALOG__DEFAULT__S3__ENDPOINT: http://seaweed:8333
       PYICEBERG_CATALOG__DEFAULT__S3__ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
       PYICEBERG_CATALOG__DEFAULT__S3__SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+    stdin_open: true
+    tty: true
 
 networks:
   dml:
