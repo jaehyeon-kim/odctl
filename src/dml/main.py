@@ -335,5 +335,48 @@ def down(
     ui.print_success("Teardown complete.")
 
 
+@app.command(
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+    },
+    rich_help_panel="Data Operations",
+    epilog="""
+[bold underline]Examples:[/bold underline]\n
+  [dim]# List all namespaces in the local catalog[/dim]\n
+  $ [bold cyan]dml iceberg list[/bold cyan]\n\n
+  [dim]# Describe a specific table[/dim]\n
+  $ [bold cyan]dml iceberg describe dev.my_table[/bold cyan]
+""",
+)
+def iceberg(ctx: typer.Context):
+    """
+    Execute PyIceberg CLI commands natively within the stack.
+    """
+    import subprocess
+    import sys
+
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+    cmd = ["docker", "exec", "-it", "dml-pyiceberg", "pyiceberg"] + ctx.args
+
+    try:
+        # subprocess.call binds to the current terminal and blocks until finished
+        exit_code = subprocess.call(cmd)
+
+        # Transparently pass the Docker container's exit code back to the host OS
+        sys.exit(exit_code)
+
+    except KeyboardInterrupt:
+        # Gracefully handle the user hitting Ctrl+C while PyIceberg is running
+        sys.exit(130)
+    except Exception as e:
+        ui.print_error("Failed to execute PyIceberg command.", details=str(e))
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
