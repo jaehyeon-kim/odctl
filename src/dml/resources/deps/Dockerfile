@@ -38,6 +38,10 @@ RUN chmod +x *.sh \
 FROM debian:bookworm-slim
 WORKDIR /workspace
 
+# Metadata Bindings for GHCR
+LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/open-dataml-stack"
+LABEL org.opencontainers.image.description="Ephemeral dependency initializer for the Open DataML Stack. Automatically runs to populate the shared Docker volume with standalone plugins, Spark runtimes, Kafka converters, and Flink/Hadoop JARs before exiting."
+
 # Grab source-built Aiven JARs
 COPY --from=source-builder /build/dist/ /workspace/connect/
 

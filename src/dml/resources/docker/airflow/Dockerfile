@@ -1,5 +1,9 @@
 FROM apache/airflow:3.2.1
 
+# Metadata Bindings for GHCR
+LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/open-dataml-stack"
+LABEL org.opencontainers.image.description="Custom Apache Airflow orchestrator image for the Open DataML Stack. Fully loaded with pipeline execution providers for PostgreSQL, Trino, ClickHouse, Amazon S3, Flink, PySpark, PyIceberg, and Feast feature store integrations."
+
 # Install Lean DataML SDKs and Providers
 # Pinning PySpark strictly to 4.0.x for Iceberg compatibility
 RUN pip install --no-cache-dir \
