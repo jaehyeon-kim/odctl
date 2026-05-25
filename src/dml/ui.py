@@ -11,7 +11,16 @@ console = Console()
 
 
 def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
-    """Formats and prints the list of available profiles."""
+    """
+    Format and print the list of available profiles to the console.
+
+    Args:
+        registry (Any): The loaded Registry model containing all stack configurations.
+        deep (bool): If True, inspects docker-compose files to show underlying services
+                     and exposed host ports.
+        get_details_func (Any): A callable (usually `get_stack_details`) to parse the
+                                compose files for deep inspection.
+    """
     table = Table(header_style="bold")
     table.add_column("Profile", style="green", no_wrap=True, vertical="middle")
     table.add_column("Parent Stack", style="cyan", vertical="middle")
@@ -53,7 +62,22 @@ def print_explain_panel(
     role: Optional[str] = None,
     usage: Optional[str] = None,
 ):
-    """Formats and prints the detailed Profile Inspector panel."""
+    """
+    Format and print the detailed Profile Inspector panel.
+
+    Args:
+        profile (str): The target profile name.
+        stack_id (str): The ID of the parent stack.
+        stack_file (str): The associated compose file.
+        description (str): A brief description of the stack.
+        deps (List[str]): Required upstream dependencies.
+        services (List[str]): Associated compose service names.
+        ports (List[str]): Formatted port mapping strings.
+        images (List[str]): Formatted container image strings.
+        volumes (List[str]): Associated named volumes.
+        role (Optional[str], optional): The architectural role. Defaults to None.
+        usage (Optional[str], optional): Usage instructions. Defaults to None.
+    """
 
     deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
 
@@ -177,7 +201,14 @@ def print_explain_panel(
 
 
 def print_dry_run(execution_plan: Dict[str, List[str]], is_teardown: bool = False):
-    """Prints the dry run execution or teardown plan."""
+    """
+    Print the dry run execution or teardown plan to the console.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): The resolved mapping of files to profiles.
+        is_teardown (bool, optional): If True, formats the output as a teardown plan
+                                      instead of a startup plan. Defaults to False.
+    """
     title = "Dry Run Teardown Plan" if is_teardown else "Dry Run Execution Plan"
     color = "red" if is_teardown else "yellow"
 
@@ -199,7 +230,14 @@ def print_dry_run(execution_plan: Dict[str, List[str]], is_teardown: bool = Fals
 
 
 def print_error(message: str, details: Optional[str] = None, show_tip: bool = False):
-    """Standardized error display."""
+    """
+    Print a standardized error message to the console.
+
+    Args:
+        message (str): The primary error message.
+        details (Optional[str], optional): Additional technical details or exceptions. Defaults to None.
+        show_tip (bool, optional): If True, appends a troubleshooting tip regarding Docker logs. Defaults to False.
+    """
     console.print(f"[bold red]Error:[/bold red] {message}")
     if details:
         console.print(f"[red]Details:[/red] {details}")
@@ -213,20 +251,43 @@ def print_error(message: str, details: Optional[str] = None, show_tip: bool = Fa
 
 
 def print_success(message: str):
+    """
+    Print a standardized success message to the console.
+
+    Args:
+        message (str): The success message to display.
+    """
     console.print(f"[bold green]✓ {message}[/bold green]")
 
 
 def print_step(message: str):
-    """Prints an intermediate loading/action step."""
+    """
+    Print an intermediate loading or action step to the console.
+
+    Args:
+        message (str): The step message to display.
+    """
     console.print(f"[bold yellow]⏳ {message}[/bold yellow]")
 
 
 def print_info(message: str, style: str = "cyan"):
+    """
+    Print general information to the console with a specific style.
+
+    Args:
+        message (str): The info message to display.
+        style (str, optional): The Rich formatting style to apply. Defaults to "cyan".
+    """
     console.print(f"[{style}]{message}[/{style}]")
 
 
 def print_ps_table(containers: List[Any]):
-    """Formats and prints the list of running containers."""
+    """
+    Format and print the list of running containers as a status table.
+
+    Args:
+        containers (List[Any]): A list of python-on-whales Container objects.
+    """
     if not containers:
         print_info(
             "No containers found for the requested profiles. Are they running?",
@@ -236,7 +297,6 @@ def print_ps_table(containers: List[Any]):
 
     table = Table(header_style="bold cyan", border_style="cyan")
     table.add_column("Container Name", style="magenta", no_wrap=True)
-    # 👇 Add this new column so the user knows exactly what to type for 'dml logs -s'
     table.add_column("Service", style="yellow", no_wrap=True)
     table.add_column("State", style="bold")
     table.add_column("Health")
@@ -293,7 +353,9 @@ def print_ps_table(containers: List[Any]):
 
 
 def print_package_info():
-    """Display system-wide DML configuration and Docker health."""
+    """
+    Display system-wide DML configuration and Docker daemon health status.
+    """
     try:
         # Change this to whatever your pip package name actually is
         cli_version = version("dml-cli")

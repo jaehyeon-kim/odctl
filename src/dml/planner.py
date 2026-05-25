@@ -9,7 +9,13 @@ console = Console()
 
 
 def get_profile_map() -> Dict[str, dict]:
-    """Creates a reverse lookup mapping a profile back to its stack config."""
+    """
+    Create a reverse lookup mapping a profile back to its stack configuration.
+
+    Returns:
+        Dict[str, dict]: A dictionary where keys are profile names and values contain
+        the associated 'stack_id' and 'file'.
+    """
     registry = load_registry()
     profile_map = {}
     for stack_id, config in registry.stacks.items():
@@ -19,7 +25,16 @@ def get_profile_map() -> Dict[str, dict]:
 
 
 def validate_profiles(profiles: List[str], profile_map: Dict[str, dict]):
-    """Checks if requested profiles exist in the registry."""
+    """
+    Check if requested profiles exist in the registry.
+
+    Args:
+        profiles (List[str]): The list of requested profile names.
+        profile_map (Dict[str, dict]): The map of valid profiles.
+
+    Raises:
+        typer.Exit: If any requested profile is not found in the profile map.
+    """
     invalid = [p for p in profiles if p not in profile_map]
     if invalid:
         console.print(
@@ -31,7 +46,17 @@ def validate_profiles(profiles: List[str], profile_map: Dict[str, dict]):
 def resolve_dependencies(
     requested_profiles: List[str], profile_map: Dict[str, dict], registry
 ) -> Set[str]:
-    """Traverses the dependency graph to ensure all required profiles are included."""
+    """
+    Traverse the dependency graph to ensure all required profiles are included.
+
+    Args:
+        requested_profiles (List[str]): The initial set of profiles requested by the user.
+        profile_map (Dict[str, dict]): The reverse lookup map of profiles.
+        registry: The loaded stack registry.
+
+    Returns:
+        Set[str]: A complete set of profile names, including all upstream dependencies.
+    """
     resolved = set(requested_profiles)
     queue = list(requested_profiles)
 
@@ -49,7 +74,23 @@ def resolve_dependencies(
 def build_execution_plan(
     profiles: List[str] = None, all_profiles: bool = False, resolve_deps: bool = True
 ) -> Dict[str, List[str]]:
-    """Generates a mapping of compose files to the profiles that need to be run."""
+    """
+    Generate a mapping of compose files to the profiles that need to be run.
+
+    This function resolves parent dependencies and applies a lightweight topological sort
+    so infrastructure layers are grouped before target execution layers.
+
+    Args:
+        profiles (List[str], optional): Specific profiles to execute. Defaults to None.
+        all_profiles (bool, optional): If True, targets all available profiles in the registry. Defaults to False.
+        resolve_deps (bool, optional): If True, traverses the registry to include dependencies. Defaults to True.
+
+    Returns:
+        Dict[str, List[str]]: A dictionary mapping compose filenames to lists of target profiles.
+
+    Raises:
+        typer.Exit: If no profiles are provided and `all_profiles` is False, or if validation fails.
+    """
     registry = load_registry()
     profile_map = get_profile_map()
     execution_plan = {}

@@ -12,8 +12,14 @@ def _create_client(
     compose_files: List[str] = None, profiles: List[str] = None
 ) -> DockerClient:
     """
-    Creates a Docker client that naturally honors the system's Docker context.
-    We only inject the host if the user explicitly set DOCKER_HOST.
+    Create a Docker client that naturally honors the system's Docker context.
+
+    Args:
+        compose_files (List[str], optional): A list of paths to docker-compose files. Defaults to None.
+        profiles (List[str], optional): A list of compose profiles to activate. Defaults to None.
+
+    Returns:
+        DockerClient: An initialized python-on-whales Docker client.
     """
     kwargs = {}
 
@@ -34,7 +40,12 @@ client = _create_client()
 
 
 def is_docker_running() -> bool:
-    """Checks if the Docker daemon is reachable."""
+    """
+    Check if the Docker daemon is reachable.
+
+    Returns:
+        bool: True if the Docker engine responds to system info requests, False otherwise.
+    """
     try:
         # Changed from client.ping() to client.system.info()
         client.system.info()
@@ -46,7 +57,18 @@ def is_docker_running() -> bool:
 def get_stack_details(
     compose_filename: str, profiles: List[str]
 ) -> Tuple[List[str], List[str], List[str], List[str]]:
-    """Resolves services, host port mappings, images, and volumes via direct YAML parsing."""
+    """
+    Resolve services, host port mappings, images, and volumes via direct YAML parsing.
+
+    Args:
+        compose_filename (str): The name of the compose file to parse.
+        profiles (List[str]): The active profiles to filter services by.
+
+    Returns:
+        Tuple[List[str], List[str], List[str], List[str]]: A tuple containing four sorted lists:
+            services, exposed host ports, container images, and named volumes.
+            Returns lists containing "File Error" if the file cannot be parsed.
+    """
     path = get_compose_path(compose_filename)
     if not path.exists():
         return ["File Error"], ["File Error"], ["File Error"], ["File Error"]
@@ -101,14 +123,29 @@ def get_stack_details(
 
 
 def pull_stack_images(compose_filename: str, profiles: List[str]):
-    """Pulls required images for the stack."""
+    """
+    Pull required images for a specific stack.
+
+    Args:
+        compose_filename (str): The compose file defining the target stack.
+        profiles (List[str]): The profiles indicating which services to pull.
+    """
     path = get_compose_path(compose_filename)
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
     stack_client.compose.pull()
 
 
 def launch_stack(compose_filename: str, profiles: List[str]):
-    """Starts the stack via docker compose up."""
+    """
+    Start the stack via docker compose up.
+
+    If the 'deps' profile is active, this blocks until the ephemeral init container
+    finishes. Otherwise, it detaches and waits for healthchecks.
+
+    Args:
+        compose_filename (str): The compose file defining the target stack.
+        profiles (List[str]): The profiles to launch.
+    """
     path = get_compose_path(compose_filename)
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
 
@@ -125,7 +162,15 @@ def launch_stack(compose_filename: str, profiles: List[str]):
 def stop_stack(
     compose_filename: str, profiles: List[str], remove_volumes: bool = False
 ):
-    """Stops and removes containers and networks for a stack."""
+    """
+    Stop and remove containers and networks for a stack.
+
+    Args:
+        compose_filename (str): The compose file defining the target stack.
+        profiles (List[str]): The profiles to stop.
+        remove_volumes (bool, optional): If True, destroys named volumes associated
+                                         with the stack. Defaults to False.
+    """
     path = get_compose_path(compose_filename)
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
     # volumes=True will remove named volumes defined in the compose file
@@ -134,8 +179,13 @@ def stop_stack(
 
 def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     """
-    Fetches Docker containers matching the requested execution plan.
-    Relies on a single API call for speed, filtering by compose labels.
+    Fetch Docker containers matching the requested execution plan.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+
+    Returns:
+        List[Any]: A list of python-on-whales Container objects managed by the DML stack.
     """
     target_services = set()
     for file, profs in execution_plan.items():
@@ -161,7 +211,15 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
 
 
 def _build_compose_client(execution_plan: Dict[str, List[str]]) -> DockerClient:
-    """Helper to build a unified DockerClient for multiple compose files and profiles."""
+    """
+    Build a unified DockerClient for multiple compose files and profiles.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+
+    Returns:
+        DockerClient: A client configured to target all specified files and profiles simultaneously.
+    """
     files = [str(get_compose_path(f)) for f in execution_plan.keys()]
     # Flatten the lists of profiles and deduplicate them
     profiles = list(set(p for profs in execution_plan.values() for p in profs))
@@ -171,7 +229,12 @@ def _build_compose_client(execution_plan: Dict[str, List[str]]) -> DockerClient:
 
 
 def restart_managed_containers(execution_plan: Dict[str, List[str]]):
-    """Restarts containers across all requested profiles."""
+    """
+    Restart containers across all requested profiles.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+    """
     compose_client = _build_compose_client(execution_plan)
     compose_client.compose.restart()
 
@@ -185,7 +248,18 @@ def get_managed_logs(
     until: Optional[str] = None,
     service: Optional[str] = None,
 ):
-    """Fetches or streams logs for the requested execution plan."""
+    """
+    Fetch or stream logs for the requested execution plan.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+        follow (bool, optional): If True, streams the logs continuously. Defaults to False.
+        tail (str, optional): Number of lines to show from the end of the logs. Defaults to "all".
+        timestamps (bool, optional): If True, prints timestamps for each log line. Defaults to False.
+        since (str, optional): Show logs since a specific timestamp or relative time. Defaults to None.
+        until (str, optional): Show logs before a specific timestamp or relative time. Defaults to None.
+        service (str, optional): Restrict logs to a specific compose service name. Defaults to None.
+    """
     compose_client = _build_compose_client(execution_plan)
 
     kwargs = {}

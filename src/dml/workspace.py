@@ -6,7 +6,13 @@ from dml.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
 
 
 def get_cli_version() -> str:
-    """Retrieve the version of the installed dml-cli package."""
+    """
+    Retrieve the version of the installed dml-cli package.
+
+    Returns:
+        str: The installed package version, or 'latest' if run directly from source
+        without installation.
+    """
     try:
         # This string must exactly match the 'name' in your pyproject.toml
         return version("dml-cli")
@@ -16,7 +22,13 @@ def get_cli_version() -> str:
 
 
 def init_workspace(force: bool = False):
-    """Copies all internal resources to the local workspace."""
+    """
+    Copy all internal resources to the local user workspace.
+
+    Args:
+        force (bool, optional): If True, completely deletes the existing workspace and
+                                recreates it from scratch. Defaults to False.
+    """
     workspace = get_workspace_dir()
 
     # Nuke the existing workspace if force is True
