@@ -103,12 +103,7 @@ services:
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow-webserver
-    # command: api-server
-    command: >
-      bash -c "
-      pip install -U 'uvicorn>=0.31.0' &&
-      airflow api-server
-      "
+    command: api-server
     ports:
       - "8085:8080"
     restart: unless-stopped
