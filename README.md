@@ -117,7 +117,7 @@ The `dml` CLI orchestrates the Open DataML Stack and is logically grouped by fun
 
 ```bash
 # View all profiles and exposed ports
-$ dml list --deep
+$ dml list -d
 
 # See exactly what the kafka profile provisions
 $ dml explain kafka
