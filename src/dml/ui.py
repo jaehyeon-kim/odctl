@@ -10,13 +10,13 @@ from dml.docker import is_docker_running
 console = Console()
 
 
-def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
+def print_profile_table(registry: Any, details: bool, get_details_func: Any):
     """
     Format and print the list of available profiles to the console.
 
     Args:
         registry (Any): The loaded Registry model containing all stack configurations.
-        deep (bool): If True, inspects docker-compose files to show underlying services
+        details (bool): If True, inspects docker-compose files to show underlying services
                      and exposed host ports.
         get_details_func (Any): A callable (usually `get_stack_details`) to parse the
                                 compose files for deep inspection.
@@ -26,7 +26,7 @@ def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
     table.add_column("Parent Stack", style="cyan", vertical="middle")
     table.add_column("Description", max_width=60, vertical="middle")
 
-    if deep:
+    if details:
         table.add_column("Services", style="magenta", max_width=45, vertical="middle")
         table.add_column("Port Mappings", style="blue", max_width=55, vertical="middle")
 
@@ -38,7 +38,7 @@ def print_profile_table(registry: Any, deep: bool, get_details_func: Any):
             display_desc = config.description if i == 0 else ""
             row = [profile, display_stack, display_desc]
 
-            if deep:
+            if details:
                 # Absorb the newly returned volumes with an underscore
                 services, ports, _, _ = get_details_func(config.file, [profile])
                 row.append(", ".join(services) if services else "N/A")
