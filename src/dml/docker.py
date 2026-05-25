@@ -21,7 +21,7 @@ def _create_client(
     Returns:
         DockerClient: An initialized python-on-whales Docker client.
     """
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
 
     if "DOCKER_HOST" in os.environ:
         kwargs["host"] = os.environ["DOCKER_HOST"]
@@ -109,7 +109,9 @@ def get_stack_details(
                             if not vol_name.startswith((".", "/")):
                                 volumes.append(vol_name)
                         elif isinstance(v, dict) and v.get("type") == "volume":
-                            volumes.append(v.get("source"))
+                            source = v.get("source")
+                            if isinstance(source, str):
+                                volumes.append(source)
 
         return (
             sorted(list(set(services))),
@@ -262,7 +264,7 @@ def get_managed_logs(
     """
     compose_client = _build_compose_client(execution_plan)
 
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     if service:
         # Compose expects a list of services to filter by
         kwargs["services"] = [service]

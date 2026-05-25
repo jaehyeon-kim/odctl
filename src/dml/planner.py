@@ -1,4 +1,4 @@
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 import typer
 from rich.console import Console
@@ -72,7 +72,9 @@ def resolve_dependencies(
 
 
 def build_execution_plan(
-    profiles: List[str] = None, all_profiles: bool = False, resolve_deps: bool = True
+    profiles: Optional[List[str]] = None,
+    all_profiles: bool = False,
+    resolve_deps: bool = True,
 ) -> Dict[str, List[str]]:
     """
     Generate a mapping of compose files to the profiles that need to be run.
@@ -93,7 +95,7 @@ def build_execution_plan(
     """
     registry = load_registry()
     profile_map = get_profile_map()
-    execution_plan = {}
+    execution_plan: Dict[str, List[str]] = {}
 
     if all_profiles:
         # For teardown/pull all: group all profiles by file
