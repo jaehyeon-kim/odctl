@@ -14,7 +14,6 @@ x-flink1-base: &flink1-base
     - flink1
   environment:
     TZ: ${TZ:-UTC}
-    ENABLE_BUILT_IN_PLUGINS: flink-s3-fs-hadoop
   entrypoint:
     - /bin/bash
     - -c
@@ -24,6 +23,11 @@ x-flink1-base: &flink1-base
       cp /mnt/shared-deps/shared/*.jar /opt/flink/usrlib/ 2>/dev/null || true
       cp /mnt/shared-deps/flink/1.x/*.jar /opt/flink/usrlib/ 2>/dev/null || true
       cp /mnt/shared-deps/connect/confluent-converters/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+
+      # S3 Plugin Linking
+      echo "Linking S3 FileSystem Plugin..."
+      mkdir -p /opt/flink/plugins/s3-fs-hadoop
+      find /opt/flink/opt -name "flink-s3-fs-hadoop*.jar" -exec ln -sf {} /opt/flink/plugins/s3-fs-hadoop/ \;
 
       exec /docker-entrypoint.sh "$$@"
     - --
