@@ -1,0 +1,64 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base", ":dependencyDashboard", "docker:enableMajor"],
+  "docker-compose": {
+    "fileMatch": ["(^|/)compose-[^/]+\\.ya?ml$"]
+  },
+  "dockerfile": {
+    "fileMatch": [
+      "^src/dml/resources/docker/.*/Dockerfile$",
+      "^src/dml/resources/deps/Dockerfile$"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Auto-merge non-breaking minor and patch updates if CI passes",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Group all Apache Airflow Providers into a single PR",
+      "matchPackagePatterns": ["^apache-airflow-providers-"],
+      "groupName": "Airflow Providers"
+    },
+    {
+      "description": "Group Spark and PySpark updates together to prevent Py4J mismatches",
+      "matchPackageNames": ["apache/spark", "pyspark"],
+      "groupName": "Spark Ecosystem"
+    },
+    {
+      "description": "Group Observability stack updates together",
+      "matchPackageNames": [
+        "prom/prometheus",
+        "prom/alertmanager",
+        "grafana/grafana"
+      ],
+      "groupName": "Observability Stack"
+    },
+    {
+      "description": "Group ClickHouse Server and Keeper to maintain cluster consensus",
+      "matchPackageNames": [
+        "clickhouse/clickhouse-server",
+        "clickhouse/clickhouse-keeper"
+      ],
+      "groupName": "ClickHouse Ecosystem"
+    },
+    {
+      "description": "Group OpenMetadata Server and Ingestion to maintain API compatibility",
+      "matchPackageNames": [
+        "docker.getcollate.io/openmetadata/server",
+        "docker.getcollate.io/openmetadata/ingestion"
+      ],
+      "groupName": "OpenMetadata Ecosystem"
+    },
+    {
+      "description": "Group Marquez API and Web UI together",
+      "matchPackageNames": [
+        "marquezproject/marquez",
+        "marquezproject/marquez-web"
+      ],
+      "groupName": "Lineage Ecosystem"
+    }
+  ]
+}
