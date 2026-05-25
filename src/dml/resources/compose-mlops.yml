@@ -71,7 +71,7 @@ services:
 
       echo 'Infrastructure is up! Applying Feast metadata...'
       cd /opt/feast/feature_repo
-      feast apply 
+      feast apply
 
       echo 'Starting Feast Server...'
       feast serve -h 0.0.0.0 -p 6566

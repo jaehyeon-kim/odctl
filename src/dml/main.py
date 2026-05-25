@@ -23,7 +23,7 @@ app = typer.Typer(
     help="""
 [bold cyan]DML CLI[/bold cyan] - Orchestrator for the Open DataML Stack.
 
-Manage your local data engineering and MLOps infrastructure effortlessly. 
+Manage your local data engineering and MLOps infrastructure effortlessly.
 Provides commands to inspect, provision, and tear down curated Docker Compose stacks.
 """,
     no_args_is_help=True,

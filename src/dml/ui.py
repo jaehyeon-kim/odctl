@@ -175,10 +175,10 @@ def print_explain_panel(
 [bold]Parent Stack:[/bold] {stack_id}
 [bold]Compose File:[/bold] {stack_file}
 
-[bold]Description:[/bold] 
+[bold]Description:[/bold]
 {description}
 {role_section}
-[bold]Requires Dependencies:[/bold] 
+[bold]Requires Dependencies:[/bold]
   {deps_str}
 
 [bold]Persistent Volumes:[/bold]
