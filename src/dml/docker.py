@@ -9,7 +9,7 @@ from dml.config import get_compose_path
 
 
 def _create_client(
-    compose_files: List[str] = None, profiles: List[str] = None
+    compose_files: List[str] | None = None, profiles: List[str] | None = None
 ) -> DockerClient:
     """
     Create a Docker client that naturally honors the system's Docker context.

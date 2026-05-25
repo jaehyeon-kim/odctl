@@ -54,10 +54,10 @@ if [ "$DRY_RUN" -eq 0 ]; then
     echo "▶️  Extracting Targeted Aiven Distributions..."
     # Notice: We intentionally do NOT create a folder for the S3 Source
     mkdir -p /build/dist/aiven-jdbc /build/dist/aiven-s3-sink
-    
+
     # Extract JDBC
     tar -xf aiven-jdbc/build/distributions/*.tar -C /build/dist/aiven-jdbc --strip-components=1
-    
+
     # Extract ONLY the S3 Sink
     tar -xf aiven-s3/s3-sink-connector/build/distributions/*.tar -C /build/dist/aiven-s3-sink --strip-components=1
 
