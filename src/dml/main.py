@@ -5,10 +5,13 @@ import typer
 
 from dml import ui
 from dml.docker import (
+    get_managed_containers,
+    get_managed_logs,
     get_stack_details,
     is_docker_running,
     launch_stack,
     pull_stack_images,
+    restart_managed_containers,
     stop_stack,
 )
 from dml.planner import build_execution_plan, get_profile_map
@@ -133,7 +136,7 @@ def explain(
 
     ui.print_explain_panel(
         profile,
-        stack_id,
+        stack.parent or stack_id,
         stack.file,
         stack.description,
         stack.depends_on or ["None"],
@@ -387,6 +390,113 @@ def iceberg(ctx: typer.Context):
     except Exception as e:
         ui.print_error("Failed to execute PyIceberg command.", details=str(e))
         raise typer.Exit(1)
+
+
+@app.command(
+    name="ps",
+    rich_help_panel="Inspection & Info",
+    epilog="""
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Show all running containers managed by DML[/dim]\n
+  $ [bold cyan]dml ps --all[/bold cyan]\n\n
+  [dim]# Show containers just for specific profiles[/dim]\n
+  $ [bold cyan]dml ps kafka spark[/bold cyan]
+""",
+)
+def ps(
+    profiles: Optional[List[str]] = typer.Argument(
+        None, help="Specific profiles to inspect."
+    ),
+    all: bool = typer.Option(
+        False, "--all", "-a", help="Show all containers managed by DML."
+    ),
+):
+    """
+    List Docker containers managed by the Open DataML Stack.
+
+    Filters out system containers and only shows those belonging to requested profiles.
+    """
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+    # Use resolve_deps=False so we ONLY see what was explicitly requested
+    plan = build_execution_plan(profiles, all, resolve_deps=False)
+
+    containers = get_managed_containers(plan)
+    ui.print_ps_table(containers)
+
+
+@app.command(name="info", rich_help_panel="Inspection & Info")
+def info():
+    ui.print_package_info()
+
+
+@app.command(
+    name="logs",
+    rich_help_panel="Management",
+    epilog="""
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Tail the last 50 lines of all Flink containers and follow live[/dim]\n
+  $ [bold cyan]dml logs flink1 -n 50 -f[/bold cyan]\n\n
+  [dim]# View logs strictly for the JobManager service[/dim]\n
+  $ [bold cyan]dml logs flink1 -s jobmanager-1[/bold cyan]\n\n
+  [dim]# Show logs with timestamps for the last 10 minutes[/dim]\n
+  $ [bold cyan]dml logs kafka --since 10m -t[/bold cyan]
+""",
+)
+def logs(
+    profiles: List[str] = typer.Argument(..., help="Profiles to fetch logs for."),
+    service: Optional[str] = typer.Option(
+        None,
+        "--service",
+        "-s",
+        help="Filter to a specific compose service (Use 'dml ps' to find names).",
+    ),
+    follow: bool = typer.Option(
+        False, "--follow", "-f", help="Follow log output in real-time."
+    ),
+    tail: str = typer.Option(
+        "all", "--tail", "-n", help="Number of lines to show from the end of the logs."
+    ),
+    timestamps: bool = typer.Option(
+        False, "--timestamps", "-t", help="Show timestamps."
+    ),
+    since: Optional[str] = typer.Option(
+        None, "--since", help="Show logs since timestamp or relative (e.g. '42m')."
+    ),
+    until: Optional[str] = typer.Option(
+        None, "--until", help="Show logs before a timestamp or relative."
+    ),
+):
+    """Fetch the logs of containers managed by specific profiles."""
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+    plan = build_execution_plan(profiles, resolve_deps=False)
+    get_managed_logs(
+        execution_plan=plan,
+        follow=follow,
+        tail=tail,
+        timestamps=timestamps,
+        since=since,
+        until=until,
+        service=service,
+    )
+
+
+@app.command(name="restart", rich_help_panel="Management")
+def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.")):
+    """Restart one or more specific profiles."""
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+    plan = build_execution_plan(profiles, resolve_deps=False)
+    ui.print_step("Restarting containers...")
+    restart_managed_containers(plan)
+    ui.print_success("Restart complete.")
 
 
 if __name__ == "__main__":
