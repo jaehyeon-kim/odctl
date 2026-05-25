@@ -14,7 +14,8 @@ RUN pip install --no-cache-dir \
     clickhouse-connect \
     'pyiceberg[s3]' \
     psycopg2-binary \
-    pyspark~=4.0.0
+    pyspark~=4.1.0 \
+    'uvicorn>=0.31.0'
 
 # Install Feast separately to bypass the pip backtracking trap
 RUN pip install --no-cache-dir 'feast[clickhouse,redis,aws,postgres]'
