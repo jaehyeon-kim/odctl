@@ -1,5 +1,6 @@
 import os
-from typing import List, Tuple
+import sys
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 from python_on_whales import DockerClient
@@ -129,3 +130,90 @@ def stop_stack(
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
     # volumes=True will remove named volumes defined in the compose file
     stack_client.compose.down(volumes=remove_volumes)
+
+
+def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
+    """
+    Fetches Docker containers matching the requested execution plan.
+    Relies on a single API call for speed, filtering by compose labels.
+    """
+    target_services = set()
+    for file, profs in execution_plan.items():
+        # Re-using your existing parser to know exactly which services to look for
+        services, _, _, _ = get_stack_details(file, profs)
+        target_services.update(services)
+
+    all_containers = client.container.list(all=True)
+    managed_containers = []
+
+    for c in all_containers:
+        # Safely access labels via the Container's Config block
+        labels = c.config.labels if c.config and c.config.labels else {}
+
+        project = labels.get("com.docker.compose.project", "")
+        service = labels.get("com.docker.compose.service", "")
+
+        # Strictly enforce that the container belongs to a DML stack AND the requested profile
+        if project.startswith("dml-") and service in target_services:
+            managed_containers.append(c)
+
+    return managed_containers
+
+
+def _build_compose_client(execution_plan: Dict[str, List[str]]) -> DockerClient:
+    """Helper to build a unified DockerClient for multiple compose files and profiles."""
+    files = [str(get_compose_path(f)) for f in execution_plan.keys()]
+    # Flatten the lists of profiles and deduplicate them
+    profiles = list(set(p for profs in execution_plan.values() for p in profs))
+
+    # Initialize a single client capable of cross-file execution
+    return _create_client(compose_files=files, profiles=profiles)
+
+
+def restart_managed_containers(execution_plan: Dict[str, List[str]]):
+    """Restarts containers across all requested profiles."""
+    compose_client = _build_compose_client(execution_plan)
+    compose_client.compose.restart()
+
+
+def get_managed_logs(
+    execution_plan: Dict[str, List[str]],
+    follow: bool = False,
+    tail: str = "all",
+    timestamps: bool = False,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    service: Optional[str] = None,
+):
+    """Fetches or streams logs for the requested execution plan."""
+    compose_client = _build_compose_client(execution_plan)
+
+    kwargs = {}
+    if service:
+        # Compose expects a list of services to filter by
+        kwargs["services"] = [service]
+    if tail != "all":
+        kwargs["tail"] = tail
+    if timestamps:
+        kwargs["timestamps"] = True
+    if since:
+        kwargs["since"] = since
+    if until:
+        kwargs["until"] = until
+
+    try:
+        if follow:
+            # stream=True yields (source, bytes) tuples in real-time
+            for source, content in compose_client.compose.logs(
+                stream=True, follow=True, **kwargs
+            ):
+                # Write raw bytes to preserve Docker Compose's native formatting
+                sys.stdout.buffer.write(content)
+                sys.stdout.flush()
+        else:
+            # Fetches the log history as a single string block
+            logs_output = compose_client.compose.logs(**kwargs)
+            if logs_output:
+                print(logs_output)
+    except KeyboardInterrupt:
+        pass  # Handle user pressing Ctrl+C gracefully
