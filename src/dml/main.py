@@ -31,7 +31,7 @@ Provides commands to inspect, provision, and tear down curated Docker Compose st
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# View all profiles and exposed ports[/dim]\n
-  $ [bold cyan]dml list --deep[/bold cyan]\n\n
+  $ [bold cyan]dml list -d[/bold cyan]\n\n
   [dim]# See exactly what the airflow profile provisions[/dim]\n
   $ [bold cyan]dml explain kafka[/bold cyan]\n\n
   [dim]# Launch specific profiles and their dependencies[/dim]\n
@@ -70,14 +70,14 @@ def main(
   [dim]# View all basic profiles[/dim]\n
   $ [bold cyan]dml list[/bold cyan]\n\n
   [dim]# View profiles, underlying services, and ports[/dim]\n
-  $ [bold cyan]dml list --deep[/bold cyan]
+  $ [bold cyan]dml list -d[/bold cyan]
 """,
 )
 @app.command(name="ls", hidden=True)
 def list_profiles(
-    deep: bool = typer.Option(
+    details: bool = typer.Option(
         False,
-        "--deep",
+        "--details",
         "-d",
         help="Inspect docker-compose files to show exact services and exposed host ports.",
     ),
@@ -90,7 +90,7 @@ def list_profiles(
     """
     try:
         registry = load_registry()
-        ui.print_profile_table(registry, deep, get_stack_details)
+        ui.print_profile_table(registry, details, get_stack_details)
     except Exception as e:
         ui.print_error(str(e))
         raise typer.Exit(1)
