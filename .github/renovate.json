@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:base", ":dependencyDashboard", "docker:enableMajor"],
+  "schedule": ["every weekend"],
   "docker-compose": {
     "fileMatch": ["(^|/)compose-[^/]+\\.ya?ml$"]
   },
@@ -16,6 +17,11 @@
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Group all Python dependencies from pyproject.toml into a single PR",
+      "matchDatasources": ["pypi"],
+      "groupName": "Python Packages"
     },
     {
       "description": "Group all Apache Airflow Providers into a single PR",
