@@ -1,8 +1,11 @@
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+from dml.docker import is_docker_running
 
 console = Console()
 
@@ -213,5 +216,97 @@ def print_success(message: str):
     console.print(f"[bold green]✓ {message}[/bold green]")
 
 
+def print_step(message: str):
+    """Prints an intermediate loading/action step."""
+    console.print(f"[bold yellow]⏳ {message}[/bold yellow]")
+
+
 def print_info(message: str, style: str = "cyan"):
     console.print(f"[{style}]{message}[/{style}]")
+
+
+def print_ps_table(containers: List[Any]):
+    """Formats and prints the list of running containers."""
+    if not containers:
+        print_info(
+            "No containers found for the requested profiles. Are they running?",
+            style="yellow",
+        )
+        return
+
+    table = Table(header_style="bold cyan", border_style="cyan")
+    table.add_column("Container Name", style="magenta", no_wrap=True)
+    # 👇 Add this new column so the user knows exactly what to type for 'dml logs -s'
+    table.add_column("Service", style="yellow", no_wrap=True)
+    table.add_column("State", style="bold")
+    table.add_column("Health")
+    table.add_column("Ports", style="blue")
+
+    sorted_containers = sorted(containers, key=lambda c: c.name)
+
+    for c in sorted_containers:
+        # Extract the exact Compose Service name
+        labels = c.config.labels if c.config and c.config.labels else {}
+        svc_name = labels.get("com.docker.compose.service", "-")
+
+        # Format State
+        state = c.state.status
+        state_color = (
+            "green"
+            if state == "running"
+            else "red"
+            if state in ["exited", "dead"]
+            else "yellow"
+        )
+        state_str = f"[{state_color}]{state}[/{state_color}]"
+
+        # Format Health
+        health_str = "-"
+        if c.state.health:
+            h_status = c.state.health.status
+            h_color = (
+                "green"
+                if h_status == "healthy"
+                else "red"
+                if h_status == "unhealthy"
+                else "yellow"
+            )
+            health_str = f"[{h_color}]{h_status}[/{h_color}]"
+
+        # Format Ports
+        ports_list = []
+        if c.network_settings and c.network_settings.ports:
+            for c_port, bindings in c.network_settings.ports.items():
+                if bindings:
+                    for b in bindings:
+                        host_port = b.get("HostPort")
+                        if host_port:
+                            mapping = f"{host_port} ➡️  {c_port}"
+                            if mapping not in ports_list:
+                                ports_list.append(mapping)
+
+        ports_str = ", ".join(ports_list) if ports_list else "-"
+
+        table.add_row(c.name, svc_name, state_str, health_str, ports_str)
+
+    console.print(table)
+
+
+def print_package_info():
+    """Display system-wide DML configuration and Docker health."""
+    try:
+        # Change this to whatever your pip package name actually is
+        cli_version = version("dml-cli")
+    except PackageNotFoundError:
+        cli_version = "Development (Local)"
+
+    docker_status = (
+        "[green]✅ Reachable[/green]"
+        if is_docker_running()
+        else "[red]❌ Not Reachable[/red]"
+    )
+
+    # You can format this using a Rich panel in ui.py, but here is the base logic
+    console.print("\n[bold cyan]Open DataML Stack (DML)[/bold cyan]")
+    console.print(f"CLI Version:   {cli_version}")
+    console.print(f"Docker Daemon: {docker_status}\n")
