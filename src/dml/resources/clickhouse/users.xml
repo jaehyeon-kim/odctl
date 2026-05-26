@@ -10,20 +10,22 @@
     </profiles>
 
     <users>
-        <default>
+        <default replace="replace">
             <password>password</password>
             <profile>default</profile>
             <networks>
                 <ip>::/0</ip>
+                <ip>0.0.0.0/0</ip>
             </networks>
             <quota>default</quota>
         </default>
 
-        <user>
+        <user replace="replace">
             <password>password</password>
             <profile>default</profile>
             <networks>
                 <ip>::/0</ip>
+                <ip>0.0.0.0/0</ip>
             </networks>
             <quota>default</quota>
             <access_management>1</access_management>

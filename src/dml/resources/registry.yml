@@ -133,18 +133,18 @@ stacks:
   store:
     file: "compose-store.yml"
     description: "ClickHouse, Fluss, and Valkey cache."
-    profiles: ["ckh1", "ckh2", "fluss", "valkey"]
+    profiles: ["ch-lite", "ch-full", "fluss", "valkey"]
     depends_on: ["deps"]
     role: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey)."
     usage:
-      ckh1: |
+      ch-lite: |
         • ClickHouse HTTP (Shard 1 / Replica 1 & 2):
           * External (Localhost): http://localhost:8123, http://localhost:8124
           * Internal (Docker): http://clickhouse-11:8123, http://clickhouse-12:8123
-      ckh2: |
-        • ClickHouse HTTP (Shard 2 / Replica 1 & 2):
-          * External (Localhost): http://localhost:8125, http://localhost:8126
-          * Internal (Docker): http://clickhouse-21:8123, http://clickhouse-22:8123
+      ch-full: |
+        • ClickHouse HTTP (Shards 1 & 2 / Replicas 1 & 2):
+          * External (Localhost): http://localhost:8123, http://localhost:8124, http://localhost:8125, http://localhost:8126
+          * Internal (Docker): http://clickhouse-11:8123, http://clickhouse-12:8123, http://clickhouse-21:8123, http://clickhouse-22:8123
       fluss: |
         • Fluss Coordinator API:
           * External (Localhost): localhost:9123
