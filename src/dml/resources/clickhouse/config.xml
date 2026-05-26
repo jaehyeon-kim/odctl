@@ -44,7 +44,7 @@
             <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
             <size>1000M</size>
             <count>10</count>
-            <console>1</console> 
+            <console>1</console>
         </logger>
     </yandex>
 </clickhouse>
