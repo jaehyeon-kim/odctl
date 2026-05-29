@@ -2,7 +2,6 @@
 <clickhouse>
     <max_connections>4096</max_connections>
     <keep_alive_timeout>64</keep_alive_timeout>
-    <tcp_keep_alive_timeout>300</tcp_keep_alive_timeout>
     <max_concurrent_queries>100</max_concurrent_queries>
 
     <uncompressed_cache_size>268435456</uncompressed_cache_size>
