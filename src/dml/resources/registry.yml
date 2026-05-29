@@ -210,20 +210,23 @@ stacks:
 
   mlops:
     file: "compose-mlops.yml"
-    description: "Machine learning feature store and experiment tracking."
-    profiles: ["mlflow", "feast"]
+    description: "Machine learning model registry and real-time inference serving."
+    profiles: ["mlflow", "ray-serve"]
     capacities: ["mlops"]
-    depends_on: ["deps", "base", "storage", "catalog", "valkey", "ckh1"]
-    role: "Manages the ML lifecycle: model registry (MLflow) and feature serving (Feast)."
+    depends_on: ["deps", "base", "storage"]
+    role: "Manages the ML lifecycle: model registry (MLflow) and real-time scalable inference (Ray Serve)."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
-          * External (Localhost): http://localhost:5000
+          * External (Localhost): http://localhost:5050
           * Internal (Docker): http://mlflow:5000
-      feast: |
-        • Feast Feature Server API:
-          * External (Localhost): http://localhost:6566
-          * Internal (Docker): http://feast:6566
+      ray-serve: |
+        • Ray Serve Inference API Proxy:
+          * External (Localhost): http://localhost:8000
+          * Internal (Docker): http://ray-serve:8000
+        • Ray Cluster Dashboard:
+          * External (Localhost): http://localhost:8265
+          * Internal (Docker): http://ray-serve:8265
 
   obsv:
     file: "compose-obsv.yml"
