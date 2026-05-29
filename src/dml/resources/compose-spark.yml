@@ -4,8 +4,6 @@ x-spark-base: &spark-base
   image: ghcr.io/jaehyeon-kim/open-dataml-stack/spark:${TAG:-latest}
   networks:
     - dml
-  profiles:
-    - spark
   volumes:
     - dml-shared-deps:/mnt/shared-deps:ro
     - spark-events-data:/tmp/spark-events
@@ -16,16 +14,14 @@ x-spark-base: &spark-base
     SPARK_DIST_CLASSPATH: "/mnt/shared-deps/shared/*:/mnt/shared-deps/spark/*"
 
 services:
-  # ==========================================
-  # Spark Master (Cluster Coordinator)
-  # ==========================================
   spark-master:
     <<: *spark-base
     container_name: spark-master
+    profiles: ["spark-lite", "spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
     ports:
-      - "9080:8080" # Web UI
-      - "7077:7077" # RPC
+      - "9080:8080"
+      - "7077:7077"
     mem_limit: 1g
     environment:
       SPARK_WORKER_MEMORY: "1500m"
@@ -35,15 +31,13 @@ services:
       timeout: 5s
       retries: 5
 
-  # ==========================================
-  # Spark Workers (Scalable Compute Nodes)
-  # ==========================================
   spark-worker-1:
     <<: *spark-base
     container_name: spark-worker-1
+    profiles: ["spark-lite", "spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "9081:8081" # Worker 1 UI
+      - "9081:8081"
     mem_limit: 2g
     environment:
       SPARK_WORKER_MEMORY: "1500m"
@@ -54,9 +48,10 @@ services:
   spark-worker-2:
     <<: *spark-base
     container_name: spark-worker-2
+    profiles: ["spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "9082:8081" # Worker 2 UI mapped to host 8082
+      - "9082:8081"
     mem_limit: 2g
     environment:
       SPARK_WORKER_MEMORY: "1500m"
@@ -67,9 +62,10 @@ services:
   spark-worker-3:
     <<: *spark-base
     container_name: spark-worker-3
+    profiles: ["spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "9083:8081" # Worker 3 UI mapped to host 8083
+      - "9083:8081"
     mem_limit: 2g
     environment:
       SPARK_WORKER_MEMORY: "1500m"
@@ -77,15 +73,13 @@ services:
       spark-master:
         condition: service_healthy
 
-  # ==========================================
-  # Spark History Server
-  # ==========================================
   spark-history:
     <<: *spark-base
     container_name: spark-history
+    profiles: ["spark-lite", "spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
     ports:
-      - "18080:18080" # History Server UI
+      - "18080:18080"
     mem_limit: 1g
 
 networks:
