@@ -10,8 +10,6 @@ x-flink-common: &flink-common
 x-flink1-base: &flink1-base
   <<: *flink-common
   image: flink:1.20.4-java17
-  profiles:
-    - flink1
   environment:
     TZ: ${TZ:-UTC}
   entrypoint:
@@ -28,17 +26,14 @@ x-flink1-base: &flink1-base
       echo "Linking S3 FileSystem Plugin..."
       mkdir -p /opt/flink/plugins/s3-fs-hadoop
       find /opt/flink/opt -name "flink-s3-fs-hadoop*.jar" -exec ln -sf {} /opt/flink/plugins/s3-fs-hadoop/ \;
-
       exec /docker-entrypoint.sh "$$@"
     - --
 
 services:
-  # ------------------------------------------
-  # FLINK 1.x SERVICES (Profile: flink1)
-  # ------------------------------------------
   jobmanager-1:
     <<: *flink1-base
     container_name: flink-jobmanager-1
+    profiles: ["flink1-lite", "flink1-full"]
     command: jobmanager
     ports:
       - "8082:8081"
@@ -52,6 +47,7 @@ services:
   taskmanager-1-a:
     <<: *flink1-base
     container_name: flink-taskmanager-1-a
+    profiles: ["flink1-lite", "flink1-full"]
     command: taskmanager
     mem_limit: 3500m
     depends_on:
@@ -61,6 +57,7 @@ services:
   taskmanager-1-b:
     <<: *flink1-base
     container_name: flink-taskmanager-1-b
+    profiles: ["flink1-full"]
     command: taskmanager
     mem_limit: 3500m
     depends_on:
@@ -70,6 +67,7 @@ services:
   taskmanager-1-c:
     <<: *flink1-base
     container_name: flink-taskmanager-1-c
+    profiles: ["flink1-full"]
     command: taskmanager
     mem_limit: 3500m
     depends_on:
@@ -79,6 +77,7 @@ services:
   sql-gateway-1:
     <<: *flink1-base
     container_name: flink-sql-gateway-1
+    profiles: ["flink1-lite", "flink1-full"]
     command: >
       bin/sql-gateway.sh start-foreground
       -Dsql-gateway.endpoint.rest.address=0.0.0.0
@@ -87,7 +86,7 @@ services:
       -Drest.address=jobmanager-1
     mem_limit: 1g
     ports:
-      - "8084:8083" # REST API
+      - "8084:8083"
     depends_on:
       jobmanager-1:
         condition: service_healthy
