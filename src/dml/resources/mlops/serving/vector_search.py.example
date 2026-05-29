@@ -1,0 +1,44 @@
+import os
+import psycopg2
+from fastapi import FastAPI
+from ray import serve
+
+app = FastAPI()
+
+@serve.deployment(num_replicas=2)
+@serve.ingress(app)
+class VectorSearchDeployment:
+    def __init__(self):
+        # Establish connection to the Postgres database running pgvector
+        self.pg_conn = psycopg2.connect(
+            host=os.getenv("POSTGRES_HOST"),
+            user=os.getenv("POSTGRES_USER"),
+            password=os.getenv("POSTGRES_PASSWORD"),
+            dbname=os.getenv("POSTGRES_DB")
+        )
+
+    @app.post("/search")
+    async def search(self, query_vector: list[float]):
+        cursor = self.pg_conn.cursor()
+        
+        # Perform an L2 distance (<->) similarity search using pgvector
+        query = """
+            SELECT document_id, content, embedding <-> %s::vector AS distance 
+            FROM document_embeddings 
+            ORDER BY distance ASC
+            LIMIT 5;
+        """
+        
+        # pgvector expects the vector as a string representation of a list
+        vector_str = str(query_vector)
+        cursor.execute(query, (vector_str,))
+        
+        # Format the results
+        columns = [desc[0] for desc in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        
+        cursor.close()
+        return {"results": results}
+
+# The binding required by Ray Serve
+app_binding = VectorSearchDeployment.bind()

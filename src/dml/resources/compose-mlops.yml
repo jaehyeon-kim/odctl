@@ -1,81 +1,72 @@
 name: dml-mlops
 
+# Shared environment variables for SeaweedFS (S3) authentication
+x-mlops-env: &mlops-env
+  TZ: ${TZ:-UTC}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+  # Internal Docker routing to your SeaweedFS API
+  AWS_ENDPOINT_URL: http://seaweed:8333
+  # Allows on-the-fly pip installations without needing a requirements.txt file
+  _PIP_ADDITIONAL_REQUIREMENTS: ${_MLOPS_PIP_DEPS:-}
+
 services:
   # ==========================================
-  # [PROFILE: mlflow] Experiment Tracking
+  # MLflow: Experiment Tracking & Model Registry
   # ==========================================
   mlflow:
-    image: ghcr.io/jaehyeon-kim/open-dataml-stack/mlflow:${TAG:-latest}
+    image: ghcr.io/jaehyeon-kim/open-dataml-stack/ray-mlops:${TAG:-latest}
     container_name: mlflow
-    profiles:
-      - mlflow
+    profiles: ["mlflow", "ray-serve"]
     networks:
       - dml
     ports:
       - "5000:5000"
-    mem_limit: 1g
     environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
-      AWS_DEFAULT_REGION: us-east-1
-      MLFLOW_S3_ENDPOINT_URL: http://seaweed:8333
-      # For quick experiments
-      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+      <<: *mlops-env
     command: >
       mlflow server
       --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
-      --artifacts-destination s3://warehouse/mlflow
-      --serve-artifacts
+      --default-artifact-root s3://mlflow
       --host 0.0.0.0
       --port 5000
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # ==========================================
-  # [PROFILE: feast] Feature Store
+  # Ray Serve: Real-time ML Inference Engine
   # ==========================================
-  feast:
-    image: ghcr.io/jaehyeon-kim/open-dataml-stack/feast:${TAG:-latest}
-    container_name: feast
-    profiles:
-      - feast
+  ray-serve:
+    image: ghcr.io/jaehyeon-kim/open-dataml-stack/ray-mlops:${TAG:-latest}
+    container_name: ray-serve
+    profiles: ["ray-serve"]
     networks:
       - dml
     ports:
-      - "6566:6566"
-    mem_limit: 1g
-    volumes:
-      - ./feast:/opt/feast/feature_repo
+      - "8000:8000"
+      - "8265:8265"
     environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
-      AWS_DEFAULT_REGION: us-east-1
-      FEAST_S3_ENDPOINT_URL: http://seaweed:8333
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      VALKEY_USER: ${VALKEY_USER:-user}
-      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-password}
+      <<: *mlops-env
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      ICEBERG_CATALOG_URI: http://catalog:8181
+      KAFKA_BOOTSTRAP_SERVERS: broker-1:19092,broker-2:19093,broker-3:19094
+      # Database/Cache Authentication
+      CLICKHOUSE_HOST: clickhouse-11
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-user}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
-      # For quick experiments
-      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-    command: >
-      bash -c "
-      echo 'Waiting for infrastructure (Postgres, Valkey, ClickHouse) to be available...'
-      while ! timeout 1 bash -c '</dev/tcp/postgres/5432'; do sleep 2; done
-      while ! timeout 1 bash -c '</dev/tcp/valkey/6379'; do sleep 2; done
-      while ! timeout 1 bash -c '</dev/tcp/clickhouse/8123'; do sleep 2; done
+      VALKEY_HOST: valkey
+      VALKEY_USER: ${VALKEY_USER:-user}
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-password}
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-vector} # DB where vector extension is installed
 
-      echo 'Infrastructure is up! Applying Feast metadata...'
-      cd /opt/feast/feature_repo
-      feast apply
-
-      echo 'Starting Feast Server...'
-      feast serve -h 0.0.0.0 -p 6566
-      "
+    volumes:
+      - ./mlops/serving:/home/ray/app
+    working_dir: /home/ray/app
+    command: ray start --head --port=6379 --dashboard-host=0.0.0.0 --block
+    depends_on:
+      - mlflow
 
 networks:
   dml:

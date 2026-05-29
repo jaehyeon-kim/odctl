@@ -1,0 +1,42 @@
+import os
+import mlflow
+from fastapi import FastAPI
+from ray import serve
+import clickhouse_connect
+
+app = FastAPI()
+
+@serve.deployment(num_replicas=2)
+@serve.ingress(app)
+class LightGBMDeployment:
+    def __init__(self):
+        # 1. Load the LightGBM model from the MLflow model registry
+        # The tracking URI is handled automatically by the environment variable
+        self.model = mlflow.pyfunc.load_model("models:/my_lightgbm_model/Production")
+        
+        # 2. Connect to ClickHouse to pull real-time streaming feature state
+        self.ch_client = clickhouse_connect.get_client(
+            host=os.getenv("CLICKHOUSE_HOST"),
+            username=os.getenv("CLICKHOUSE_USER"),
+            password=os.getenv("CLICKHOUSE_PASSWORD")
+        )
+
+    @app.post("/predict")
+    async def predict(self, user_id: int):
+        # Retrieve the updated state matrix computed continuously by Flink
+        query = f"SELECT feature_alpha, feature_beta FROM online_features WHERE user_id={user_id}"
+        features = self.ch_client.query(query)
+        
+        if not features.result_rows:
+            return {"error": f"No features found in ClickHouse for user_id {user_id}"}
+            
+        # Execute low-latency prediction using LightGBM core
+        prediction = self.model.predict(features.result_rows)
+        
+        return {
+            "user_id": user_id, 
+            "prediction": float(prediction[0])
+        }
+
+# Bind application for Ray Serve execution planner
+app_binding = LightGBMDeployment.bind()
