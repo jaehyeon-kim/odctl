@@ -77,62 +77,86 @@ stacks:
 
   kafka:
     file: "compose-kafka.yml"
-    description: "Distributed event streaming and schema registry."
-    profiles: ["kafka"]
+    description: "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers."
+    profiles: ["kafka-lite", "kafka-full"]
     capacities: ["messaging"]
     depends_on: ["deps", "base"]
-    role: "3-node KRaft broker with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion."
-    usage: |
-      • Kafka UI:
-        - External (Localhost): http://localhost:8086
-        - Internal (Docker): http://kafka-ui:8080
-      • Connect API:
-        - External (Localhost): http://localhost:8083
-        - Internal (Docker): http://connect:8083
-      • Schema Registry:
-        - External (Localhost): http://localhost:8081
-        - Internal (Docker): http://karapace:8081
-      • Bootstrap Servers:
-        - External (Localhost): localhost:9092, localhost:9093, localhost:9094
-        - Internal (Docker): kafka-1:19092, kafka-2:19093, kafka-3:19094
-        - Minikube: host.minikube.internal:29092, host.minikube.internal:29093, host.minikube.internal:29094
+    role: "KRaft broker(s) with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion."
+    usage:
+      kafka-lite: |
+        • Kafka UI:
+          - External (Localhost): http://localhost:8086
+          - Internal (Docker): http://kafka-ui:8080
+        • Schema Registry & Connect:
+          - External (Localhost): http://localhost:8081 / http://localhost:8083
+        • Bootstrap Servers (1-Node Lite):
+          - External (Localhost): localhost:9092
+          - Internal (Docker): broker-1:19092
+      kafka-full: |
+        • Kafka UI:
+          - External (Localhost): http://localhost:8086
+          - Internal (Docker): http://kafka-ui:8080
+        • Schema Registry & Connect:
+          - External (Localhost): http://localhost:8081 / http://localhost:8083
+        • Bootstrap Servers (3-Node Cluster):
+          - External (Localhost): localhost:9092, localhost:9093, localhost:9094
+          - Internal (Docker): broker-1:19092, broker-2:19093, broker-3:19094
 
   flink:
     file: "compose-flink.yml"
-    description: "Stateful, real-time stream processing engine."
-    profiles: ["flink1"]
+    description: "Stateful, real-time stream processing engine. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
+    profiles: ["flink1-lite", "flink1-full"]
     capacities: ["stream_processing"]
     depends_on: ["deps", "storage", "catalog"]
-    role: "Executes continuous streaming pipelines across a JobManager and 3 TaskManagers."
-    usage: |
-      • Flink JobManager UI:
-        - External (Localhost): http://localhost:8082
-        - Internal (Docker): http://jobmanager-1:8081
-      • SQL Gateway REST:
-        - External (Localhost): http://localhost:8084
-        - Internal (Docker): http://flink-sql-gateway-1:8083
+    role: "Executes continuous streaming pipelines. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
+    usage:
+      flink1-lite: |
+        • Flink JobManager UI (1 TaskManager):
+          - External (Localhost): http://localhost:8082
+          - Internal (Docker): http://jobmanager-1:8081
+        • SQL Gateway REST:
+          - External (Localhost): http://localhost:8084
+          - Internal (Docker): http://flink-sql-gateway-1:8083
+      flink1-full: |
+        • Flink JobManager UI (3 TaskManagers):
+          - External (Localhost): http://localhost:8082
+          - Internal (Docker): http://jobmanager-1:8081
+        • SQL Gateway REST:
+          - External (Localhost): http://localhost:8084
+          - Internal (Docker): http://flink-sql-gateway-1:8083
 
   spark:
     file: "compose-spark.yml"
-    description: "Distributed batch and micro-batch data processing."
-    profiles: ["spark"]
+    description: "Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers."
+    profiles: ["spark-lite", "spark-full"]
     capacities: ["data_processing"]
     depends_on: ["deps", "storage", "catalog"]
     role: "Distributed batch engine for data preparation and large-scale ETL."
-    usage: |
-      • Spark Master UI:
-        - External (Localhost): http://localhost:9080
-        - Internal (Docker): http://spark-master:8080
-      • Master RPC:
-        - External (Localhost): spark://localhost:7077
-        - Internal (Docker): spark://spark-master:7077
-      • Spark History Server:
-        - External (Localhost): http://localhost:18080
-        - Internal (Docker): http://spark-history:18080
+    usage:
+      spark-lite: |
+        • Spark Master UI (1 Worker):
+          - External (Localhost): http://localhost:9080
+          - Internal (Docker): http://spark-master:8080
+        • Master RPC:
+          - External (Localhost): spark://localhost:7077
+          - Internal (Docker): spark://spark-master:7077
+        • Spark History Server:
+          - External (Localhost): http://localhost:18080
+          - Internal (Docker): http://spark-history:18080
+      spark-full: |
+        • Spark Master UI (3 Workers):
+          - External (Localhost): http://localhost:9080
+          - Internal (Docker): http://spark-master:8080
+        • Master RPC:
+          - External (Localhost): spark://localhost:7077
+          - Internal (Docker): spark://spark-master:7077
+        • Spark History Server:
+          - External (Localhost): http://localhost:18080
+          - Internal (Docker): http://spark-history:18080
 
   store:
     file: "compose-store.yml"
-    description: "ClickHouse, Fluss, and Valkey cache."
+    description: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey). 'ch-lite' has 1 shard and 2 replicas; 'ch-full' uses 2 shards and 2 replicas each."
     profiles: ["ch-lite", "ch-full", "fluss", "valkey"]
     depends_on: ["deps"]
     role: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey)."
