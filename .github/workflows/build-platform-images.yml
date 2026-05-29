@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, feast, spark, mlflow, pyiceberg]
+        component: [airflow, pyiceberg, spark, ray-mlops]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, feast, spark, mlflow, pyiceberg]
+        component: [airflow, pyiceberg, spark, ray-mlops]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
