@@ -13,7 +13,7 @@ class LightGBMDeployment:
         # 1. Load the LightGBM model from the MLflow model registry
         # The tracking URI is handled automatically by the environment variable
         self.model = mlflow.pyfunc.load_model("models:/my_lightgbm_model/Production")
-        
+
         # 2. Connect to ClickHouse to pull real-time streaming feature state
         self.ch_client = clickhouse_connect.get_client(
             host=os.getenv("CLICKHOUSE_HOST"),
@@ -26,15 +26,15 @@ class LightGBMDeployment:
         # Retrieve the updated state matrix computed continuously by Flink
         query = f"SELECT feature_alpha, feature_beta FROM online_features WHERE user_id={user_id}"
         features = self.ch_client.query(query)
-        
+
         if not features.result_rows:
             return {"error": f"No features found in ClickHouse for user_id {user_id}"}
-            
+
         # Execute low-latency prediction using LightGBM core
         prediction = self.model.predict(features.result_rows)
-        
+
         return {
-            "user_id": user_id, 
+            "user_id": user_id,
             "prediction": float(prediction[0])
         }
 
