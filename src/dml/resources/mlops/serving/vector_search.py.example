@@ -20,23 +20,23 @@ class VectorSearchDeployment:
     @app.post("/search")
     async def search(self, query_vector: list[float]):
         cursor = self.pg_conn.cursor()
-        
+
         # Perform an L2 distance (<->) similarity search using pgvector
         query = """
-            SELECT document_id, content, embedding <-> %s::vector AS distance 
-            FROM document_embeddings 
+            SELECT document_id, content, embedding <-> %s::vector AS distance
+            FROM document_embeddings
             ORDER BY distance ASC
             LIMIT 5;
         """
-        
+
         # pgvector expects the vector as a string representation of a list
         vector_str = str(query_vector)
         cursor.execute(query, (vector_str,))
-        
+
         # Format the results
         columns = [desc[0] for desc in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        
+
         cursor.close()
         return {"results": results}
 
