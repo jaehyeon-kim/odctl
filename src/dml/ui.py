@@ -1,10 +1,10 @@
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from dml import workspace
 from dml.docker import is_docker_running
 
 console = Console()
@@ -98,8 +98,7 @@ def print_explain_panel(
         "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
         "amazon/aws-cli": "Airflow DAG S3 Sync",
         "open-dataml-stack/airflow": "Airflow Orchestrator",
-        "open-dataml-stack/mlflow": "MLflow Tracking Server",
-        "open-dataml-stack/feast": "Feast Feature Server",
+        "open-dataml-stack/ray-mlops": "Unified Ray Serve & MLflow Node",
         "marquez-web": "Lineage Dashboard",
         "marquezproject/marquez": "Lineage API Server",
         "prometheus": "Telemetry Metrics Server",
@@ -356,11 +355,8 @@ def print_package_info():
     """
     Display system-wide DML configuration and Docker daemon health status.
     """
-    try:
-        # Change this to whatever your pip package name actually is
-        cli_version = version("dml-cli")
-    except PackageNotFoundError:
-        cli_version = "Development (Local)"
+    # Call the workspace function so the monkeypatch intercepts it
+    cli_version = workspace.get_cli_version()
 
     docker_status = (
         "[green]✅ Reachable[/green]"
@@ -368,7 +364,6 @@ def print_package_info():
         else "[red]❌ Not Reachable[/red]"
     )
 
-    # You can format this using a Rich panel in ui.py, but here is the base logic
     console.print("\n[bold cyan]Open DataML Stack (DML)[/bold cyan]")
     console.print(f"CLI Version:   {cli_version}")
     console.print(f"Docker Daemon: {docker_status}\n")
