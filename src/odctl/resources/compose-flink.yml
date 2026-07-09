@@ -1,0 +1,102 @@
+name: odctl-flink
+
+x-flink-common: &flink-common
+  networks:
+    - odctl
+  volumes:
+    - ./flink/flink1-conf.yml:/opt/flink/conf/config.yaml:ro
+    - odctl-shared-deps:/mnt/shared-deps:ro
+
+x-flink1-base: &flink1-base
+  <<: *flink-common
+  image: flink:1.20.4-java17
+  environment:
+    TZ: ${TZ:-UTC}
+  entrypoint:
+    - /bin/bash
+    - -c
+    - |
+      # Load dependencies
+      mkdir -p /opt/flink/usrlib
+      cp /mnt/shared-deps/shared/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+      cp /mnt/shared-deps/flink/1.x/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+      cp /mnt/shared-deps/connect/confluent-converters/*.jar /opt/flink/usrlib/ 2>/dev/null || true
+
+      # S3 Plugin Linking
+      echo "Linking S3 FileSystem Plugin..."
+      mkdir -p /opt/flink/plugins/s3-fs-hadoop
+      find /opt/flink/opt -name "flink-s3-fs-hadoop*.jar" -exec ln -sf {} /opt/flink/plugins/s3-fs-hadoop/ \;
+      exec /docker-entrypoint.sh "$$@"
+    - --
+
+services:
+  jobmanager-1:
+    <<: *flink1-base
+    container_name: flink-jobmanager-1
+    profiles: ["flink1-lite", "flink1-full"]
+    command: jobmanager
+    ports:
+      - "8082:8081"
+    mem_limit: 1500m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/config"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  taskmanager-1-a:
+    <<: *flink1-base
+    container_name: flink-taskmanager-1-a
+    profiles: ["flink1-lite", "flink1-full"]
+    command: taskmanager
+    mem_limit: 3500m
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+  taskmanager-1-b:
+    <<: *flink1-base
+    container_name: flink-taskmanager-1-b
+    profiles: ["flink1-full"]
+    command: taskmanager
+    mem_limit: 3500m
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+  taskmanager-1-c:
+    <<: *flink1-base
+    container_name: flink-taskmanager-1-c
+    profiles: ["flink1-full"]
+    command: taskmanager
+    mem_limit: 3500m
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+  sql-gateway-1:
+    <<: *flink1-base
+    container_name: flink-sql-gateway-1
+    profiles: ["flink1-lite", "flink1-full"]
+    command: >
+      bin/sql-gateway.sh start-foreground
+      -Dsql-gateway.endpoint.rest.address=0.0.0.0
+      -Dsql-gateway.endpoint.rest.port=8083
+      -Djobmanager.rpc.address=jobmanager-1
+      -Drest.address=jobmanager-1
+    mem_limit: 1g
+    ports:
+      - "8084:8083"
+    depends_on:
+      jobmanager-1:
+        condition: service_healthy
+
+networks:
+  odctl:
+    name: odctl
+    external: true
+
+volumes:
+  odctl-shared-deps:
+    name: odctl-shared-deps
+    external: true

@@ -1,7 +1,7 @@
 import pytest
 import typer
 
-from dml.planner import (
+from odctl.planner import (
     build_execution_plan,
     get_profile_map,
     resolve_dependencies,
@@ -11,7 +11,7 @@ from dml.planner import (
 
 def test_get_profile_map(mock_workspace, mock_registry_data, monkeypatch):
     """Validates generation of the profile reverse lookup table."""
-    monkeypatch.setattr("dml.planner.load_registry", lambda: mock_registry_data)
+    monkeypatch.setattr("odctl.planner.load_registry", lambda: mock_registry_data)
 
     profile_map = get_profile_map()
 
@@ -52,7 +52,7 @@ def test_resolve_dependencies(mock_registry_data):
 
 def test_build_execution_plan(mock_workspace, mock_registry_data, monkeypatch):
     """Ensures the execution plan isolates targets into their respective compose files."""
-    monkeypatch.setattr("dml.planner.load_registry", lambda: mock_registry_data)
+    monkeypatch.setattr("odctl.planner.load_registry", lambda: mock_registry_data)
 
     plan = build_execution_plan(profiles=["spark-master"])
 
