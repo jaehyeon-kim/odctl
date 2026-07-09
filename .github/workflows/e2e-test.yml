@@ -1,10 +1,7 @@
 name: End-to-End Integration Tests
 
 on:
-  workflow_run:
-    workflows: ["Build Platform Images"]
-    types:
-      - completed
+  workflow_call:
 
 
 concurrency:
@@ -16,7 +13,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
