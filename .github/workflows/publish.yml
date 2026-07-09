@@ -4,6 +4,10 @@ on:
   release:
     types: [published] # ONLY triggers when a drafted release is published
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   pypi-publish:
     name: Build and publish Python package
