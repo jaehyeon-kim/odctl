@@ -31,8 +31,8 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
       - name: Run Tests
-        # Target your test folder and output coverage for src/dml
-        run: uv run --with pytest-cov pytest tests/ --cov=src/dml --cov-report=xml
+        # Target your test folder and output coverage for src/odctl
+        run: uv run --with pytest-cov pytest tests/ --cov=src/odctl --cov-report=xml
 
       # - name: Upload coverage reports to Codecov
       #   uses: codecov/codecov-action@v4

@@ -34,7 +34,7 @@ jobs:
           sleep 10
           docker ps
           odctl ps
-          
+
           # Check if any containers are running
           RUNNING=$(docker ps -q | wc -l)
           if [ "$RUNNING" -lt 1 ]; then

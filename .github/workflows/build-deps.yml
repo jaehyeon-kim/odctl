@@ -5,12 +5,12 @@ on:
     branches: ["main"]
     tags: ["v*"]
     paths:
-      - "src/dml/resources/deps/**"
+      - "src/odctl/resources/deps/**"
       - ".github/workflows/build-deps.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "src/dml/resources/deps/**"
+      - "src/odctl/resources/deps/**"
   workflow_dispatch:
 
 env:
@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Script Dry Run
         run: |
-          cd src/dml/resources/deps
+          cd src/odctl/resources/deps
           # Make all scripts executable
           chmod +x *.sh
 
@@ -74,7 +74,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: src/dml/resources/deps
+          context: src/odctl/resources/deps
           # Strictly enforce push only on 'v' tags
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
