@@ -15,13 +15,10 @@ concurrency:
 jobs:
   build-platform:
     uses: ./.github/workflows/build-platform-images.yml
-    secrets: inherit
 
   build-deps:
     uses: ./.github/workflows/build-deps.yml
-    secrets: inherit
 
   e2e:
     needs: [build-platform, build-deps]
     uses: ./.github/workflows/e2e-test.yml
-    secrets: inherit
