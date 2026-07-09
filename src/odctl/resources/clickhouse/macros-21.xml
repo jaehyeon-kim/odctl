@@ -1,0 +1,1 @@
+<clickhouse><macros><shard>2</shard><replica>clickhouse-21</replica><cluster>odctl_cluster</cluster></macros></clickhouse>

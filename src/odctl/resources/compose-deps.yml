@@ -1,0 +1,24 @@
+name: odctl-deps
+
+services:
+  # ==========================================
+  # Init Container: Populates the Shared Volume
+  # ==========================================
+  init-deps:
+    image: ghcr.io/jaehyeon-kim/odctl/deps:${TAG:-latest}
+    container_name: odctl-init-deps
+    networks:
+      - odctl
+    profiles:
+      - deps
+    volumes:
+      # Mounts the named volume to the export path defined in the Dockerfile
+      - odctl-shared-deps:/mnt/shared-deps/
+
+networks:
+  odctl:
+    name: odctl
+
+volumes:
+  odctl-shared-deps:
+    name: odctl-shared-deps
