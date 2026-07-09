@@ -1,13 +1,13 @@
 [project]
-name = "open-dataml-stack"
-version = "0.1.0"
-description = "Orchestrator for the Open DataML Stack"
+name = "odctl"
+version = "0.0.1"
+description = "Orchestrator for the Open Data Stack"
 readme = "README.md"
 authors = [
     { name = "Jaehyeon Kim", email = "dottami@gmail.com" }
 ]
 keywords = [
-    "dataml",
+    "open-data",
     "cli",
     "orchestrator",
     "docker",
@@ -37,13 +37,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jaehyeon-kim/open-dataml-stack"
-Repository = "https://github.com/jaehyeon-kim/open-dataml-stack"
-Documentation = "https://github.com/jaehyeon-kim/open-dataml-stack"
-Issues = "https://github.com/jaehyeon-kim/open-dataml-stack/issues"
+Homepage = "https://github.com/jaehyeon-kim/odctl"
+Repository = "https://github.com/jaehyeon-kim/odctl"
+Documentation = "https://github.com/jaehyeon-kim/odctl"
+Issues = "https://github.com/jaehyeon-kim/odctl/issues"
 
 [project.scripts]
-dml = "dml.main:app"
+odctl = "odctl.main:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -57,4 +57,4 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/dml"]
+packages = ["src/odctl"]

@@ -1,15 +1,15 @@
-# Open DataML Stack
+# Open Data Stack
 
-![CI Status](https://img.shields.io/github/actions/workflow/status/jaehyeon-kim/open-dataml-stack/ci.yml?branch=main&label=CI)
-![PyPI Version](https://img.shields.io/pypi/v/open-dataml-stack)
-![Python Versions](https://img.shields.io/pypi/pyversions/open-dataml-stack)
-![License](https://img.shields.io/github/license/jaehyeon-kim/open-dataml-stack)
+![CI Status](https://img.shields.io/github/actions/workflow/status/jaehyeon-kim/odctl/ci.yml?branch=main&label=CI)
+![PyPI Version](https://img.shields.io/pypi/v/odctl)
+![Python Versions](https://img.shields.io/pypi/pyversions/odctl)
+![License](https://img.shields.io/github/license/jaehyeon-kim/odctl)
 
 ![Architecture Diagram](./image/diagram.png)
 
-A curated collection of open-source technologies and an accompanying CLI (`dml`) for experimenting with modern data architecture and MLOps locally.
+A curated collection of open-source technologies and an accompanying CLI (`odctl`) for experimenting with modern data architecture and MLOps locally.
 
-Provisioning a local data environment with distributed systems can be highly complex. The Open DataML Stack streamlines this process by resolving dependency conflicts, network routing configurations, and integration challenges across tools like Kafka, Spark, Flink, Iceberg, and Airflow. It provides a cohesive, Docker-based blueprint that operates seamlessly out of the box.
+Provisioning a local data environment with distributed systems can be highly complex. The Open Data Stack streamlines this process by resolving dependency conflicts, network routing configurations, and integration challenges across tools like Kafka, Spark, Flink, Iceberg, and Airflow. It provides a cohesive, Docker-based blueprint that operates seamlessly out of the box.
 
 ## Bundled Technologies
 
@@ -31,24 +31,24 @@ The stack is organized into distinct profiles that can be launched independently
 
 ### Installation
 
-Since `dml` is a CLI tool, it is highly recommended to install it in an isolated environment using `uv tool` or `pipx`.
+Since `odctl` is a CLI tool, it is highly recommended to install it in an isolated environment using `uv tool` or `pipx`.
 
 **Using uv (Recommended):**
 
 ```bash
-uv tool install open-dataml-stack
+uv tool install odctl
 ```
 
 **Using pipx:**
 
 ```bash
-pipx install open-dataml-stack
+pipx install odctl
 ```
 
 **Using pip:**
 
 ```bash
-pip install open-dataml-stack
+pip install odctl
 ```
 
 ## Quick Start
@@ -56,82 +56,82 @@ pip install open-dataml-stack
 Get your local cluster up and running in three simple steps.
 
 **1. Initialize your workspace**
-This command copies the default Docker Compose files and configurations into a hidden `.dml` folder in your current directory.
+This command copies the default Docker Compose files and configurations into a hidden `.odctl` folder in your current directory.
 
 ```bash
-dml init
+odctl init
 ```
 
 **2. Explore available profiles**
 See a full list of technologies you can launch.
 
 ```bash
-dml list
+odctl list
 ```
 
 **3. Launch the streaming and batch processing engines**
 Bring up a robust data engineering environment.
 
 ```bash
-dml up kafka flink1 spark
+odctl up kafka flink1 spark
 ```
 
 _Note: You do not need to memorize dependencies. The CLI will automatically detect that these profiles require foundational infrastructure and will launch PostgreSQL, SeaweedFS (S3), and the Iceberg REST Catalog for you before starting the target compute engines._
 
 ## CLI Command Reference
 
-The `dml` CLI orchestrates the Open DataML Stack and is logically grouped by functionality. You can append `--help` to any command for deeper parameter details.
+The `odctl` CLI orchestrates the Open Data Stack and is logically grouped by functionality. You can append `--help` to any command for deeper parameter details.
 
 ### Global Options
 
 - `--verbose`: Enable debug-level logging across all commands.
-- `-w, --workspace PATH`: Path to the DML workspace directory (default: `./.dml`).
+- `-w, --workspace PATH`: Path to the ODCTL workspace directory (default: `./.odctl`).
 
 ### Inspection & Info
 
-- `dml list`: List all available profiles and their capabilities.
-- `dml explain <profile>`: Explain the details, services, images, and dependencies of a profile.
-- `dml ps`: List Docker containers managed by the Open DataML Stack.
-- `dml info`: View package and system-wide Docker daemon health status.
+- `odctl list`: List all available profiles and their capabilities.
+- `odctl explain <profile>`: Explain the details, services, images, and dependencies of a profile.
+- `odctl ps`: List Docker containers managed by the Open Data Stack.
+- `odctl info`: View package and system-wide Docker daemon health status.
 
 ### Workspace
 
-- `dml init`: Initialize a local `.dml` workspace for custom configurations.
+- `odctl init`: Initialize a local `.odctl` workspace for custom configurations.
 
 ### Cluster Lifecycle
 
-- `dml pull`: Pre-fetch Docker images without starting the containers.
-- `dml up`: Launch DataML profiles (automatically resolves upstream dependencies).
-- `dml down`: Stop and remove profile containers and networks.
+- `odctl pull`: Pre-fetch Docker images without starting the containers.
+- `odctl up`: Launch Open Data profiles (automatically resolves upstream dependencies).
+- `odctl down`: Stop and remove profile containers and networks.
 
 ### Data Operations
 
-- `dml iceberg`: Execute PyIceberg CLI commands natively within the stack.
+- `odctl iceberg`: Execute PyIceberg CLI commands natively within the stack.
 
 ### Management
 
-- `dml logs`: Fetch the logs of containers managed by specific profiles.
-- `dml restart`: Restart one or more specific profiles.
+- `odctl logs`: Fetch the logs of containers managed by specific profiles.
+- `odctl restart`: Restart one or more specific profiles.
 
 ### Examples
 
 ```bash
 # View all profiles and exposed ports
-$ dml list -d
+$ odctl list -d
 
 # See exactly what the kafka profile provisions
-$ dml explain kafka
+$ odctl explain kafka
 
 # Launch specific profiles and their dependencies
-$ dml up flink1 kafka spark
+$ odctl up flink1 kafka spark
 
 # Complete teardown and wipe all data
-$ dml down --all --volumes
+$ odctl down --all --volumes
 ```
 
-## Workspace Customization (.dml)
+## Workspace Customization (.odctl)
 
-The Open DataML Stack is designed to be fully hackable. When you run `dml init`, a local `./.dml/` workspace is generated in your current working directory.
+The Open Data Stack is designed to be fully hackable. When you run `odctl init`, a local `./.odctl/` workspace is generated in your current working directory.
 
 This folder contains all the underlying configurations that power the stack:
 
@@ -139,7 +139,7 @@ This folder contains all the underlying configurations that power the stack:
 - `registry.yml`: The internal dependency graph.
 - `.env`: The environment variables used across the stack (e.g., default credentials or timezones).
 
-The CLI will always prioritize the files in your local `./.dml/` directory. If you make a mistake, you can always revert to the pristine default state by running `dml init --force`.
+The CLI will always prioritize the files in your local `./.odctl/` directory. If you make a mistake, you can always revert to the pristine default state by running `odctl init --force`.
 
 ## Local Development & Contributing
 

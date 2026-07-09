@@ -1,0 +1,218 @@
+name: odctl-base
+
+services:
+  # ==========================================
+  # Unified Metadata & Vector DB (Postgres 18)
+  # ==========================================
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg18-trixie
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - odctl
+    profiles:
+      - base
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-odctl}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      TZ: ${TZ:-UTC}
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=4"
+      - "-c"
+      - "max_wal_senders=4"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "log_statement=all"
+      - "-c"
+      - "pg_stat_statements.max=10000"
+      - "-c"
+      - "track_activity_query_size=2048"
+      - "-c"
+      - "work_mem=10MB"
+    volumes:
+      - ./postgres/01-init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d metabase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ==========================================
+  # DbGate (DB Inspection)
+  # ==========================================
+  dbgate:
+    image: dbgate/dbgate:7.1.9
+    container_name: dbgate
+    ports:
+      - "8282:3000"
+    networks:
+      - odctl
+    profiles:
+      - base
+    environment:
+      - CONNECTIONS=pg,vk,ch1,ch2,ch3,ch4
+      # PostgreSQL Auto-connection
+      - LABEL_pg=Postgres
+      - ENGINE_pg=postgres@dbgate-plugin-postgres
+      - SERVER_pg=postgres
+      - USER_pg=${POSTGRES_USER:-user}
+      - PASSWORD_pg=${POSTGRES_PASSWORD:-password}
+      # Valkey Auto-connection
+      - LABEL_vk=Cache
+      - ENGINE_vk=redis@dbgate-plugin-redis
+      - SERVER_vk=valkey
+      - USER_vk=${VALKEY_USER:-user}
+      - PASSWORD_vk=${VALKEY_PASSWORD:-password}
+      # ClickHouse Shard 1
+      - LABEL_ch1=ClickHouse-S1R1
+      - ENGINE_ch1=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch1=http://clickhouse-11:8123
+      - USER_ch1=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch1=${CLICKHOUSE_PASSWORD:-password}
+      - LABEL_ch2=ClickHouse-S1R2
+      - ENGINE_ch2=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch2=http://clickhouse-12:8123
+      - USER_ch2=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch2=${CLICKHOUSE_PASSWORD:-password}
+      # ClickHouse Shard 2
+      - LABEL_ch3=ClickHouse-S2R1
+      - ENGINE_ch3=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch3=http://clickhouse-21:8123
+      - USER_ch3=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch3=${CLICKHOUSE_PASSWORD:-password}
+      - LABEL_ch4=ClickHouse-S2R2
+      - ENGINE_ch4=clickhouse@dbgate-plugin-clickhouse
+      - URL_ch4=http://clickhouse-22:8123
+      - USER_ch4=${CLICKHOUSE_USER:-user}
+      - PASSWORD_ch4=${CLICKHOUSE_PASSWORD:-password}
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ==========================================
+  # Object Storage (SeaweedFS - Single Node)
+  # ==========================================
+  seaweed:
+    image: chrislusf/seaweedfs:4.22
+    container_name: seaweed
+    ports:
+      - "8333:8333" # S3 API
+      - "8889:8888" # Filer UI
+      - "9333:9333" # Master UI
+    networks:
+      odctl:
+        aliases:
+          - warehouse.seaweed
+    profiles:
+      - storage
+    volumes:
+      # Mount the S3 credentials configuration
+      - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
+    # Explicitly tell the S3 gateway to enforce the config file
+    command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  seaweed-init:
+    image: chrislusf/seaweedfs:4.22
+    container_name: seaweed-init
+    depends_on:
+      seaweed:
+        condition: service_healthy
+    networks:
+      - odctl
+    profiles:
+      - storage
+    entrypoint: |
+      sh -c "
+      echo '...waiting for SeaweedFS Master...'
+      sleep 2
+
+      BUCKETS='warehouse odctl-dev flink-checkpoints flink-savepoints airflow mlflow'
+      for bucket in \$$BUCKETS; do
+        echo \"--- Creating S3 bucket natively: \$$bucket ---\"
+        echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333
+      done
+
+      echo '--- SeaweedFS Native Setup Complete ---'
+      exit 0
+      "
+
+  # ==========================================
+  # Iceberg REST Catalog
+  # ==========================================
+  catalog:
+    image: tabulario/iceberg-rest:1.6.0
+    container_name: iceberg-catalog
+    ports:
+      - "8181:8181"
+    networks:
+      - odctl
+    profiles:
+      - catalog
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweed-init:
+        condition: service_completed_successfully
+    mem_limit: 512m
+    environment:
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://seaweed:8333
+      - CATALOG_S3_ACCESS_KEY_ID=user
+      - CATALOG_S3_SECRET_ACCESS_KEY=password
+      - CATALOG_S3_PATH_STYLE_ACCESS=true
+      - CATALOG_IO__S3_PATH_STYLE_ACCESS=true
+      # Explicit AWS SDK overrides (just in case)
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-user}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-password}
+      # Database Backend (Postgres)
+      - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
+      - CATALOG_URI=jdbc:postgresql://postgres:5432/iceberg
+      - CATALOG_JDBC_USER=${POSTGRES_USER:-user}
+      - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
+
+  # ==========================================
+  # [PROFILE: catalog] PyIceberg CLI Sidecar
+  # ==========================================
+  pyiceberg:
+    image: ghcr.io/jaehyeon-kim/odctl/pyiceberg:${TAG:-latest}
+    container_name: odctl-pyiceberg
+    profiles:
+      - catalog
+    networks:
+      - odctl
+    depends_on:
+      catalog:
+        condition: service_started
+    environment:
+      PYICEBERG_CATALOG__DEFAULT__TYPE: rest
+      PYICEBERG_CATALOG__DEFAULT__URI: http://catalog:8181
+      PYICEBERG_CATALOG__DEFAULT__S3__ENDPOINT: http://seaweed:8333
+      PYICEBERG_CATALOG__DEFAULT__S3__ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+      PYICEBERG_CATALOG__DEFAULT__S3__SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+    stdin_open: true
+    tty: true
+
+networks:
+  odctl:
+    name: odctl
+    external: true

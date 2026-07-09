@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dml.registry import Registry, load_registry
+from odctl.registry import Registry, load_registry
 
 
 def test_registry_pydantic_validation(mock_registry_data):
@@ -28,7 +28,7 @@ def test_registry_validation_missing_fields():
 def test_load_registry_file_not_found(mock_workspace, monkeypatch):
     """Should raise standard FileNotFoundError if registry file is missing entirely."""
     monkeypatch.setattr(
-        "dml.config.get_registry_path", lambda: mock_workspace / "ghost_registry.yml"
+        "odctl.config.get_registry_path", lambda: mock_workspace / "ghost_registry.yml"
     )
     with pytest.raises(FileNotFoundError):
         load_registry()

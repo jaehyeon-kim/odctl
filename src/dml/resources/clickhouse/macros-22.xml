@@ -1,1 +1,0 @@
-<clickhouse><macros><shard>2</shard><replica>clickhouse-22</replica><cluster>dml_cluster</cluster></macros></clickhouse>

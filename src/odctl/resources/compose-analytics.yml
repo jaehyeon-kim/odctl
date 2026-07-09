@@ -1,0 +1,59 @@
+name: odctl-analytics
+
+services:
+  # ==========================================
+  # [PROFILE: trino] Federated SQL Engine
+  # ==========================================
+  trino:
+    image: trinodb/trino:480
+    container_name: trino
+    profiles:
+      - trino
+    networks:
+      - odctl
+    ports:
+      - "8080:8080" # Trino UI & JDBC connection port
+    mem_limit: 4g
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx3G"
+    volumes:
+      # Mount the static catalogs
+      - ./trino/catalog:/etc/trino/catalog:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # [PROFILE: metabase] BI & Dashboarding
+  # ==========================================
+  metabase:
+    image: metabase/metabase:v0.61.x
+    container_name: metabase
+    profiles:
+      - metabase
+    networks:
+      - odctl
+    ports:
+      - "3000:3000"
+    mem_limit: 1500m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx1G"
+      # Map Metabase's internal state to our unified Postgres instance
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER:-user}
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-password}
+      MB_DB_HOST: postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  odctl:
+    name: odctl
+    external: true
