@@ -89,9 +89,10 @@ wheels = [
 
 [[package]]
 name = "dml-cli"
-version = "0.0.4"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "pydantic" },
     { name = "python-on-whales" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -107,6 +108,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "pydantic", specifier = ">=2.0.0" },
     { name = "python-on-whales", specifier = ">=0.70.0" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "rich", specifier = ">=13.7.0" },
