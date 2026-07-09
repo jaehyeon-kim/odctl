@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Create a report to help us improve the Open DataML Stack
+about: Create a report to help us improve the Open Data Stack
 title: "[BUG] "
 labels: bug
 assignees: ""
@@ -42,5 +42,5 @@ If applicable, paste the full CLI error or the specific container logs here (you
 ## **Additional context**
 
 * Did you customize any files in your local `./.dml/` workspace? (e.g., changing ports in `compose-orch.yml` or editing `registry.yml`)
-* How much RAM/CPU is allocated to your Docker daemon? (Many DataML profiles are resource-heavy)
+* How much RAM/CPU is allocated to your Docker daemon? (Many Open Data profiles are resource-heavy)
 * Add any other context about the problem here.
