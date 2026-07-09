@@ -1,4 +1,4 @@
-name: Build DataML Dependencies Image
+name: Build Open Data Dependencies Image
 
 on:
   push:

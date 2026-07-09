@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an idea for the Open DataML Stack
+about: Suggest an idea for the Open Data Stack
 title: "[FEATURE] "
 labels: enhancement
 assignees: ""
