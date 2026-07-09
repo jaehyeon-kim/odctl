@@ -1,18 +1,46 @@
 [project]
 name = "dml-cli"
-version = "0.0.4"
+version = "0.1.0"
 description = "Orchestrator for the Open DataML Stack"
 readme = "README.md"
 authors = [
     { name = "Jaehyeon Kim", email = "dottami@gmail.com" }
 ]
+keywords = [
+    "dataml",
+    "cli",
+    "orchestrator",
+    "docker",
+    "docker-compose",
+    "data-engineering",
+    "machine-learning"
+]
 requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "typer>=0.12.0",
     "rich>=13.7.0",
     "pyyaml>=6.0.1",
-    "python-on-whales>=0.70.0"
+    "python-on-whales>=0.70.0",
+    "pydantic>=2.0.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/jaehyeon-kim/open-dataml-stack"
+Repository = "https://github.com/jaehyeon-kim/open-dataml-stack"
+Documentation = "https://github.com/jaehyeon-kim/open-dataml-stack"
+Issues = "https://github.com/jaehyeon-kim/open-dataml-stack/issues"
 
 [project.scripts]
 dml = "dml.main:app"
