@@ -7,9 +7,7 @@ env:
   REGISTRY: ghcr.io
 
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+
 jobs:
   validate:
     name: Build Dry Run (${{ matrix.component }})
