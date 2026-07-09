@@ -16,6 +16,7 @@ USER ray
 
 # Inline pip installation to preserve a single file deployment structure
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir \
     # MLOps & Serving Core
     'mlflow~=3.12.0' \
@@ -24,7 +25,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
     # Database Driver (Required for Postgres tracking backend)
     psycopg2-binary \
     # Inference Engines (Required for Deserialization)
-    torch \
     stable-baselines3 \
     gymnasium \
     scikit-learn \
