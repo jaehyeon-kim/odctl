@@ -7,7 +7,7 @@ from dml.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
 
 def get_cli_version() -> str:
     """
-    Retrieve the version of the installed dml-cli package.
+    Retrieve the version of the installed open-dataml-stack package.
 
     Returns:
         str: The installed package version, or 'latest' if run directly from source
@@ -15,7 +15,7 @@ def get_cli_version() -> str:
     """
     try:
         # This string must exactly match the 'name' in your pyproject.toml
-        return version("dml-cli")
+        return version("open-dataml-stack")
     except PackageNotFoundError:
         # Fallback for when you are developing locally and haven't installed the package
         return "latest"
