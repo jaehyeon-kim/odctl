@@ -1,17 +1,7 @@
 name: Build Open Data Dependencies Image
 
 on:
-  push:
-    branches: ["main"]
-    tags: ["v*"]
-    paths:
-      - "src/odctl/resources/deps/**"
-      - ".github/workflows/build-deps.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "src/odctl/resources/deps/**"
-  workflow_dispatch:
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io

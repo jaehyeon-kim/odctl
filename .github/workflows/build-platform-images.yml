@@ -1,17 +1,7 @@
 name: Build Platform Images
 
 on:
-  push:
-    branches: ["main"]
-    tags: ["v*"]
-    paths:
-      - "src/odctl/resources/docker/**"
-      - ".github/workflows/build-platform-images.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "src/odctl/resources/docker/**"
-  workflow_dispatch:
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
