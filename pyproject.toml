@@ -1,5 +1,5 @@
 [project]
-name = "dml-cli"
+name = "open-dataml-stack"
 version = "0.1.0"
 description = "Orchestrator for the Open DataML Stack"
 readme = "README.md"

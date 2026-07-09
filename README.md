@@ -1,8 +1,8 @@
 # Open DataML Stack
 
 ![CI Status](https://img.shields.io/github/actions/workflow/status/jaehyeon-kim/open-dataml-stack/ci.yml?branch=main&label=CI)
-![PyPI Version](https://img.shields.io/pypi/v/dml-cli)
-![Python Versions](https://img.shields.io/pypi/pyversions/dml-cli)
+![PyPI Version](https://img.shields.io/pypi/v/open-dataml-stack)
+![Python Versions](https://img.shields.io/pypi/pyversions/open-dataml-stack)
 ![License](https://img.shields.io/github/license/jaehyeon-kim/open-dataml-stack)
 
 ![Architecture Diagram](./image/diagram.png)
@@ -36,19 +36,19 @@ Since `dml` is a CLI tool, it is highly recommended to install it in an isolated
 **Using uv (Recommended):**
 
 ```bash
-uv tool install dml-cli
+uv tool install open-dataml-stack
 ```
 
 **Using pipx:**
 
 ```bash
-pipx install dml-cli
+pipx install open-dataml-stack
 ```
 
 **Using pip:**
 
 ```bash
-pip install dml-cli
+pip install open-dataml-stack
 ```
 
 ## Quick Start
