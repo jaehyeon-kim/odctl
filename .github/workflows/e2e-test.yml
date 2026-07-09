@@ -57,4 +57,4 @@ jobs:
           fi
 
       - name: Teardown
-        run: odctl down --all --volumes
+        run: yes | odctl down --all --volumes
