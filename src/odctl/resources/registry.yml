@@ -276,6 +276,6 @@ stacks:
     role: "Translates natural language questions into executable SQL using LLMs."
     usage: |
       • WrenAI Chat UI:
-        - External (Localhost): http://localhost:3001
+        - External (Localhost): http://localhost:3005
         - Internal (Docker): http://wren-ui:3000
       • CLI Access: Use 'odctl wrenai' to interact via the AI service container.
