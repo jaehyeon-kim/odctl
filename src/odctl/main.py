@@ -402,10 +402,10 @@ def iceberg(ctx: typer.Context):
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# Add a data source profile[/dim]\n
-  $ [bold cyan]odctl wrenai profile add ...[/bold cyan]
+  $ [bold cyan]odctl wren profile add ...[/bold cyan]
 """,
 )
-def wrenai(ctx: typer.Context):
+def wren(ctx: typer.Context):
     """
     Execute WrenAI CLI commands natively within the stack.
     """
