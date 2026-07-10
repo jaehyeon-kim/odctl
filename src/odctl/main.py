@@ -33,9 +33,9 @@ Provides commands to inspect, provision, and tear down curated Docker Compose st
   [dim]# View all profiles and exposed ports[/dim]\n
   $ [bold cyan]odctl list -d[/bold cyan]\n\n
   [dim]# See exactly what the airflow profile provisions[/dim]\n
-  $ [bold cyan]odctl explain kafka[/bold cyan]\n\n
+  $ [bold cyan]odctl explain kafka-lite[/bold cyan]\n\n
   [dim]# Launch specific profiles and their dependencies[/dim]\n
-  $ [bold cyan]odctl up flink1 kafka spark[/bold cyan]\n\n
+  $ [bold cyan]odctl up flink1-lite kafka-lite spark-lite[/bold cyan]\n\n
   [dim]# Complete teardown and wipe all data[/dim]\n
   $ [bold cyan]odctl down --all --volumes[/bold cyan]
 """,
@@ -85,7 +85,7 @@ def list_profiles(
     """
     List all available profiles and their capabilities.
 
-    A [bold]profile[/bold] is a specific capability or technology (e.g., `kafka`, `spark`, `airflow`)
+    A [bold]profile[/bold] is a specific capability or technology (e.g., `kafka-lite`, `spark-lite`, `airflow`)
     provided by the Open Data Stack. This command lists them alongside their parent stack.
     """
     try:
@@ -101,12 +101,12 @@ def list_profiles(
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# See what the Spark profile provisions[/dim]\n
-  $ [bold cyan]odctl explain spark[/bold cyan]
+  $ [bold cyan]odctl explain spark-lite[/bold cyan]
 """,
 )
 def explain(
     profile: str = typer.Argument(
-        ..., help="The target profile to inspect (e.g., 'airflow', 'kafka')."
+        ..., help="The target profile to inspect (e.g., 'airflow', 'kafka-lite')."
     ),
 ):
     """
@@ -188,7 +188,7 @@ def init(
   [dim]# Pre-fetch images for all profiles[/dim]\n
   $ [bold cyan]odctl pull --all[/bold cyan]\n\n
   [dim]# Pre-fetch images just for Flink 1.x and Spark[/dim]\n
-  $ [bold cyan]odctl pull flink1 kafka[/bold cyan]
+  $ [bold cyan]odctl pull flink1-lite kafka-lite[/bold cyan]
 """,
 )
 def pull(
@@ -230,16 +230,16 @@ def pull(
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# Launch Clickhouse, Flink 1.x, and their dependencies[/dim]\n
-  $ [bold cyan]odctl up clickhouse1 flink1[/bold cyan]\n\n
+  $ [bold cyan]odctl up ch-lite flink1-lite[/bold cyan]\n\n
   [dim]# Preview what would be launched for Airflow[/dim]\n
   $ [bold cyan]odctl up airflow --dry-run[/bold cyan]\n\n
   [dim]# Force pull latest images before launching[/dim]\n
-  $ [bold cyan]odctl up kafka --pull[/bold cyan]
+  $ [bold cyan]odctl up kafka-lite --pull[/bold cyan]
 """,
 )
 def up(
     profiles: List[str] = typer.Argument(
-        ..., help="One or more profiles to launch (e.g., 'clickhouse1', 'kafka')."
+        ..., help="One or more profiles to launch (e.g., 'ch-lite', 'kafka-lite')."
     ),
     dry_run: bool = typer.Option(
         False,
@@ -292,7 +292,7 @@ def up(
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# Stop specific profile(s)[/dim]\n
-  $ [bold cyan]odctl down kafka[/bold cyan]\n\n
+  $ [bold cyan]odctl down kafka-lite[/bold cyan]\n\n
   [dim]# Stop all running profiles[/dim]\n
   $ [bold cyan]odctl down --all[/bold cyan]\n\n
   [dim]# Complete teardown and wipe all data[/dim]\n
@@ -401,36 +401,100 @@ def iceberg(ctx: typer.Context):
     rich_help_panel="Data Operations",
     epilog="""
 [bold underline]Examples:[/bold underline]\n
-  [dim]# Add a data source profile[/dim]\n
+  [dim]# Automatically inject data sources for a profile[/dim]\n
+  $ [bold cyan]odctl wren auto-setup ch-lite[/bold cyan]\n\n
+  [dim]# Add a custom data source profile manually[/dim]\n
   $ [bold cyan]odctl wren profile add ...[/bold cyan]
 """,
 )
 def wren(ctx: typer.Context):
     """
-    Execute WrenAI CLI commands natively within the stack.
+    Execute WrenAI CLI commands natively within the stack, or auto-setup data sources.
     """
     import subprocess
     import sys
+    import json
+    import tempfile
+    from pathlib import Path
 
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    cmd = ["docker", "exec", "-it", "wren-ai-service", "wren"] + ctx.args
+    args = ctx.args
+    if args and args[0] == "auto-setup":
+        if len(args) < 2:
+            ui.print_error("Missing profile. Usage: odctl wren auto-setup <profile>")
+            raise typer.Exit(1)
+        profile_name = args[1]
+        
+        conn = {}
+        if profile_name in ["ch-lite", "ch-full"]:
+            conn = {
+                "type": "clickhouse",
+                "properties": {
+                    "host": "clickhouse-11",
+                    "port": 8123,
+                    "user": "default",
+                    "password": "",
+                    "database": "default"
+                }
+            }
+        elif profile_name == "trino":
+            conn = {
+                "type": "trino",
+                "properties": {
+                    "host": "trino",
+                    "port": 8080,
+                    "user": "admin",
+                    "password": "",
+                    "catalog": "iceberg",
+                    "schema": "default"
+                }
+            }
+        elif profile_name == "base":
+            conn = {
+                "type": "postgres",
+                "properties": {
+                    "host": "postgres",
+                    "port": 5432,
+                    "user": "user",
+                    "password": "password",
+                    "database": "odctl"
+                }
+            }
+        else:
+            ui.print_error(f"Auto-setup does not support profile: {profile_name}")
+            raise typer.Exit(1)
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(conn, f)
+            temp_path = f.name
+        
+        ui.print_info(f"Injecting data source for {profile_name} into WrenAI...")
+        
+        try:
+            subprocess.run(["docker", "cp", temp_path, "wren-ai-service:/tmp/conn.json"], check=True)
+            exec_cmd = ["docker", "exec", "-it", "wren-ai-service", "wren", "profile", "add", profile_name, "--from-file", "/tmp/conn.json"]
+            exit_code = subprocess.call(exec_cmd)
+            sys.exit(exit_code)
+        except Exception as e:
+            ui.print_error(f"Failed to auto-setup {profile_name}", details=str(e))
+            raise typer.Exit(1)
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+            
+    cmd = ["docker", "exec", "-it", "wren-ai-service", "wren"] + args
 
     try:
-        # subprocess.call binds to the current terminal and blocks until finished
         exit_code = subprocess.call(cmd)
-
-        # Transparently pass the Docker container's exit code back to the host OS
         sys.exit(exit_code)
-
     except KeyboardInterrupt:
-        # Gracefully handle the user hitting Ctrl+C while WrenAI is running
         sys.exit(130)
     except Exception as e:
         ui.print_error("Failed to execute WrenAI command.", details=str(e))
         raise typer.Exit(1)
+
 
 
 @app.command(
@@ -441,7 +505,7 @@ def wren(ctx: typer.Context):
   [dim]# Show all running containers managed by ODCTL[/dim]\n
   $ [bold cyan]odctl ps --all[/bold cyan]\n\n
   [dim]# Show containers just for specific profiles[/dim]\n
-  $ [bold cyan]odctl ps kafka spark[/bold cyan]
+  $ [bold cyan]odctl ps kafka-lite spark-lite[/bold cyan]
 """,
 )
 def ps(
@@ -479,11 +543,11 @@ def info():
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# Tail the last 50 lines of all Flink containers and follow live[/dim]\n
-  $ [bold cyan]odctl logs flink1 -n 50 -f[/bold cyan]\n\n
+  $ [bold cyan]odctl logs flink1-lite -n 50 -f[/bold cyan]\n\n
   [dim]# View logs strictly for the JobManager service[/dim]\n
-  $ [bold cyan]odctl logs flink1 -s jobmanager-1[/bold cyan]\n\n
+  $ [bold cyan]odctl logs flink1-lite -s jobmanager-1[/bold cyan]\n\n
   [dim]# Show logs with timestamps for the last 10 minutes[/dim]\n
-  $ [bold cyan]odctl logs kafka --since 10m -t[/bold cyan]
+  $ [bold cyan]odctl logs kafka-lite --since 10m -t[/bold cyan]
 """,
 )
 def logs(
