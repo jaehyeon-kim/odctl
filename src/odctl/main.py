@@ -393,6 +393,47 @@ def iceberg(ctx: typer.Context):
 
 
 @app.command(
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+    },
+    rich_help_panel="Data Operations",
+    epilog="""
+[bold underline]Examples:[/bold underline]\n
+  [dim]# Add a data source profile[/dim]\n
+  $ [bold cyan]odctl wrenai profile add ...[/bold cyan]
+""",
+)
+def wrenai(ctx: typer.Context):
+    """
+    Execute WrenAI CLI commands natively within the stack.
+    """
+    import subprocess
+    import sys
+
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+    cmd = ["docker", "exec", "-it", "wren-ai-service", "wren"] + ctx.args
+
+    try:
+        # subprocess.call binds to the current terminal and blocks until finished
+        exit_code = subprocess.call(cmd)
+
+        # Transparently pass the Docker container's exit code back to the host OS
+        sys.exit(exit_code)
+
+    except KeyboardInterrupt:
+        # Gracefully handle the user hitting Ctrl+C while WrenAI is running
+        sys.exit(130)
+    except Exception as e:
+        ui.print_error("Failed to execute WrenAI command.", details=str(e))
+        raise typer.Exit(1)
+
+
+@app.command(
     name="ps",
     rich_help_panel="Inspection & Info",
     epilog="""

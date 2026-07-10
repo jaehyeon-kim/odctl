@@ -11,7 +11,7 @@ capacities:
   metadata: "data catalog governance discovery search data dictionary"
   observability: "metrics monitoring alerting grafana prometheus telemetry dashboards"
   lineage: "data lineage provenance data flow troubleshooting tracing marquez"
-
+  semantic: "text-to-sql ai agent semantic modeling rag"
 # ==========================================
 # Stack Registry (The Execution Map)
 # ==========================================
@@ -266,3 +266,16 @@ stacks:
         - External (Localhost): http://localhost:8087
         - Internal (Docker): http://openmetadata-ingestion:8080
       • Default Admin: admin@open-data.local / admin
+
+  wrenai:
+    file: "compose-wrenai.yml"
+    description: "Semantic layer and Text-to-SQL AI agent using RAG."
+    profiles: ["wrenai"]
+    capacities: ["semantic"]
+    depends_on: []
+    role: "Translates natural language questions into executable SQL using LLMs."
+    usage: |
+      • WrenAI Chat UI:
+        - External (Localhost): http://localhost:3001
+        - Internal (Docker): http://wren-ui:3000
+      • CLI Access: Use 'odctl wrenai' to interact via the AI service container.
