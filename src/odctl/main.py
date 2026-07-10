@@ -427,11 +427,13 @@ def wren(ctx: typer.Context):
         check = subprocess.run(
             ["docker", "ps", "-q", "-f", "name=wren-ai-service"],
             capture_output=True,
-            text=True
+            text=True,
         )
         if not check.stdout.strip():
             ui.print_info("The wren-ai-service container is not currently running.")
-            ui.print_info("Start it with 'odctl up wrenai' to execute native CLI commands.")
+            ui.print_info(
+                "Start it with 'odctl up wrenai' to execute native CLI commands."
+            )
             typer.echo(f"\n{ctx.get_help()}")
             raise typer.Exit()
 
@@ -440,7 +442,7 @@ def wren(ctx: typer.Context):
             ui.print_error("Missing profile. Usage: odctl wren auto-setup <profile>")
             raise typer.Exit(1)
         profile_name = args[1]
-        
+
         conn = {}
         if profile_name in ["ch-lite", "ch-full"]:
             conn = {
@@ -450,8 +452,8 @@ def wren(ctx: typer.Context):
                     "port": 8123,
                     "user": "default",
                     "password": "",
-                    "database": "default"
-                }
+                    "database": "default",
+                },
             }
         elif profile_name == "trino":
             conn = {
@@ -462,8 +464,8 @@ def wren(ctx: typer.Context):
                     "user": "admin",
                     "password": "",
                     "catalog": "iceberg",
-                    "schema": "default"
-                }
+                    "schema": "default",
+                },
             }
         elif profile_name == "base":
             conn = {
@@ -473,8 +475,8 @@ def wren(ctx: typer.Context):
                     "port": 5432,
                     "user": "user",
                     "password": "password",
-                    "database": "odctl"
-                }
+                    "database": "odctl",
+                },
             }
         else:
             ui.print_error(f"Auto-setup does not support profile: {profile_name}")
@@ -483,12 +485,26 @@ def wren(ctx: typer.Context):
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(conn, f)
             temp_path = f.name
-        
+
         ui.print_info(f"Injecting data source for {profile_name} into WrenAI...")
-        
+
         try:
-            subprocess.run(["docker", "cp", temp_path, "wren-ai-service:/tmp/conn.json"], check=True)
-            exec_cmd = ["docker", "exec", "-it", "wren-ai-service", "wren", "profile", "add", profile_name, "--from-file", "/tmp/conn.json"]
+            subprocess.run(
+                ["docker", "cp", temp_path, "wren-ai-service:/tmp/conn.json"],
+                check=True,
+            )
+            exec_cmd = [
+                "docker",
+                "exec",
+                "-it",
+                "wren-ai-service",
+                "wren",
+                "profile",
+                "add",
+                profile_name,
+                "--from-file",
+                "/tmp/conn.json",
+            ]
             exit_code = subprocess.call(exec_cmd)
             sys.exit(exit_code)
         except Exception as e:
@@ -496,7 +512,7 @@ def wren(ctx: typer.Context):
             raise typer.Exit(1)
         finally:
             Path(temp_path).unlink(missing_ok=True)
-            
+
     cmd = ["docker", "exec", "-it", "wren-ai-service", "wren"] + args
 
     try:
@@ -507,7 +523,6 @@ def wren(ctx: typer.Context):
     except Exception as e:
         ui.print_error("Failed to execute WrenAI command.", details=str(e))
         raise typer.Exit(1)
-
 
 
 @app.command(

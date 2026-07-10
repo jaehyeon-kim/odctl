@@ -17,7 +17,7 @@ def test_wren_auto_setup_ch_lite(monkeypatch):
 
     mock_call = MagicMock(return_value=0)
     monkeypatch.setattr("subprocess.call", mock_call)
-    
+
     # We also mock sys.exit because main.py calls sys.exit(exit_code)
     # Using side_effect=SystemExit ensures the function actually terminates
     mock_exit = MagicMock(side_effect=SystemExit)
@@ -33,7 +33,7 @@ def test_wren_auto_setup_ch_lite(monkeypatch):
     monkeypatch.setattr("json.dump", mock_json_dump)
 
     try:
-        result = runner.invoke(app, ["wren", "auto-setup", "ch-lite"])
+        runner.invoke(app, ["wren", "auto-setup", "ch-lite"])
     except SystemExit:
         pass
 
@@ -50,7 +50,18 @@ def test_wren_auto_setup_ch_lite(monkeypatch):
 
     assert mock_call.call_count == 1
     exec_args = mock_call.call_args[0][0]
-    assert exec_args == ["docker", "exec", "-it", "wren-ai-service", "wren", "profile", "add", "ch-lite", "--from-file", "/tmp/conn.json"]
+    assert exec_args == [
+        "docker",
+        "exec",
+        "-it",
+        "wren-ai-service",
+        "wren",
+        "profile",
+        "add",
+        "ch-lite",
+        "--from-file",
+        "/tmp/conn.json",
+    ]
 
     mock_exit.assert_called_once_with(0)
 
@@ -64,7 +75,7 @@ def test_wren_auto_setup_trino(monkeypatch):
 
     mock_call = MagicMock(return_value=0)
     monkeypatch.setattr("subprocess.call", mock_call)
-    
+
     mock_exit = MagicMock(side_effect=SystemExit)
     monkeypatch.setattr("sys.exit", mock_exit)
 
@@ -78,7 +89,7 @@ def test_wren_auto_setup_trino(monkeypatch):
     monkeypatch.setattr("json.dump", mock_json_dump)
 
     try:
-        result = runner.invoke(app, ["wren", "auto-setup", "trino"])
+        runner.invoke(app, ["wren", "auto-setup", "trino"])
     except SystemExit:
         pass
 
