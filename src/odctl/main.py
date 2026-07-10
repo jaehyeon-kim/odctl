@@ -375,21 +375,7 @@ def iceberg(ctx: typer.Context):
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    args = ctx.args
-
-    if not args or "--help" in args or "-h" in args:
-        check = subprocess.run(
-            ["docker", "ps", "-q", "-f", "name=odctl-pyiceberg"],
-            capture_output=True,
-            text=True
-        )
-        if not check.stdout.strip():
-            ui.print_info("The odctl-pyiceberg container is not currently running.")
-            ui.print_info("Start it with 'odctl up catalog' to execute native CLI commands.")
-            typer.echo(f"\n{ctx.get_help()}")
-            raise typer.Exit()
-
-    cmd = ["docker", "exec", "-it", "odctl-pyiceberg", "pyiceberg"] + args
+    cmd = ["docker", "exec", "-it", "odctl-pyiceberg", "pyiceberg"] + ctx.args
 
     try:
         # subprocess.call binds to the current terminal and blocks until finished
