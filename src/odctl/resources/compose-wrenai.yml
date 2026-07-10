@@ -90,7 +90,7 @@ services:
       WREN_AI_ENDPOINT: http://wren-ai-service:5555
       IBIS_SERVER_ENDPOINT: http://wren-engine-ibis:8000
     ports:
-      - "3001:3000"
+      - "3005:3000"
     volumes:
       - wren_data:/app/data
     networks:
