@@ -278,4 +278,6 @@ stacks:
       • WrenAI Chat UI:
         - External (Localhost): http://localhost:3005
         - Internal (Docker): http://wren-ui:3000
-      • CLI Access: Use 'odctl wren' to interact via the AI service container.
+      • Data Sources (CLI): 
+        - Auto-connect: 'odctl wren auto-setup <profile>'
+        - Manual connect: 'odctl wren profile add ...'
