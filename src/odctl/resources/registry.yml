@@ -269,4 +269,3 @@ stacks:
         - External (Localhost): http://localhost:8087
         - Internal (Docker): http://openmetadata-ingestion:8080
       • Default Admin: admin@open-data.local / admin
-
