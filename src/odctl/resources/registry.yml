@@ -187,7 +187,7 @@ stacks:
     role: "Trino federates queries across Iceberg/Postgres; Metabase handles visualization."
     usage:
       trino: |
-        • Trino UI & JDBC connection (user: admin, password: none):
+        • Trino UI & JDBC connection (user: user, password: none):
           * External (Localhost): http://localhost:8080
           * Internal (Docker): http://trino:8080
       metabase: |
