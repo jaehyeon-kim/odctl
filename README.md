@@ -104,10 +104,6 @@ The `odctl` CLI orchestrates the Open Data Stack and is logically grouped by fun
 - `odctl up`: Launch Open Data profiles (automatically resolves upstream dependencies).
 - `odctl down`: Stop and remove profile containers and networks.
 
-### Data Operations
-
-- `odctl iceberg`: Execute PyIceberg CLI commands natively within the stack.
-
 ### Management
 
 - `odctl logs`: Fetch the logs of containers managed by specific profiles.
