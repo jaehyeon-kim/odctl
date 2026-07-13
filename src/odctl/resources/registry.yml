@@ -28,16 +28,13 @@ stacks:
 
   base:
     file: "compose-infra.yml"
-    description: "PostgreSQL metadata backend and DbGate UI."
+    description: "PostgreSQL metadata backend."
     profiles: ["base"]
     parent: "infra"
     capacities: []
     depends_on: ["deps"]
     role: "The foundational state-store using pgvector. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata."
     usage: |
-      • DbGate UI:
-        - External (Localhost): http://localhost:8282
-        - Internal (Docker): http://dbgate:3000
       • Postgres JDBC:
         - External (Localhost): jdbc:postgresql://localhost:5432/odctl
         - Internal (Docker): jdbc:postgresql://postgres:5432/odctl
@@ -62,7 +59,7 @@ stacks:
 
   catalog:
     file: "compose-infra.yml"
-    description: "Iceberg REST Catalog and PyIceberg CLI."
+    description: "Iceberg REST Catalog."
     profiles: ["catalog"]
     parent: "infra"
     capacities: []
@@ -72,7 +69,6 @@ stacks:
       • REST API Endpoint:
         - External (Localhost): http://localhost:8181
         - Internal (Docker): http://catalog:8181
-      • CLI Access: Use 'odctl iceberg list' to interact via the headless sidecar wrapper.
 
   kafka:
     file: "compose-kafka.yml"
