@@ -11,7 +11,6 @@ capacities:
   metadata: "data catalog governance discovery search data dictionary"
   observability: "metrics monitoring alerting grafana prometheus telemetry dashboards"
   lineage: "data lineage provenance data flow troubleshooting tracing marquez"
-  semantic: "text-to-sql ai agent semantic modeling rag"
 # ==========================================
 # Stack Registry (The Execution Map)
 # ==========================================
@@ -157,7 +156,7 @@ stacks:
   store:
     file: "compose-store.yml"
     description: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey). 'ch-lite' has 1 shard and 2 replicas; 'ch-full' uses 2 shards and 2 replicas each."
-    profiles: ["ch-lite", "ch-full", "fluss", "valkey"]
+    profiles: ["ch-lite", "ch-full", "fluss", "valkey", "qdrant"]
     depends_on: ["deps"]
     role: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey)."
     usage:
@@ -173,6 +172,10 @@ stacks:
         • Fluss Coordinator API:
           * External (Localhost): localhost:9123
           * Internal (Docker): fluss-coordinator:9123
+      qdrant: |
+        • Qdrant Vector DB:
+          * External (Localhost): http://localhost:6333
+          * Internal (Docker): http://qdrant:6333
       valkey: |
         • Valkey Port (In-Memory Key-Value Cache):
           * External (Localhost): localhost:6379
@@ -267,17 +270,3 @@ stacks:
         - Internal (Docker): http://openmetadata-ingestion:8080
       • Default Admin: admin@open-data.local / admin
 
-  wrenai:
-    file: "compose-wrenai.yml"
-    description: "Semantic layer and Text-to-SQL AI agent using RAG."
-    profiles: ["wrenai"]
-    capacities: ["semantic"]
-    depends_on: []
-    role: "Translates natural language questions into executable SQL using LLMs."
-    usage: |
-      • WrenAI Chat UI:
-        - External (Localhost): http://localhost:3005
-        - Internal (Docker): http://wren-ui:3000
-      • Data Sources (CLI):
-        - Auto-connect: 'odctl wren auto-setup <profile>'
-        - Manual connect: 'odctl wren profile add ...'
