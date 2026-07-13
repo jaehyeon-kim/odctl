@@ -144,7 +144,7 @@ services:
       echo '...waiting for SeaweedFS Master...'
       sleep 2
 
-      BUCKETS='warehouse odctl-dev flink-checkpoints flink-savepoints airflow mlflow'
+      BUCKETS='warehouse odctl-dev flink-checkpoints flink-savepoints airflow mlflow wrenai-memory'
       for bucket in \$$BUCKETS; do
         echo \"--- Creating S3 bucket natively: \$$bucket ---\"
         echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333
