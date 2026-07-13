@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, pyiceberg, spark, ray-mlops]
+        component: [airflow, spark, ray-mlops]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, pyiceberg, spark, ray-mlops]
+        component: [airflow, spark, ray-mlops]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

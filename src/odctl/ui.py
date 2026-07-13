@@ -84,10 +84,8 @@ def print_explain_panel(
     # Container Context (Substring matching)
     container_roles = {
         "pgvector": "Unified Metadata & Vector DB",
-        "dbgate": "Database Inspection UI",
         "seaweedfs": "Object Storage (S3 API)",
         "iceberg-rest": "Iceberg REST Catalog",
-        "odctl/pyiceberg": "PyIceberg CLI Proxy",
         "odctl/deps": "Dependency Initializer",
         "flink": "Flink Stream Processing Node",
         "apache/kafka": "Event Broker / Kafka Connect",
