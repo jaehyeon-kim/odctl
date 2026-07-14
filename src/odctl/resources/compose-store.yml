@@ -266,18 +266,6 @@ services:
     mem_limit: 512m
 
 
-  # ==========================================
-  # [PROFILE: qdrant] Vector Database
-  # ==========================================
-  qdrant:
-    image: qdrant/qdrant:v1.15.0
-    container_name: qdrant
-    profiles: ["qdrant"]
-    restart: on-failure
-    ports:
-      - "6333:6333"
-    networks:
-      - odctl
 networks:
   odctl:
     name: odctl
