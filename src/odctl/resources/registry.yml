@@ -152,7 +152,7 @@ stacks:
   store:
     file: "compose-store.yml"
     description: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey). 'ch-lite' has 1 shard and 2 replicas; 'ch-full' uses 2 shards and 2 replicas each."
-    profiles: ["ch-lite", "ch-full", "fluss", "valkey", "qdrant"]
+    profiles: ["ch-lite", "ch-full", "fluss", "valkey"]
     depends_on: ["deps"]
     role: "Fast analytical storage (ClickHouse), stream storage (Fluss), and caching (Valkey)."
     usage:
@@ -168,10 +168,6 @@ stacks:
         • Fluss Coordinator API:
           * External (Localhost): localhost:9123
           * Internal (Docker): fluss-coordinator:9123
-      qdrant: |
-        • Qdrant Vector DB:
-          * External (Localhost): http://localhost:6333
-          * Internal (Docker): http://qdrant:6333
       valkey: |
         • Valkey Port (In-Memory Key-Value Cache):
           * External (Localhost): localhost:6379
