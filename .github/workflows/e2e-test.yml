@@ -11,6 +11,19 @@ jobs:
     permissions:
       contents: read
       packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        profile_group:
+          - "metadata airflow"
+          - "kafka-lite kafka-full"
+          - "flink1-lite flink1-full"
+          - "spark-lite spark-full"
+          - "ch-lite ch-full"
+          - "trino metabase"
+          - "mlflow ray-serve"
+          - "lineage telemetry"
+          - "fluss valkey"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,27 +47,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Launch metadata profile
-        run: odctl up metadata
-
-      - name: Validate containers are running
+      - name: Test Profile Group
         run: |
-          for i in {1..15}; do
-            RUNNING=$(docker ps -q | wc -l)
-            if [ "$RUNNING" -ge 1 ]; then
-              echo "Containers are healthy and running!"
-              docker ps
+          # Split the space-separated group into an array
+          for profile in ${{ matrix.profile_group }}; do
+            echo "::group::Testing Profile: $profile"
+            echo "🚀 Launching $profile..."
+            odctl up $profile
+
+            echo "⏳ Validating containers..."
+            SUCCESS=0
+            for i in {1..15}; do
+              RUNNING=$(docker ps -q | wc -l)
+              if [ "$RUNNING" -ge 1 ]; then
+                echo "✅ Containers are running!"
+                docker ps
+                odctl ps --all
+                SUCCESS=1
+                break
+              fi
+              echo "Waiting... ($i/15)"
+              sleep 2
+            done
+
+            if [ "$SUCCESS" -eq 0 ]; then
+              echo "❌ Timeout reached: No containers are running for $profile!"
+              docker ps -a
               odctl ps --all
-              exit 0
+              exit 1
             fi
-            echo "Waiting for containers to start... ($i/15)"
-            sleep 2
+
+            echo "🧹 Tearing down $profile..."
+            yes | odctl down --all --volumes
+            echo "::endgroup::"
           done
-
-          echo "Timeout reached: No containers are running!"
-          docker ps -a
-          odctl ps --all
-          exit 1
-
-      - name: Teardown
-        run: yes | odctl down --all --volumes

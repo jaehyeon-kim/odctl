@@ -268,7 +268,7 @@ def up(
         return
 
     for file, profs in plan.items():
-        is_base = any(x in profs for x in ["base", "deps"])
+        is_base = any(x in profs for x in ["deps", "postgres", "storage", "catalog"])
         prefix = "🧱 Infrastructure" if is_base else "🚀 Target"
 
         if pull:

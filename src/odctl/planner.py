@@ -118,8 +118,8 @@ def build_execution_plan(
     else:
         final_profiles = set(profiles)
 
-    # Enforce lightweight topological sort (deps -> base -> target)
-    order_weights = {"deps": 0, "base": 1}
+    # Enforce lightweight topological sort
+    order_weights = {"deps": 0, "postgres": 1, "storage": 1, "catalog": 2}
     sorted_profiles = sorted(
         list(final_profiles), key=lambda p: (order_weights.get(p, 99), p)
     )
