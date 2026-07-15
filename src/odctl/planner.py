@@ -64,7 +64,7 @@ def resolve_dependencies(
         current = queue.pop(0)
         stack_id = profile_map[current]["stack_id"]
         stack = registry.stacks[stack_id]
-        for dep in stack.depends_on:
+        for dep in stack.depends_on.get(current, []):
             if dep not in resolved:
                 resolved.add(dep)
                 queue.append(dep)

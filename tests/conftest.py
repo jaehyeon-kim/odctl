@@ -14,14 +14,14 @@ def mock_registry_data():
                 description="Core infrastructure",
                 profiles=["storage", "kafka"],
                 capacities=["messaging"],
-                depends_on=[],
+                depends_on={"storage": [], "kafka": []},
             ),
             "spark": StackConfig(
                 file="compose-spark.yml",
                 description="Spark compute layer",
                 profiles=["spark-master", "spark-worker"],
                 capacities=["compute"],
-                depends_on=["storage"],
+                depends_on={"spark-master": ["storage"], "spark-worker": ["storage"]},
             ),
         },
     )
