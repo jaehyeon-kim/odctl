@@ -12,7 +12,6 @@ jobs:
       contents: read
       packages: read
     strategy:
-      fail-fast: false
       matrix:
         profile_group:
           - "metadata airflow"
@@ -24,6 +23,7 @@ jobs:
           - "mlflow ray-serve"
           - "lineage telemetry"
           - "fluss valkey"
+          - "postgres storage catalog"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

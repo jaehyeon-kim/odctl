@@ -1,6 +1,6 @@
 [project]
 name = "odctl"
-version = "0.0.6"
+version = "0.0.7"
 description = "Orchestrator for the Open Data Stack"
 readme = "README.md"
 authors = [
