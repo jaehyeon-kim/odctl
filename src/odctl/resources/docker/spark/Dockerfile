@@ -4,7 +4,8 @@ FROM apache/spark:4.1.2
 USER root
 
 # Only install libraries required for distributed UDFs
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install \
     'clickhouse-connect' \
     'psycopg2-binary' \
     'valkey' \

@@ -6,7 +6,9 @@ LABEL org.opencontainers.image.description="Unified Ray Serve and MLflow image f
 USER root
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
@@ -15,9 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 USER ray
 
 # Inline pip installation to preserve a single file deployment structure
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir \
+RUN --mount=type=cache,target=/home/ray/.cache/pip \
+    pip install --upgrade pip && \
+    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install \
     # MLOps & Serving Core
     'mlflow~=3.12.0' \
     fastapi \
