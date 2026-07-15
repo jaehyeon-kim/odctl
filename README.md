@@ -5,7 +5,7 @@
 ![Python Versions](https://img.shields.io/pypi/pyversions/odctl)
 ![License](https://img.shields.io/github/license/jaehyeon-kim/odctl)
 
-![Architecture Diagram](./image/diagram.png)
+![Architecture Diagram](https://raw.githubusercontent.com/jaehyeon-kim/odctl/refs/heads/main/image/diagram.png)
 
 A curated collection of open-source technologies and an accompanying CLI (`odctl`) for experimenting with modern data architecture and MLOps locally.
 
@@ -15,12 +15,26 @@ Provisioning a local data environment with distributed systems can be highly com
 
 The stack is organized into distinct profiles that can be launched independently or together:
 
-- **Event Streaming:** Kafka (KRaft), Schema Registry (Karapace), Kafka Connect
-- **Processing Engines:** Apache Spark, Apache Flink
-- **Storage & Catalog:** SeaweedFS (S3-compatible), Iceberg REST Catalog, ClickHouse, PostgreSQL (pgvector), Valkey, Apache Fluss
-- **Orchestration & MLOps:** Apache Airflow, MLflow, Feast Feature Store
-- **Federation & BI:** Trino, Metabase
-- **Governance & Observability:** OpenMetadata, Marquez (Lineage), Prometheus, Grafana
+- **Messaging:** Real-time event streaming, schema validation, and robust data ingestion.
+  - **Stack:** Kafka (KRaft), Schema Registry (Karapace), Kafka Connect
+- **Stream Processing:** Stateful stream processing and continuous real-time data transformations.
+  - **Stack:** Apache Flink
+- **Data Processing:** Distributed batch processing and large-scale ETL pipelines.
+  - **Stack:** Apache Spark
+- **Analytics:** Real-time OLAP querying, federated SQL execution, and interactive BI dashboards.
+  - **Stack:** ClickHouse, Trino, Metabase
+- **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation.
+  - **Stack:** Apache Airflow
+- **MLOps:** Machine learning experiment tracking, model registry, and scalable inference serving.
+  - **Stack:** MLflow, Ray Serve
+- **Metadata:** Centralized data catalog, data discovery, and enterprise governance.
+  - **Stack:** OpenMetadata
+- **Observability:** Metrics collection, intelligent alerting, and system telemetry visualization.
+  - **Stack:** Prometheus, Alertmanager, Grafana
+- **Lineage:** Data provenance, pipeline dependency tracking, and troubleshooting.
+  - **Stack:** OpenLineage, Marquez
+- **Foundational Storage, Data Store, & Catalog:** Persistent state, S3-compatible object storage, unified table metadata, high-performance caching/vector search, and unified stream storage.
+  - **Stack:** PostgreSQL (pgvector), SeaweedFS (S3), Iceberg REST Catalog, Valkey Bundle, Apache Fluss
 
 ## Prerequisites & Installation
 
@@ -73,7 +87,7 @@ odctl list
 Bring up a robust data engineering environment.
 
 ```bash
-odctl up kafka flink1 spark
+odctl up kafka-lite flink1-lite spark-lite
 ```
 
 _Note: You do not need to memorize dependencies. The CLI will automatically detect that these profiles require foundational infrastructure and will launch PostgreSQL, SeaweedFS (S3), and the Iceberg REST Catalog for you before starting the target compute engines._
@@ -116,10 +130,10 @@ The `odctl` CLI orchestrates the Open Data Stack and is logically grouped by fun
 $ odctl list -d
 
 # See exactly what the kafka profile provisions
-$ odctl explain kafka
+$ odctl explain kafka-lite
 
-# Launch specific profiles and their dependencies
-$ odctl up flink1 kafka spark
+# Launch specific profiles
+$ odctl up flink1-lite kafka-lite spark-lite
 
 # Complete teardown and wipe all data
 $ odctl down --all --volumes
