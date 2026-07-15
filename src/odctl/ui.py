@@ -278,13 +278,19 @@ def print_info(message: str, style: str = "cyan"):
     console.print(f"[{style}]{message}[/{style}]")
 
 
-def print_ps_table(containers: List[Any]):
+def print_ps_table(containers: List[Any], running_profiles: Optional[List[str]] = None):
     """
     Format and print the list of running containers as a status table.
 
     Args:
         containers (List[Any]): A list of python-on-whales Container objects.
+        running_profiles (Optional[List[str]]): A list of active profiles to display.
     """
+    if running_profiles:
+        console.print(
+            f"🌟 [bold]Active Profiles:[/bold] [green]{', '.join(running_profiles)}[/green]\n"
+        )
+
     if not containers:
         print_info(
             "No containers found for the requested profiles. Are they running?",
@@ -293,7 +299,7 @@ def print_ps_table(containers: List[Any]):
         return
 
     table = Table(header_style="bold cyan", border_style="cyan")
-    table.add_column("Container Name", style="magenta", no_wrap=True)
+    table.add_column("Container", style="magenta", no_wrap=True)
     table.add_column("Service", style="yellow", no_wrap=True)
     table.add_column("State", style="bold")
     table.add_column("Health")

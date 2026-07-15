@@ -333,6 +333,31 @@ def down(
         )
 
     plan = build_execution_plan(profiles, all, resolve_deps=False)
+
+    if all:
+        from odctl.docker import get_managed_containers, get_stack_details
+
+        containers = get_managed_containers(plan)
+        existing_services = set()
+        for c in containers:
+            labels = c.config.labels if c.config and c.config.labels else {}
+            svc = labels.get("com.docker.compose.service", "")
+            if svc:
+                existing_services.add(svc)
+
+        active_plan = {}
+        for file, profs in plan.items():
+            active_profs = []
+            for p in profs:
+                services, _, _, named_vols = get_stack_details(file, [p])
+                if any(s in existing_services for s in services) or (
+                    volumes and named_vols
+                ):
+                    active_profs.append(p)
+            if active_profs:
+                active_plan[file] = active_profs
+        plan = active_plan
+
     plan = dict(reversed(list(plan.items())))
 
     if dry_run:
@@ -381,7 +406,24 @@ def ps(
     plan = build_execution_plan(profiles, all, resolve_deps=False)
 
     containers = get_managed_containers(plan)
-    ui.print_ps_table(containers)
+
+    from odctl.docker import get_stack_details
+
+    running_profiles = set()
+    running_services = set()
+    for c in containers:
+        labels = c.config.labels if c.config and c.config.labels else {}
+        svc = labels.get("com.docker.compose.service", "")
+        if svc:
+            running_services.add(svc)
+
+    for file, profs in plan.items():
+        for p in profs:
+            services, _, _, _ = get_stack_details(file, [p])
+            if any(s in running_services for s in services):
+                running_profiles.add(p)
+
+    ui.print_ps_table(containers, running_profiles=sorted(list(running_profiles)))
 
 
 @app.command(name="info", rich_help_panel="Inspection & Info")
