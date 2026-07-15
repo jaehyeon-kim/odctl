@@ -134,12 +134,17 @@ def explain(
             profile, f"• No specific usage guide for profile: {profile}"
         )
 
+    if isinstance(stack.depends_on, dict):
+        resolved_deps = stack.depends_on.get(profile, [])
+    else:
+        resolved_deps = stack.depends_on
+
     ui.print_explain_panel(
         profile,
         stack.parent or stack_id,
         stack.file,
         stack.description,
-        stack.depends_on or ["None"],
+        resolved_deps or ["None"],
         services,
         ports,
         images,
