@@ -13,7 +13,7 @@
 
     <zookeeper>
         <node>
-            <host>clickhouse-keeper</host>
+            <host>ch-keeper</host>
             <port>9181</port>
         </node>
     </zookeeper>
@@ -22,13 +22,13 @@
         <odctl_cluster>
             <shard>
                 <internal_replication>true</internal_replication>
-                <replica><host>clickhouse-11</host><port>9000</port></replica>
-                <replica><host>clickhouse-12</host><port>9000</port></replica>
+                <replica><host>ch-11</host><port>9000</port></replica>
+                <replica><host>ch-12</host><port>9000</port></replica>
             </shard>
             <shard>
                 <internal_replication>true</internal_replication>
-                <replica><host>clickhouse-21</host><port>9000</port></replica>
-                <replica><host>clickhouse-22</host><port>9000</port></replica>
+                <replica><host>ch-21</host><port>9000</port></replica>
+                <replica><host>ch-22</host><port>9000</port></replica>
             </shard>
         </odctl_cluster>
     </remote_servers>
