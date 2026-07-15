@@ -10,7 +10,7 @@ x-clickhouse-base: &clickhouse-base
     CLICKHOUSE_DO_NOT_CHOWN: 1
     CLICKHOUSE_PASSWORD: "password"
   depends_on:
-    clickhouse-keeper:
+    ch-keeper:
       condition: service_healthy
   healthcheck:
     test:
@@ -31,9 +31,9 @@ services:
   # ==========================================
   # [SHARED] Consensus Node
   # ==========================================
-  clickhouse-keeper:
+  ch-keeper:
     image: clickhouse/clickhouse-keeper:24.3-alpine
-    container_name: clickhouse-keeper
+    container_name: ch-keeper
     # Keeper must run in BOTH profiles
     profiles:
       - ch-lite
@@ -58,23 +58,23 @@ services:
   # ==========================================
   # This container ONLY boots in the single profile to instantly
   # resolve DNS for the missing Shard 2, preventing the 22s timeout.
-  clickhouse-shard2-stub:
+  ch-shard2-stub:
     image: alpine:latest
-    container_name: clickhouse-shard2-stub
+    container_name: ch-shard2-stub
     command: sleep infinity
     profiles: ["ch-lite"]
     networks:
       odctl:
         aliases:
-          - clickhouse-21
-          - clickhouse-22
+          - ch-21
+          - ch-22
 
   # ==========================================
   # Shard 1 (Active in BOTH profiles)
   # ==========================================
-  clickhouse-11:
+  ch-11:
     <<: *clickhouse-base
-    container_name: clickhouse-11
+    container_name: ch-11
     profiles: ["ch-lite", "ch-full"]
     ports:
       - "8123:8123"
@@ -84,9 +84,9 @@ services:
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
       - ./clickhouse/macros-11.xml:/etc/clickhouse-server/config.d/macros.xml
 
-  clickhouse-12:
+  ch-12:
     <<: *clickhouse-base
-    container_name: clickhouse-12
+    container_name: ch-12
     profiles: ["ch-lite", "ch-full"]
     ports:
       - "8124:8123"
@@ -99,9 +99,9 @@ services:
   # ==========================================
   # Shard 2 (Active ONLY in multi profile)
   # ==========================================
-  clickhouse-21:
+  ch-21:
     <<: *clickhouse-base
-    container_name: clickhouse-21
+    container_name: ch-21
     profiles: ["ch-full"]
     ports:
       - "8125:8123"
@@ -111,9 +111,9 @@ services:
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
       - ./clickhouse/macros-21.xml:/etc/clickhouse-server/config.d/macros.xml
 
-  clickhouse-22:
+  ch-22:
     <<: *clickhouse-base
-    container_name: clickhouse-22
+    container_name: ch-22
     profiles: ["ch-full"]
     ports:
       - "8126:8123"
@@ -126,24 +126,24 @@ services:
   # ==========================================
   # [INIT: ch-lite] Database Initialization
   # ==========================================
-  clickhouse-init-lite:
+  ch-init-lite:
     image: clickhouse/clickhouse-server:24.3-alpine
-    container_name: clickhouse-init-lite
+    container_name: ch-init-lite
     profiles: ["ch-lite"]
     networks:
       - odctl
     depends_on:
-      clickhouse-11:
+      ch-11:
         condition: service_healthy
-      clickhouse-12:
+      ch-12:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       echo '[ch-lite] Creating databases on Shard 1...' &&
-      clickhouse-client --host clickhouse-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
-      clickhouse-client --host clickhouse-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
-      clickhouse-client --host clickhouse-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
-      clickhouse-client --host clickhouse-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
+      clickhouse-client --host ch-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
+      clickhouse-client --host ch-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
+      clickhouse-client --host ch-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
+      clickhouse-client --host ch-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
       echo '✅ [ch-lite] Databases created successfully!' &&
       sleep infinity
       "
@@ -151,34 +151,34 @@ services:
   # ==========================================
   # [INIT: ch-full] Database Initialization
   # ==========================================
-  clickhouse-init-full:
+  ch-init-full:
     image: clickhouse/clickhouse-server:24.3-alpine
-    container_name: clickhouse-init-full
+    container_name: ch-init-full
     profiles: ["ch-full"]
     networks:
       - odctl
     depends_on:
-      clickhouse-11:
+      ch-11:
         condition: service_healthy
-      clickhouse-12:
+      ch-12:
         condition: service_healthy
-      clickhouse-21:
+      ch-21:
         condition: service_healthy
-      clickhouse-22:
+      ch-22:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       echo '[ch-full] Creating databases on Shard 1...' &&
-      clickhouse-client --host clickhouse-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
-      clickhouse-client --host clickhouse-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
-      clickhouse-client --host clickhouse-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
-      clickhouse-client --host clickhouse-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
+      clickhouse-client --host ch-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
+      clickhouse-client --host ch-11 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
+      clickhouse-client --host ch-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
+      clickhouse-client --host ch-12 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
 
       echo '[ch-full] Creating databases on Shard 2...' &&
-      clickhouse-client --host clickhouse-21 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
-      clickhouse-client --host clickhouse-21 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
-      clickhouse-client --host clickhouse-22 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
-      clickhouse-client --host clickhouse-22 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
+      clickhouse-client --host ch-21 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
+      clickhouse-client --host ch-21 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
+      clickhouse-client --host ch-22 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS feature_store;' &&
+      clickhouse-client --host ch-22 --user default --password password --query 'CREATE DATABASE IF NOT EXISTS odctl;' &&
 
       echo '✅ [ch-full] All databases created across the cluster!' &&
       sleep infinity
