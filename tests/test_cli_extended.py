@@ -10,6 +10,17 @@ def test_down_command(monkeypatch):
     monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
 
+    # Mock get_managed_containers to return a fake container so down --all proceeds
+    mock_container = MagicMock()
+    mock_container.config.labels = {"com.docker.compose.service": "kafka"}
+    monkeypatch.setattr(
+        "odctl.docker.get_managed_containers", lambda x: [mock_container]
+    )
+    monkeypatch.setattr(
+        "odctl.docker.get_stack_details",
+        lambda x, y: (["kafka"], [], [], []),
+    )
+
     result = runner.invoke(app, ["down", "--all"])
     assert result.exit_code == 0
     mock_stop.assert_called()
