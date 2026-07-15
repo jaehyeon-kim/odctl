@@ -2,7 +2,7 @@ FROM apache/airflow:3.2.1
 
 # Metadata Bindings for GHCR
 LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
-LABEL org.opencontainers.image.description="Custom Apache Airflow orchestrator image for the Open Data Stack. Fully loaded with pipeline execution providers for PostgreSQL, Trino, ClickHouse, Amazon S3, Flink, PySpark, PyIceberg, and Feast feature store integrations."
+LABEL org.opencontainers.image.description="Custom Apache Airflow orchestrator image for the Open Data Stack. Fully loaded with pipeline execution providers for PostgreSQL, Trino, ClickHouse, Amazon S3, Flink, PySpark, and PyIceberg."
 
 # Install Lean Open Data SDKs and Providers
 # Pinning PySpark strictly to 4.0.x for Iceberg compatibility
@@ -15,10 +15,8 @@ RUN pip install --no-cache-dir \
     'pyiceberg[s3]' \
     psycopg2-binary \
     pyspark~=4.1.0 \
-    'uvicorn>=0.31.0'
-
-# Install Feast separately to bypass the pip backtracking trap
-RUN pip install --no-cache-dir 'feast[clickhouse,redis,aws,postgres]'
+    'uvicorn>=0.31.0' \
+    valkey
 
 # Note: DAGs and Plugins are intentionally NOT copied here.
 # They are managed at runtime via the SeaweedFS S3-sync sidecar.

@@ -106,7 +106,7 @@ def print_explain_panel(
         "clickhouse-keeper": "Consensus Node",
         "clickhouse-server": "Analytical Database (OLAP)",
         "fluss": "Streaming Storage Engine",
-        "valkey": "In-Memory Cache",
+        "valkey": "In-Memory Cache & Vector DB",
         "trinodb/trino": "Federated SQL Engine",
         "metabase": "BI Dashboard",
     }

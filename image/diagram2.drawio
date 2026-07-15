@@ -1,0 +1,85 @@
+<mxfile host="65bd71144e">
+    <diagram id="diagram_capacities" name="Capacities Layout">
+        <mxGraphModel dx="1305" dy="689" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2339" pageHeight="3300" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b style=&quot;font-size: 24px;&quot;&gt;Open Data Stack (Managed by ODCTL CLI)&lt;/b&gt;" style="text;html=1;sketch=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="71" width="560" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_msg" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Messaging&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="120" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="kafka" value="&lt;b&gt;kafka&lt;/b&gt;&lt;br&gt;Brokers, Connect, Schema Reg." style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="165" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_stream" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Stream Processing&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="410" y="120" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="flink" value="&lt;b&gt;flink&lt;/b&gt;&lt;br&gt;Real-time Stream Engine" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="165" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_batch" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Data Processing&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="120" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="spark" value="&lt;b&gt;spark&lt;/b&gt;&lt;br&gt;Distributed Batch Engine" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="165" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_analytics" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Analytics&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="250" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="analytics" value="&lt;b&gt;analytics&lt;/b&gt;&lt;br&gt;ClickHouse, Trino, Metabase" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="295" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_orch" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Orchestration&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="410" y="250" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="orch" value="&lt;b&gt;orch&lt;/b&gt;&lt;br&gt;Airflow" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="295" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_mlops" value="&lt;b style=&quot;font-size:16px;&quot;&gt;MLOps&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="250" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="mlops" value="&lt;b&gt;mlops&lt;/b&gt;&lt;br&gt;MLflow, Ray Serve" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="295" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_metadata" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Metadata&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="380" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="metadata" value="&lt;b&gt;metadata&lt;/b&gt;&lt;br&gt;OpenMetadata" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="425" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_obsv" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Observability&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="410" y="380" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="obsv" value="&lt;b&gt;obsv&lt;/b&gt;&lt;br&gt;Prometheus, Alertmanager, Grafana" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="425" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_lineage" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Lineage&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="380" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="lineage" value="&lt;b&gt;lineage&lt;/b&gt;&lt;br&gt;OpenLineage, Marquez" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="425" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="infra_container" value="&lt;b style=&quot;font-size: 16px;&quot;&gt;Foundational Storage, Data Store &amp;amp; Catalog&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=15;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="510" width="900" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="infra_base" value="&lt;b&gt;postgres&lt;/b&gt;&lt;br&gt;PostgreSQL (pgvector)" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#ffffff;strokeColor=#82b366;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="555" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="infra_storage" value="&lt;b&gt;storage&lt;/b&gt;&lt;br&gt;SeaweedFS (S3 Object Storage)" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#ffffff;strokeColor=#82b366;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="555" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="infra_catalog" value="&lt;b&gt;catalog&lt;/b&gt;&lt;br&gt;Iceberg REST" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#ffffff;strokeColor=#82b366;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="555" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="infra_store" value="&lt;b&gt;store&lt;/b&gt;&lt;br&gt;Valkey Bundle &amp;amp; Fluss" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#ffffff;strokeColor=#82b366;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="555" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="deps_container" value="&lt;b style=&quot;font-size: 16px;&quot;&gt;Dependencies Layer (deps)&lt;/b&gt;&lt;br&gt;&lt;i&gt;Ephemeral Init: JARs, Connectors, &amp;amp; Shared Volumes&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;align=center;verticalAlign=middle;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="640" width="900" height="70" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
