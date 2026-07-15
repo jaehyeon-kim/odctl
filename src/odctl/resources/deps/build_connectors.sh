@@ -44,11 +44,11 @@ build_repo "aiven-jdbc" \
     "$JDBC_TAG" \
     "./gradlew clean assemble"
 
-# Build Aiven S3 (We build both, but will only extract the Sink)
+# Build ONLY Aiven S3 Sink
 build_repo "aiven-s3" \
     "https://github.com/Aiven-Open/cloud-storage-connectors-for-apache-kafka.git" \
     "$S3_TAG" \
-    "./gradlew clean assemble"
+    "./gradlew :s3-sink-connector:clean :s3-sink-connector:assemble"
 
 if [ "$DRY_RUN" -eq 0 ]; then
     echo "▶️  Extracting Targeted Aiven Distributions..."
