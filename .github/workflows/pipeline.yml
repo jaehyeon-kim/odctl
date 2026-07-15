@@ -17,6 +17,9 @@ permissions:
   packages: write
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build-platform:
     uses: ./.github/workflows/build-platform-images.yml
 
