@@ -26,7 +26,7 @@ class StackConfig(BaseModel):
     description: str
     profiles: List[str]
     capacities: List[str] = Field(default_factory=list)
-    depends_on: List[str] = Field(default_factory=list)
+    depends_on: Dict[str, List[str]] = Field(default_factory=dict)
     parent: Optional[str] = None
     role: Optional[str] = None
     usage: Optional[Union[str, Dict[str, str]]] = None

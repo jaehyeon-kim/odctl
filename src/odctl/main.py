@@ -134,12 +134,17 @@ def explain(
             profile, f"• No specific usage guide for profile: {profile}"
         )
 
+    if isinstance(stack.depends_on, dict):
+        resolved_deps = stack.depends_on.get(profile, [])
+    else:
+        resolved_deps = stack.depends_on
+
     ui.print_explain_panel(
         profile,
         stack.parent or stack_id,
         stack.file,
         stack.description,
-        stack.depends_on or ["None"],
+        resolved_deps or ["None"],
         services,
         ports,
         images,
@@ -417,12 +422,25 @@ def ps(
         if svc:
             running_services.add(svc)
 
+    active_profile_services = {}
     for file, profs in plan.items():
         for p in profs:
             services, _, _, _ = get_stack_details(file, [p])
-            if any(s in running_services for s in services):
-                running_profiles.add(p)
+            import builtins
 
+            if services and builtins.all(s in running_services for s in services):
+                active_profile_services[p] = set(services)
+
+    for p, p_services in active_profile_services.items():
+        is_strict_subset = False
+        for other_p, other_services in active_profile_services.items():
+            if p != other_p and p_services < other_services:
+                is_strict_subset = True
+                break
+        if not is_strict_subset:
+            running_profiles.add(p)
+
+    running_profiles.discard("deps")
     ui.print_ps_table(containers, running_profiles=sorted(list(running_profiles)))
 
 

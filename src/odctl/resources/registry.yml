@@ -20,7 +20,8 @@ stacks:
     description: "Shared dependencies, JARs, connectors, and Docker network"
     profiles: ["deps"]
     capacities: []
-    depends_on: []
+    depends_on:
+      deps: []
     role: "Ephemeral init-container. It populates the shared Docker volume with downloaded JARs (Iceberg, Flink, Spark) and Kafka connectors before shutting down."
     usage: |
       • Runs automatically on 'odctl up'.
@@ -32,7 +33,8 @@ stacks:
     profiles: ["postgres"]
     parent: "infra"
     capacities: []
-    depends_on: ["deps"]
+    depends_on:
+      postgres: ["deps"]
     role: "The foundational state-store using pgvector. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata."
     usage: |
       • Postgres JDBC:
@@ -46,7 +48,8 @@ stacks:
     profiles: ["storage"]
     parent: "infra"
     capacities: []
-    depends_on: ["deps"]
+    depends_on:
+      storage: ["deps"]
     role: "Acts as the physical data lake (S3 equivalent). Holds Parquet/Iceberg files and Airflow DAGs."
     usage: |
       • S3 Browser UI:
@@ -63,7 +66,8 @@ stacks:
     profiles: ["catalog"]
     parent: "infra"
     capacities: []
-    depends_on: ["deps", "postgres", "storage"]
+    depends_on:
+      catalog: ["deps", "postgres", "storage"]
     role: "Central metadata gateway for Iceberg. All compute engines route through this REST API."
     usage: |
       • REST API Endpoint:
@@ -75,7 +79,9 @@ stacks:
     description: "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers."
     profiles: ["kafka-lite", "kafka-full"]
     capacities: ["messaging"]
-    depends_on: ["deps", "postgres"]
+    depends_on:
+      kafka-lite: ["deps"]
+      kafka-full: ["deps"]
     role: "KRaft broker(s) with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion."
     usage:
       kafka-lite: |
@@ -102,7 +108,9 @@ stacks:
     description: "Stateful, real-time stream processing engine. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     profiles: ["flink1-lite", "flink1-full"]
     capacities: ["stream_processing"]
-    depends_on: ["deps", "storage", "catalog"]
+    depends_on:
+      flink1-lite: ["deps", "storage", "catalog"]
+      flink1-full: ["deps", "storage", "catalog"]
     role: "Executes continuous streaming pipelines. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     usage:
       flink1-lite: |
@@ -125,7 +133,9 @@ stacks:
     description: "Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers."
     profiles: ["spark-lite", "spark-full"]
     capacities: ["data_processing"]
-    depends_on: ["deps", "storage", "catalog"]
+    depends_on:
+      spark-lite: ["deps", "storage", "catalog"]
+      spark-full: ["deps", "storage", "catalog"]
     role: "Distributed batch engine for data preparation and large-scale ETL."
     usage:
       spark-lite: |
@@ -153,7 +163,9 @@ stacks:
     file: "compose-store.yml"
     description: "Stream storage (Fluss) and multi-model data store (Valkey Bundle). Valkey includes advanced JSON, Bloom, and Vector Search capabilities."
     profiles: ["fluss", "valkey"]
-    depends_on: ["deps"]
+    depends_on:
+      fluss: ["deps"]
+      valkey: ["deps"]
     role: "Stream storage (Fluss) and multi-model data store (Valkey Bundle)."
     usage:
       fluss: |
@@ -171,17 +183,21 @@ stacks:
     description: "Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase)."
     profiles: ["ch-lite", "ch-full", "trino", "metabase"]
     capacities: ["analytics"]
-    depends_on: ["deps", "postgres"]
+    depends_on:
+      ch-lite: ["deps"]
+      ch-full: ["deps"]
+      trino: ["deps", "postgres"]
+      metabase: ["deps", "postgres"]
     role: "ClickHouse provides real-time OLAP; Trino federates queries across Iceberg/Postgres; Metabase handles visualization."
     usage:
       ch-lite: |
         • ClickHouse HTTP (Shard 1 / Replica 1 & 2):
           * External (Localhost): http://localhost:8123, http://localhost:8124
-          * Internal (Docker): http://clickhouse-11:8123, http://clickhouse-12:8123
+          * Internal (Docker): http://ch-11:8123, http://ch-12:8123
       ch-full: |
         • ClickHouse HTTP (Shards 1 & 2 / Replicas 1 & 2):
           * External (Localhost): http://localhost:8123, http://localhost:8124, http://localhost:8125, http://localhost:8126
-          * Internal (Docker): http://clickhouse-11:8123, http://clickhouse-12:8123, http://clickhouse-21:8123, http://clickhouse-22:8123
+          * Internal (Docker): http://ch-11:8123, http://ch-12:8123, http://ch-21:8123, http://ch-22:8123
       trino: |
         • Trino UI & JDBC connection (user: user, password: none):
           * External (Localhost): http://localhost:8080
@@ -196,7 +212,8 @@ stacks:
     description: "Workflow orchestration and pipeline scheduling."
     profiles: ["airflow"]
     capacities: ["orchestration"]
-    depends_on: ["deps", "postgres", "storage"]
+    depends_on:
+      airflow: ["deps", "postgres", "storage"]
     role: "Central nervous system for scheduling data pipelines, ETL, and ML training runs."
     usage:
       airflow: |
@@ -209,7 +226,9 @@ stacks:
     description: "Machine learning model registry and real-time inference serving."
     profiles: ["mlflow", "ray-serve"]
     capacities: ["mlops"]
-    depends_on: ["deps", "postgres", "storage"]
+    depends_on:
+      mlflow: ["deps", "postgres", "storage"]
+      ray-serve: ["deps", "postgres", "storage"]
     role: "Manages the ML lifecycle: model registry (MLflow) and real-time scalable inference (Ray Serve)."
     usage:
       mlflow: |
@@ -229,7 +248,9 @@ stacks:
     description: "System telemetry, monitoring, and data lineage."
     profiles: ["lineage", "telemetry"]
     capacities: ["observability", "lineage"]
-    depends_on: ["deps", "postgres"]
+    depends_on:
+      lineage: ["deps", "postgres"]
+      telemetry: ["deps", "postgres"]
     role: "Data provenance tracking (Marquez) and metric dashboards (Grafana)."
     usage:
       lineage: |
@@ -255,7 +276,8 @@ stacks:
     description: "Data catalog, discovery, and governance platform."
     profiles: ["metadata"]
     capacities: ["metadata"]
-    depends_on: ["deps", "postgres"]
+    depends_on:
+      metadata: ["deps", "postgres"]
     role: "Enterprise data catalog utilizing Elasticsearch and Postgres backends."
     usage: |
       • OpenMetadata UI & REST API:
