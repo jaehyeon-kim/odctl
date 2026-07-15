@@ -21,9 +21,11 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   build-platform:
+    needs: ci
     uses: ./.github/workflows/build-platform-images.yml
 
   build-deps:
+    needs: ci
     uses: ./.github/workflows/build-deps.yml
 
   e2e:
