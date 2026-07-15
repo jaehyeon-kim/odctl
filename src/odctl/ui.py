@@ -218,7 +218,7 @@ def print_dry_run(execution_plan: Dict[str, List[str]], is_teardown: bool = Fals
         else:
             layer = (
                 "Infrastructure Layer"
-                if any(x in profs for x in ["base", "deps"])
+                if any(x in profs for x in ["deps", "postgres", "storage", "catalog"])
                 else "Target Stack"
             )
             console.print(f"📦 [cyan]{file}[/cyan] ({layer})")
