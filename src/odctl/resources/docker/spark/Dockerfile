@@ -5,7 +5,9 @@ USER root
 
 # Only install libraries required for distributed UDFs
 RUN pip install --no-cache-dir \
-    'feast[clickhouse,redis,aws,postgres]' \
+    'clickhouse-connect' \
+    'psycopg2-binary' \
+    'valkey' \
     'mlflow~=3.12.0' \
     'boto3'
 

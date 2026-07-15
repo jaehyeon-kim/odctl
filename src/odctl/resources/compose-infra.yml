@@ -1,4 +1,4 @@
-name: odctl-base
+name: odctl-infra
 
 services:
   # ==========================================
@@ -12,7 +12,7 @@ services:
     networks:
       - odctl
     profiles:
-      - base
+      - postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-odctl}
       POSTGRES_USER: ${POSTGRES_USER:-user}
