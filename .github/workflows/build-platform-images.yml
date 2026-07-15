@@ -6,39 +6,76 @@ on:
 env:
   REGISTRY: ghcr.io
 
-
-
 jobs:
-  validate:
-    name: Build Dry Run (${{ matrix.component }})
-    runs-on: ubuntu-latest
+  build:
+    name: Build (${{ matrix.component }}, ${{ matrix.platform.arch }})
+    runs-on: ${{ matrix.platform.os }}
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
         component: [airflow, spark, ray-mlops]
+        platform:
+          - os: ubuntu-latest
+            arch: linux/amd64
+            name: amd64
+          - os: ubuntu-24.04-arm
+            arch: linux/arm64
+            name: arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Dry Run
+      - name: Log in to the Container registry
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}
+
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: src/odctl/resources/docker/${{ matrix.component }}
-          push: false
-          platforms: linux/amd64,linux/arm64
-          # Use the cache to speed up PR checks, but don't write to it
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}:buildcache
+          platforms: ${{ matrix.platform.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }},push-by-digest=true,name-canonical=true,push=${{ startsWith(github.ref, 'refs/tags/v') }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}:buildcache-${{ matrix.platform.name }}
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}:buildcache-${{ matrix.platform.name }},mode=max
 
-  build-and-push:
-    name: Build & Push (${{ matrix.component }})
-    needs: validate
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      - name: Export digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.component }}-${{ matrix.platform.name }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge & Tag (${{ matrix.component }})
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,11 +85,12 @@ jobs:
       matrix:
         component: [airflow, spark, ray-mlops]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digests-${{ matrix.component }}-*
+          path: /tmp/digests
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -73,14 +111,8 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: src/odctl/resources/docker/${{ matrix.component }}
-          # Strictly enforce push only on 'v' tags
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}:buildcache,mode=max
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.component }}@sha256:%s ' *)

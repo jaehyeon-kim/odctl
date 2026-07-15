@@ -39,16 +39,22 @@ jobs:
 
       - name: Validate containers are running
         run: |
-          sleep 10
-          docker ps
+          for i in {1..15}; do
+            RUNNING=$(docker ps -q | wc -l)
+            if [ "$RUNNING" -ge 1 ]; then
+              echo "Containers are healthy and running!"
+              docker ps
+              odctl ps --all
+              exit 0
+            fi
+            echo "Waiting for containers to start... ($i/15)"
+            sleep 2
+          done
+          
+          echo "Timeout reached: No containers are running!"
+          docker ps -a
           odctl ps --all
-
-          # Check if any containers are running
-          RUNNING=$(docker ps -q | wc -l)
-          if [ "$RUNNING" -lt 1 ]; then
-            echo "No containers are running!"
-            exit 1
-          fi
+          exit 1
 
       - name: Teardown
         run: yes | odctl down --all --volumes
