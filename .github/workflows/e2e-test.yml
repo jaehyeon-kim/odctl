@@ -50,7 +50,7 @@ jobs:
             echo "Waiting for containers to start... ($i/15)"
             sleep 2
           done
-          
+
           echo "Timeout reached: No containers are running!"
           docker ps -a
           odctl ps --all
