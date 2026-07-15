@@ -6,7 +6,8 @@ LABEL org.opencontainers.image.description="Custom Apache Airflow orchestrator i
 
 # Install Lean Open Data SDKs and Providers
 # Pinning PySpark strictly to 4.0.x for Iceberg compatibility
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,target=/home/airflow/.cache/pip \
+    pip install \
     apache-airflow-providers-apache-flink \
     apache-airflow-providers-amazon \
     apache-airflow-providers-postgres \

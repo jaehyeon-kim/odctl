@@ -2,10 +2,13 @@
 # Stage 1: Source Builder (Aiven Connectors)
 # ==========================================
 FROM debian:bookworm-slim AS source-builder
-RUN apt-get update && apt-get install -y openjdk-17-jdk git curl maven unzip && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y openjdk-17-jdk git curl maven unzip && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY build_connectors.sh .
-RUN chmod +x build_connectors.sh && ./build_connectors.sh
+RUN --mount=type=cache,target=/root/.gradle \
+    chmod +x build_connectors.sh && ./build_connectors.sh
 
 # ==========================================
 # Stage 2: Gradle Resolver (Schema Converters & Flink Parquet)
@@ -14,13 +17,16 @@ FROM gradle:8.6-jdk17 AS gradle-resolver
 WORKDIR /app
 COPY build.gradle .
 # Let Gradle do the heavy transitive lifting for both Connect and Flink!
-RUN gradle copyAllDependencies --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle \
+    gradle copyAllDependencies --no-daemon
 
 # ==========================================
 # Stage 3: Direct Downloader (Uber JARs & ZIPs)
 # ==========================================
 FROM debian:bookworm-slim AS downloader
-RUN apt-get update && apt-get install -y curl tar unzip && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y curl tar unzip && rm -rf /var/lib/apt/lists/*
 WORKDIR /downloads
 # Copy the standalone fetch scripts
 COPY fetch_standalone_plugins.sh .
