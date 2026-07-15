@@ -171,7 +171,7 @@ stacks:
     description: "Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase)."
     profiles: ["ch-lite", "ch-full", "trino", "metabase"]
     capacities: ["analytics"]
-    depends_on: ["deps"]
+    depends_on: ["deps", "postgres"]
     role: "ClickHouse provides real-time OLAP; Trino federates queries across Iceberg/Postgres; Metabase handles visualization."
     usage:
       ch-lite: |
