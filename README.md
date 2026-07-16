@@ -1,6 +1,6 @@
 # Open Data Stack
 
-![CI Status](https://img.shields.io/github/actions/workflow/status/jaehyeon-kim/odctl/ci.yml?branch=main&label=CI)
+![CI Status](https://img.shields.io/github/actions/workflow/status/jaehyeon-kim/odctl/pipeline.yml?branch=main&label=CI)
 ![PyPI Version](https://img.shields.io/pypi/v/odctl)
 ![Python Versions](https://img.shields.io/pypi/pyversions/odctl)
 ![License](https://img.shields.io/github/license/jaehyeon-kim/odctl)
