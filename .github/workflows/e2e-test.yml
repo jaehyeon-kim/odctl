@@ -14,16 +14,16 @@ jobs:
     strategy:
       matrix:
         profile_group:
-          - "metadata airflow"
+          - "metadata"
+          - "airflow"
           - "kafka-lite kafka-full"
-          - "flink1-lite flink1-full"
+          - "flink1-lite flink1-full fluss"
           - "spark-lite spark-full"
           - "ch-lite ch-full"
           - "trino metabase"
           - "mlflow ray-serve"
           - "lineage telemetry"
-          - "fluss valkey"
-          - "postgres storage catalog"
+          - "postgres storage catalog valkey"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
