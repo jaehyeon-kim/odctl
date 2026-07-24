@@ -1,9 +1,10 @@
+import logging
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 
-from odctl import ui
+from odctl import config, ui
 from odctl.docker import (
     get_managed_containers,
     get_managed_logs,
@@ -51,14 +52,20 @@ def main(
         help="Enable debug-level logging across all commands.",
         rich_help_panel="Global Options",
     ),
-    workspace: Path = typer.Option(
-        "./.odctl",
+    workspace: Optional[Path] = typer.Option(
+        None,
         "--workspace",
         "-w",
-        help="Path to the ODCTL workspace directory.",
+        help="Path to the ODCTL workspace directory (default: ./.odctl).",
         rich_help_panel="Global Options",
     ),
 ):
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+    config.set_workspace_override(workspace)
     ctx.obj = {"verbose": verbose, "workspace": workspace}
 
 
@@ -183,7 +190,9 @@ def init(
             "⚠️  This will wipe out local modifications. Are you sure?", abort=True
         )
     init_workspace(force=force)
-    ui.print_success("Workspace initialized! You can now edit any file in ./.odctl/")
+    ui.print_success(
+        f"Workspace initialized! You can now edit any file in {get_workspace_dir()}/"
+    )
 
 
 @app.command(

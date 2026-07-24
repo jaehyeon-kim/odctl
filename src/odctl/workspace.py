@@ -1,6 +1,5 @@
 import shutil
 from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 
 from odctl.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
 
@@ -34,11 +33,11 @@ def init_workspace(force: bool = False):
     # Nuke the existing workspace if force is True
     if force and workspace.exists():
         shutil.rmtree(workspace)
-        print(f"🗑️  Removed existing workspace at {workspace.relative_to(Path.cwd())}/")
+        print(f"🗑️  Removed existing workspace at {workspace}/")
 
     if not workspace.exists():
         workspace.mkdir(parents=True)
-        print(f"📁 Created workspace at {workspace.relative_to(Path.cwd())}/")
+        print(f"📁 Created workspace at {workspace}/")
 
     # Iterate over everything in the internal resources
     for item in INTERNAL_RESOURCES_DIR.iterdir():
