@@ -1,5 +1,15 @@
 import sys
 from pathlib import Path
+from typing import Optional
+
+# Workspace directory requested via the global `--workspace` flag (set in main.py).
+_workspace_override: Optional[Path] = None
+
+
+def set_workspace_override(path: Optional[Path]) -> None:
+    """Record the workspace directory requested via the global `--workspace` flag."""
+    global _workspace_override
+    _workspace_override = path.resolve() if path is not None else None
 
 
 def get_internal_resources_dir() -> Path:
@@ -25,8 +35,11 @@ def get_workspace_dir() -> Path:
     Get the path to the local mutable workspace.
 
     Returns:
-        Path: The absolute path to the `.odctl` directory in the current working directory.
+        Path: The directory supplied via `--workspace`, or the `.odctl` directory in
+        the current working directory when no override is set.
     """
+    if _workspace_override is not None:
+        return _workspace_override
     return Path.cwd() / ".odctl"
 
 

@@ -10,7 +10,6 @@ def test_init_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "odctl.workspace.get_workspace_dir", lambda: tmp_path / ".odctl"
     )
-    monkeypatch.setattr("odctl.workspace.Path.cwd", lambda: tmp_path)
 
     # Mock INTERNAL_RESOURCES_DIR to point to a temporary internal dir
     internal_dir = tmp_path / "internal"
