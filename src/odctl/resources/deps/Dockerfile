@@ -54,10 +54,11 @@ COPY --from=source-builder /build/dist/ /workspace/connect/
 # Grab perfectly resolved Schema Converters
 COPY --from=gradle-resolver /app/build/confluent-converters/ /workspace/connect/confluent-converters/
 
-# Grab Gradle-resolved Flink Parquet & Hadoop JARs
-COPY --from=gradle-resolver /app/build/flink-jars/ /workspace/flink/1.x/
+# Grab Gradle-resolved Flink Parquet & Hadoop JARs (Hadoop is what the Iceberg
+# catalog needs for org.apache.hadoop.conf.Configuration)
+COPY --from=gradle-resolver /app/build/flink-jars/ /workspace/flink/2.x/
 
-# Grab standalone Uber JARs & ZIPs (Docker safely merges flink/1.x/ folders)
+# Grab standalone Uber JARs & ZIPs (Docker safely merges flink/2.x/ folders)
 COPY --from=downloader /downloads/connect /workspace/connect/
 COPY --from=downloader /downloads/flink /workspace/flink/
 COPY --from=downloader /downloads/spark /workspace/spark/
