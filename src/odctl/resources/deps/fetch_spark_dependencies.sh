@@ -10,7 +10,7 @@ fetch_artifact() {
     else echo " ⬇️  Downloading: $2"; curl -sL -f -o "$1" "$2"; fi
 }
 get_maven_version() {
-    curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed 's/<\/\?version>//g' || true
+    curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed -E 's#</?version>##g' || true
 }
 
 echo "▶️  Resolving Spark Versions..."
