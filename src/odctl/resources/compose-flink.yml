@@ -4,12 +4,14 @@ x-flink-common: &flink-common
   networks:
     - odctl
   volumes:
-    - ./flink/flink1-conf.yml:/opt/flink/conf/config.yaml:ro
+    - ./flink/flink-conf.yml:/opt/flink/conf/config.yaml:ro
     - odctl-shared-deps:/mnt/shared-deps:ro
 
-x-flink1-base: &flink1-base
+x-flink-base: &flink-base
   <<: *flink-common
-  image: flink:1.20.5-java17
+  # Pinned to 2.1 because Iceberg publishes iceberg-flink-runtime for 2.0 and
+  # 2.1 only, and Fluss has no 2.0 build. See issue #9.
+  image: flink:2.1-java17
   environment:
     TZ: ${TZ:-UTC}
   entrypoint:
@@ -19,7 +21,7 @@ x-flink1-base: &flink1-base
       # Load dependencies into lib/, not usrlib/. Only lib/ reaches the system
       # classloader, which is where SQL connector factories are looked up.
       cp /mnt/shared-deps/shared/*.jar /opt/flink/lib/ 2>/dev/null || true
-      cp /mnt/shared-deps/flink/1.x/*.jar /opt/flink/lib/ 2>/dev/null || true
+      cp /mnt/shared-deps/flink/2.x/*.jar /opt/flink/lib/ 2>/dev/null || true
       cp /mnt/shared-deps/connect/confluent-converters/*.jar /opt/flink/lib/ 2>/dev/null || true
 
       # S3 Plugin Linking
@@ -30,10 +32,10 @@ x-flink1-base: &flink1-base
     - --
 
 services:
-  jobmanager-1:
-    <<: *flink1-base
-    container_name: flink-jobmanager-1
-    profiles: ["flink1-lite", "flink1-full"]
+  jobmanager:
+    <<: *flink-base
+    container_name: flink-jobmanager
+    profiles: ["flink-lite", "flink-full"]
     command: jobmanager
     ports:
       - "8082:8081"
@@ -44,51 +46,51 @@ services:
       timeout: 5s
       retries: 5
 
-  taskmanager-1-a:
-    <<: *flink1-base
-    container_name: flink-taskmanager-1-a
-    profiles: ["flink1-lite", "flink1-full"]
+  taskmanager-a:
+    <<: *flink-base
+    container_name: flink-taskmanager-a
+    profiles: ["flink-lite", "flink-full"]
     command: taskmanager
     mem_limit: 3500m
     depends_on:
-      jobmanager-1:
+      jobmanager:
         condition: service_healthy
 
-  taskmanager-1-b:
-    <<: *flink1-base
-    container_name: flink-taskmanager-1-b
-    profiles: ["flink1-full"]
+  taskmanager-b:
+    <<: *flink-base
+    container_name: flink-taskmanager-b
+    profiles: ["flink-full"]
     command: taskmanager
     mem_limit: 3500m
     depends_on:
-      jobmanager-1:
+      jobmanager:
         condition: service_healthy
 
-  taskmanager-1-c:
-    <<: *flink1-base
-    container_name: flink-taskmanager-1-c
-    profiles: ["flink1-full"]
+  taskmanager-c:
+    <<: *flink-base
+    container_name: flink-taskmanager-c
+    profiles: ["flink-full"]
     command: taskmanager
     mem_limit: 3500m
     depends_on:
-      jobmanager-1:
+      jobmanager:
         condition: service_healthy
 
-  sql-gateway-1:
-    <<: *flink1-base
-    container_name: flink-sql-gateway-1
-    profiles: ["flink1-lite", "flink1-full"]
+  sql-gateway:
+    <<: *flink-base
+    container_name: flink-sql-gateway
+    profiles: ["flink-lite", "flink-full"]
     command: >
       bin/sql-gateway.sh start-foreground
       -Dsql-gateway.endpoint.rest.address=0.0.0.0
       -Dsql-gateway.endpoint.rest.port=8083
-      -Djobmanager.rpc.address=jobmanager-1
-      -Drest.address=jobmanager-1
+      -Djobmanager.rpc.address=jobmanager
+      -Drest.address=jobmanager
     mem_limit: 1g
     ports:
       - "8084:8083"
     depends_on:
-      jobmanager-1:
+      jobmanager:
         condition: service_healthy
 
 networks:
