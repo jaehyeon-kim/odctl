@@ -12,5 +12,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     'mlflow~=3.12.0' \
     'boto3'
 
+# Pre-create the event log directory owned by the spark user. A named volume
+# mounted here inherits this ownership, so spark-submit can write its logs.
+RUN mkdir -p /tmp/spark-events && chown 185:185 /tmp/spark-events
+
 # Revert to the official Apache Spark non-root user ID
 USER 185
