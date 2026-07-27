@@ -12,6 +12,12 @@ x-spark-base: &spark-base
   environment:
     TZ: ${TZ:-UTC}
     SPARK_DIST_CLASSPATH: "/mnt/shared-deps/shared/*:/mnt/shared-deps/spark/*"
+    # Picked up by boto3 and by any AWS SDK client that falls back to the
+    # default credential chain
+    AWS_REGION: us-east-1
+    AWS_ACCESS_KEY_ID: user
+    AWS_SECRET_ACCESS_KEY: password
+    SPARK_WORKER_MEMORY: "1500m"
 
 services:
   spark-master:
@@ -23,8 +29,6 @@ services:
       - "9080:8080"
       - "7077:7077"
     mem_limit: 1g
-    environment:
-      SPARK_WORKER_MEMORY: "1500m"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 10s
@@ -39,8 +43,6 @@ services:
     ports:
       - "9081:8081"
     mem_limit: 2g
-    environment:
-      SPARK_WORKER_MEMORY: "1500m"
     depends_on:
       spark-master:
         condition: service_healthy
@@ -53,8 +55,6 @@ services:
     ports:
       - "9082:8081"
     mem_limit: 2g
-    environment:
-      SPARK_WORKER_MEMORY: "1500m"
     depends_on:
       spark-master:
         condition: service_healthy
@@ -67,8 +67,6 @@ services:
     ports:
       - "9083:8081"
     mem_limit: 2g
-    environment:
-      SPARK_WORKER_MEMORY: "1500m"
     depends_on:
       spark-master:
         condition: service_healthy
