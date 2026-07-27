@@ -10,7 +10,7 @@ fetch_artifact() {
     else echo " ⬇️  Downloading: $2"; curl -sL -f -o "$1" "$2"; fi
 }
 get_maven_version() {
-    curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed 's/<\/\?version>//g' || true
+    curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed -E 's#</?version>##g' || true
 }
 
 echo "▶️  Resolving Flink Versions..."
@@ -33,6 +33,12 @@ fetch_artifact "flink/1.x/iceberg-runtime.jar" "https://repo1.maven.org/maven2/o
 K_V=$(get_maven_version "org/apache/flink/flink-sql-connector-kafka" "[0-9]+\.[0-9]+\.[0-9]+-${FLINK_MINOR}")
 if [ -z "$K_V" ]; then echo "❌ Error: Kafka connector for Flink ${FLINK_MINOR} is not published yet!"; exit 1; fi
 fetch_artifact "flink/1.x/kafka.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/${K_V}/flink-sql-connector-kafka-${K_V}.jar"
+
+# Avro with Confluent Schema Registry. This uber JAR is a superset of
+# flink-sql-avro: it registers the plain 'avro' format factory as well as
+# 'avro-confluent' and 'debezium-avro-confluent', so adding both would duplicate
+# the Avro classes and register the same factory twice.
+fetch_artifact "flink/1.x/avro-confluent-registry.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-sql-avro-confluent-registry/${FLINK_V}/flink-sql-avro-confluent-registry-${FLINK_V}.jar"
 
 # JDBC
 J_V=$(get_maven_version "org/apache/flink/flink-connector-jdbc" "[0-9]+\.[0-9]+\.[0-9]+-${FLINK_MINOR}")
