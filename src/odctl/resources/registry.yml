@@ -202,8 +202,8 @@ stacks:
         • Trino UI & JDBC connection (user: user, password: none):
           * External (Localhost): http://localhost:8080
           * Internal (Docker): http://trino:8080
-        • Catalogs: iceberg, kafka (JSON topics), kafka_avro (Avro via
-          the schema registry), clickhouse, postgres, valkey
+        • Catalogs: iceberg, kafka (topics discovered from the schema
+          registry), clickhouse, postgres, valkey
       metabase: |
         • Metabase Dashboard Engine:
           * External (Localhost): http://localhost:3000
