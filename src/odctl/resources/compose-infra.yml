@@ -124,10 +124,13 @@ services:
       - CATALOG_WAREHOUSE=s3://warehouse/
       - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
       - CATALOG_S3_ENDPOINT=http://seaweed:8333
-      - CATALOG_S3_ACCESS_KEY_ID=user
-      - CATALOG_S3_SECRET_ACCESS_KEY=password
-      - CATALOG_S3_PATH_STYLE_ACCESS=true
-      - CATALOG_IO__S3_PATH_STYLE_ACCESS=true
+      # The image maps a double underscore to a hyphen and a single one to a dot,
+      # so hyphenated Iceberg properties need __ or they resolve to names Iceberg
+      # ignores. With path-style access silently dropped, S3FileIO addressed
+      # buckets virtual-host style and SeaweedFS read the namespace as the bucket.
+      - CATALOG_S3_ACCESS__KEY__ID=user
+      - CATALOG_S3_SECRET__ACCESS__KEY=password
+      - CATALOG_S3_PATH__STYLE__ACCESS=true
       # Explicit AWS SDK overrides (just in case)
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-user}
