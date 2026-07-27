@@ -4,6 +4,13 @@
         <level>information</level>
         <console>1</console>
     </logger>
+    <!-- Docker networks hand out IPv6 addresses, and container names can resolve
+         to the AAAA record only, so listening on IPv4 alone leaves peers with
+         connection refused. :: is dual-stack and covers IPv4 too, so it comes
+         first; the 0.0.0.0 entry is a fallback for hosts without IPv6, where
+         the :: bind fails harmlessly thanks to listen_try. -->
+    <listen_try>1</listen_try>
+    <listen_host>::</listen_host>
     <listen_host>0.0.0.0</listen_host>
     <keeper_server>
         <tcp_port>9181</tcp_port>
