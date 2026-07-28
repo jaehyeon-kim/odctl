@@ -17,10 +17,10 @@ scrape_configs:
     metrics_path: "/metrics"
     static_configs:
       - targets:
-          - "jobmanager-1:9249"
-          - "taskmanager-1-a:9249"
-          - "taskmanager-1-b:9249"
-          - "taskmanager-1-c:9249"
+          - "jobmanager:9249"
+          - "taskmanager-a:9249"
+          - "taskmanager-b:9249"
+          - "taskmanager-c:9249"
 
   - job_name: "clickhouse"
     metrics_path: "/metrics"

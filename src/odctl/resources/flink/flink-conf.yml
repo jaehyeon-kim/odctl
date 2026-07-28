@@ -1,7 +1,7 @@
 # ======================================================================
 # Core Process & Memory
 # ======================================================================
-jobmanager.rpc.address: jobmanager-1
+jobmanager.rpc.address: jobmanager
 jobmanager.bind-address: 0.0.0.0
 jobmanager.memory.process.size: 1024m
 taskmanager.memory.process.size: 2560m
@@ -10,15 +10,15 @@ taskmanager.numberOfTaskSlots: 5
 # ======================================================================
 # State Backend (RocksDB)
 # ======================================================================
-state.backend: rocksdb
+state.backend.type: rocksdb
 state.backend.rocksdb.localdir: /tmp/rocksdb
-state.backend.rocksdb.incremental: true
+execution.checkpointing.incremental: true
 state.backend.rocksdb.predefined-options: FLASH_SSD_OPTIMIZED
 state.backend.rocksdb.thread.num: 4
 state.backend.rocksdb.memory.managed: true
 
-state.checkpoints.dir: s3://flink-checkpoints/1.x/
-state.savepoints.dir: s3://flink-savepoints/1.x/
+execution.checkpointing.dir: s3://flink-checkpoints/2.x/
+execution.checkpointing.savepoint-dir: s3://flink-savepoints/2.x/
 
 # ======================================================================
 # SeaweedFS (S3 Presto Plugin) Configuration
@@ -56,3 +56,13 @@ classloader.resolve-order: child-first
 
 # Enable streaming Iceberg queries with OPTIONS hints
 table.dynamic-table-options.enabled: true
+
+# ======================================================================
+# JVM module access
+# Mounting this file replaces the image's config.yaml, which is where Flink
+# ships its --add-opens and --add-exports defaults. Without them, Kryo
+# serialization of java.nio buffers fails on Java 17 with
+# InaccessibleObjectException and every checkpoint of a job that touches them
+# dies. Copied verbatim from the flink:2.1-java17 image.
+# ======================================================================
+env.java.opts.all: --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED
