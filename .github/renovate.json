@@ -13,6 +13,16 @@
   },
   "packageRules": [
     {
+      "description": "Flink stays on 2.1: Iceberg publishes iceberg-flink-runtime for 2.0 and 2.1 only, and fluss-flink has no 2.0 build. Raise this when Iceberg ships a runtime for a newer minor. See issue #9.",
+      "matchPackageNames": ["flink", "org.apache.flink:{/,}**"],
+      "allowedVersions": "<2.2"
+    },
+    {
+      "description": "Fluss stays on 0.8.x because 0.9.x requires Flink 2.2, which has no Iceberg runtime. Moves together with the Flink ceiling above.",
+      "matchPackageNames": ["apache/fluss", "org.apache.fluss:{/,}**"],
+      "allowedVersions": "<0.9"
+    },
+    {
       "description": "Auto-merge non-breaking minor and patch updates if CI passes",
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,

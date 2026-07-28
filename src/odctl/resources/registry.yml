@@ -106,27 +106,27 @@ stacks:
   flink:
     file: "compose-flink.yml"
     description: "Stateful, real-time stream processing engine. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
-    profiles: ["flink1-lite", "flink1-full"]
+    profiles: ["flink-lite", "flink-full"]
     capacities: ["stream_processing"]
     depends_on:
-      flink1-lite: ["deps", "storage", "catalog"]
-      flink1-full: ["deps", "storage", "catalog"]
+      flink-lite: ["deps", "storage", "catalog"]
+      flink-full: ["deps", "storage", "catalog"]
     role: "Executes continuous streaming pipelines. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     usage:
-      flink1-lite: |
+      flink-lite: |
         • Flink JobManager UI (1 TaskManager):
           - External (Localhost): http://localhost:8082
-          - Internal (Docker): http://jobmanager-1:8081
+          - Internal (Docker): http://jobmanager:8081
         • SQL Gateway REST:
           - External (Localhost): http://localhost:8084
-          - Internal (Docker): http://flink-sql-gateway-1:8083
-      flink1-full: |
+          - Internal (Docker): http://flink-sql-gateway:8083
+      flink-full: |
         • Flink JobManager UI (3 TaskManagers):
           - External (Localhost): http://localhost:8082
-          - Internal (Docker): http://jobmanager-1:8081
+          - Internal (Docker): http://jobmanager:8081
         • SQL Gateway REST:
           - External (Localhost): http://localhost:8084
-          - Internal (Docker): http://flink-sql-gateway-1:8083
+          - Internal (Docker): http://flink-sql-gateway:8083
 
   spark:
     file: "compose-spark.yml"

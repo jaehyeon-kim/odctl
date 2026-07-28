@@ -87,7 +87,7 @@ odctl list
 Bring up a robust data engineering environment.
 
 ```bash
-odctl up kafka-lite flink1-lite spark-lite
+odctl up kafka-lite flink-lite spark-lite
 ```
 
 _Note: You do not need to memorize dependencies. The CLI will automatically detect that these profiles require foundational infrastructure and will launch PostgreSQL, SeaweedFS (S3), and the Iceberg REST Catalog for you before starting the target compute engines._
@@ -133,7 +133,7 @@ $ odctl list -d
 $ odctl explain kafka-lite
 
 # Launch specific profiles
-$ odctl up flink1-lite kafka-lite spark-lite
+$ odctl up flink-lite kafka-lite spark-lite
 
 # Complete teardown and wipe all data
 $ odctl down --all --volumes

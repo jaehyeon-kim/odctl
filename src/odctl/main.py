@@ -36,7 +36,7 @@ Provides commands to inspect, provision, and tear down curated Docker Compose st
   [dim]# See exactly what the airflow profile provisions[/dim]\n
   $ [bold cyan]odctl explain kafka-lite[/bold cyan]\n\n
   [dim]# Launch specific profiles and their dependencies[/dim]\n
-  $ [bold cyan]odctl up flink1-lite kafka-lite spark-lite[/bold cyan]\n\n
+  $ [bold cyan]odctl up flink-lite kafka-lite spark-lite[/bold cyan]\n\n
   [dim]# Complete teardown and wipe all data[/dim]\n
   $ [bold cyan]odctl down --all --volumes[/bold cyan]
 """,
@@ -201,8 +201,8 @@ def init(
 [bold underline]Examples:[/bold underline]\n
   [dim]# Pre-fetch images for all profiles[/dim]\n
   $ [bold cyan]odctl pull --all[/bold cyan]\n\n
-  [dim]# Pre-fetch images just for Flink 1.x and Spark[/dim]\n
-  $ [bold cyan]odctl pull flink1-lite kafka-lite[/bold cyan]
+  [dim]# Pre-fetch images just for Flink and Spark[/dim]\n
+  $ [bold cyan]odctl pull flink-lite kafka-lite[/bold cyan]
 """,
 )
 def pull(
@@ -243,8 +243,8 @@ def pull(
     rich_help_panel="Cluster Lifecycle",
     epilog="""
 [bold underline]Examples:[/bold underline]\n
-  [dim]# Launch Clickhouse, Flink 1.x, and their dependencies[/dim]\n
-  $ [bold cyan]odctl up ch-lite flink1-lite[/bold cyan]\n\n
+  [dim]# Launch Clickhouse, Flink, and their dependencies[/dim]\n
+  $ [bold cyan]odctl up ch-lite flink-lite[/bold cyan]\n\n
   [dim]# Preview what would be launched for Airflow[/dim]\n
   $ [bold cyan]odctl up airflow --dry-run[/bold cyan]\n\n
   [dim]# Force pull latest images before launching[/dim]\n
@@ -464,9 +464,9 @@ def info():
     epilog="""
 [bold underline]Examples:[/bold underline]\n
   [dim]# Tail the last 50 lines of all Flink containers and follow live[/dim]\n
-  $ [bold cyan]odctl logs flink1-lite -n 50 -f[/bold cyan]\n\n
+  $ [bold cyan]odctl logs flink-lite -n 50 -f[/bold cyan]\n\n
   [dim]# View logs strictly for the JobManager service[/dim]\n
-  $ [bold cyan]odctl logs flink1-lite -s jobmanager-1[/bold cyan]\n\n
+  $ [bold cyan]odctl logs flink-lite -s jobmanager[/bold cyan]\n\n
   [dim]# Show logs with timestamps for the last 10 minutes[/dim]\n
   $ [bold cyan]odctl logs kafka-lite --since 10m -t[/bold cyan]
 """,
