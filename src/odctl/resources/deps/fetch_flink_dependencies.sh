@@ -9,21 +9,20 @@ fetch_artifact() {
     if [ "$DRY_RUN" -eq 1 ]; then echo " 🔍 Checking: $2"; curl -sL -I -f "$2" > /dev/null || exit 1;
     else echo " ⬇️  Downloading: $2"; curl -sL -f -o "$1" "$2"; fi
 }
+# Versions come from versions.env so a bump is one edit rather than four kept
+# in step. See issue #5.
+# shellcheck source=versions.env
+. "$(dirname "$0")/versions.env"
+
 get_maven_version() {
     curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed -E 's#</?version>##g' || true
 }
 
 echo "▶️  Resolving Flink Versions..."
 
-# 🔒 PINNED: Flink 2.1, not the latest 2.x. Iceberg publishes
-# iceberg-flink-runtime for 2.0 and 2.1 only, and Fluss has no 2.0 build, so 2.1
-# is the one minor where every connector this stack needs exists. See issue #9.
-FLINK_MINOR="2.1"
 FLINK_V=$(get_maven_version "org/apache/flink/flink-core" "${FLINK_MINOR}\.[0-9]+")
 if [ -z "$FLINK_V" ]; then echo "❌ Error: Could not resolve Flink ${FLINK_MINOR} patch version!"; exit 1; fi
 
-# 🔒 HARDCODED: Lock Iceberg to 1.11.0 to match Spark and PyIceberg sidecar
-ICEBERG_V="1.11.0"
 
 echo "▶️  Fetching Flink Dependencies for ${FLINK_MINOR} (Iceberg ${ICEBERG_V})..."
 make_dir "flink/2.x"

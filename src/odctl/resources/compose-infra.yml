@@ -53,7 +53,7 @@ services:
   # Object Storage (SeaweedFS - Single Node)
   # ==========================================
   seaweed:
-    image: chrislusf/seaweedfs:4.22
+    image: &seaweed-image chrislusf/seaweedfs:4.22
     container_name: seaweed
     ports:
       - "8333:8333" # S3 API
@@ -78,7 +78,7 @@ services:
       retries: 10
 
   seaweed-init:
-    image: chrislusf/seaweedfs:4.22
+    image: *seaweed-image
     container_name: seaweed-init
     depends_on:
       seaweed:

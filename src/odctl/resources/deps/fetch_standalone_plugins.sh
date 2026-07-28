@@ -9,14 +9,18 @@ fetch_artifact() {
     if [ "$DRY_RUN" -eq 1 ]; then echo " 🔍 Checking: $2"; curl -sL -I -f "$2" > /dev/null || exit 1;
     else echo " ⬇️  Downloading: $2"; curl -sL -f -o "$1" "$2"; fi
 }
+# Versions come from versions.env so a bump is one edit rather than several
+# kept in step. See issue #5.
+# shellcheck source=versions.env
+. "$(dirname "$0")/versions.env"
+
 get_maven_version() {
     curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed -E 's#</?version>##g' || true
 }
 
 echo "▶️  Resolving Shared & Connector Versions..."
 
-# 🔒 HARDCODED: Lock core dependencies to ensure absolute stack stability (May 2026)
-ICEBERG_V="1.11.0"
+# 🔒 HARDCODED: Lock core dependencies; Iceberg comes from versions.env
 DEB_V="3.5.1.Final"
 POSTGRES_V="42.7.3"  # Latest stable JDBC 42.x series
 
