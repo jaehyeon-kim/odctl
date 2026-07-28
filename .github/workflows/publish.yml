@@ -1,25 +1,81 @@
 name: Publish to PyPI
 
+# Publishing stays tied to publishing a release, so the release notes remain the
+# trigger. What is new is the gate below: a release event fires independently of
+# CI, which is how v0.3.0 reached PyPI while the pipeline's e2e job was failing.
+# This job now waits for the tag's Main Pipeline run and refuses to publish
+# unless it succeeded.
 on:
   release:
-    types: [published] # ONLY triggers when a drafted release is published
-
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, for example v0.3.1"
+        required: true
+      skip_pipeline_check:
+        description: "Publish even if the tag's pipeline is not green"
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   pypi-publish:
     name: Build and publish Python package
     runs-on: ubuntu-latest
-    # These permissions are strictly required for PyPI OIDC Trusted Publishing
+    # These permissions are strictly required for PyPI OIDC Trusted Publishing;
+    # actions:read is what lets the gate query the pipeline's conclusion.
     permissions:
       contents: read
       id-token: write
+      actions: read
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Require a green Main Pipeline for this tag
+        if: ${{ !inputs.skip_pipeline_check }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          # Wait rather than fail outright: a release is usually published moments
+          # after the tag is pushed, so the pipeline is still running e2e.
+          deadline=$(( SECONDS + 45 * 60 ))
+          while :; do
+            run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?event=push&per_page=100" \
+                    --jq "[.workflow_runs[]
+                           | select(.name == \"Main Pipeline\" and .head_branch == \"${TAG}\")]
+                           | sort_by(.created_at) | last // empty")
+            if [ -z "$run" ]; then
+              echo "::error::No Main Pipeline run found for tag ${TAG}. Push the tag first."
+              exit 1
+            fi
+            status=$(jq -r '.status'     <<<"$run")
+            concl=$(jq  -r '.conclusion' <<<"$run")
+            url=$(jq    -r '.html_url'   <<<"$run")
+            if [ "$status" = "completed" ]; then
+              if [ "$concl" = "success" ]; then
+                echo "✅ Main Pipeline for ${TAG} succeeded: $url"
+                exit 0
+              fi
+              echo "::error::Main Pipeline for ${TAG} concluded '${concl}', refusing to publish: $url"
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Main Pipeline for ${TAG} still '${status}' after 45 minutes: $url"
+              exit 1
+            fi
+            echo "⏳ Main Pipeline for ${TAG} is ${status}; waiting: $url"
+            sleep 30
+          done
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
