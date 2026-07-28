@@ -118,13 +118,23 @@ smoke_ch_full() {
   pass "replicated table converged on shard 1 and stayed off shard 2"
 }
 
-smoke_trino() {
-  retry 40 5 http_ok "http://127.0.0.1:8080/v1/info" || fail "Trino never answered"
+# Catalog registration finishes after the health endpoint starts answering, so
+# poll rather than asserting once. Catalogs load even when their backing service
+# is absent, which is why this can be required in a trino-only profile group.
+catalogs_loaded() {
   local cat
   cat=$(docker exec trino trino --execute "SHOW CATALOGS" 2>/dev/null | tr -d '"')
   for expected in iceberg kafka clickhouse postgres; do
-    grep -q "^${expected}$" <<<"$cat" || fail "catalog $expected did not load"
+    grep -q "^${expected}$" <<<"$cat" || return 1
   done
+}
+
+smoke_trino() {
+  retry 40 5 http_ok "http://127.0.0.1:8080/v1/info" || fail "Trino never answered"
+  retry 24 5 catalogs_loaded || {
+    docker exec trino trino --execute "SHOW CATALOGS" 2>&1 | tail -10
+    fail "not every catalog loaded within two minutes"
+  }
   docker exec trino trino --execute "SELECT 1" >/dev/null 2>&1 || fail "query execution failed"
   pass "all catalogs loaded and a query ran"
 }
@@ -170,7 +180,7 @@ case "$PROFILE" in
   postgres|storage|catalog|valkey) smoke_infra ;;
   metabase)   smoke_http_only "http://127.0.0.1:3000/api/health" ;;
   airflow)    smoke_http_only "http://127.0.0.1:8085/api/v2/monitor/health" ;;
-  mlflow)     smoke_http_only "http://127.0.0.1:5050/health" ;;
+  mlflow)     smoke_http_only "http://127.0.0.1:5000/health" ;;
   ray-serve)  smoke_http_only "http://127.0.0.1:8265" ;;
   lineage)    smoke_http_only "http://127.0.0.1:5002/api/v1/namespaces" ;;
   telemetry)  smoke_http_only "http://127.0.0.1:19090/-/ready" ;;
