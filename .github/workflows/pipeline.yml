@@ -17,17 +17,52 @@ permissions:
   packages: write
 
 jobs:
+  # Which parts of the tree moved. Used to skip the multi-arch image builds on
+  # changes that cannot affect them, which is most changes.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      images: ${{ steps.filter.outputs.images }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            images:
+              - 'src/odctl/resources/deps/**'
+              - 'src/odctl/resources/docker/**'
+              - '.github/workflows/build-deps.yml'
+              - '.github/workflows/build-platform-images.yml'
+
   ci:
     uses: ./.github/workflows/ci.yml
 
+  # Images are pushed only on a tag, so on any other ref this is a
+  # build-and-discard. Run it when the build inputs changed, so a broken
+  # Dockerfile surfaces before release instead of at tag time, and skip it
+  # otherwise. That removes two multi-arch builds from the typical change.
   build-platform:
-    needs: ci
+    needs: [ci, changes]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.images == 'true'
     uses: ./.github/workflows/build-platform-images.yml
 
   build-deps:
-    needs: ci
+    needs: [ci, changes]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.images == 'true'
     uses: ./.github/workflows/build-deps.yml
 
+  # Tags and manual runs only: the e2e job pulls images at the CLI's own version,
+  # and those exist on ghcr only once a tag has published them.
   e2e:
     needs: [build-platform, build-deps]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'

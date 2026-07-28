@@ -175,8 +175,12 @@ def stop_stack(
     """
     path = get_compose_path(compose_filename)
     stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
-    # volumes=True will remove named volumes defined in the compose file
-    stack_client.compose.down(volumes=remove_volumes)
+    # volumes=True will remove named volumes defined in the compose file.
+    # remove_orphans catches containers whose service no longer exists in the
+    # compose file, which teardown would otherwise leave running forever: an
+    # upgrade that drops or renames a service (ch-init-lite in 0.2.0, the
+    # flink1-* services in 0.3.0) leaves the old container holding its name.
+    stack_client.compose.down(volumes=remove_volumes, remove_orphans=True)
 
 
 def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:

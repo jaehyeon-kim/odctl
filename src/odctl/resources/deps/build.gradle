@@ -11,8 +11,10 @@ repositories {
 
 ext {
     confluentVersion = '8.2.0'
-    flinkVersion = '2.1.3'
-    hadoopVersion = '3.3.6'
+    // Supplied by the Dockerfile from versions.env. The '+' resolves the latest
+    // patch of the pinned minor, which is what the fetch scripts do too.
+    flinkVersion = "${project.findProperty('flinkMinor') ?: '2.1'}.+"
+    hadoopVersion = project.findProperty('hadoopVersion') ?: '3.3.6'
 }
 
 configurations {

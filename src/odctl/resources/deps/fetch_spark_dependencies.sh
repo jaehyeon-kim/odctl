@@ -9,6 +9,11 @@ fetch_artifact() {
     if [ "$DRY_RUN" -eq 1 ]; then echo " 🔍 Checking: $2"; curl -sL -I -f "$2" > /dev/null || exit 1;
     else echo " ⬇️  Downloading: $2"; curl -sL -f -o "$1" "$2"; fi
 }
+# Versions come from versions.env so a bump is one edit rather than several
+# kept in step. See issue #5.
+# shellcheck source=versions.env
+. "$(dirname "$0")/versions.env"
+
 get_maven_version() {
     curl -sL "https://repo1.maven.org/maven2/${1}/maven-metadata.xml" | grep -Eo "<version>${2}</version>" | sort -V | tail -1 | sed -E 's#</?version>##g' || true
 }
@@ -16,9 +21,8 @@ get_maven_version() {
 echo "▶️  Resolving Spark Versions..."
 SCALA_V="2.13"
 
-# 🔒 HARDCODED: Lock to Spark 4.1.x and Iceberg 1.11.0 to ensure stack stability
+# 🔒 HARDCODED: Lock to Spark 4.1.x; Iceberg comes from versions.env
 SPARK_COMPAT_MINOR="4.1"
-ICEBERG_V="1.11.0"
 
 # Keep OpenLineage dynamic as it relies on frequent patch updates
 OL_SPARK_V=$(get_maven_version "io/openlineage/openlineage-spark_${SCALA_V}" "[0-9]+\.[0-9]+\.[0-9]+")
