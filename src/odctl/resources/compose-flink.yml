@@ -14,6 +14,12 @@ x-flink-base: &flink-base
   image: flink:2.1-java17
   environment:
     TZ: ${TZ:-UTC}
+    # SeaweedFS ignores the region, but the AWS SDK refuses to build a client
+    # without one, so an Iceberg catalog that omits client.region fails its
+    # commits with "Unable to load region" while checkpoints keep succeeding.
+    AWS_REGION: us-east-1
+    AWS_ACCESS_KEY_ID: user
+    AWS_SECRET_ACCESS_KEY: password
   entrypoint:
     - /bin/bash
     - -c
