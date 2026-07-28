@@ -33,7 +33,7 @@ services:
   # [PROFILE: metadata] OpenMetadata DB Migration
   # ==========================================
   openmetadata-migrate:
-    image: docker.getcollate.io/openmetadata/server:1.12.6
+    image: &om-server-image docker.getcollate.io/openmetadata/server:1.12.6
     container_name: openmetadata-migrate
     command: "./bootstrap/openmetadata-ops.sh migrate"
     profiles:
@@ -63,7 +63,7 @@ services:
   # [PROFILE: metadata] OpenMetadata Server
   # ==========================================
   openmetadata-server:
-    image: docker.getcollate.io/openmetadata/server:1.12.6
+    image: *om-server-image
     container_name: openmetadata-server
     restart: always
     profiles:

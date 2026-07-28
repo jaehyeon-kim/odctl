@@ -3,8 +3,6 @@ name: End-to-End Integration Tests
 on:
   workflow_call:
 
-
-
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -12,12 +10,13 @@ jobs:
       contents: read
       packages: read
     strategy:
+      fail-fast: false
       matrix:
         profile_group:
           - "metadata"
           - "airflow"
           - "kafka-lite kafka-full"
-          - "flink1-lite flink1-full fluss"
+          - "flink-lite flink-full fluss"
           - "spark-lite spark-full"
           - "ch-lite ch-full"
           - "trino metabase"
@@ -49,31 +48,27 @@ jobs:
 
       - name: Test Profile Group
         run: |
-          # Split the space-separated group into an array
+          chmod +x .github/scripts/smoke.sh
           for profile in ${{ matrix.profile_group }}; do
             echo "::group::Testing Profile: $profile"
             echo "🚀 Launching $profile..."
-            odctl up $profile
+            odctl up "$profile"
 
-            echo "⏳ Validating containers..."
-            SUCCESS=0
-            for i in {1..15}; do
-              RUNNING=$(docker ps -q | wc -l)
-              if [ "$RUNNING" -ge 1 ]; then
-                echo "✅ Containers are running!"
-                docker ps
-                odctl ps --all
-                SUCCESS=1
-                break
-              fi
-              echo "Waiting... ($i/15)"
-              sleep 2
-            done
+            echo "⏳ Containers:"
+            docker ps
 
-            if [ "$SUCCESS" -eq 0 ]; then
-              echo "❌ Timeout reached: No containers are running for $profile!"
+            # Liveness alone has never been enough here: every bug fixed in 0.2.x
+            # and 0.3.0 left healthy containers behind a broken profile, so the
+            # smoke script asserts the profile can actually do its job.
+            echo "🔍 Smoke testing $profile..."
+            if ! .github/scripts/smoke.sh "$profile"; then
+              echo "::error::Smoke test failed for $profile"
               docker ps -a
               odctl ps --all
+              for c in $(docker ps -aq); do
+                echo "---- logs: $(docker inspect --format '{{.Name}}' "$c") ----"
+                docker logs --tail 40 "$c" 2>&1 || true
+              done
               exit 1
             fi
 

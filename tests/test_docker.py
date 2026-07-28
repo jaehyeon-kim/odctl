@@ -65,7 +65,9 @@ def test_docker_actions(monkeypatch):
     mock_client.compose.up.assert_called_with(detach=False)
 
     docker.stop_stack("dummy.yml", ["prof1"], remove_volumes=True)
-    mock_client.compose.down.assert_called_with(volumes=True)
+    # remove_orphans is what clears containers whose service was dropped
+    # from the compose file.
+    mock_client.compose.down.assert_called_with(volumes=True, remove_orphans=True)
 
 
 def test_restart_managed_containers(monkeypatch):

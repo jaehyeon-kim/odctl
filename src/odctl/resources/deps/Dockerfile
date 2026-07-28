@@ -15,10 +15,13 @@ RUN --mount=type=cache,target=/root/.gradle \
 # ==========================================
 FROM gradle:8.6-jdk17 AS gradle-resolver
 WORKDIR /app
-COPY build.gradle .
-# Let Gradle do the heavy transitive lifting for both Connect and Flink!
+COPY build.gradle versions.env ./
+# Let Gradle do the heavy transitive lifting for both Connect and Flink, using the
+# same pins the fetch scripts read so the two cannot drift. See issue #5.
 RUN --mount=type=cache,target=/home/gradle/.gradle \
-    gradle copyAllDependencies --no-daemon
+    . ./versions.env \
+    && gradle copyAllDependencies --no-daemon \
+        -PflinkMinor="${FLINK_MINOR}" -PhadoopVersion="${HADOOP_V}"
 
 # ==========================================
 # Stage 3: Direct Downloader (Uber JARs & ZIPs)
@@ -29,6 +32,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y curl tar unzip && rm -rf /var/lib/apt/lists/*
 WORKDIR /downloads
 # Copy the standalone fetch scripts
+COPY versions.env .
 COPY fetch_standalone_plugins.sh .
 COPY fetch_flink_dependencies.sh .
 COPY fetch_spark_dependencies.sh .
