@@ -235,7 +235,7 @@ stacks:
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
-          * External (Localhost): http://localhost:5050
+          * External (Localhost): http://localhost:5000
           * Internal (Docker): http://mlflow:5000
       ray-serve: |
         • Ray Serve Inference API Proxy:

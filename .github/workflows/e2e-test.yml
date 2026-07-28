@@ -12,17 +12,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Profiles are grouped only where they share a large image, so the pull
+        # is amortised: the lite and full variants of Kafka, Flink, Spark and
+        # ClickHouse. Everything else runs alone, which keeps the failure signal
+        # per profile and shortens the critical path.
         profile_group:
-          - "metadata"
-          - "airflow"
           - "kafka-lite kafka-full"
-          - "flink-lite flink-full fluss"
+          - "flink-lite flink-full"
           - "spark-lite spark-full"
           - "ch-lite ch-full"
-          - "trino metabase"
-          - "mlflow ray-serve"
-          - "lineage telemetry"
-          - "postgres storage catalog valkey"
+          - "fluss"
+          - "trino"
+          - "metabase"
+          - "mlflow"
+          - "ray-serve"
+          - "lineage"
+          - "telemetry"
+          - "metadata"
+          - "airflow"
+          - "postgres"
+          - "storage"
+          - "catalog"
+          - "valkey"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
