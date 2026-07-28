@@ -7,7 +7,7 @@ services:
   # [PROFILE: fluss] Streaming Storage Engine
   # ==========================================
   fluss-coordinator:
-    image: apache/fluss:0.8.0-incubating
+    image: &fluss-image apache/fluss:0.8.0-incubating
     container_name: fluss-coordinator
     command: coordinatorServer
     profiles: ["fluss"]
@@ -28,7 +28,7 @@ services:
         remote.data.dir: /tmp/fluss/remote-data
 
   fluss-tablet-1:
-    image: apache/fluss:0.8.0-incubating
+    image: *fluss-image
     container_name: fluss-tablet-1
     command: tabletServer
     profiles: ["fluss"]
