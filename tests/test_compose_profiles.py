@@ -66,7 +66,9 @@ def test_every_teardown_selection_yields_a_valid_project():
     for path in _compose_files():
         services = _services(path)
         for profile in _profiles_of_file(path):
-            active = set(expand_same_file_dependencies(_profiles_of_file(path), [profile]))
+            active = set(
+                expand_same_file_dependencies(_profiles_of_file(path), [profile])
+            )
             live = {
                 name
                 for name, svc in services.items()
@@ -111,12 +113,14 @@ def test_expansion_stays_within_the_file():
             catalog_deps = stack.depends_on["catalog"]
     assert catalog_deps and "deps" in catalog_deps, "expected catalog to depend on deps"
 
-    expanded = expand_same_file_dependencies(["postgres", "storage", "catalog"], ["catalog"])
+    expanded = expand_same_file_dependencies(
+        ["postgres", "storage", "catalog"], ["catalog"]
+    )
     assert "deps" not in expanded
 
 
 def test_expansion_is_a_noop_without_dependencies():
     """A profile with no same-file dependencies is returned unchanged."""
-    assert expand_same_file_dependencies(["kafka-lite", "kafka-full"], ["kafka-lite"]) == [
-        "kafka-lite"
-    ]
+    assert expand_same_file_dependencies(
+        ["kafka-lite", "kafka-full"], ["kafka-lite"]
+    ) == ["kafka-lite"]
