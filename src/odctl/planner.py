@@ -131,3 +131,46 @@ def build_execution_plan(
         execution_plan[file].append(p)
 
     return execution_plan
+
+
+def expand_same_file_dependencies(
+    file_profiles: List[str], active: List[str]
+) -> List[str]:
+    """Widen a set of active profiles to include their same-file dependencies.
+
+    Compose filters services by the active profiles and then validates
+    depends_on against what survives, so activating a profile whose service
+    depends on one in another profile of the same file gives "depends on
+    undefined service" and the command aborts. Teardown selects profiles by
+    running state and by volume ownership, which can pick one profile of a file
+    on its own, so it has to widen the selection back to a valid project.
+
+    Only same-file dependencies are added. Each file is torn down by its own
+    compose call, and widening across files would stop shared infrastructure
+    that other profiles may still be using.
+
+    Args:
+        file_profiles (List[str]): Every profile the compose file declares.
+        active (List[str]): The profiles selected for this file.
+
+    Returns:
+        List[str]: The selected profiles plus their same-file dependencies, in
+            the order the file declares them.
+    """
+    registry = load_registry()
+    profile_map = get_profile_map()
+
+    in_file = set(file_profiles)
+    selected = set(active)
+    queue = list(active)
+    while queue:
+        current = queue.pop(0)
+        entry = profile_map.get(current)
+        if not entry:
+            continue
+        stack = registry.stacks[entry["stack_id"]]
+        for dep in stack.depends_on.get(current, []):
+            if dep in in_file and dep not in selected:
+                selected.add(dep)
+                queue.append(dep)
+    return [p for p in file_profiles if p in selected]
