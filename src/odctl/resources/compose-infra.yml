@@ -109,9 +109,8 @@ services:
     # apache/iceberg-rest-fixture is the maintained successor to
     # tabulario/iceberg-rest, which stopped at Iceberg 1.6 and rejects table
     # format version 3. Same RESTCatalogServer codebase and the same CATALOG_*
-    # environment convention, but unlike tabulario it ships no JDBC driver, and
-    # its default `java -jar` command cannot pick one up. Hence the classpath
-    # form below, with the Postgres driver taken from the shared deps volume.
+    # environment convention, but it ships no JDBC driver and its default
+    # `java -jar` command cannot pick one up, hence the explicit classpath.
     image: apache/iceberg-rest-fixture:1.10.1
     command:
       - java
@@ -124,7 +123,7 @@ services:
     networks:
       - odctl
     volumes:
-      # Supplies the Postgres JDBC driver named on the classpath above
+      # Postgres JDBC driver, which the fixture image does not ship
       - odctl-shared-deps:/mnt/shared-deps:ro
     profiles:
       - catalog

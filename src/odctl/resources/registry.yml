@@ -109,8 +109,8 @@ stacks:
     profiles: ["flink-lite", "flink-full"]
     capacities: ["stream_processing"]
     depends_on:
-      flink-lite: ["deps", "storage", "catalog"]
-      flink-full: ["deps", "storage", "catalog"]
+      flink-lite: ["deps", "catalog"]
+      flink-full: ["deps", "catalog"]
     role: "Executes continuous streaming pipelines. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     usage:
       flink-lite: |
@@ -134,8 +134,8 @@ stacks:
     profiles: ["spark-lite", "spark-full"]
     capacities: ["data_processing"]
     depends_on:
-      spark-lite: ["deps", "storage", "catalog"]
-      spark-full: ["deps", "storage", "catalog"]
+      spark-lite: ["deps", "catalog"]
+      spark-full: ["deps", "catalog"]
     role: "Distributed batch engine for data preparation and large-scale ETL."
     usage:
       spark-lite: |

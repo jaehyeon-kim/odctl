@@ -113,6 +113,18 @@ def get_stack_details(
                             if isinstance(source, str):
                                 volumes.append(source)
 
+        # Drop volumes the file declares as external. Compose never removes
+        # those, so mounting one is not a reason to tear a profile down. Counting
+        # them made `odctl down --all --volumes` select `catalog` purely because
+        # it mounts the shared dependency volume, even when nothing of it ran.
+        declared = compose_dict.get("volumes") or {}
+        external = {
+            name
+            for name, spec in declared.items()
+            if isinstance(spec, dict) and spec.get("external")
+        }
+        volumes = [v for v in volumes if v not in external]
+
         return (
             sorted(list(set(services))),
             sorted(list(set(ports))),
