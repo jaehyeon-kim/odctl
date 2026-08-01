@@ -132,6 +132,7 @@ def build_execution_plan(
 
     return execution_plan
 
+
 def expand_same_file_dependencies(
     file_profiles: List[str], active: List[str]
 ) -> List[str]:
