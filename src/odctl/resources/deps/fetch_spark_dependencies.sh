@@ -41,4 +41,10 @@ fetch_artifact "spark/iceberg-runtime.jar" "https://repo1.maven.org/maven2/org/a
 fetch_artifact "spark/openlineage.jar" "https://repo1.maven.org/maven2/io/openlineage/openlineage-spark_${SCALA_V}/${OL_SPARK_V}/openlineage-spark_${SCALA_V}-${OL_SPARK_V}.jar"
 fetch_artifact "spark/openmetadata-agent.jar" "$OM_SPARK_URL"
 
+# Hadoop S3A, so the Iceberg procedures that walk storage through Hadoop's
+# FileSystem API work against SeaweedFS. S3FileIO covers the data path already;
+# these two jars are what remove_orphan_files and add_files need.
+fetch_artifact "spark/hadoop-aws.jar" "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_V}/hadoop-aws-${HADOOP_AWS_V}.jar"
+fetch_artifact "spark/aws-sdk-bundle.jar" "https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/${AWS_SDK_V}/bundle-${AWS_SDK_V}.jar"
+
 echo "✅ Spark dependencies complete!"

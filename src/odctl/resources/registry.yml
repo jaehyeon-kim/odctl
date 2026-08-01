@@ -199,11 +199,16 @@ stacks:
           * External (Localhost): http://localhost:8123, http://localhost:8124, http://localhost:8125, http://localhost:8126
           * Internal (Docker): http://ch-11:8123, http://ch-12:8123, http://ch-21:8123, http://ch-22:8123
       trino: |
-        • Trino UI & JDBC connection (user: user, password: none):
+        • Trino UI & JDBC connection (no password: no authenticator is
+          configured, so any username is accepted):
           * External (Localhost): http://localhost:8080
           * Internal (Docker): http://trino:8080
+        • Identities: `docker exec -it trino trino` connects as `trino`, the
+          CLI default. Pass `--user user` for the stack-wide convention, or
+          `--user analyst` to see the column mask and row filter that
+          trino/rules.json applies.
         • Catalogs: iceberg, kafka (topics discovered from the schema
-          registry), clickhouse, postgres, valkey
+          registry), clickhouse, postgres, and valkey with that profile up
       metabase: |
         • Metabase Dashboard Engine:
           * External (Localhost): http://localhost:3000
