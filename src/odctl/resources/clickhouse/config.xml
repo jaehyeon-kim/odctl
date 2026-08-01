@@ -25,19 +25,36 @@
         </node>
     </zookeeper>
 
+    <!-- Every replica carries credentials because the default user has a
+         password. Without them a server-to-server connection authenticates as
+         default with an empty password and fails with AUTHENTICATION_FAILED,
+         which any distributed or parallel-replica read would hit as soon as it
+         has to leave the local node. -->
     <remote_servers>
         <odctl_cluster>
             <shard>
                 <internal_replication>true</internal_replication>
-                <replica><host>ch-11</host><port>9000</port></replica>
-                <replica><host>ch-12</host><port>9000</port></replica>
+                <replica><host>ch-11</host><port>9000</port><user>default</user><password>password</password></replica>
+                <replica><host>ch-12</host><port>9000</port><user>default</user><password>password</password></replica>
             </shard>
             <shard>
                 <internal_replication>true</internal_replication>
-                <replica><host>ch-21</host><port>9000</port></replica>
-                <replica><host>ch-22</host><port>9000</port></replica>
+                <replica><host>ch-21</host><port>9000</port><user>default</user><password>password</password></replica>
+                <replica><host>ch-22</host><port>9000</port><user>default</user><password>password</password></replica>
             </shard>
         </odctl_cluster>
+
+        <!-- Parallel replicas require a cluster of exactly one shard, so they
+             cannot use odctl_cluster on any profile. This entry covers the
+             single shard that ch-lite runs, and is what
+             cluster_for_parallel_replicas should name. -->
+        <odctl_single_shard>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica><host>ch-11</host><port>9000</port><user>default</user><password>password</password></replica>
+                <replica><host>ch-12</host><port>9000</port><user>default</user><password>password</password></replica>
+            </shard>
+        </odctl_single_shard>
     </remote_servers>
 
     <distributed_ddl>

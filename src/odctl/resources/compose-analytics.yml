@@ -145,6 +145,13 @@ services:
     volumes:
       # Mount the static catalogs
       - ./trino/catalog:/etc/trino/catalog:ro
+      # File-based access control, which is what enables column masks and row
+      # filters. No authenticator is configured, so Trino trusts the identity a
+      # client claims and `trino --user analyst` is enough to exercise the rules.
+      - ./trino/access-control.properties:/etc/trino/access-control.properties:ro
+      - ./trino/rules.json:/etc/trino/rules.json:ro
+      - ./trino/group-provider.properties:/etc/trino/group-provider.properties:ro
+      - ./trino/groups.txt:/etc/trino/groups.txt:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
       interval: 10s

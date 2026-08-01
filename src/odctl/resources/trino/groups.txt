@@ -1,0 +1,4 @@
+# One group per line: group_name:user1,user2
+# Referenced from rules.json via a "group" key.
+analysts:analyst
+data_admin:trino,admin

@@ -89,5 +89,13 @@ volumes:
   odctl-shared-deps:
     name: odctl-shared-deps
     external: true
+  # Shared so the drivers can write event logs and the History Server can read
+  # them, tmpfs-backed so it holds nothing once the stack is down. Every other
+  # service in the stack keeps its data in the container layer and loses it on
+  # teardown, and this keeps Spark consistent with that.
   spark-events-data:
     name: spark-events-data
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
