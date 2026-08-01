@@ -56,7 +56,7 @@ services:
   # Valkey (Redis Alternative) + Valkey Search
   # ==========================================
   valkey:
-    image: valkey/valkey-bundle:9.1.1-alpine
+    image: valkey/valkey-bundle:9.1.2-alpine
     container_name: valkey
     ports:
       - "6379:6379"
