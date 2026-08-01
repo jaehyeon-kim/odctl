@@ -19,7 +19,7 @@ services:
   # [LITE] Single Broker Cluster (Container: kafka)
   # ==========================================
   kafka:
-    image: &kafka-image apache/kafka:4.3.0
+    image: &kafka-image apache/kafka:4.3.1
     container_name: kafka
     ports:
       - "9092:9092"
