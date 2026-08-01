@@ -106,12 +106,26 @@ services:
   # Iceberg REST Catalog
   # ==========================================
   catalog:
-    image: tabulario/iceberg-rest:1.6.0
+    # apache/iceberg-rest-fixture is the maintained successor to
+    # tabulario/iceberg-rest, which stopped at Iceberg 1.6 and rejects table
+    # format version 3. Same RESTCatalogServer codebase and the same CATALOG_*
+    # environment convention, but unlike tabulario it ships no JDBC driver, and
+    # its default `java -jar` command cannot pick one up. Hence the classpath
+    # form below, with the Postgres driver taken from the shared deps volume.
+    image: apache/iceberg-rest-fixture:1.10.1
+    command:
+      - java
+      - -cp
+      - /usr/lib/iceberg-rest/iceberg-rest-adapter.jar:/mnt/shared-deps/shared/postgresql.jar
+      - org.apache.iceberg.rest.RESTCatalogServer
     container_name: iceberg-catalog
     ports:
       - "8181:8181"
     networks:
       - odctl
+    volumes:
+      # Supplies the Postgres JDBC driver named on the classpath above
+      - odctl-shared-deps:/mnt/shared-deps:ro
     profiles:
       - catalog
     depends_on:
@@ -144,4 +158,9 @@ services:
 networks:
   odctl:
     name: odctl
+    external: true
+
+volumes:
+  odctl-shared-deps:
+    name: odctl-shared-deps
     external: true
