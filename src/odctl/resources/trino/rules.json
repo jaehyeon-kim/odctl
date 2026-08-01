@@ -1,0 +1,49 @@
+{
+  "catalogs": [
+    {
+      "allow": "all"
+    }
+  ],
+  "schemas": [
+    {
+      "user": "analyst",
+      "owner": false
+    },
+    {
+      "owner": true
+    }
+  ],
+  "tables": [
+    {
+      "user": "analyst",
+      "catalog": "iceberg",
+      "schema": "web",
+      "table": "analytics_events",
+      "privileges": ["SELECT"],
+      "filter": "domain = 'shop.acme.com'",
+      "columns": [
+        {
+          "name": "payload",
+          "mask": "'***redacted***'"
+        }
+      ]
+    },
+    {
+      "user": "analyst",
+      "catalog": "iceberg",
+      "schema": "logs_lab",
+      "table": "logs",
+      "privileges": ["SELECT"],
+      "filter": "environment = 'production'",
+      "columns": [
+        {
+          "name": "message",
+          "mask": "'***redacted***'"
+        }
+      ]
+    },
+    {
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP"]
+    }
+  ]
+}
