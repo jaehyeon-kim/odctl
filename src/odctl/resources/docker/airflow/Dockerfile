@@ -1,4 +1,4 @@
-FROM apache/airflow:3.2.1
+FROM apache/airflow:3.3.0
 
 # Metadata Bindings for GHCR
 LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
