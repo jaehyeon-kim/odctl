@@ -142,6 +142,13 @@ services:
       offset.storage.topic=odctl-connect-offsets
       config.storage.topic=odctl-connect-configs
       status.storage.topic=odctl-connect-status
+      # Connect creates these three topics itself, and its own defaults are 3,
+      # which one broker can never satisfy. The broker-side replication factors
+      # set for kafka-lite do not apply here, so without these the herder fails
+      # to create its storage topics and the worker restarts in a loop.
+      offset.storage.replication.factor=1
+      config.storage.replication.factor=1
+      status.storage.replication.factor=1
       rest.advertised.host.name=connect
       rest.port=8083
       plugin.path=/mnt/shared-deps/connect
