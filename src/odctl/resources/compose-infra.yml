@@ -5,7 +5,7 @@ services:
   # Unified Metadata & Vector DB (Postgres 18)
   # ==========================================
   postgres:
-    image: pgvector/pgvector:0.8.2-pg18-trixie
+    image: pgvector/pgvector:0.8.6-pg18-trixie
     container_name: postgres
     ports:
       - "5432:5432"
