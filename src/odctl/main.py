@@ -15,7 +15,11 @@ from odctl.docker import (
     restart_managed_containers,
     stop_stack,
 )
-from odctl.planner import build_execution_plan, get_profile_map
+from odctl.planner import (
+    build_execution_plan,
+    expand_same_file_dependencies,
+    get_profile_map,
+)
 from odctl.registry import load_registry
 from odctl.workspace import get_workspace_dir, init_workspace
 
@@ -369,7 +373,7 @@ def down(
                 ):
                     active_profs.append(p)
             if active_profs:
-                active_plan[file] = active_profs
+                active_plan[file] = expand_same_file_dependencies(profs, active_profs)
         plan = active_plan
 
     plan = dict(reversed(list(plan.items())))
