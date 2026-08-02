@@ -1,7 +1,7 @@
 name: odctl-analytics
 
 x-clickhouse-base: &clickhouse-base
-  image: clickhouse/clickhouse-server:25.8-alpine
+  image: clickhouse/clickhouse-server:25.12-alpine
   networks:
     - odctl
   mem_limit: 4g
@@ -32,7 +32,7 @@ services:
   # [SHARED] Consensus Node
   # ==========================================
   ch-keeper:
-    image: clickhouse/clickhouse-keeper:25.8-alpine
+    image: clickhouse/clickhouse-keeper:25.12-alpine
     container_name: ch-keeper
     # Keeper must run in BOTH profiles
     profiles:
