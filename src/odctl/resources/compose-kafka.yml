@@ -163,7 +163,7 @@ services:
   # Schema Registry & UI
   # ==========================================
   karapace:
-    image: ghcr.io/aiven-open/karapace:6.1.3
+    image: ghcr.io/aiven-open/karapace:6.2.2
     container_name: karapace
     entrypoint:
       - python3
