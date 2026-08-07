@@ -33,7 +33,7 @@ services:
   # [PROFILE: metadata] OpenMetadata DB Migration
   # ==========================================
   openmetadata-migrate:
-    image: &om-server-image docker.getcollate.io/openmetadata/server:1.12.6
+    image: &om-server-image docker.getcollate.io/openmetadata/server:1.13.3
     container_name: openmetadata-migrate
     command: "./bootstrap/openmetadata-ops.sh migrate"
     profiles:
@@ -126,7 +126,7 @@ services:
   # [PROFILE: metadata] OpenMetadata Ingestion (Standard Image)
   # ==========================================
   openmetadata-ingestion:
-    image: docker.getcollate.io/openmetadata/ingestion:1.12.6
+    image: docker.getcollate.io/openmetadata/ingestion:1.13.3
     container_name: openmetadata-ingestion
     profiles:
       - metadata
