@@ -2,13 +2,16 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:base", ":dependencyDashboard", "docker:enableMajor"],
   "schedule": ["every weekend"],
+
+  "automerge": false,
+
   "docker-compose": {
     "fileMatch": ["(^|/)compose-[^/]+\\.ya?ml$"]
   },
   "dockerfile": {
     "fileMatch": [
-      "^src/dml/resources/docker/.*/Dockerfile$",
-      "^src/dml/resources/deps/Dockerfile$"
+      "^src/odctl/resources/docker/.*/Dockerfile$",
+      "^src/odctl/resources/deps/Dockerfile$"
     ]
   },
   "packageRules": [
@@ -23,10 +26,13 @@
       "allowedVersions": "<0.9"
     },
     {
-      "description": "Auto-merge non-breaking minor and patch updates if CI passes",
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "automergeType": "pr"
+      "description": "Spark stays on 4.1: Iceberg publishes iceberg-spark-runtime for 4.0 and 4.1 only, so a 4.2 image loads a 4.1 runtime and every Iceberg statement dies with IncompatibleClassChangeError. HADOOP_AWS_V in versions.env is matched to the Hadoop this series bundles, and the airflow image pins pyspark to the same minor. Raise this only when Iceberg ships a runtime for a newer minor, and move SPARK_COMPAT_MINOR, HADOOP_AWS_V and the pyspark pin with it. See PR #29.",
+      "matchPackageNames": [
+        "apache/spark",
+        "pyspark",
+        "org.apache.spark:{/,}**"
+      ],
+      "allowedVersions": "<4.2"
     },
     {
       "description": "Group all Python dependencies from pyproject.toml into a single PR",
