@@ -10,7 +10,7 @@ repositories {
 }
 
 ext {
-    confluentVersion = '8.2.0'
+    confluentVersion = '8.3.1'
     // Supplied by the Dockerfile from versions.env. The '+' resolves the latest
     // patch of the pinned minor, which is what the fetch scripts do too.
     flinkVersion = "${project.findProperty('flinkMinor') ?: '2.1'}.+"
