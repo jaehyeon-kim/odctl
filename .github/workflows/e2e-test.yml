@@ -83,7 +83,17 @@ jobs:
               exit 1
             fi
 
-            echo "🧹 Tearing down $profile..."
+            # Tear down by name before sweeping with --all. These are two code
+            # paths: --all resolves dependency profiles for itself, while a
+            # named teardown did not until 0.4.3, so compose rejected the
+            # project with "depends on undefined service" and only the named
+            # form could catch it. Naming the profile is also what a user runs.
+            echo "🧹 Tearing down $profile by name..."
+            yes | odctl down "$profile" --volumes
+
+            # Sweep afterwards so a failure above cannot leak state into the
+            # next profile in the group. This is a no-op when the named
+            # teardown succeeded.
             yes | odctl down --all --volumes
             echo "::endgroup::"
           done

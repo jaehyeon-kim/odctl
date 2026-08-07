@@ -17,7 +17,7 @@ from odctl.docker import (
 )
 from odctl.planner import (
     build_execution_plan,
-    expand_same_file_dependencies,
+    expand_plan_dependencies,
     get_profile_map,
 )
 from odctl.registry import load_registry
@@ -373,8 +373,14 @@ def down(
                 ):
                     active_profs.append(p)
             if active_profs:
-                active_plan[file] = expand_same_file_dependencies(profs, active_profs)
+                active_plan[file] = active_profs
         plan = active_plan
+
+    # Widen after the running-state filter, not inside it, so a teardown that
+    # names profiles directly is validated the same way `--all` is. Without
+    # this, `odctl down catalog` hands compose a project where catalog's
+    # depends_on points at a postgres that the profile filter removed.
+    plan = expand_plan_dependencies(plan)
 
     plan = dict(reversed(list(plan.items())))
 
@@ -420,8 +426,11 @@ def ps(
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    # Use resolve_deps=False so we ONLY see what was explicitly requested
-    plan = build_execution_plan(profiles, all, resolve_deps=False)
+    # Use resolve_deps=False so we ONLY see what was explicitly requested,
+    # widened just enough that compose accepts the project.
+    plan = expand_plan_dependencies(
+        build_execution_plan(profiles, all, resolve_deps=False)
+    )
 
     containers = get_managed_containers(plan)
 
@@ -504,7 +513,7 @@ def logs(
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    plan = build_execution_plan(profiles, resolve_deps=False)
+    plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     get_managed_logs(
         execution_plan=plan,
         follow=follow,
@@ -523,7 +532,7 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    plan = build_execution_plan(profiles, resolve_deps=False)
+    plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Restarting containers...")
     restart_managed_containers(plan)
     ui.print_success("Restart complete.")
