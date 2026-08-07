@@ -1,4 +1,4 @@
-FROM rayproject/ray:2.55.1-py312-cpu
+FROM rayproject/ray:2.56.1-py312-cpu
 
 LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
 LABEL org.opencontainers.image.description="Unified Ray Serve and MLflow image for the Open Data Stack. Handles inference deployment, experiment tracking, and direct ClickHouse/Kafka connections."
