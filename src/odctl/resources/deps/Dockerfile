@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.gradle \
 # ==========================================
 # Stage 2: Gradle Resolver (Schema Converters & Flink Parquet)
 # ==========================================
-FROM gradle:8.6-jdk17 AS gradle-resolver
+FROM gradle:8.14-jdk17 AS gradle-resolver
 WORKDIR /app
 COPY build.gradle versions.env ./
 # Let Gradle do the heavy transitive lifting for both Connect and Flink, using the
