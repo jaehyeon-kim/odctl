@@ -174,3 +174,30 @@ def expand_same_file_dependencies(
                 selected.add(dep)
                 queue.append(dep)
     return [p for p in file_profiles if p in selected]
+
+
+def expand_plan_dependencies(plan: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    """Widen every file in a plan to include its same-file dependencies.
+
+    Any command that hands profiles to a compose client has to pass a set that
+    validates, because compose filters services by active profile and then
+    checks depends_on against what survives. Naming a profile whose service
+    depends on one in another profile of the same file therefore aborts with
+    "depends on undefined service", and that applies to teardown, ps, logs and
+    restart alike, not just to teardown of a whole file.
+
+    Plans built with ``resolve_deps=False`` need this. Plans built with
+    ``resolve_deps=True`` already carry their dependencies.
+
+    Args:
+        plan (Dict[str, List[str]]): Compose file to selected profiles.
+
+    Returns:
+        Dict[str, List[str]]: Same mapping, each selection widened to a set
+            compose will accept, in the order each file declares.
+    """
+    declared = build_execution_plan(None, all_profiles=True, resolve_deps=False)
+    return {
+        file: expand_same_file_dependencies(declared.get(file, profiles), profiles)
+        for file, profiles in plan.items()
+    }
