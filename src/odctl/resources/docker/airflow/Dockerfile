@@ -5,7 +5,9 @@ LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
 LABEL org.opencontainers.image.description="Custom Apache Airflow orchestrator image for the Open Data Stack. Fully loaded with pipeline execution providers for PostgreSQL, Trino, ClickHouse, Amazon S3, Flink, PySpark, and PyIceberg."
 
 # Install Lean Open Data SDKs and Providers
-# Pinning PySpark strictly to 4.0.x for Iceberg compatibility
+# Pinned to the same Spark minor the spark image runs, because Iceberg
+# publishes iceberg-spark-runtime per minor. Move it with that image, not on its
+# own. See the renovate ceiling on apache/spark.
 RUN --mount=type=cache,target=/home/airflow/.cache/pip \
     pip install \
     apache-airflow-providers-apache-flink \

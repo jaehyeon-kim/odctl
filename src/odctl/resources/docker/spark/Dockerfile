@@ -1,4 +1,11 @@
-FROM apache/spark:4.2.0
+# Pinned to the 4.1 series on purpose. Iceberg 1.11.0 publishes
+# iceberg-spark-runtime for 4.0 and 4.1 only, so a 4.2 image loads a runtime
+# built against 4.1 and every Iceberg statement dies with
+# IncompatibleClassChangeError on connector.catalog.View. HADOOP_AWS_V in
+# versions.env is also matched to the Hadoop this series bundles, and the
+# airflow image pins pyspark to the same minor. Raise all four together, and
+# only once Iceberg ships a runtime for the newer minor. See PR #29.
+FROM apache/spark:4.1.2
 
 # Switch to root to install system-wide packages
 USER root
