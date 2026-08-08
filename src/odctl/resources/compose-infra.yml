@@ -53,7 +53,7 @@ services:
   # Object Storage (SeaweedFS - Single Node)
   # ==========================================
   seaweed:
-    image: &seaweed-image chrislusf/seaweedfs:4.40
+    image: &seaweed-image chrislusf/seaweedfs:4.41
     container_name: seaweed
     ports:
       - "8333:8333" # S3 API
