@@ -12,8 +12,15 @@
             <max_execution_time>0</max_execution_time>
             <timeout_before_checking_execution_speed>60</timeout_before_checking_execution_speed>
 
+            <!-- Buffering stays on so many small inserts still batch into
+                 fewer, larger parts, which is what a local stack full of
+                 hand-typed inserts needs. Waiting stays on too, matching the
+                 ClickHouse default: with wait_for_async_insert = 0 an INSERT is
+                 acknowledged before its rows are queryable, so insert-then-read
+                 is racy and an invalid value fails silently in the server log
+                 instead of returning an error. -->
             <async_insert>1</async_insert>
-            <wait_for_async_insert>0</wait_for_async_insert>
+            <wait_for_async_insert>1</wait_for_async_insert>
             <min_insert_block_size_rows>1048576</min_insert_block_size_rows>
         </default>
     </profiles>
