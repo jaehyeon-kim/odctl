@@ -220,6 +220,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Gradle daemon caches, written by the gradle-resolver stage of the deps build
+# into whichever directory it runs from. Machine-local and keyed to a Gradle
+# version, so it is never worth committing. Deleting it does not stick while a
+# daemon is alive; the daemon recreates it.
+.gradle/
+
 # OS generated files
 .DS_Store
 .DS_Store?
