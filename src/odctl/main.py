@@ -305,6 +305,31 @@ def up(
     ui.print_success("All requested profiles successfully started!")
 
 
+_DEPS_FILE = "compose-deps.yml"
+
+
+def _shared_deps_are_idle(torn_down: dict) -> bool:
+    """Report whether the shared deps project is safe to remove.
+
+    The deps project owns the ``odctl`` network and the shared JAR volume, so it
+    may only go once no other profile has a container left. Containers are listed
+    including exited ones, so a stopped-but-present service still counts as in
+    use, and deps itself is excluded because its init container always exits.
+
+    Args:
+        torn_down (dict): The plan just stopped, so its files are not consulted.
+
+    Returns:
+        bool: True when nothing outside deps remains.
+    """
+    if _DEPS_FILE in torn_down:
+        return False
+
+    declared = build_execution_plan(None, True, resolve_deps=False)
+    others = {file: profs for file, profs in declared.items() if file != _DEPS_FILE}
+    return not get_managed_containers(others)
+
+
 @app.command(
     rich_help_panel="Cluster Lifecycle",
     epilog="""
@@ -395,6 +420,20 @@ def down(
         except Exception as e:
             ui.print_error(f"Failed to stop {file}", details=str(e))
             raise typer.Exit(1)
+
+    # `--all` already carries deps in its plan. A named teardown does not, so
+    # `odctl down kafka-lite -v` used to leave the init container, the odctl
+    # network and the shared JAR volume behind: a wipe that did not wipe. Remove
+    # them here, but only once nothing else is running, since every other profile
+    # attaches to that network and mounts that volume.
+    if volumes and not all and _shared_deps_are_idle(plan):
+        ui.print_info("🛑 Stopping [cyan]deps[/cyan]...")
+        try:
+            stop_stack(_DEPS_FILE, ["deps"], remove_volumes=True)
+        except Exception as e:
+            ui.print_error("Failed to stop deps", details=str(e))
+            raise typer.Exit(1)
+
     ui.print_success("Teardown complete.")
 
 
