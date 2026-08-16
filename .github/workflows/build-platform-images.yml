@@ -64,7 +64,7 @@ jobs:
 
       - name: Upload digest
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: digests-${{ matrix.component }}-${{ matrix.platform.name }}
           path: /tmp/digests/*
@@ -85,7 +85,7 @@ jobs:
         component: [airflow, spark, ray-mlops]
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: digests-${{ matrix.component }}-*
           path: /tmp/digests
