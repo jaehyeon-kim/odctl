@@ -36,6 +36,38 @@ def test_restart_command(monkeypatch):
     mock_restart.assert_called()
 
 
+def test_recreate_command(monkeypatch):
+    mock_recreate = MagicMock()
+    monkeypatch.setattr("odctl.main.recreate_managed_containers", mock_recreate)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+
+    result = runner.invoke(app, ["recreate", "kafka-lite"])
+    assert result.exit_code == 0
+    mock_recreate.assert_called()
+    assert mock_recreate.call_args.kwargs["pull"] is False
+
+
+def test_recreate_command_pull(monkeypatch):
+    """--pull has to reach the primitive, or a stale image survives a recreate."""
+    mock_recreate = MagicMock()
+    monkeypatch.setattr("odctl.main.recreate_managed_containers", mock_recreate)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+
+    result = runner.invoke(app, ["recreate", "kafka-lite", "--pull"])
+    assert result.exit_code == 0
+    assert mock_recreate.call_args.kwargs["pull"] is True
+
+
+def test_recreate_requires_docker(monkeypatch):
+    mock_recreate = MagicMock()
+    monkeypatch.setattr("odctl.main.recreate_managed_containers", mock_recreate)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: False)
+
+    result = runner.invoke(app, ["recreate", "kafka-lite"])
+    assert result.exit_code == 1
+    mock_recreate.assert_not_called()
+
+
 def test_logs_command(monkeypatch):
     mock_logs = MagicMock()
     monkeypatch.setattr("odctl.main.get_managed_logs", mock_logs)

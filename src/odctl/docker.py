@@ -257,6 +257,31 @@ def restart_managed_containers(execution_plan: Dict[str, List[str]]):
     compose_client.compose.restart()
 
 
+def recreate_managed_containers(
+    execution_plan: Dict[str, List[str]], pull: bool = False
+):
+    """
+    Replace the containers of the requested profiles.
+
+    A restart keeps the container, so an edit to a compose file never reaches it.
+    This replaces each one from its current definition instead, which is what
+    applies a new memory limit, port, image tag or environment variable. Profiles
+    outside the plan are untouched, unlike `up`, which stops what it is not asked
+    for.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+        pull (bool, optional): Pull images before recreating. Defaults to False.
+    """
+    compose_client = _build_compose_client(execution_plan)
+    compose_client.compose.up(
+        detach=True,
+        wait=True,
+        force_recreate=True,
+        pull="always" if pull else "missing",
+    )
+
+
 def get_managed_logs(
     execution_plan: Dict[str, List[str]],
     follow: bool = False,

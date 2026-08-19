@@ -12,6 +12,7 @@ from odctl.docker import (
     is_docker_running,
     launch_stack,
     pull_stack_images,
+    recreate_managed_containers,
     restart_managed_containers,
     stop_stack,
 )
@@ -575,6 +576,26 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
     ui.print_step("Restarting containers...")
     restart_managed_containers(plan)
     ui.print_success("Restart complete.")
+
+
+@app.command(name="recreate", rich_help_panel="Management")
+def recreate(
+    profiles: List[str] = typer.Argument(..., help="Profiles to recreate."),
+    pull: bool = typer.Option(False, "--pull", help="Pull images before recreating."),
+):
+    """Replace one or more profiles' containers, applying compose file changes."""
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+    plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
+    ui.print_step("Recreating containers...")
+    ui.print_info(
+        "Recreating replaces the containers, so their data goes with them.",
+        style="yellow",
+    )
+    recreate_managed_containers(plan, pull=pull)
+    ui.print_success("Recreate complete.")
 
 
 if __name__ == "__main__":
