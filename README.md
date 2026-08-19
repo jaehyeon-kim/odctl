@@ -148,6 +148,7 @@ This folder contains all the underlying configurations that power the stack:
 - `compose-*.yml`: The actual Docker Compose definitions. You can edit these to change exposed ports, adjust memory limits, or inject new environment variables.
 - `registry.yml`: The internal dependency graph.
 - `.env`: The environment variables used across the stack (e.g., default credentials or timezones).
+- `trino/rules.json`: Trino's file-based access control. The shipped policy is deliberately generic: it grants every identity full table privileges and denies `analyst` schema ownership, and it names no catalog, schema or table, because those belong to your project rather than to this tool. Add your own table rules here for row filtering and column masking, and restart Trino afterwards, since the file is read at startup.
 
 The CLI will always prioritize the files in your local `./.odctl/` directory. If you make a mistake, you can always revert to the pristine default state by running `odctl init --force`.
 
