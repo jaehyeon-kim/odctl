@@ -121,7 +121,10 @@ The `odctl` CLI orchestrates the Open Data Stack and is logically grouped by fun
 ### Management
 
 - `odctl logs`: Fetch the logs of containers managed by specific profiles.
-- `odctl restart`: Restart one or more specific profiles.
+- `odctl restart`: Restart one or more specific profiles, keeping their containers.
+- `odctl recreate`: Replace one or more profiles' containers, which is what applies an edited compose file. Add `--pull` to refresh the images too.
+
+`restart` and `recreate` differ in one way that matters: a restart bounces the process inside the existing container, so a new memory limit, port, image tag or environment variable never reaches it, while a recreate replaces the container from its current definition. Recreating therefore discards whatever that container held. Both act only on the profiles you name, unlike `up`, which stops the ones you leave out.
 
 ### Examples
 

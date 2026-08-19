@@ -222,6 +222,29 @@ def test_restart_widens_a_named_profile():
     )
 
 
+def test_recreate_widens_a_named_profile():
+    """`odctl recreate catalog` needs the same widening as restart.
+
+    It builds its plan with `resolve_deps=False` and hands the profiles to a
+    compose client, so without the widening compose gets a project missing the
+    dependency that catalog attaches to.
+    """
+    captured = {}
+    with (
+        mock.patch("odctl.main.is_docker_running", return_value=True),
+        mock.patch(
+            "odctl.main.recreate_managed_containers",
+            side_effect=lambda plan, pull=False: captured.update(plan),
+        ),
+    ):
+        result = runner.invoke(app, ["recreate", "catalog"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "postgres" in captured.get("compose-infra.yml", []), (
+        f"expected postgres in the recreate plan, got {captured}"
+    )
+
+
 def test_every_named_selection_yields_a_valid_project():
     """Every single-profile plan must survive widening as a valid project.
 
