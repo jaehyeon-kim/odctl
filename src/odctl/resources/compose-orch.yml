@@ -39,7 +39,7 @@ services:
   # [PROFILE: airflow] Orchestration
   # ==========================================
   airflow-sync:
-    image: amazon/aws-cli:2.36.14
+    image: amazon/aws-cli:2.36.40
     container_name: airflow-sync
     profiles:
       - airflow
