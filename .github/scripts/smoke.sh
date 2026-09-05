@@ -156,9 +156,19 @@ smoke_infra() {
         || fail "namespace create or list failed"
       pass "namespace created and listed through the REST API" ;;
     valkey)
-      retry 30 5 docker exec valkey valkey-cli -u redis://user:password@localhost:6379 ping \
+      local vk="redis://user:password@localhost:6379"
+      retry 30 5 docker exec valkey valkey-cli -u "$vk" ping \
         || fail "valkey never answered PING"
-      pass "responding to PING" ;;
+      # product-recommender writes LinUCB models as a multi-key write and reads
+      # them back with a batch MGET, so assert that round trip rather than a ping.
+      docker exec valkey valkey-cli -u "$vk" \
+        mset 'linucb:smoke-1' '{"a":1}' 'linucb:smoke-2' '{"a":2}' >/dev/null 2>&1 \
+        || fail "multi-key MSET failed"
+      local got
+      got=$(docker exec valkey valkey-cli -u "$vk" mget 'linucb:smoke-1' 'linucb:smoke-2' 2>/dev/null | grep -c '"a"')
+      [ "$got" -eq 2 ] || fail "batch MGET returned $got of 2 values, expected 2"
+      docker exec valkey valkey-cli -u "$vk" del 'linucb:smoke-1' 'linucb:smoke-2' >/dev/null 2>&1
+      pass "authenticated, multi-key write and batch MGET round-tripped" ;;
   esac
 }
 
@@ -188,7 +198,15 @@ case "$PROFILE" in
   fluss)
     retry 40 5 bash -c 'docker ps --format "{{.Names}}" | grep -q fluss-coordinator' \
       || fail "coordinator container never appeared"
-    pass "coordinator running" ;;
+    # Present is not the same as stable: a restart loop keeps the name in
+    # docker ps while the service never stays up. No consumer drives Fluss yet,
+    # so not failing is the whole bar.
+    for c in fluss-coordinator fluss-tablet-1; do
+      docker ps --format '{{.Names}}' | grep -q "$c" || continue
+      restarts=$(docker inspect -f '{{.RestartCount}}' "$c" 2>/dev/null || echo 0)
+      [ "${restarts:-0}" -eq 0 ] || fail "$c restarted $restarts times"
+    done
+    pass "coordinator and tablet server running without restarts" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"
