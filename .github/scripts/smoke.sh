@@ -13,6 +13,8 @@
 set -uo pipefail
 
 PROFILE="${1:?usage: smoke.sh <profile>}"
+MB_USER="smoke@example.com"
+MB_PASS="Smoke-test-1234"
 
 fail() { echo "❌ $PROFILE: $*"; exit 1; }
 pass() { echo "✅ $PROFILE: $*"; }
@@ -28,6 +30,17 @@ retry() {
 }
 
 http_ok() { curl -fsS -o /dev/null --max-time 10 "$1"; }
+# retry() throws stdout away, which a value-returning probe needs to keep.
+retry_out() {
+  local tries="$1" delay="$2"; shift 2
+  local out
+  for ((i = 1; i <= tries; i++)); do
+    if out=$("$@" 2>/dev/null) && [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+    sleep "$delay"
+  done
+  return 1
+}
+
 
 # Some endpoints answer 403 or 404 to an unauthenticated probe, which still
 # proves the service is listening.
@@ -172,6 +185,81 @@ smoke_infra() {
   esac
 }
 
+# Metabase: a bundled driver is not proof it can reach the host. Both clickhouse
+# and starburst ship in the image, so the failure mode is the connection, not a
+# missing JAR. Metabase sits on the odctl network, so it must use container
+# names rather than the published host ports.
+mb_session() {
+  local props tok sid
+  props=$(curl -fsS --max-time 10 http://127.0.0.1:3000/api/session/properties) || return 1
+  tok=$(printf '%s' "$props" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("setup-token") or "")')
+  if [ -n "$tok" ]; then
+    curl -fsS -X POST http://127.0.0.1:3000/api/setup -H 'Content-Type: application/json' \
+      -d "{\"token\":\"$tok\",\"user\":{\"first_name\":\"smoke\",\"last_name\":\"test\",\"email\":\"$MB_USER\",\"password\":\"$MB_PASS\",\"site_name\":\"odctl\"},\"prefs\":{\"site_name\":\"odctl\",\"allow_tracking\":false}}" \
+      >/dev/null 2>&1
+  fi
+  sid=$(curl -fsS -X POST http://127.0.0.1:3000/api/session -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$MB_USER\",\"password\":\"$MB_PASS\"}" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null)
+  [ -n "$sid" ] && printf '%s' "$sid"
+}
+
+# Create a database and run a query through it. Creating one returns 200 even
+# when the target is unreachable, so only a completed query proves the path.
+mb_query() {
+  local sid="$1" name="$2" engine="$3" details="$4" sql="$5" id res
+  # Reuse a database of this name if one exists, so a retry does not pile up
+  # duplicates against a Metabase whose state outlives the run.
+  id=$(curl -fsS http://127.0.0.1:3000/api/database -H "X-Metabase-Session: $sid" 2>/dev/null \
+    | MB_NAME="$name" python3 -c 'import json,os,sys
+d = json.load(sys.stdin)
+for db in (d.get("data") if isinstance(d, dict) else d) or []:
+    if db.get("name") == os.environ["MB_NAME"]:
+        print(db["id"]); break' 2>/dev/null)
+  if [ -z "$id" ]; then
+    id=$(curl -fsS -X POST http://127.0.0.1:3000/api/database -H "X-Metabase-Session: $sid" \
+      -H 'Content-Type: application/json' \
+      -d "{\"name\":\"$name\",\"engine\":\"$engine\",\"details\":$details}" 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null)
+  fi
+  [ -n "$id" ] || return 1
+  res=$(curl -fsS -X POST http://127.0.0.1:3000/api/dataset -H "X-Metabase-Session: $sid" \
+    -H 'Content-Type: application/json' \
+    -d "{\"database\":$id,\"type\":\"native\",\"native\":{\"query\":\"$sql\"}}" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null)
+  [ "$res" = "completed" ]
+}
+
+smoke_metabase() {
+  local sid
+  retry 60 5 http_ok "http://127.0.0.1:3000/api/health" || fail "no HTTP response from :3000"
+  sid=$(retry_out 12 5 mb_session) || fail "could not obtain a Metabase session"
+
+  # Postgres always: it is Metabase's own application database, so this proves
+  # the network path before any analytics engine is involved.
+  retry 12 5 mb_query "$sid" pg-smoke postgres \
+    '{"host":"postgres","port":5432,"dbname":"metabase","user":"'"${POSTGRES_USER:-user}"'","password":"'"${POSTGRES_PASSWORD:-password}"'"}' \
+    'SELECT 1 AS one' || fail "postgres query did not complete"
+  pass "queried postgres"
+
+  # ch-11 is in both ch-lite and ch-full, so one connection covers either.
+  if docker ps --format '{{.Names}}' | grep -q '^ch-11$'; then
+    retry 12 5 mb_query "$sid" ch-smoke clickhouse \
+      '{"host":"ch-11","port":8123,"user":"default","password":"password","dbname":"default","ssl":false}' \
+      'SELECT 1 AS one' || fail "clickhouse query did not complete"
+    pass "queried clickhouse through ch-11"
+  fi
+
+  # starburst is the bundled driver, and it does speak to open-source Trino.
+  # A catalog is required, and postgres is one of the five already defined.
+  if docker ps --format '{{.Names}}' | grep -q '^trino$'; then
+    retry 12 5 mb_query "$sid" trino-smoke starburst \
+      '{"host":"trino","port":8080,"catalog":"postgres","schema":"public","user":"admin","ssl":false}' \
+      'SELECT 1 AS one' || fail "trino query did not complete"
+    pass "queried trino through the starburst driver"
+  fi
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -188,7 +276,7 @@ case "$PROFILE" in
   ch-full)               smoke_ch_full ;;
   trino)                 smoke_trino ;;
   postgres|storage|catalog|valkey) smoke_infra ;;
-  metabase)   smoke_http_only "http://127.0.0.1:3000/api/health" ;;
+  metabase)   smoke_metabase ;;
   airflow)    smoke_http_only "http://127.0.0.1:8085/api/v2/monitor/health" ;;
   mlflow)     smoke_http_only "http://127.0.0.1:5000/health" ;;
   ray-serve)  smoke_http_only "http://127.0.0.1:8265" ;;
