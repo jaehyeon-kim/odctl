@@ -25,7 +25,6 @@ jobs:
           - "trino"
           - "metabase"
           - "mlflow"
-          - "ray-serve"
           - "lineage"
           - "telemetry"
           - "metadata"

@@ -40,7 +40,7 @@
                 <mxCell id="c_mlops" value="&lt;b style=&quot;font-size:16px;&quot;&gt;MLOps&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">
                     <mxGeometry x="720" y="250" width="280" height="120" as="geometry"/>
                 </mxCell>
-                <mxCell id="mlops" value="&lt;b&gt;mlops&lt;/b&gt;&lt;br&gt;MLflow, Ray Serve" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
+                <mxCell id="mlops" value="&lt;b&gt;mlops&lt;/b&gt;&lt;br&gt;MLflow Tracking &amp;amp; Model Serving" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontFamily=Comic Sans MS;" parent="1" vertex="1">
                     <mxGeometry x="740" y="295" width="240" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="c_metadata" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Metadata&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;spacingTop=15;fontFamily=Comic Sans MS;" parent="1" vertex="1">

@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     'clickhouse-connect' \
     'psycopg2-binary' \
     'valkey' \
-    'mlflow~=3.12.0' \
+    'mlflow~=3.16.0' \
     'boto3'
 
 # Pre-create the event log directory owned by the spark user. A named volume

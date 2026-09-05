@@ -230,25 +230,23 @@ stacks:
 
   mlops:
     file: "compose-mlops.yml"
-    description: "Machine learning model registry and real-time inference serving."
-    profiles: ["mlflow", "ray-serve"]
+    description: "Machine learning experiment tracking, model registry, and model serving."
+    profiles: ["mlflow", "mlflow-serve"]
     capacities: ["mlops"]
     depends_on:
       mlflow: ["deps", "postgres", "storage"]
-      ray-serve: ["deps", "postgres", "storage"]
-    role: "Manages the ML lifecycle: model registry (MLflow) and real-time scalable inference (Ray Serve)."
+      mlflow-serve: ["mlflow"]
+    role: "Manages the ML lifecycle: experiment tracking, the model registry, and scoring a registered model over HTTP (MLflow)."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
           * External (Localhost): http://localhost:5000
           * Internal (Docker): http://mlflow:5000
-      ray-serve: |
-        • Ray Serve Inference API Proxy:
-          * External (Localhost): http://localhost:8000
-          * Internal (Docker): http://ray-serve:8000
-        • Ray Cluster Dashboard:
-          * External (Localhost): http://localhost:8265
-          * Internal (Docker): http://ray-serve:8265
+      mlflow-serve: |
+        • MLflow Model Scoring Server (set MODEL_URI in .env before starting):
+          * External (Localhost): http://localhost:5003/invocations
+          * Internal (Docker): http://mlflow-serve:5003/invocations
+        • Liveness: http://localhost:5003/ping and http://localhost:5003/health
 
   obsv:
     file: "compose-obsv.yml"
