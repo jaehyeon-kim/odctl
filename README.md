@@ -25,7 +25,7 @@ The stack is organized into distinct profiles that can be launched independently
   - **Stack:** ClickHouse, Trino, Metabase
 - **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation.
   - **Stack:** Apache Airflow
-- **MLOps:** Machine learning experiment tracking and model registry.
+- **MLOps:** Machine learning experiment tracking, model registry, and HTTP model serving.
   - **Stack:** MLflow
 - **Metadata:** Centralized data catalog, data discovery, and enterprise governance.
   - **Stack:** OpenMetadata

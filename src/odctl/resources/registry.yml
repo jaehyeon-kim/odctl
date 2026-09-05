@@ -230,17 +230,23 @@ stacks:
 
   mlops:
     file: "compose-mlops.yml"
-    description: "Machine learning experiment tracking and model registry."
-    profiles: ["mlflow"]
+    description: "Machine learning experiment tracking, model registry, and model serving."
+    profiles: ["mlflow", "mlflow-serve"]
     capacities: ["mlops"]
     depends_on:
       mlflow: ["deps", "postgres", "storage"]
-    role: "Manages the ML lifecycle: experiment tracking and the model registry (MLflow)."
+      mlflow-serve: ["mlflow"]
+    role: "Manages the ML lifecycle: experiment tracking, the model registry, and scoring a registered model over HTTP (MLflow)."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
           * External (Localhost): http://localhost:5000
           * Internal (Docker): http://mlflow:5000
+      mlflow-serve: |
+        • MLflow Model Scoring Server (set MODEL_URI in .env before starting):
+          * External (Localhost): http://localhost:5003/invocations
+          * Internal (Docker): http://mlflow-serve:5003/invocations
+        • Liveness: http://localhost:5003/ping and http://localhost:5003/health
 
   obsv:
     file: "compose-obsv.yml"

@@ -288,6 +288,59 @@ if "smoke.txt" not in names:
     sys.exit(f"artifact not listed back: {names}")
 PYEOF
   pass "logged a run with a proxied artifact and read it back"
+  smoke_model_server "$run_id"
+}
+
+# The mlflow-serve profile is asserted here rather than as its own e2e matrix
+# entry. The runner starts a profile before calling this script, and an empty
+# MODEL_URI stops that container by design, so a standalone entry could only
+# ever fail. A model has to exist first, which makes this the profile that can
+# create one.
+smoke_model_server() {
+  local run_id="$1" name="odctl-smoke-$1"
+  docker exec -i -e SMOKE_MODEL_NAME="$name" -e GIT_PYTHON_REFRESH=quiet -e MLFLOW_LOGGING_LEVEL=ERROR \
+    mlflow python - <<'PYEOF' || fail "could not register a model to serve"
+import mlflow, numpy as np, os, xgboost as xgb
+from mlflow import MlflowClient
+mlflow.set_tracking_uri("http://localhost:5000")
+name = os.environ["SMOKE_MODEL_NAME"]
+mlflow.set_experiment(name)
+X, y = np.array([[0.0], [1.0], [2.0], [3.0]]), np.array([0, 0, 1, 1])
+with mlflow.start_run():
+    model = xgb.XGBClassifier(n_estimators=5, max_depth=2).fit(X, y)
+    mlflow.xgboost.log_model(model, name="model", registered_model_name=name)
+c = MlflowClient()
+v = max(int(mv.version) for mv in c.search_model_versions(f"name='{name}'"))
+c.set_registered_model_alias(name, "champion", v)
+PYEOF
+
+  [ -f .odctl/.env ] || fail "no .odctl/.env to set MODEL_URI in"
+  # A fresh line rather than an edit in place, so this works whether or not the
+  # generated template still carries a MODEL_URI key.
+  sed -i'' -e '/^MODEL_URI=/d' .odctl/.env
+  echo "MODEL_URI=\"models:/$name@champion\"" >> .odctl/.env
+
+  odctl up mlflow-serve >/dev/null 2>&1 || fail "mlflow-serve did not start for models:/$name@champion"
+  retry 30 5 http_ok "http://127.0.0.1:5003/ping" || fail "no HTTP response from :5003"
+
+  # Assert on the response body. The endpoint answers 200 with an error payload
+  # when scoring fails, so a status code alone proves nothing was served.
+  local got
+  got=$(curl -fsS --max-time 20 -X POST http://127.0.0.1:5003/invocations \
+    -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}' 2>/dev/null)
+  case "$got" in
+    *'"predictions"'*) pass "served models:/$name@champion and scored: $got" ;;
+    *) server_down; fail "/invocations returned no predictions: ${got:-<empty>}" ;;
+  esac
+  server_down
+}
+
+# Down by name, so tearing the mlflow profile down afterwards does not leave a
+# container behind that depends on it. Not `yes | odctl down`: this script runs
+# under pipefail, and odctl exits before `yes` does, so the pipeline reports
+# SIGPIPE as 141 and the whole smoke test fails after passing.
+server_down() {
+  printf 'y\n' | odctl down mlflow-serve >/dev/null 2>&1 || true
 }
 
 # A profile with no functional assertion yet still has to expose its endpoint.
