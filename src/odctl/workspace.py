@@ -67,7 +67,15 @@ def init_workspace(force: bool = False):
             f.write('_AIRFLOW_PIP_DEPS=""\n\n')
 
             f.write("# MLOps Additional Dependencies\n")
-            f.write('# _MLOPS_PIP_DEPS="river nltk"\n')
-            f.write('_MLOPS_PIP_DEPS=""\n')
+            f.write('# _MLOPS_PIP_DEPS="pyod river"\n')
+            f.write('_MLOPS_PIP_DEPS=""\n\n')
+
+            # Left empty on purpose. The mlflow-serve profile has nothing to
+            # serve until a model is logged, so an empty value stops that one
+            # container instead of serving something unintended.
+            f.write("# MLflow Model Server target: models:/<name>@<alias>,\n")
+            f.write("# runs:/<run-id>/<artifact-path>, or an s3:// path\n")
+            f.write('# MODEL_URI="models:/my-model@champion"\n')
+            f.write('MODEL_URI=""\n')
 
         print(f"  └─ Generated: .env (TAG={cli_version})")
