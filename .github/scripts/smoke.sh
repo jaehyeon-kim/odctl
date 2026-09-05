@@ -260,6 +260,36 @@ smoke_metabase() {
   fi
 }
 
+# MLflow: the health endpoint answers long before artifact logging works, and
+# artifacts are the part that breaks. A client uploads to the artifact store
+# directly unless the server proxies, and s3://mlflow resolves only inside the
+# odctl network, so a run that logs params but no artifact is the failure this
+# asserts against.
+smoke_mlflow() {
+  local run_id="$$"
+  retry 60 5 http_ok "http://127.0.0.1:5000/health" || fail "no HTTP response from :5000"
+  docker exec -i -e SMOKE_RUN_ID="$run_id" -e GIT_PYTHON_REFRESH=quiet -e MLFLOW_LOGGING_LEVEL=ERROR mlflow python - <<'PYEOF' || fail "could not log a run with a proxied artifact"
+import mlflow, os, pathlib, sys
+mlflow.set_tracking_uri("http://localhost:5000")
+mlflow.set_experiment(f"odctl-smoke-{os.environ['SMOKE_RUN_ID']}")
+p = pathlib.Path("/tmp/smoke.txt")
+p.write_text("odctl smoke")
+with mlflow.start_run() as run:
+    mlflow.log_param("k", "v")
+    mlflow.log_metric("m", 1.0)
+    mlflow.log_artifact(str(p))
+    uri = mlflow.get_run(run.info.run_id).info.artifact_uri
+# Proxied artifacts get an mlflow-artifacts:/ URI. An s3:// URI means the
+# server handed the client a location only reachable inside the network.
+if not uri.startswith("mlflow-artifacts:"):
+    sys.exit(f"artifact_uri is {uri}, expected mlflow-artifacts:/")
+names = [f.path for f in mlflow.MlflowClient().list_artifacts(run.info.run_id)]
+if "smoke.txt" not in names:
+    sys.exit(f"artifact not listed back: {names}")
+PYEOF
+  pass "logged a run with a proxied artifact and read it back"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -278,8 +308,7 @@ case "$PROFILE" in
   postgres|storage|catalog|valkey) smoke_infra ;;
   metabase)   smoke_metabase ;;
   airflow)    smoke_http_only "http://127.0.0.1:8085/api/v2/monitor/health" ;;
-  mlflow)     smoke_http_only "http://127.0.0.1:5000/health" ;;
-  ray-serve)  smoke_http_only "http://127.0.0.1:8265" ;;
+  mlflow)     smoke_mlflow ;;
   lineage)    smoke_http_only "http://127.0.0.1:5002/api/v1/namespaces" ;;
   telemetry)  smoke_http_only "http://127.0.0.1:19090/-/ready" ;;
   metadata)   smoke_http_only "http://127.0.0.1:8585/api/v1/system/version" ;;

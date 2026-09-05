@@ -16,9 +16,9 @@ services:
   # MLflow: Experiment Tracking & Model Registry
   # ==========================================
   mlflow:
-    image: ghcr.io/jaehyeon-kim/odctl/ray-mlops:${TAG:-latest}
+    image: ghcr.io/mlflow/mlflow:v3.16.0-full
     container_name: mlflow
-    profiles: ["mlflow", "ray-serve"]
+    profiles: ["mlflow"]
     networks:
       - odctl
     ports:
@@ -28,45 +28,10 @@ services:
     command: >
       mlflow server
       --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
-      --default-artifact-root s3://mlflow
+      --artifacts-destination s3://mlflow
+      --serve-artifacts
       --host 0.0.0.0
       --port 5000
-
-  # ==========================================
-  # Ray Serve: Real-time ML Inference Engine
-  # ==========================================
-  ray-serve:
-    image: ghcr.io/jaehyeon-kim/odctl/ray-mlops:${TAG:-latest}
-    container_name: ray-serve
-    profiles: ["ray-serve"]
-    networks:
-      - odctl
-    ports:
-      - "8000:8000"
-      - "8265:8265"
-    environment:
-      <<: *mlops-env
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      ICEBERG_CATALOG_URI: http://catalog:8181
-      KAFKA_BOOTSTRAP_SERVERS: broker-1:19092,broker-2:19093,broker-3:19094
-      # Database/Cache Authentication
-      CLICKHOUSE_HOST: clickhouse-11
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-user}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
-      VALKEY_HOST: valkey
-      VALKEY_USER: ${VALKEY_USER:-user}
-      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-password}
-      POSTGRES_HOST: postgres
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-vector} # DB where vector extension is installed
-
-    volumes:
-      - ./mlops/serving:/home/ray/app
-    working_dir: /home/ray/app
-    command: ray start --head --port=6379 --dashboard-host=0.0.0.0 --block
-    depends_on:
-      - mlflow
 
 networks:
   odctl:

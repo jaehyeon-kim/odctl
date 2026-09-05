@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, spark, ray-mlops]
+        component: [airflow, spark]
         platform:
           - os: ubuntu-latest
             arch: linux/amd64
@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, spark, ray-mlops]
+        component: [airflow, spark]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
