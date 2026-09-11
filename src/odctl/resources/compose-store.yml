@@ -76,6 +76,11 @@ services:
       - "on"
       - ">password"
       - "~*"
+      # Channels are a separate permission class from keys. Without this, Valkey
+      # applies its default of resetchannels, so PUBLISH and SUBSCRIBE are refused
+      # with NOPERM while every key operation still works, which makes the account
+      # look healthy until something tries Pub/Sub.
+      - "&*"
       - "+@all"
       # Persistence.
       - --appendonly
