@@ -274,3 +274,23 @@ def test_every_named_selection_yields_a_valid_project():
         "a named selection would produce an invalid compose project:\n"
         + "\n".join(violations)
     )
+
+
+def test_valkey_user_can_use_pubsub_channels():
+    """Channels are a separate ACL class from keys, and Valkey defaults to
+    resetchannels. Without an explicit channel grant, PUBLISH and SUBSCRIBE return
+    NOPERM while every key operation still works, so the account looks healthy and
+    only Pub/Sub clients fail. Verified against the image: with `~* +@all` alone,
+    ACL LIST reports resetchannels and PUBLISH returns
+    "NOPERM No permissions to access a channel".
+    """
+    compose = yaml.safe_load(
+        (get_internal_resources_dir() / "compose-store.yml").read_text()
+    )
+    command = compose["services"]["valkey"]["command"]
+
+    assert "~*" in command, "the valkey user should have access to all keys"
+    assert "&*" in command, (
+        "the valkey user needs an explicit channel grant, because +@all grants "
+        "commands and ~* grants keys, and neither grants channels"
+    )
