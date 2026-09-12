@@ -162,7 +162,7 @@ services:
   # [PROFILE: metabase] BI & Dashboarding
   # ==========================================
   metabase:
-    image: metabase/metabase:v0.63.16.6
+    image: metabase/metabase:v0.63.17.2
     container_name: metabase
     profiles:
       - metabase
