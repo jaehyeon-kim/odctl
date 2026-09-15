@@ -60,6 +60,9 @@ services:
   airflow-sync:
     image: amazon/aws-cli:2.36.14
     container_name: airflow-sync
+    # The only path DAGs take from s3://airflow into the containers. Without
+    # this, one exit leaves Airflow healthy while DAG changes stop arriving.
+    restart: unless-stopped
     profiles:
       - airflow
     networks:

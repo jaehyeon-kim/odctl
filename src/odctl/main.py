@@ -282,6 +282,11 @@ def up(
 
     Resolves dependencies for the requested profiles and brings up the required
     Docker Compose stacks in the correct topological order.
+
+    Refuses to start if the images for the resolved TAG are not published,
+    naming the tag rather than leaving Docker to report a missing manifest.
+    Warns about any service whose declared profile belongs to another compose
+    file, since the planner will never start it.
     """
     if not dry_run and not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -539,6 +544,7 @@ def ps(
 
 @app.command(name="info", rich_help_panel="Inspection & Info")
 def info():
+    """Show the installed odctl version, its workspace and the images it uses."""
     ui.print_package_info()
 
 

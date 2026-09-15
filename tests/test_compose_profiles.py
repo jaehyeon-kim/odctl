@@ -294,3 +294,263 @@ def test_valkey_user_can_use_pubsub_channels():
         "the valkey user needs an explicit channel grant, because +@all grants "
         "commands and ~* grants keys, and neither grants channels"
     )
+
+
+class TestConfigHostnamesResolve:
+    """
+    A config that names a host no container provides fails at runtime, silently
+    and long after startup. Three faults of exactly this shape were found in
+    September 2026: prometheus scraped clickhouse-11 to clickhouse-22 where the
+    containers are ch-11 to ch-22, fluss pointed at clickhouse-keeper where the
+    service is ch-keeper, and a Trino catalog once named clickhouse-11, which
+    was the 0.2.0 regression. None needs a container to catch.
+    """
+
+    # Any scheme, not just http, because a Trino catalog names its host inside a
+    # JDBC URL: jdbc:clickhouse://ch-11:8123. That is the shape of the 0.2.0
+    # regression, so missing it would defeat the purpose.
+    #
+    # A port is two to five digits not followed by another digit, a dot or a
+    # dash, so an image tag like flink:2.1-java17 is not read as a host.
+    HOST_PORT = r"(?:://|@|[\s=\"']|^)([a-z][a-z0-9.-]*):\d{2,5}(?![\d.\-])"
+
+    @staticmethod
+    def _resources():
+        from pathlib import Path
+
+        import odctl.config as config
+
+        return Path(config.__file__).parent / "resources"
+
+    @classmethod
+    def _valid_hosts(cls) -> set:
+        """Service names, container names and network aliases across all files."""
+        import yaml
+
+        names = set()
+        for path in cls._resources().glob("compose-*.yml"):
+            compose = yaml.safe_load(path.read_text()) or {}
+            for svc_name, svc in (compose.get("services") or {}).items():
+                names.add(svc_name)
+                if not isinstance(svc, dict):
+                    continue
+                if svc.get("container_name"):
+                    names.add(svc["container_name"])
+                networks = svc.get("networks")
+                if isinstance(networks, dict):
+                    for net in networks.values():
+                        if isinstance(net, dict):
+                            names.update(net.get("aliases") or [])
+        return names
+
+    @classmethod
+    def _mounted_configs(cls) -> list:
+        """Files a compose service bind-mounts from the resources directory."""
+        import yaml
+
+        root = cls._resources()
+        found = []
+        for path in root.glob("compose-*.yml"):
+            compose = yaml.safe_load(path.read_text()) or {}
+            for svc in (compose.get("services") or {}).values():
+                if not isinstance(svc, dict):
+                    continue
+                for volume in svc.get("volumes") or []:
+                    if not isinstance(volume, str) or not volume.startswith("./"):
+                        continue
+                    target = root / volume.split(":")[0][2:]
+                    if target.is_file():
+                        found.append(target)
+                    elif target.is_dir():
+                        found.extend(p for p in target.rglob("*") if p.is_file())
+        return sorted(set(found))
+
+    def test_every_host_port_in_a_mounted_config_resolves(self):
+        import re
+
+        root = self._resources()
+        valid = self._valid_hosts()
+        # Addresses that are deliberately not a container on the odctl network.
+        allowed = {
+            "localhost",
+            "0.0.0.0",
+            "127.0.0.1",
+            "host.minikube.internal",
+            "host.docker.internal",
+        }
+
+        unknown = []
+        for path in self._mounted_configs():
+            try:
+                text = path.read_text()
+            except (UnicodeDecodeError, OSError):
+                continue
+            for host in set(re.findall(self.HOST_PORT, text, re.M)):
+                if host in allowed or host in valid or "." in host:
+                    continue
+                unknown.append(f"{path.relative_to(root)} names {host}")
+        assert not unknown, "config names hosts no container provides: " + "; ".join(
+            sorted(unknown)
+        )
+
+    def test_every_host_in_a_compose_environment_resolves(self):
+        import re
+
+        import yaml
+
+        root = self._resources()
+        valid = self._valid_hosts()
+        allowed = {"localhost", "0.0.0.0", "127.0.0.1", "host.minikube.internal"}
+
+        unknown = []
+        for path in root.glob("compose-*.yml"):
+            compose = yaml.safe_load(path.read_text()) or {}
+            for svc_name, svc in (compose.get("services") or {}).items():
+                if not isinstance(svc, dict):
+                    continue
+                blob = yaml.dump(
+                    {
+                        k: v
+                        for k, v in svc.items()
+                        if k in ("environment", "command", "healthcheck")
+                    }
+                )
+                for host in set(re.findall(self.HOST_PORT, blob, re.M)):
+                    if host in allowed or host in valid or "." in host:
+                        continue
+                    unknown.append(f"{path.name}:{svc_name} names {host}")
+        assert not unknown, "compose names hosts no container provides: " + "; ".join(
+            sorted(unknown)
+        )
+
+    def test_every_host_style_env_var_resolves(self):
+        """
+        Many services name a peer without a port, as DB_HOST or
+        ELASTICSEARCH_HOST, so the host:port pattern cannot see them. A typo
+        there fails exactly like a wrong scrape target, and just as quietly.
+        """
+        import re
+
+        import yaml
+
+        valid = self._valid_hosts()
+        # Bind addresses and values that are not a peer at all.
+        allowed = {"0.0.0.0", "::", "localhost", "127.0.0.1", "host.minikube.internal"}
+        keys = re.compile(r"(_HOST|_HOSTNAME|_ADDR|_ADDRESS|_SERVER|_NODES?)$")
+
+        unknown = []
+        for path in self._resources().glob("compose-*.yml"):
+            compose = yaml.safe_load(path.read_text()) or {}
+            for svc_name, svc in (compose.get("services") or {}).items():
+                if not isinstance(svc, dict):
+                    continue
+                env = svc.get("environment")
+                if not isinstance(env, dict):
+                    continue
+                for key, value in env.items():
+                    if not isinstance(value, str) or not keys.search(key):
+                        continue
+                    # Skip anything with a port, a variable, or a scheme: the
+                    # other two tests cover those.
+                    if ":" in value or "$" in value or "/" in value or not value:
+                        continue
+                    if value in allowed or value in valid or "." in value:
+                        continue
+                    unknown.append(f"{path.name}:{svc_name} {key}={value}")
+        assert not unknown, "env var names a host no container provides: " + "; ".join(
+            sorted(unknown)
+        )
+
+
+class TestComposeShape:
+    """
+    Two mistakes that compose accepts silently. Both were found by hand in
+    September 2026 and neither is visible without looking for it.
+    """
+
+    @staticmethod
+    def _compose_files():
+        from pathlib import Path
+
+        import odctl.config as config
+
+        return sorted(
+            (Path(config.__file__).parent / "resources").glob("compose-*.yml")
+        )
+
+    def test_mem_limit_is_never_nested_where_compose_ignores_it(self):
+        """
+        mem_limit is a service-level key. Nested under environment it parses,
+        applies nothing, and the container runs uncapped. compose-metadata.yml
+        shipped that way and openmetadata-ingestion had no limit at all.
+        """
+        import yaml
+
+        misplaced = []
+        for path in self._compose_files():
+            services = (yaml.safe_load(path.read_text()) or {}).get("services") or {}
+
+            def walk(node, trail):
+                if isinstance(node, dict):
+                    for key, value in node.items():
+                        if key == "mem_limit" and len(trail) > 1:
+                            misplaced.append(f"{path.name}: {'.'.join(trail)}.{key}")
+                        walk(value, trail + [str(key)])
+                elif isinstance(node, list):
+                    for index, value in enumerate(node):
+                        walk(value, trail + [str(index)])
+
+            walk(services, [])
+        assert not misplaced, "mem_limit nested where compose ignores it: " + "; ".join(
+            misplaced
+        )
+
+    def test_no_image_uses_a_floating_tag(self):
+        """
+        A floating tag changes the stack with no commit and no dashboard entry,
+        so a break has no diff to blame. ch-shard2-stub shipped on alpine:latest.
+        """
+        import yaml
+
+        floating = []
+        for path in self._compose_files():
+            services = (yaml.safe_load(path.read_text()) or {}).get("services") or {}
+            for name, svc in services.items():
+                if not isinstance(svc, dict):
+                    continue
+                image = svc.get("image")
+                if not isinstance(image, str) or "${" in image:
+                    continue
+                tag = image.split("/")[-1]
+                if image.endswith(":latest") or ":" not in tag:
+                    floating.append(f"{path.name}:{name} -> {image}")
+        assert not floating, "image uses a floating tag: " + "; ".join(floating)
+
+    def test_every_env_var_the_cli_writes_is_read_by_a_compose_file(self):
+        """
+        init_workspace writes variables into .odctl/.env for users to set.
+        compose-orch.yml read _PIP_ADDITIONAL_REQUIREMENTS while the CLI wrote
+        _AIRFLOW_PIP_DEPS, so setting Airflow extra packages installed nothing
+        and nothing said so.
+        """
+        import re
+        from pathlib import Path
+
+        import odctl.workspace as workspace
+
+        source = Path(workspace.__file__).read_text()
+        written = set(re.findall(r"""f\.write\(.?['"](_?[A-Z][A-Z0-9_]*)=""", source))
+        written |= set(re.findall(r"# (_[A-Z][A-Z0-9_]*)=", source))
+        written -= {"TZ"}  # read by service images directly, not by compose.
+
+        referenced = set()
+        for path in self._compose_files():
+            referenced.update(
+                re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", path.read_text())
+            )
+
+        orphans = sorted(written - referenced)
+        assert not orphans, (
+            "the CLI writes these into .env and no compose file reads them: "
+            + ", ".join(orphans)
+        )
