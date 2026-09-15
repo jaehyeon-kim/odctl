@@ -53,7 +53,7 @@ services:
   # [PROFILE: telemetry] Prometheus
   # ==========================================
   prometheus:
-    image: prom/prometheus:v3
+    image: prom/prometheus:v3.14.0
     container_name: prometheus
     profiles:
       - telemetry
@@ -74,7 +74,7 @@ services:
   # [PROFILE: telemetry] Alertmanager
   # ==========================================
   alertmanager:
-    image: prom/alertmanager:v0
+    image: prom/alertmanager:v0.34.0
     container_name: alertmanager
     profiles:
       - telemetry
