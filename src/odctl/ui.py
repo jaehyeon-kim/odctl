@@ -226,6 +226,35 @@ def print_dry_run(execution_plan: Dict[str, List[str]], is_teardown: bool = Fals
                 console.print(f"  └─ 🚀 Profile: [bold green]{p}[/bold green]")
 
 
+def format_docker_error(exc: Exception, max_lines: int = 10) -> str:
+    """
+    Reduce a python_on_whales DockerException to the part worth reading.
+
+    str() on one of these returns four lines of boilerplate that name the full
+    command and then say the output "can be found above the stacktrace (it
+    wasn't captured)". That is accurate but useless: compose runs with
+    capture_stderr=False, so Docker has already printed the real error to the
+    terminal, and repeating that it is missing buries it.
+
+    Args:
+        exc (Exception): The exception raised by a compose call.
+        max_lines (int, optional): How many trailing stderr lines to keep. Defaults to 10.
+
+    Returns:
+        str: The captured stderr if there is any, otherwise the exit code alone.
+    """
+    stderr = getattr(exc, "stderr", None)
+    if stderr:
+        lines = [ln for ln in stderr.strip().splitlines() if ln.strip()]
+        return "\n".join(lines[-max_lines:])
+
+    code = getattr(exc, "return_code", None)
+    if code is not None:
+        return f"docker compose exited with code {code}. Its output is above."
+
+    return str(exc)
+
+
 def print_error(message: str, details: Optional[str] = None, show_tip: bool = False):
     """
     Print a standardized error message to the console.
@@ -240,10 +269,12 @@ def print_error(message: str, details: Optional[str] = None, show_tip: bool = Fa
         console.print(f"[red]Details:[/red] {details}")
     if show_tip:
         console.print(
-            "\n[yellow]Tip:[/yellow] A container failed to reach a healthy state or crashed on startup."
+            "\n[yellow]Tip:[/yellow] Docker's own message is printed above this error."
         )
         console.print(
-            "Run [cyan]docker ps -a[/cyan] or check Docker Desktop to inspect the logs."
+            "A pull failure names the image and leaves no container behind. "
+            "For a container that started and then failed, "
+            "run [cyan]docker ps -a[/cyan] and [cyan]docker logs <name>[/cyan]."
         )
 
 
