@@ -47,7 +47,7 @@ x-airflow-common: &airflow-common
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
     AWS_DEFAULT_REGION: us-east-1
     # For quick experiments
-    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_AIRFLOW_PIP_DEPS:-}
   volumes:
     - airflow-dags:/opt/airflow/dags
     - airflow-plugins:/opt/airflow/plugins

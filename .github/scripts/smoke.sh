@@ -157,17 +157,57 @@ smoke_infra() {
     postgres)
       retry 30 5 docker exec postgres pg_isready -U user || fail "postgres never became ready"
       docker exec postgres psql -U user -d odctl -c "SELECT 1" >/dev/null 2>&1 || fail "psql query failed"
-      pass "accepting connections and running queries" ;;
+      pass "accepting connections and running queries"
+      # The image is pgvector/pgvector and 01-init-databases.sh creates the
+      # extension in a `vector` database. SELECT 1 on `odctl` proves neither, so
+      # retrieval work would fail at first use rather than here.
+      docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -q -c "
+        CREATE TABLE IF NOT EXISTS odctl_smoke (id bigserial primary key, embedding vector(3));
+        TRUNCATE odctl_smoke;
+        INSERT INTO odctl_smoke (embedding) VALUES ('[1,0,0]'), ('[0,1,0]'), ('[0.9,0.1,0]');
+        CREATE INDEX IF NOT EXISTS odctl_smoke_hnsw ON odctl_smoke USING hnsw (embedding vector_l2_ops);
+      " >/dev/null 2>&1 || fail "pgvector table, insert or HNSW index failed in the vector database"
+      local nearest
+      nearest=$(docker exec postgres psql -U user -d vector -tAc \
+        "SELECT id FROM odctl_smoke ORDER BY embedding <-> '[1,0,0]' LIMIT 1" 2>/dev/null | tr -d '[:space:]')
+      docker exec postgres psql -U user -d vector -q -c "DROP TABLE IF EXISTS odctl_smoke" >/dev/null 2>&1
+      [ "$nearest" = "1" ] || fail "pgvector similarity returned row '$nearest', expected 1"
+      pass "pgvector: vector column, HNSW index and similarity ordering all work" ;;
     storage)
       retry 30 5 http_reachable "http://127.0.0.1:8333" || fail "S3 API never answered"
-      pass "S3 API reachable" ;;
+      # A port that answers is not a bucket that stores anything. Spark, Flink,
+      # Iceberg and the airflow DAG sync all write here, so assert the round
+      # trip. Signed, because the S3 API refuses anonymous requests with 403,
+      # which also makes this a check on the credentials the whole stack uses.
+      local s3="http://localhost:8333/warehouse/odctl-smoke-$$.txt"
+      local sig='--aws-sigv4 aws:amz:us-east-1:s3 --user'
+      local cred="${AWS_ACCESS_KEY_ID:-user}:${AWS_SECRET_ACCESS_KEY:-password}"
+      docker exec seaweed sh -c "echo odctl-smoke > /tmp/odctl-smoke.txt" >/dev/null 2>&1
+      docker exec seaweed sh -c \
+        "curl -fsS $sig '$cred' -X PUT --data-binary @/tmp/odctl-smoke.txt '$s3'" \
+        >/dev/null 2>&1 || fail "could not write an object to $s3"
+      local body
+      body=$(docker exec seaweed sh -c "curl -fsS $sig '$cred' '$s3'" 2>/dev/null | tr -d '[:space:]')
+      docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE '$s3'" >/dev/null 2>&1 || true
+      [ "$body" = "odctl-smoke" ] || fail "read back '$body' from S3, expected odctl-smoke"
+      pass "signed write, read back and delete through the S3 API" ;;
     catalog)
       retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
       curl -fsS -X POST -H 'Content-Type: application/json' \
         -d '{"namespace":["smoke"]}' "http://127.0.0.1:8181/v1/namespaces" >/dev/null 2>&1
       curl -fsS "http://127.0.0.1:8181/v1/namespaces" 2>/dev/null | grep -q smoke \
         || fail "namespace create or list failed"
-      pass "namespace created and listed through the REST API" ;;
+      pass "namespace created and listed through the REST API"
+      # A namespace is metadata only. Creating a table exercises the JDBC
+      # catalog backend and the S3FileIO write that every engine depends on.
+      curl -fsS -X POST -H 'Content-Type: application/json' \
+        -d '{"name":"t","schema":{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","required":true,"type":"long"}]}}' \
+        "http://127.0.0.1:8181/v1/namespaces/smoke/tables" >/dev/null 2>&1 \
+        || fail "table create failed against the REST catalog"
+      curl -fsS "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" 2>/dev/null \
+        | grep -q 'metadata-location' || fail "table metadata did not read back"
+      curl -fsS -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" >/dev/null 2>&1 || true
+      pass "table created through the catalog and its metadata read back" ;;
     valkey)
       local vk="redis://user:password@localhost:6379"
       retry 30 5 docker exec valkey valkey-cli -u "$vk" ping \
@@ -343,6 +383,324 @@ server_down() {
   printf 'y\n' | odctl down mlflow-serve >/dev/null 2>&1 || true
 }
 
+# Airflow: a healthy api-server proves nothing. On Airflow 3 the profile shipped
+# for months with no dag-processor, so DAG files were never parsed, and then with
+# tasks that could not reach the Execution API and whose tokens were rejected.
+# Four containers were healthy through all of it. Only a DAG run reaching success
+# catches that, so this drives one the whole way: into s3://airflow, through the
+# sync, past the parser, to a task that actually executes.
+smoke_airflow() {
+  retry 60 5 http_ok "http://127.0.0.1:8085/api/v2/monitor/health" \
+    || fail "no HTTP response from :8085"
+
+  # Scheduler and dag_processor both, because a missing dag-processor is exactly
+  # the fault this exists to catch and the endpoint answers without it.
+  local health
+  health=$(curl -fsS --max-time 10 "http://127.0.0.1:8085/api/v2/monitor/health" 2>/dev/null)
+  printf '%s' "$health" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+bad = [p for p in ("metadatabase", "scheduler", "dag_processor")
+       if d.get(p, {}).get("status") != "healthy"]
+if bad:
+    sys.exit("unhealthy: " + ", ".join(bad))
+' || fail "airflow component unhealthy: $health"
+  pass "metadatabase, scheduler and dag_processor all healthy"
+
+  local dag_id="odctl_smoke_$$"
+  cat > /tmp/"$dag_id".py <<PYEOF
+from airflow.sdk import DAG
+from airflow.providers.standard.operators.bash import BashOperator
+import pendulum
+
+with DAG(
+    dag_id="$dag_id",
+    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
+    schedule=None,
+    catchup=False,
+):
+    BashOperator(task_id="say_hello", bash_command="echo odctl-smoke-ran")
+PYEOF
+
+  # s3://airflow owns the DAGs. airflow-sync copies them into the volume, so
+  # writing there rather than into the container tests the real path.
+  docker cp /tmp/"$dag_id".py airflow-sync:/tmp/dag.py >/dev/null 2>&1 \
+    || fail "could not stage the DAG into airflow-sync"
+  docker exec airflow-sync sh -c \
+    "aws --endpoint-url http://seaweed:8333 s3 cp /tmp/dag.py s3://airflow/dags/$dag_id.py" \
+    >/dev/null 2>&1 || fail "could not upload the DAG to s3://airflow/dags"
+
+  retry 24 5 docker exec airflow-scheduler test -f /opt/airflow/dags/"$dag_id".py \
+    || fail "airflow-sync never delivered the DAG into /opt/airflow/dags"
+  pass "airflow-sync delivered the DAG from s3://airflow"
+
+  # The dag-processor scans on its own interval, so this is the slow step.
+  retry 30 10 bash -c \
+    "docker exec airflow-scheduler airflow dags list 2>/dev/null | grep -q $dag_id" \
+    || fail "dag-processor never parsed the DAG, so it is not in the database"
+  pass "dag-processor parsed the DAG"
+
+  docker exec airflow-scheduler airflow dags unpause "$dag_id" >/dev/null 2>&1
+  docker exec airflow-scheduler airflow dags trigger "$dag_id" >/dev/null 2>&1 \
+    || fail "could not trigger the DAG"
+
+  local state=""
+  for _ in $(seq 1 30); do
+    state=$(docker exec airflow-scheduler airflow dags list-runs "$dag_id" -o plain 2>/dev/null \
+      | grep -E "^$dag_id" | head -1 | tr -s ' ' | cut -d' ' -f3)
+    case "$state" in success|failed) break ;; esac
+    sleep 10
+  done
+  [ "$state" = "success" ] || fail "DAG run finished in state ${state:-none}, not success"
+  pass "DAG run reached success, so a task really executed"
+
+  docker exec airflow-sync sh -c \
+    "aws --endpoint-url http://seaweed:8333 s3 rm s3://airflow/dags/$dag_id.py" >/dev/null 2>&1 || true
+  rm -f /tmp/"$dag_id".py
+}
+
+# deps is a one-shot copy into a shared volume, so there is no container to
+# probe afterwards. Every Flink and Spark profile mounts that volume read-only
+# and copies jars out of it, and `cp ... || true` there means a missing jar is
+# silent until a connector factory cannot be found at query time. Assert the
+# directories the consumers actually read.
+smoke_deps() {
+  local vol=odctl-shared-deps
+  docker volume inspect "$vol" >/dev/null 2>&1 || fail "$vol does not exist"
+
+  # Read through a throwaway container, because init-deps has already exited.
+  local listing
+  listing=$(docker run --rm -v "$vol":/d alpine sh -c 'ls /d' 2>/dev/null)
+  [ -n "$listing" ] || fail "$vol is empty, so init-deps copied nothing"
+
+  local missing=""
+  for dir in shared flink spark; do
+    printf '%s\n' "$listing" | grep -qx "$dir" || missing="$missing $dir"
+  done
+  [ -z "$missing" ] && pass "shared-deps holds:$(printf ' %s' $listing)" \
+    || fail "shared-deps is missing:$missing (has:$(printf ' %s' $listing))"
+
+  # A directory can exist and hold nothing, which is the same failure later.
+  local jars
+  jars=$(docker run --rm -v "$vol":/d alpine sh -c 'find /d -name "*.jar" | wc -l' 2>/dev/null | tr -d '[:space:]')
+  [ "${jars:-0}" -gt 0 ] || fail "no jars under $vol, so the Flink and Spark copies would be silent no-ops"
+  pass "$jars jars present for the Flink and Spark profiles to copy"
+}
+
+# Prometheus: /-/ready answers before the config is loaded, and a scrape config
+# an image bump moved looks identical from outside. The matrix runs telemetry on
+# its own, so the services it scrapes are absent and 8 of 9 targets are legitimately
+# down. Assert what holds alone: the config parsed into targets, the self-scrape
+# works, a query returns data, and alertmanager was discovered.
+smoke_telemetry() {
+  retry 60 5 http_ok "http://127.0.0.1:19090/-/ready" || fail "no HTTP response from :19090"
+
+  # The self-scrape target reports unknown until the first scrape completes,
+  # one scrape_interval after start, so this has to be retried.
+  retry 24 5 bash -c '
+    curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/targets?state=active" 2>/dev/null \
+      | python3 -c "
+import json, sys
+t = json.load(sys.stdin)[\"data\"][\"activeTargets\"]
+jobs = {x[\"labels\"].get(\"job\") for x in t}
+up = [x for x in t if x[\"labels\"].get(\"job\") == \"prometheus\" and x[\"health\"] == \"up\"]
+sys.exit(0 if (t and \"prometheus\" in jobs and up) else 1)
+"' || fail "prometheus never reported a loaded scrape config with its self-scrape up"
+  pass "scrape config loaded and the self-scrape target is up"
+
+  curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/query?query=up" 2>/dev/null \
+    | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+if d.get("status") != "success" or not d["data"]["result"]:
+    sys.exit("PromQL returned no series for up")
+' || fail "prometheus could not answer a PromQL query"
+  pass "PromQL query returned series"
+
+  retry 30 5 http_ok "http://127.0.0.1:19093/-/ready" || fail "alertmanager never became ready"
+  curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/alertmanagers" 2>/dev/null \
+    | grep -q activeAlertmanagers || fail "prometheus did not discover alertmanager"
+  pass "alertmanager ready and discovered by prometheus"
+}
+
+# Marquez: the namespaces endpoint answers on an empty database, so it proves
+# only that the service started. Lineage is the product, so post a real
+# OpenLineage event and read the dataset back out.
+smoke_lineage() {
+  retry 60 5 http_ok "http://127.0.0.1:5002/api/v1/namespaces" || fail "no HTTP response from :5002"
+
+  local ns="odctl-smoke" run_id="a1b2c3d4-0000-4000-8000-00000000$$"
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+
+  for event in START COMPLETE; do
+    curl -fsS -X POST "http://127.0.0.1:5002/api/v1/lineage" \
+      -H 'Content-Type: application/json' \
+      -d "{\"eventType\":\"$event\",\"eventTime\":\"$now\",
+           \"producer\":\"odctl-smoke\",
+           \"run\":{\"runId\":\"$run_id\"},
+           \"job\":{\"namespace\":\"$ns\",\"name\":\"smoke-job\"},
+           \"outputs\":[{\"namespace\":\"$ns\",\"name\":\"smoke-dataset\"}]}" \
+      >/dev/null 2>&1 || fail "Marquez rejected the $event OpenLineage event"
+  done
+  pass "posted START and COMPLETE OpenLineage events"
+
+  # Marquez writes the job, run and dataset from those events. Reading the
+  # dataset back proves it persisted them rather than accepting and dropping.
+  retry 12 5 bash -c \
+    "curl -fsS 'http://127.0.0.1:5002/api/v1/namespaces/$ns/datasets/smoke-dataset' | grep -q smoke-dataset" \
+    || fail "the dataset never appeared, so Marquez did not persist the lineage"
+  curl -fsS "http://127.0.0.1:5002/api/v1/namespaces/$ns/jobs/smoke-job" 2>/dev/null \
+    | grep -q smoke-job || fail "the job did not read back"
+  pass "dataset and job both read back from Marquez"
+}
+
+# Fluss: both containers ran while the cluster did nothing at all. The
+# coordinator pointed at a ZooKeeper hostname that did not exist, then at a
+# ClickHouse Keeper that rejects opcode 19 and dropped the session every eight
+# seconds. Neither port was ever open. Assert the cluster formed, not that the
+# processes are alive.
+smoke_fluss() {
+  for c in fluss-zookeeper fluss-coordinator fluss-tablet-1; do
+    local state
+    state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null) || fail "$c does not exist"
+    [ "$state" = "running" ] || fail "$c is $state, not running"
+  done
+  pass "zookeeper, coordinator and tablet server all running"
+
+  # bind.listeners binds the container hostname, so localhost is refused here.
+  for c in fluss-coordinator fluss-tablet-1; do
+    retry 24 5 docker exec "$c" bash -c "timeout 3 bash -c '</dev/tcp/$c/9123'" \
+      || fail "$c is not accepting connections on 9123"
+  done
+  pass "coordinator and tablet server both accept client connections"
+
+  # The registrations live in ZooKeeper, so this proves the cluster formed
+  # rather than that two processes opened a socket. Retried, because a port
+  # opens before the server has written its node.
+  retry 24 5 bash -c \
+    "docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids 2>/dev/null | grep -q '\[0'" \
+    || fail "no tablet server registered in ZooKeeper"
+  pass "tablet server 0 registered in ZooKeeper"
+
+  retry 24 5 bash -c \
+    "docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active 2>/dev/null | grep -q fluss-coordinator:9123" \
+    || fail "no active coordinator registered in ZooKeeper"
+  pass "coordinator registered itself as the active leader"
+}
+
+# OpenMetadata: the version endpoint answers through every failure the 2.0.1
+# upgrade could cause. The ingestion container runs its own Airflow 3, whose
+# health path moved to /api/v2/monitor/health, and a stale image or a failed
+# migration both leave a server that still reports a version. Drive the whole
+# path: migrate, login, a real ingestion, then the 2.0 features the upgrade was
+# for.
+smoke_metadata() {
+  retry 90 5 http_ok "http://127.0.0.1:8585/api/v1/system/version" \
+    || fail "no HTTP response from :8585"
+
+  local migrate
+  migrate=$(docker inspect -f '{{.State.ExitCode}}' openmetadata-migrate 2>/dev/null || echo NA)
+  [ "$migrate" = "0" ] || fail "openmetadata-migrate exited $migrate, so the schema is not migrated"
+  pass "schema migration completed"
+
+  # The principal domain odctl sets is open-data.local, not the upstream
+  # default. A wrong domain fails with a misleading invalid password error.
+  local token
+  token=$(curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+    -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \
+    "http://127.0.0.1:8585/api/v1/users/login" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])' 2>/dev/null)
+  [ -n "$token" ] || fail "admin@open-data.local could not log in"
+  pass "admin logged in and received a JWT"
+  local auth="Authorization: Bearer $token"
+
+  # Airflow 3 moved this path. The old /health returns 404 with a message saying so.
+  retry 60 5 http_ok "http://127.0.0.1:8087/api/v2/monitor/health" \
+    || fail "ingestion Airflow never answered on 8087"
+  docker exec openmetadata-server sh -c \
+    'wget -q -O- http://openmetadata-ingestion:8080/api/v2/monitor/health' >/dev/null 2>&1 \
+    || fail "the server cannot reach the ingestion container, so no pipeline can deploy"
+  pass "ingestion Airflow healthy and reachable from the server"
+
+  # A real ingestion. Postgres is already running, so it is its own source.
+  curl -fsS --max-time 60 -X DELETE -H "$auth" \
+    "http://127.0.0.1:8585/api/v1/services/databaseServices/name/odctl_smoke?hardDelete=true&recursive=true" \
+    >/dev/null 2>&1 || true
+  local svc
+  svc=$(curl -fsS --max-time 30 -X PUT -H "$auth" -H 'Content-Type: application/json' \
+    -d '{"name":"odctl_smoke","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}' \
+    "http://127.0.0.1:8585/api/v1/services/databaseServices" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)
+  [ -n "$svc" ] || fail "could not create a database service"
+
+  local pipe
+  pipe=$(curl -fsS --max-time 30 -X POST -H "$auth" -H 'Content-Type: application/json' \
+    -d "{\"name\":\"odctl_smoke_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"$svc\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}" \
+    "http://127.0.0.1:8585/api/v1/services/ingestionPipelines" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)
+  [ -n "$pipe" ] || fail "could not create an ingestion pipeline"
+
+  curl -fsS --max-time 90 -X POST -H "$auth" \
+    "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$pipe" 2>/dev/null \
+    | grep -q 'has been created' || fail "the pipeline did not deploy a DAG into Airflow"
+  pass "ingestion pipeline deployed a DAG"
+
+  # Airflow's dag_processor has to parse the new file before it can be triggered.
+  local triggered=no
+  for _ in $(seq 1 24); do
+    if curl -fsS --max-time 90 -X POST -H "$auth" \
+        "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$pipe" 2>/dev/null \
+        | grep -q 'has been triggered'; then triggered=yes; break; fi
+    sleep 5
+  done
+  [ "$triggered" = "yes" ] || fail "the pipeline never triggered"
+
+  local state=""
+  for _ in $(seq 1 30); do
+    state=$(curl -fsS --max-time 15 -H "$auth" \
+      "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/odctl_smoke.odctl_smoke_metadata?fields=pipelineStatuses" 2>/dev/null \
+      | python3 -c 'import json,sys; s=json.load(sys.stdin).get("pipelineStatuses") or []; print(s[0]["pipelineState"] if s else "")' 2>/dev/null)
+    case "$state" in success|failed|partialSuccess) break ;; esac
+    sleep 10
+  done
+  [ "$state" = "success" ] || fail "ingestion run finished in state ${state:-none}, not success"
+  pass "ingestion run reached success"
+
+  # Elasticsearch moved to 9.3.0 with this upgrade, so assert the catalogue is
+  # searchable rather than merely populated.
+  curl -fsS --max-time 60 -X POST -H "$auth" \
+    "http://127.0.0.1:8585/api/v1/apps/trigger/SearchIndexingApplication" >/dev/null 2>&1
+  local hits=0
+  for _ in $(seq 1 60); do
+    hits=$(curl -fsS --max-time 20 -H "$auth" \
+      'http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_search_index&size=1' 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["hits"]["total"]["value"])' 2>/dev/null || echo 0)
+    [ "${hits:-0}" -gt 100 ] && break
+    sleep 5
+  done
+  [ "${hits:-0}" -gt 100 ] || fail "only ${hits:-0} tables searchable in Elasticsearch"
+  pass "$hits tables ingested and searchable through Elasticsearch"
+
+  # The 2.0 features the upgrade was for. A 1.13 server has neither.
+  curl -fsS --max-time 15 -X POST "http://127.0.0.1:8585/mcp" -H "$auth" \
+    -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"odctl-smoke","version":"1"}}}' \
+    2>/dev/null | grep -q serverInfo || fail "the MCP server did not answer an initialize handshake"
+  pass "MCP server completed an initialize handshake"
+
+  for collection in contextCenter/pages contextCenter/memories; do
+    curl -fsS --max-time 10 -H "$auth" \
+      "http://127.0.0.1:8585/api/v1/$collection?limit=1" >/dev/null 2>&1 \
+      || fail "2.0 API /v1/$collection does not answer"
+  done
+  pass "Context Center pages and memories both answer"
+
+  curl -fsS --max-time 60 -X DELETE -H "$auth" \
+    "http://127.0.0.1:8585/api/v1/services/databaseServices/name/odctl_smoke?hardDelete=true&recursive=true" \
+    >/dev/null 2>&1 || true
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -358,26 +716,15 @@ case "$PROFILE" in
   ch-lite)               smoke_ch_lite ;;
   ch-full)               smoke_ch_full ;;
   trino)                 smoke_trino ;;
+  deps)       smoke_deps ;;
   postgres|storage|catalog|valkey) smoke_infra ;;
   metabase)   smoke_metabase ;;
-  airflow)    smoke_http_only "http://127.0.0.1:8085/api/v2/monitor/health" ;;
+  airflow)    smoke_airflow ;;
   mlflow)     smoke_mlflow ;;
-  lineage)    smoke_http_only "http://127.0.0.1:5002/api/v1/namespaces" ;;
-  telemetry)  smoke_http_only "http://127.0.0.1:19090/-/ready" ;;
-  metadata)   smoke_http_only "http://127.0.0.1:8585/api/v1/system/version" ;;
-  fluss)
-    retry 40 5 bash -c 'docker ps --format "{{.Names}}" | grep -q fluss-coordinator' \
-      || fail "coordinator container never appeared"
-    # Neither fluss service sets a restart policy, so RestartCount can never
-    # move and a crashed container simply exits. Assert the state directly, and
-    # do it for the tablet server too, which nothing checked before. No consumer
-    # drives Fluss yet, so staying up is the whole bar.
-    for c in fluss-coordinator fluss-tablet-1; do
-      state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null) \
-        || fail "$c does not exist"
-      [ "$state" = "running" ] || fail "$c is $state, not running"
-    done
-    pass "coordinator and tablet server both running" ;;
+  lineage)    smoke_lineage ;;
+  telemetry)  smoke_telemetry ;;
+  metadata)   smoke_metadata ;;
+  fluss)      smoke_fluss ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

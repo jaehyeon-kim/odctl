@@ -2,6 +2,13 @@ name: End-to-End Integration Tests
 
 on:
   workflow_call:
+    inputs:
+      profile_groups:
+        description: >-
+          JSON array of profile groups to run. The caller decides: every group
+          on a tag, and only the groups a change affects on a pull request.
+        required: true
+        type: string
 
 jobs:
   e2e:
@@ -12,27 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Profiles are grouped only where they share a large image, so the pull
-        # is amortised: the lite and full variants of Kafka, Flink, Spark and
-        # ClickHouse. Everything else runs alone, which keeps the failure signal
-        # per profile and shortens the critical path.
-        profile_group:
-          - "kafka-lite kafka-full"
-          - "flink-lite flink-full"
-          - "spark-lite spark-full"
-          - "ch-lite ch-full"
-          - "fluss"
-          - "trino"
-          - "metabase"
-          - "mlflow"
-          - "lineage"
-          - "telemetry"
-          - "metadata"
-          - "airflow"
-          - "postgres"
-          - "storage"
-          - "catalog"
-          - "valkey"
+        # Groups come from select-profiles.py, which pairs the lite and full
+        # variants that share a large image so the pull is paid for once.
+        profile_group: ${{ fromJSON(inputs.profile_groups) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
