@@ -1,11 +1,66 @@
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 import typer
+import yaml
 from rich.console import Console
 
+from odctl.config import get_compose_path
 from odctl.registry import load_registry
 
 console = Console()
+
+
+def find_unreachable_profiles() -> List[Tuple[str, str, str]]:
+    """
+    Find services whose declared profile belongs to a different compose file.
+
+    A profile resolves to exactly one file, the one the registry names for it.
+    A service elsewhere declaring that profile is never started, and nothing
+    else reports it. ch-keeper declared the fluss profile for months while
+    living in compose-analytics.yml, so fluss ran with no ZooKeeper.
+
+    Returns:
+        List[Tuple[str, str, str]]: One (file, service, profile) per unreachable
+        declaration, sorted.
+    """
+    registry = load_registry()
+    owner = {}
+    for config in registry.stacks.values():
+        for profile in config.profiles:
+            owner[profile] = config.file
+
+    unreachable = []
+    for config in registry.stacks.values():
+        path = get_compose_path(config.file)
+        if not path.exists():
+            continue
+        try:
+            with open(path, "r") as f:
+                compose = yaml.safe_load(f) or {}
+        except yaml.YAMLError:
+            continue
+
+        for svc_name, svc_data in (compose.get("services") or {}).items():
+            if not isinstance(svc_data, dict):
+                continue
+            for profile in svc_data.get("profiles") or []:
+                # An unknown profile is a different problem, caught by
+                # validate_profiles when someone asks for it by name.
+                if profile in owner and owner[profile] != config.file:
+                    unreachable.append((config.file, svc_name, profile))
+
+    return sorted(unreachable)
+
+
+def warn_unreachable_profiles() -> None:
+    """
+    Print a warning for every service whose declared profile is unreachable.
+    """
+    for file, service, profile in find_unreachable_profiles():
+        console.print(
+            f"[yellow]Warning:[/yellow] {file} service '{service}' declares profile "
+            f"'{profile}', which the registry maps to another file. It will never start."
+        )
 
 
 def get_profile_map() -> Dict[str, dict]:
