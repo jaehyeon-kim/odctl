@@ -5,7 +5,7 @@ services:
   # [PROFILE: metadata] Elasticsearch (OM Backend)
   # ==========================================
   openmetadata-es:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.19
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
     container_name: openmetadata-es
     profiles:
       - metadata
@@ -33,7 +33,7 @@ services:
   # [PROFILE: metadata] OpenMetadata DB Migration
   # ==========================================
   openmetadata-migrate:
-    image: &om-server-image docker.getcollate.io/openmetadata/server:1.13.3
+    image: &om-server-image docker.getcollate.io/openmetadata/server:2.0.1
     container_name: openmetadata-migrate
     command: "./bootstrap/openmetadata-ops.sh migrate"
     profiles:
@@ -75,7 +75,9 @@ services:
       - "8586:8586"
     mem_limit: 2g
     environment:
-      JAVA_OPTS: "-Xms1G -Xmx1500m"
+      # bin/openmetadata-server-start.sh reads OPENMETADATA_HEAP_OPTS and
+      # ignores JAVA_OPTS, so the old key left the image default of -Xmx1G in place.
+      OPENMETADATA_HEAP_OPTS: "-Xms1G -Xmx1500m"
       # Database
       DB_HOST: postgres
       DB_PORT: 5432
@@ -126,8 +128,13 @@ services:
   # [PROFILE: metadata] OpenMetadata Ingestion (Standard Image)
   # ==========================================
   openmetadata-ingestion:
-    image: docker.getcollate.io/openmetadata/ingestion:1.13.3
+    image: docker.getcollate.io/openmetadata/ingestion:2.0.1
     container_name: openmetadata-ingestion
+    # The 2.0 image sets no default CMD, so without these the entrypoint runs
+    # `airflow` with no subcommand and exits 2. This is what upstream's own
+    # compose file uses, and the script starts the scheduler and the API server.
+    entrypoint: /bin/bash
+    command: "/opt/airflow/ingestion_dependency.sh"
     profiles:
       - metadata
     networks:
@@ -148,8 +155,7 @@ services:
       AIRFLOW__LINEAGE__BACKEND: airflow_provider_openmetadata.lineage.backend.OpenMetadataLineageBackend
       AIRFLOW__LINEAGE__AIRFLOW_SERVICE_NAME: local_airflow
       AIRFLOW__LINEAGE__OPENMETADATA_API_ENDPOINT: http://openmetadata-server:8585/api
-      # Application Limit
-      mem_limit: 1500m
+    mem_limit: 1500m
     depends_on:
       openmetadata-server:
         condition: service_healthy
