@@ -25,7 +25,7 @@ services:
       - odctl
     ports:
       - "5000:5000"
-    mem_limit: 1g
+    mem_limit: 2500m
     environment:
       <<: *mlops-env
     healthcheck:
@@ -34,6 +34,10 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    # Each worker imports the ML runtimes in the mlops image, so memory is about
+    # 1.1G fixed plus 0.35G per worker: 1.46G at one, 1.81G at two and 2.58G at
+    # the default four. Two is enough for a local stack. A comment cannot live
+    # inside the folded block below, where it becomes an argument.
     command: >
       mlflow server
       --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
@@ -42,6 +46,7 @@ services:
       --host 0.0.0.0
       --port 5000
       --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000
+      --workers 2
 
   # ==========================================
   # MLflow Model Server: scores one registered model
