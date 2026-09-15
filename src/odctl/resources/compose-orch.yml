@@ -36,6 +36,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    # Down from the default 300, on top of the 30s airflow-sync interval.
+    AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "120"
+    # Tasks call the Execution API, which defaults to localhost:8080.
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution/"
+    # Must match across scheduler and api-server, or tasks get "Invalid auth token".
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-Ck3aVwEHhGHlzrBLKRcTJBOaTpMIbOBBKq7vDWQ5cNA=}
     # AWS Credentials for Iceberg/Boto3 tasks and Sidecar Sync
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
@@ -128,6 +134,17 @@ services:
     <<: *airflow-common
     container_name: airflow-triggerer
     command: triggerer
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Airflow 3 parses DAG files here, not in the scheduler. Without it
+  # `airflow dags list` stays empty while every container reports healthy.
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow-dag-processor
+    command: dag-processor
     restart: unless-stopped
     depends_on:
       airflow-init:

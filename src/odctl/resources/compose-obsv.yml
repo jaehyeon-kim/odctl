@@ -27,6 +27,14 @@ services:
     volumes:
       - ./marquez/marquez.yml:/usr/src/app/marquez.yml
     command: ["server", "/usr/src/app/marquez.yml"]
+    # Admin port, and it checks Postgres too, so marquez-web waits for a
+    # Marquez that can actually serve rather than one that has just started.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5001/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   # ==========================================
   # [PROFILE: lineage] Marquez Web UI
@@ -46,14 +54,15 @@ services:
       MARQUEZ_PORT: 5000
       WEB_PORT: 3000
     depends_on:
-      - marquez-api
+      marquez-api:
+        condition: service_healthy
     restart: on-failure
 
   # ==========================================
   # [PROFILE: telemetry] Prometheus
   # ==========================================
   prometheus:
-    image: prom/prometheus:v3
+    image: prom/prometheus:v3.14.0
     container_name: prometheus
     profiles:
       - telemetry
@@ -69,12 +78,18 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   # ==========================================
   # [PROFILE: telemetry] Alertmanager
   # ==========================================
   alertmanager:
-    image: prom/alertmanager:v0
+    image: prom/alertmanager:v0.34.0
     container_name: alertmanager
     profiles:
       - telemetry
@@ -107,7 +122,8 @@ services:
     volumes:
       - ./grafana:/etc/grafana/provisioning
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
 
 networks:
   odctl:

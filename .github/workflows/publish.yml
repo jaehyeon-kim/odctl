@@ -1,10 +1,13 @@
 name: Publish to PyPI
 
 # Publishing stays tied to publishing a release, so the release notes remain the
-# trigger. What is new is the gate below: a release event fires independently of
-# CI, which is how v0.3.0 reached PyPI while the pipeline's e2e job was failing.
-# This job now waits for the tag's Main Pipeline run and refuses to publish
-# unless it succeeded.
+# trigger. Two gates run before the package is built. A release event fires
+# independently of CI, which is how v0.3.0 reached PyPI while the pipeline's e2e
+# job was failing, so the first gate waits for the tag's Main Pipeline run and
+# refuses to publish unless it succeeded. The second gate asks ghcr whether the
+# images for this version are actually there, because the CLI resolves every
+# image it builds at its own version and a package published ahead of its images
+# installs and then fails on the first `odctl up`.
 on:
   release:
     types: [published]
@@ -27,11 +30,13 @@ jobs:
     name: Build and publish Python package
     runs-on: ubuntu-latest
     # These permissions are strictly required for PyPI OIDC Trusted Publishing;
-    # actions:read is what lets the gate query the pipeline's conclusion.
+    # actions:read is what lets the gate query the pipeline's conclusion, and
+    # packages:read is what lets the image gate read ghcr.
     permissions:
       contents: read
       id-token: write
       actions: read
+      packages: read
 
     steps:
       - name: Checkout source code
@@ -76,6 +81,46 @@ jobs:
             echo "⏳ Main Pipeline for ${TAG} is ${status}; waiting: $url"
             sleep 30
           done
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A green pipeline proves a workflow run succeeded. It does not prove the
+      # images reached ghcr, and that is the fact the published package depends
+      # on. This step checks the registry directly. It has no override input on
+      # purpose: publishing a version with no images behind it is the failure the
+      # gate exists to prevent.
+      - name: Require published images for this tag
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          # docker/metadata-action tags with the bare semver, so the leading v
+          # is not part of the image tag.
+          version="${TAG#v}"
+          # `|| true` keeps a no-match grep from ending the step under set -e,
+          # so the empty case reports something a reader can act on.
+          repositories=$(grep -rhoE "ghcr\.io/${GITHUB_REPOSITORY}/[a-z0-9._-]+" \
+                          src/odctl/resources/ | sort -u || true)
+          if [ -z "$repositories" ]; then
+            echo "::error::Found no ghcr images in the compose files. Has the path moved?"
+            exit 1
+          fi
+          missing=0
+          for repository in $repositories; do
+            reference="${repository}:${version}"
+            if docker manifest inspect "$reference" >/dev/null 2>&1; then
+              echo "✅ $reference is published"
+            else
+              echo "::error::No image published at ${reference}"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
 
       - name: Install uv
         # Pinned to a full version on purpose: setup-uv stopped publishing

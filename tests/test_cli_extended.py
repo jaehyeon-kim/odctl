@@ -95,6 +95,38 @@ def test_docker_not_running(monkeypatch):
     assert "Docker is not reachable" in result.stdout
 
 
+def test_up_stops_when_the_images_for_the_tag_are_absent(monkeypatch):
+    """A CLI version with no published images must say so, and start nothing."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.resolve_image_tag", lambda: "0.0.0-nope")
+    monkeypatch.setattr(
+        "odctl.main.find_unpublished_images",
+        lambda plan: ["ghcr.io/jaehyeon-kim/odctl/deps:0.0.0-nope"],
+    )
+    mock_launch = MagicMock()
+    monkeypatch.setattr("odctl.main.launch_stack", mock_launch)
+
+    result = runner.invoke(app, ["up", "kafka-lite"])
+
+    assert result.exit_code == 1
+    assert "No published image for TAG=0.0.0-nope" in result.stdout
+    assert "ghcr.io/jaehyeon-kim/odctl/deps:0.0.0-nope" in result.stdout
+    assert ".odctl/.env" in result.stdout
+    mock_launch.assert_not_called()
+
+
+def test_up_dry_run_skips_the_image_preflight(monkeypatch):
+    """A dry run reports the plan, so it must not need a registry."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    mock_preflight = MagicMock()
+    monkeypatch.setattr("odctl.main.find_unpublished_images", mock_preflight)
+
+    result = runner.invoke(app, ["up", "kafka-lite", "--dry-run"])
+
+    assert result.exit_code == 0
+    mock_preflight.assert_not_called()
+
+
 def test_invalid_profile(monkeypatch):
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     result = runner.invoke(app, ["up", "invalid_profile"])
