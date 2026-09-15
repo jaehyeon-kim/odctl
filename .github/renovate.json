@@ -1,20 +1,35 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:base", ":dependencyDashboard", "docker:enableMajor"],
-  "schedule": ["every weekend"],
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "schedule": ["before 6am on monday"],
 
   "automerge": false,
 
   "docker-compose": {
-    "fileMatch": ["(^|/)compose-[^/]+\\.ya?ml$"]
+    "managerFilePatterns": ["/(^|/)compose-[^/]+\\.ya?ml$/"]
   },
   "dockerfile": {
-    "fileMatch": [
-      "^src/odctl/resources/docker/.*/Dockerfile$",
-      "^src/odctl/resources/deps/Dockerfile$"
+    "managerFilePatterns": [
+      "/^src/odctl/resources/docker/.*/Dockerfile$/",
+      "/^src/odctl/resources/deps/Dockerfile$/"
     ]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track ICEBERG_V in versions.env. No built-in manager reads that file, so the Iceberg client jars were never updated.",
+      "managerFilePatterns": ["/^src/odctl/resources/deps/versions\\.env$/"],
+      "matchStrings": ["(?m)^ICEBERG_V=(?<currentValue>\\S+)\\s*$"],
+      "depNameTemplate": "org.apache.iceberg:iceberg-aws-bundle",
+      "datasourceTemplate": "maven"
+    }
+  ],
   "packageRules": [
+    {
+      "description": "Patch, pin and digest updates run as soon as they are found. Holding a bug fix for up to a week gains nothing, and these updates are the ones least likely to change behaviour.",
+      "matchUpdateTypes": ["patch", "pin", "pinDigest", "digest"],
+      "schedule": ["at any time"]
+    },
     {
       "description": "Flink stays on 2.1: Iceberg publishes iceberg-flink-runtime for 2.0 and 2.1 only, and fluss-flink has no 2.0 build. Raise this when Iceberg ships a runtime for a newer minor. See issue #9.",
       "matchPackageNames": ["flink", "org.apache.flink:{/,}**"],
@@ -41,13 +56,21 @@
     },
     {
       "description": "Group all Apache Airflow Providers into a single PR",
-      "matchPackagePatterns": ["^apache-airflow-providers-"],
+      "matchPackageNames": ["apache-airflow-providers-{/,}**"],
       "groupName": "Airflow Providers"
     },
     {
       "description": "Group Spark and PySpark updates together to prevent Py4J mismatches",
       "matchPackageNames": ["apache/spark", "pyspark"],
       "groupName": "Spark Ecosystem"
+    },
+    {
+      "description": "Group the Iceberg REST catalog image with the ICEBERG_V client jars, because the catalog and the engine clients have to speak the same table format version",
+      "matchPackageNames": [
+        "apache/iceberg-rest-fixture",
+        "org.apache.iceberg:{/,}**"
+      ],
+      "groupName": "Iceberg Ecosystem"
     },
     {
       "description": "Group Observability stack updates together",
@@ -67,10 +90,11 @@
       "groupName": "ClickHouse Ecosystem"
     },
     {
-      "description": "Group OpenMetadata Server and Ingestion to maintain API compatibility",
+      "description": "Group OpenMetadata Server and Ingestion with Elasticsearch. OpenMetadata only runs against the Elasticsearch version it was built for, so the three move as one set.",
       "matchPackageNames": [
         "docker.getcollate.io/openmetadata/server",
-        "docker.getcollate.io/openmetadata/ingestion"
+        "docker.getcollate.io/openmetadata/ingestion",
+        "docker.elastic.co/elasticsearch/elasticsearch"
       ],
       "groupName": "OpenMetadata Ecosystem"
     },
