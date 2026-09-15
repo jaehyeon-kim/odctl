@@ -3,11 +3,24 @@ name: odctl-orch
 # ==========================================
 # Shared Volumes for Stateless Airflow
 # ==========================================
+# tmpfs-backed, so neither holds anything once the stack is down. Every other
+# service in the stack keeps its data in the container layer and loses it on
+# teardown, and these two were the exception. Neither is a source of truth:
+# s3://airflow owns the content and airflow-sync re-syncs it every 30 seconds,
+# so a restart refills them.
 volumes:
   airflow-dags:
     name: airflow-dags
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
   airflow-plugins:
     name: airflow-plugins
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
 
 x-airflow-common: &airflow-common
   image: ghcr.io/jaehyeon-kim/odctl/airflow:${TAG:-latest}
