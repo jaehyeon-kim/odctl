@@ -10,16 +10,16 @@ LABEL org.opencontainers.image.description="Custom Apache Airflow orchestrator i
 # own. See the renovate ceiling on apache/spark.
 RUN --mount=type=cache,target=/home/airflow/.cache/pip \
     pip install \
-    apache-airflow-providers-apache-flink \
-    apache-airflow-providers-amazon \
-    apache-airflow-providers-postgres \
-    apache-airflow-providers-trino \
-    clickhouse-connect \
-    'pyiceberg[s3]' \
-    psycopg2-binary \
+    apache-airflow-providers-apache-flink==1.8.5 \
+    apache-airflow-providers-amazon==9.31.0 \
+    apache-airflow-providers-postgres==6.8.0 \
+    apache-airflow-providers-trino==6.6.0 \
+    clickhouse-connect==1.6.0 \
+    'pyiceberg[s3]==0.11.1' \
+    psycopg2-binary==2.9.12 \
     pyspark~=4.1.0 \
     'uvicorn>=0.31.0' \
-    valkey
+    valkey==6.1.1
 
 # Note: DAGs and Plugins are intentionally NOT copied here.
 # They are managed at runtime via the SeaweedFS S3-sync sidecar.

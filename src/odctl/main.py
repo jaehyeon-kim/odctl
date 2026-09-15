@@ -6,6 +6,7 @@ import typer
 
 from odctl import config, ui
 from odctl.docker import (
+    find_unpublished_images,
     get_managed_containers,
     get_managed_logs,
     get_stack_details,
@@ -13,6 +14,7 @@ from odctl.docker import (
     launch_stack,
     pull_stack_images,
     recreate_managed_containers,
+    resolve_image_tag,
     restart_managed_containers,
     stop_stack,
 )
@@ -288,6 +290,24 @@ def up(
     if dry_run:
         ui.print_dry_run(plan)
         return
+
+    # odctl tags the images it builds with its own version, so a CLI version
+    # whose images are not published cannot start anything. Say that here, where
+    # the expected tag can be named, rather than leaving Docker to report a
+    # missing manifest for one service.
+    unpublished = find_unpublished_images(plan)
+    if unpublished:
+        listed = "\n".join(f"  {reference}" for reference in unpublished)
+        ui.print_error(
+            f"No published image for TAG={resolve_image_tag()}.",
+            details=(
+                f"Absent from the registry:\n{listed}\n\n"
+                "odctl builds these images at its own version. "
+                "Set TAG to a published version in .odctl/.env, "
+                "or move the CLI to a version whose images exist."
+            ),
+        )
+        raise typer.Exit(1)
 
     for file, profs in plan.items():
         is_base = any(x in profs for x in ["deps", "postgres", "storage", "catalog"])

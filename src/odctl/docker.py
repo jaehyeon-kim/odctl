@@ -1,11 +1,14 @@
 import os
+import re
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 from python_on_whales import DockerClient
 
-from odctl.config import get_compose_path
+from odctl.config import get_active_dir, get_compose_path
 
 
 def _create_client(
@@ -134,6 +137,197 @@ def get_stack_details(
     except Exception as e:
         err = f"Err: {type(e).__name__}"
         return [err], [err], [err], [err]
+
+
+# Images this project builds and publishes itself. They carry the CLI version as
+# their tag, so a version whose build has not finished has no image to pull.
+# Every other image in the compose files is a third-party one pinned to an exact
+# upstream version, and those are never checked here.
+ODCTL_IMAGE_PREFIX = "ghcr.io/jaehyeon-kim/odctl/"
+
+# Compose interpolation, limited to the forms the compose files use:
+# ${VAR}, ${VAR:-default} and ${VAR-default}.
+_VARIABLE_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?-)([^}]*))?\}")
+
+# Registry replies that mean the tag is genuinely absent. Anything else, a DNS
+# failure or a refused connection for instance, leaves the answer unknown, and
+# an unknown answer must not stop a launch.
+_ABSENT_MARKERS = ("manifest unknown", "no such manifest", "not found")
+
+
+def _read_env_file(path: Path) -> Dict[str, str]:
+    """
+    Parse a compose `.env` file into a plain dictionary.
+
+    Args:
+        path (Path): Path to the `.env` file. A missing file yields an empty mapping.
+
+    Returns:
+        Dict[str, str]: The declared variables, with surrounding quotes removed.
+    """
+    values: Dict[str, str] = {}
+    if not path.exists():
+        return values
+
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        values[key.strip()] = value
+    return values
+
+
+def _interpolation_env() -> Dict[str, str]:
+    """
+    Build the variable mapping compose uses to interpolate the compose files.
+
+    Compose reads `.env` from the project directory, which is the directory
+    holding the compose file, and lets the shell environment override it.
+
+    Returns:
+        Dict[str, str]: Variables from the active directory's `.env`, overridden
+        by the current process environment.
+    """
+    env = _read_env_file(get_active_dir() / ".env")
+    env.update(os.environ)
+    return env
+
+
+def _expand(value: str, env: Dict[str, str]) -> str:
+    """
+    Substitute compose variables in a string.
+
+    Args:
+        value (str): A raw value from a compose file, such as an image reference.
+        env (Dict[str, str]): The variables to substitute.
+
+    Returns:
+        str: The value with every recognised variable reference replaced.
+    """
+
+    def replace(match: re.Match) -> str:
+        name, operator, default = match.group(1), match.group(2), match.group(3)
+        current = env.get(name)
+        if operator is None:
+            return current or ""
+        if operator == ":-":
+            return current if current else default
+        return default if current is None else current
+
+    return _VARIABLE_PATTERN.sub(replace, value)
+
+
+def resolve_image_tag() -> str:
+    """
+    Resolve the tag the compose files will put on the images odctl builds.
+
+    Returns:
+        str: The value of TAG as compose resolves it, or 'latest' when unset.
+    """
+    return _expand("${TAG:-latest}", _interpolation_env())
+
+
+def get_versioned_images(execution_plan: Dict[str, List[str]]) -> List[str]:
+    """
+    List the version-coupled image references an execution plan needs.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+
+    Returns:
+        List[str]: Sorted, deduplicated references to images built by this
+        project, with their variables already substituted.
+    """
+    env = _interpolation_env()
+    references = set()
+
+    for file, profiles in execution_plan.items():
+        _, _, images, _ = get_stack_details(file, profiles)
+        for entry in images:
+            _, _, raw = entry.partition(" -> ")
+            reference = _expand(raw, env)
+            if reference.startswith(ODCTL_IMAGE_PREFIX):
+                references.add(reference)
+
+    return sorted(references)
+
+
+def _image_is_local(reference: str) -> bool:
+    """
+    Report whether an image is already on the Docker host.
+
+    Args:
+        reference (str): A full image reference.
+
+    Returns:
+        bool: True when the local daemon holds the image.
+    """
+    try:
+        return bool(client.image.exists(reference))
+    except Exception:
+        return False
+
+
+def _registry_has_image(reference: str) -> Optional[bool]:
+    """
+    Ask the registry whether an image tag is published.
+
+    Args:
+        reference (str): A full image reference.
+
+    Returns:
+        Optional[bool]: True when the registry serves a manifest for it, False
+        when the registry says the tag is absent, and None when the question
+        could not be answered, which is what an offline machine returns.
+    """
+    try:
+        client.manifest.inspect(reference)
+        return True
+    except Exception as exc:
+        text = f"{getattr(exc, 'stderr', '') or ''} {exc}".lower()
+        if any(marker in text for marker in _ABSENT_MARKERS):
+            return False
+        return None
+
+
+def find_unpublished_images(execution_plan: Dict[str, List[str]]) -> List[str]:
+    """
+    Find images an execution plan needs that neither Docker nor the registry has.
+
+    An image already on the host is accepted without a registry call, so a
+    machine with no network can still start a stack it has pulled before. A
+    registry that cannot be reached leaves the answer unknown, and an unknown
+    answer is treated as present so the launch proceeds and Docker reports
+    whatever it finds.
+
+    Args:
+        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
+
+    Returns:
+        List[str]: References the registry reported as absent, in sorted order.
+    """
+    candidates = [
+        reference
+        for reference in get_versioned_images(execution_plan)
+        if not _image_is_local(reference)
+    ]
+    if not candidates:
+        return []
+
+    # Each registry call is a network round trip of a second or more, so ask
+    # about every image at once rather than one after another.
+    with ThreadPoolExecutor(max_workers=len(candidates)) as pool:
+        answers = list(pool.map(_registry_has_image, candidates))
+
+    return [
+        reference for reference, answer in zip(candidates, answers) if answer is False
+    ]
 
 
 def pull_stack_images(compose_filename: str, profiles: List[str]):

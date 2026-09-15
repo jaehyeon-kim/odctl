@@ -6,6 +6,25 @@ services:
   # ==========================================
   # [PROFILE: fluss] Streaming Storage Engine
   # ==========================================
+  # Fluss needs a real ZooKeeper. ClickHouse Keeper refuses opcode 19,
+  # createContainer, which Curator uses, and drops the session repeatedly.
+  fluss-zookeeper:
+    image: zookeeper:3.9.5
+    container_name: fluss-zookeeper
+    profiles: ["fluss"]
+    networks:
+      - odctl
+    mem_limit: 512m
+    restart: on-failure
+    environment:
+      ZOO_4LW_COMMANDS_WHITELIST: "ruok,srvr"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc 127.0.0.1 2181 | grep -q imok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   fluss-coordinator:
     image: &fluss-image apache/fluss:0.8.0-incubating
     container_name: fluss-coordinator
@@ -15,17 +34,29 @@ services:
       - "9123:9123"
     networks:
       - odctl
-
+    depends_on:
+      fluss-zookeeper:
+        condition: service_healthy
+    # Dies on ConnectionLoss if ZooKeeper drops, so let it retry.
+    restart: on-failure
     mem_limit: 1g
     environment:
       - JVM_ARGS=-Xmx512m
       - |
         FLUSS_PROPERTIES=
-        zookeeper.address: clickhouse-keeper:9181
+        zookeeper.address: fluss-zookeeper:2181
         bind.listeners: INTERNAL://fluss-coordinator:0, CLIENT://fluss-coordinator:9123
         advertised.listeners: CLIENT://fluss-coordinator:9123
         internal.listener.name: INTERNAL
         remote.data.dir: /tmp/fluss/remote-data
+    # bind.listeners binds the container hostname, not loopback, so localhost
+    # is refused here. The CLIENT listener only opens once ZooKeeper is up.
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c '</dev/tcp/fluss-coordinator/9123'"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
 
   fluss-tablet-1:
     image: *fluss-image
@@ -37,13 +68,15 @@ services:
     networks:
       - odctl
     depends_on:
-      - fluss-coordinator
+      fluss-coordinator:
+        condition: service_healthy
+    restart: on-failure
     mem_limit: 2g
     environment:
       - JVM_ARGS=-Xmx1500m
       - |
         FLUSS_PROPERTIES=
-        zookeeper.address: clickhouse-keeper:9181
+        zookeeper.address: fluss-zookeeper:2181
         bind.listeners: INTERNAL://fluss-tablet-1:0, CLIENT://fluss-tablet-1:9123
         advertised.listeners: CLIENT://fluss-tablet-1:9123
         internal.listener.name: INTERNAL
