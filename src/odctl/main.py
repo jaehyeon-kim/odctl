@@ -426,9 +426,7 @@ def down(
         try:
             stop_stack(file, profs, remove_volumes=volumes)
         except Exception as e:
-            ui.print_error(
-                f"Failed to stop {file}", details=ui.format_docker_error(e)
-            )
+            ui.print_error(f"Failed to stop {file}", details=ui.format_docker_error(e))
             raise typer.Exit(1)
 
     # `--all` already carries deps in its plan. A named teardown does not, so
