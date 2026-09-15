@@ -61,6 +61,9 @@ services:
     container_name: ch-shard2-stub
     command: sleep infinity
     mem_limit: 64m
+    # If this exits, ch-21 and ch-22 stop resolving and the 22s DNS timeout it
+    # exists to prevent comes back, with nothing to point at the cause.
+    restart: unless-stopped
     profiles: ["ch-lite"]
     networks:
       odctl:
