@@ -78,7 +78,9 @@ jobs:
           done
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        # Pinned to a full version on purpose: setup-uv stopped publishing
+        # moving major tags at v8, so astral-sh/setup-uv@v10 does not exist.
+        uses: astral-sh/setup-uv@v10.1.0
 
       - name: Set up Python
         run: uv python install 3.10

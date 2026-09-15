@@ -239,7 +239,10 @@ def pull(
         try:
             pull_stack_images(file, profs)
         except Exception as e:
-            ui.print_error(f"Failed to pull images for {file}", details=str(e))
+            ui.print_error(
+                f"Failed to pull images for {file}",
+                details=ui.format_docker_error(e),
+            )
             raise typer.Exit(1)
     ui.print_success("All images pulled successfully!")
 
@@ -300,7 +303,11 @@ def up(
         try:
             launch_stack(file, profs)
         except Exception as e:
-            ui.print_error(f"Failed to start {file}", details=str(e), show_tip=True)
+            ui.print_error(
+                f"Failed to start {file}",
+                details=ui.format_docker_error(e),
+                show_tip=True,
+            )
             raise typer.Exit(1)
 
     ui.print_success("All requested profiles successfully started!")
@@ -419,7 +426,7 @@ def down(
         try:
             stop_stack(file, profs, remove_volumes=volumes)
         except Exception as e:
-            ui.print_error(f"Failed to stop {file}", details=str(e))
+            ui.print_error(f"Failed to stop {file}", details=ui.format_docker_error(e))
             raise typer.Exit(1)
 
     # `--all` already carries deps in its plan. A named teardown does not, so
@@ -432,7 +439,7 @@ def down(
         try:
             stop_stack(_DEPS_FILE, ["deps"], remove_volumes=True)
         except Exception as e:
-            ui.print_error("Failed to stop deps", details=str(e))
+            ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
             raise typer.Exit(1)
 
     ui.print_success("Teardown complete.")
