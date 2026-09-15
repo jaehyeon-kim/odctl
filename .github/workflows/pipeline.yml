@@ -82,15 +82,15 @@ jobs:
       needs.changes.outputs.images == 'true'
     uses: ./.github/workflows/build-deps.yml
 
-  # Runs on pull requests too, for the profiles a change affects. That is the
-  # point: every fault found so far reached a release because nothing
-  # functional ran at review time. `needs` covers build-platform and build-deps
-  # so a tag still publishes images before this pulls them, and `always()` lets
-  # it run when those two skip, which is the normal case on a pull request.
+  # Tags and manual runs only. TAG follows the CLI version and the images for an
+  # unreleased version do not exist yet, so a pull request cannot pull them and
+  # the preflight refuses every profile. The matrix is still selected from the
+  # changed files, which keeps a manual dispatch proportionate.
   e2e:
     needs: [changes, build-platform, build-deps]
     if: >-
       always() &&
+      (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') &&
       needs.changes.outputs.profile_groups != '[]' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled')

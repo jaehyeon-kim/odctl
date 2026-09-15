@@ -24,6 +24,9 @@ from pathlib import Path
 import yaml
 
 GROUPS = [
+    # deps has an assertion of its own, and every other group pulls its image
+    # anyway, so giving it an entry costs almost nothing.
+    "deps",
     "kafka-lite kafka-full",
     "flink-lite flink-full",
     "spark-lite spark-full",
