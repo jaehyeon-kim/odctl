@@ -26,7 +26,7 @@ scrape_configs:
     metrics_path: "/metrics"
     static_configs:
       - targets:
-          - "clickhouse-11:9363"
-          - "clickhouse-12:9363"
-          - "clickhouse-21:9363"
-          - "clickhouse-22:9363"
+          - "ch-11:9363"
+          - "ch-12:9363"
+          - "ch-21:9363"
+          - "ch-22:9363"

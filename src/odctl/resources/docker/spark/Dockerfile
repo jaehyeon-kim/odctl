@@ -13,11 +13,11 @@ USER root
 # Only install libraries required for distributed UDFs
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install \
-    'clickhouse-connect' \
-    'psycopg2-binary' \
-    'valkey' \
+    'clickhouse-connect==1.8.0' \
+    'psycopg2-binary==2.9.12' \
+    'valkey==6.1.1' \
     'mlflow~=3.16.0' \
-    'boto3'
+    'boto3==1.43.89'
 
 # Pre-create the event log directory owned by the spark user. A named volume
 # mounted here inherits this ownership, so spark-submit can write its logs.

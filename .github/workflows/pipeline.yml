@@ -26,8 +26,11 @@ jobs:
       pull-requests: read
     outputs:
       images: ${{ steps.filter.outputs.images }}
+      profile_groups: ${{ steps.profiles.outputs.groups }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -37,6 +40,24 @@ jobs:
               - 'src/odctl/resources/docker/**'
               - '.github/workflows/build-deps.yml'
               - '.github/workflows/build-platform-images.yml'
+
+      # A tag runs every profile. A pull request runs only the groups its
+      # changed files affect, because the full matrix pulls roughly 10 GB per
+      # entry and paying that on every push is not worth the signal.
+      - uses: astral-sh/setup-uv@v10.1.0
+      - name: Choose profile groups
+        id: profiles
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(git diff --name-only \
+              "origin/${{ github.base_ref }}"...HEAD)
+            echo "Changed files:"; echo "$changed"
+            groups=$(uv run --with pyyaml python .github/scripts/select-profiles.py $changed)
+          else
+            groups=$(uv run --with pyyaml python .github/scripts/select-profiles.py --all)
+          fi
+          echo "Profile groups: $groups"
+          echo "groups=$groups" >> "$GITHUB_OUTPUT"
 
   ci:
     uses: ./.github/workflows/ci.yml
@@ -61,9 +82,18 @@ jobs:
       needs.changes.outputs.images == 'true'
     uses: ./.github/workflows/build-deps.yml
 
-  # Tags and manual runs only: the e2e job pulls images at the CLI's own version,
-  # and those exist on ghcr only once a tag has published them.
+  # Tags and manual runs only. TAG follows the CLI version and the images for an
+  # unreleased version do not exist yet, so a pull request cannot pull them and
+  # the preflight refuses every profile. The matrix is still selected from the
+  # changed files, which keeps a manual dispatch proportionate.
   e2e:
-    needs: [build-platform, build-deps]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [changes, build-platform, build-deps]
+    if: >-
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') &&
+      needs.changes.outputs.profile_groups != '[]' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     uses: ./.github/workflows/e2e-test.yml
+    with:
+      profile_groups: ${{ needs.changes.outputs.profile_groups }}
