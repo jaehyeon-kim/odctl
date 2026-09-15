@@ -5,7 +5,7 @@
 # versions.env is also matched to the Hadoop this series bundles, and the
 # airflow image pins pyspark to the same minor. Raise all four together, and
 # only once Iceberg ships a runtime for the newer minor. See PR #29.
-FROM apache/spark:4.1.2
+FROM apache/spark:4.1.3
 
 # Switch to root to install system-wide packages
 USER root
