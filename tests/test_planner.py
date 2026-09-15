@@ -1,6 +1,7 @@
 import pytest
 import typer
 
+from odctl.registry import Registry, StackConfig
 from odctl.planner import (
     build_execution_plan,
     get_profile_map,
@@ -61,3 +62,132 @@ def test_build_execution_plan(mock_workspace, mock_registry_data, monkeypatch):
     assert "compose-spark.yml" in plan
     assert "storage" in plan["compose-infra.yml"]
     assert "spark-master" in plan["compose-spark.yml"]
+
+
+class TestUnreachableProfiles:
+    """
+    A profile resolves to exactly one compose file, the one the registry names.
+    A service in another file that declares the same profile is never started,
+    and nothing else reports it. ch-keeper declared the fluss profile while
+    living in compose-analytics.yml, so fluss ran with no ZooKeeper.
+    """
+
+    @staticmethod
+    def _setup(tmp_path, monkeypatch, files):
+        for name, body in files.items():
+            (tmp_path / name).write_text(body)
+        monkeypatch.setattr(
+            "odctl.planner.get_compose_path", lambda name: tmp_path / name
+        )
+
+    def test_reports_a_profile_declared_in_another_file(self, tmp_path, monkeypatch):
+        from odctl.planner import find_unreachable_profiles
+
+        registry = Registry(
+            capacities={},
+            stacks={
+                "store": StackConfig(
+                    file="compose-store.yml", description="d", profiles=["fluss"]
+                ),
+                "analytics": StackConfig(
+                    file="compose-analytics.yml", description="d", profiles=["ch-lite"]
+                ),
+            },
+        )
+        monkeypatch.setattr("odctl.planner.load_registry", lambda: registry)
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            {
+                "compose-store.yml": "services:\n  fluss-coordinator:\n    profiles: ['fluss']\n",
+                "compose-analytics.yml": "services:\n  ch-keeper:\n    profiles: ['ch-lite', 'fluss']\n",
+            },
+        )
+
+        assert find_unreachable_profiles() == [
+            ("compose-analytics.yml", "ch-keeper", "fluss")
+        ]
+
+    def test_silent_when_every_declaration_matches(self, tmp_path, monkeypatch):
+        from odctl.planner import find_unreachable_profiles
+
+        registry = Registry(
+            capacities={},
+            stacks={
+                "store": StackConfig(
+                    file="compose-store.yml", description="d", profiles=["fluss"]
+                ),
+                "analytics": StackConfig(
+                    file="compose-analytics.yml", description="d", profiles=["ch-lite"]
+                ),
+            },
+        )
+        monkeypatch.setattr("odctl.planner.load_registry", lambda: registry)
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            {
+                "compose-store.yml": "services:\n  fluss-coordinator:\n    profiles: ['fluss']\n",
+                "compose-analytics.yml": "services:\n  ch-keeper:\n    profiles: ['ch-lite']\n",
+            },
+        )
+
+        assert find_unreachable_profiles() == []
+
+    def test_ignores_a_profile_no_stack_declares(self, tmp_path, monkeypatch):
+        """An unknown profile is validate_profiles' job, not this check's."""
+        from odctl.planner import find_unreachable_profiles
+
+        registry = Registry(
+            capacities={},
+            stacks={
+                "store": StackConfig(
+                    file="compose-store.yml", description="d", profiles=["fluss"]
+                )
+            },
+        )
+        monkeypatch.setattr("odctl.planner.load_registry", lambda: registry)
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            {
+                "compose-store.yml": "services:\n  x:\n    profiles: ['not-in-registry']\n"
+            },
+        )
+
+        assert find_unreachable_profiles() == []
+
+    def test_survives_a_missing_or_unparseable_file(self, tmp_path, monkeypatch):
+        from odctl.planner import find_unreachable_profiles
+
+        registry = Registry(
+            capacities={},
+            stacks={
+                "gone": StackConfig(
+                    file="compose-gone.yml", description="d", profiles=["a"]
+                ),
+                "bad": StackConfig(
+                    file="compose-bad.yml", description="d", profiles=["b"]
+                ),
+            },
+        )
+        monkeypatch.setattr("odctl.planner.load_registry", lambda: registry)
+        self._setup(tmp_path, monkeypatch, {"compose-bad.yml": "services: [oops\n"})
+
+        assert find_unreachable_profiles() == []
+
+    def test_warning_names_the_file_service_and_profile(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        from odctl.planner import warn_unreachable_profiles
+
+        monkeypatch.setattr(
+            "odctl.planner.find_unreachable_profiles",
+            lambda: [("compose-analytics.yml", "ch-keeper", "fluss")],
+        )
+        warn_unreachable_profiles()
+
+        out = capsys.readouterr().out
+        assert "compose-analytics.yml" in out
+        assert "ch-keeper" in out
+        assert "fluss" in out

@@ -34,11 +34,9 @@ services:
   ch-keeper:
     image: clickhouse/clickhouse-keeper:25.12-alpine
     container_name: ch-keeper
-    # Keeper must run in BOTH profiles
     profiles:
       - ch-lite
       - ch-full
-      - fluss
     networks:
       - odctl
     ports:

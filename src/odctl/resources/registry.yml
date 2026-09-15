@@ -93,6 +93,10 @@ stacks:
         • Bootstrap Servers (1-Node Lite):
           - External (Localhost): localhost:9092
           - Internal (Docker): broker-1:19092
+        • Port 29092 is a minikube listener, not a host endpoint. It is
+          advertised as host.minikube.internal:29092, which does not resolve
+          on a normal host, so a client connects and then fails to produce.
+          Use localhost:9092 from the host.
       kafka-full: |
         • Kafka UI:
           - External (Localhost): http://localhost:8086
@@ -102,6 +106,10 @@ stacks:
         • Bootstrap Servers (3-Node Cluster):
           - External (Localhost): localhost:9092, localhost:9093, localhost:9094
           - Internal (Docker): broker-1:19092, broker-2:19093, broker-3:19094
+        • Ports 29092, 29093 and 29094 are minikube listeners, not host
+          endpoints. They are advertised as host.minikube.internal, which does
+          not resolve on a normal host, so a client connects and then fails to
+          produce. Use localhost:9092, 9093 and 9094 from the host.
 
   flink:
     file: "compose-flink.yml"
