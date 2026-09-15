@@ -25,6 +25,7 @@ services:
       - odctl
     ports:
       - "5000:5000"
+    mem_limit: 1g
     environment:
       <<: *mlops-env
     healthcheck:
@@ -55,6 +56,7 @@ services:
       - odctl
     ports:
       - "5003:5003"
+    mem_limit: 1500m
     environment:
       <<: *mlops-env
       MLFLOW_TRACKING_URI: http://mlflow:5000
