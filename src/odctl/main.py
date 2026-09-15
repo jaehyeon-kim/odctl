@@ -22,6 +22,7 @@ from odctl.planner import (
     build_execution_plan,
     expand_plan_dependencies,
     get_profile_map,
+    warn_unreachable_profiles,
 )
 from odctl.registry import load_registry
 from odctl.workspace import get_workspace_dir, init_workspace
@@ -287,6 +288,9 @@ def up(
         raise typer.Exit(1)
 
     plan = build_execution_plan(profiles, resolve_deps=True)
+    # A profile resolves to one file. A service elsewhere declaring it is never
+    # started and nothing else says so, which is how fluss ran with no ZooKeeper.
+    warn_unreachable_profiles()
     if dry_run:
         ui.print_dry_run(plan)
         return
