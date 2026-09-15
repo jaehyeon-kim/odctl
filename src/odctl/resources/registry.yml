@@ -117,8 +117,8 @@ stacks:
     profiles: ["flink-lite", "flink-full"]
     capacities: ["stream_processing"]
     depends_on:
-      flink-lite: ["deps", "catalog"]
-      flink-full: ["deps", "catalog"]
+      flink-lite: ["deps", "catalog", "storage"]
+      flink-full: ["deps", "catalog", "storage"]
     role: "Executes continuous streaming pipelines. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     usage:
       flink-lite: |
@@ -142,8 +142,8 @@ stacks:
     profiles: ["spark-lite", "spark-full"]
     capacities: ["data_processing"]
     depends_on:
-      spark-lite: ["deps", "catalog"]
-      spark-full: ["deps", "catalog"]
+      spark-lite: ["deps", "catalog", "storage"]
+      spark-full: ["deps", "catalog", "storage"]
     role: "Distributed batch engine for data preparation and large-scale ETL."
     usage:
       spark-lite: |
@@ -213,10 +213,12 @@ stacks:
           * Internal (Docker): http://trino:8080
         • Identities: `docker exec -it trino trino` connects as `trino`, the
           CLI default. Pass `--user user` for the stack-wide convention, or
-          `--user analyst` to see the column mask and row filter that
-          trino/rules.json applies.
-        • Catalogs: iceberg, kafka (topics discovered from the schema
-          registry), clickhouse, postgres, and valkey with that profile up
+          `--user analyst`, which trino/rules.json denies schema ownership
+          while leaving every table privilege in place.
+        • Catalogs: postgres works with the trino profile alone. iceberg,
+          kafka, clickhouse and valkey load without their backing services,
+          so they appear in SHOW CATALOGS and then fail at query time unless
+          catalog, storage, kafka-lite, ch-lite or valkey is also up.
       metabase: |
         • Metabase Dashboard Engine:
           * External (Localhost): http://localhost:3000
@@ -243,7 +245,7 @@ stacks:
     capacities: ["mlops"]
     depends_on:
       mlflow: ["deps", "postgres", "storage"]
-      mlflow-serve: ["mlflow"]
+      mlflow-serve: ["mlflow", "storage"]
     role: "Manages the ML lifecycle: experiment tracking, the model registry, and scoring a registered model over HTTP (MLflow)."
     usage:
       mlflow: |
@@ -263,7 +265,7 @@ stacks:
     capacities: ["observability", "lineage"]
     depends_on:
       lineage: ["deps", "postgres"]
-      telemetry: ["deps", "postgres"]
+      telemetry: ["deps"]
     role: "Data provenance tracking (Marquez) and metric dashboards (Grafana)."
     usage:
       lineage: |
@@ -278,9 +280,9 @@ stacks:
           * External (Localhost): http://localhost:19090
           * Internal (Docker): http://prometheus:9090
         • Alertmanager:
-          * External (Localhost): http://localhost:9093
+          * External (Localhost): http://localhost:19093
           * Internal (Docker): http://alertmanager:9093
-        • Grafana Metrics Dashboard (Credentials: admin / admin):
+        • Grafana Metrics Dashboard (Credentials: user / password):
           * External (Localhost): http://localhost:3004
           * Internal (Docker): http://grafana:3000
 

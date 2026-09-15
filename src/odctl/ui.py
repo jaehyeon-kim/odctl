@@ -96,7 +96,6 @@ def print_explain_panel(
         "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
         "amazon/aws-cli": "Airflow DAG S3 Sync",
         "odctl/airflow": "Airflow Orchestrator",
-        "odctl/ray-mlops": "Unified Ray Serve & MLflow Node",
         "marquez-web": "Lineage Dashboard",
         "marquezproject/marquez": "Lineage API Server",
         "prometheus": "Telemetry Metrics Server",

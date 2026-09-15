@@ -57,9 +57,10 @@ services:
   # This container ONLY boots in the single profile to instantly
   # resolve DNS for the missing Shard 2, preventing the 22s timeout.
   ch-shard2-stub:
-    image: alpine:latest
+    image: alpine:3.22
     container_name: ch-shard2-stub
     command: sleep infinity
+    mem_limit: 64m
     profiles: ["ch-lite"]
     networks:
       odctl:
@@ -68,12 +69,31 @@ services:
           - ch-22
 
   # ==========================================
-  # Shard 1 (Active in BOTH profiles)
+  # Shard 1, one entry per profile
   # ==========================================
+  # {cluster} has to name a cluster whose every host exists, or ON CLUSTER
+  # queues a DDL task for hosts that never execute it and the statement blocks
+  # for distributed_ddl_task_timeout, 180s, before failing. ch-lite runs one
+  # shard, so it points at odctl_single_shard. The macro is per container and
+  # these services share one definition, so the profiles get separate entries.
+  # Container names are unchanged and the profiles are mutually exclusive.
   ch-11:
     <<: *clickhouse-base
     container_name: ch-11
-    profiles: ["ch-lite", "ch-full"]
+    profiles: ["ch-lite"]
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
+      - ./clickhouse/macros-11-lite.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  ch-11-full:
+    <<: *clickhouse-base
+    container_name: ch-11
+    profiles: ["ch-full"]
     ports:
       - "8123:8123"
       - "9000:9000"
@@ -86,7 +106,20 @@ services:
   ch-12:
     <<: *clickhouse-base
     container_name: ch-12
-    profiles: ["ch-lite", "ch-full"]
+    profiles: ["ch-lite"]
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
+      - ./clickhouse/macros-12-lite.xml:/etc/clickhouse-server/config.d/macros.xml
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  ch-12-full:
+    <<: *clickhouse-base
+    container_name: ch-12
+    profiles: ["ch-full"]
     ports:
       - "8124:8123"
       - "9001:9000"

@@ -10,6 +10,5 @@
       ],
       "actions": ["Admin", "Read", "Write", "List", "Tagging"]
     }
-  ],
-  "signingKey": "odctl-key-please-change"
+  ]
 }
