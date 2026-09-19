@@ -16,7 +16,7 @@ Provisioning a local data environment with distributed systems can be highly com
 The stack is organized into distinct profiles that can be launched independently or together:
 
 - **Messaging:** Real-time event streaming, schema validation, and robust data ingestion.
-  - **Stack:** Kafka (KRaft), Schema Registry (Karapace), Kafka Connect
+  - **Stack:** Kafka (KRaft), Schema Registry (Karapace), Kafka Connect, Kafka UI (kafbat)
 - **Stream Processing:** Stateful stream processing and continuous real-time data transformations.
   - **Stack:** Apache Flink
 - **Data Processing:** Distributed batch processing and large-scale ETL pipelines.
@@ -154,6 +154,14 @@ This folder contains all the underlying configurations that power the stack:
 - `trino/rules.json`: Trino's file-based access control. The shipped policy is deliberately generic: it grants every identity full table privileges and denies `analyst` schema ownership, and it names no catalog, schema or table, because those belong to your project rather than to this tool. Add your own table rules here for row filtering and column masking, and restart Trino afterwards, since the file is read at startup.
 
 The CLI will always prioritize the files in your local `./.odctl/` directory. If you make a mistake, you can always revert to the pristine default state by running `odctl init --force`.
+
+## Related reading
+
+Blog posts that use this CLI:
+
+- [Productionizing an Online Product Recommender using Event Driven Architecture](https://jaehyeon.me/blog/2026-02-23-productionize-recommender-with-eda/): splits a contextual bandit recommender into a serving layer and a training layer on Kafka, Flink and Valkey.
+- [Introducing odctl: One CLI for a Local Open Data Stack](https://jaehyeon.me/blog/2026-07-16-odctl-open-data-stack/): why the tool exists and how one command launches the stack.
+- [Building an Agentic Analytics System over an Iceberg Lakehouse](https://jaehyeon.me/blog/2026-07-18-agentic-analytics-system/): runs Trino, Iceberg and object storage from this CLI under a semantic layer an agent queries.
 
 ## Local Development & Contributing
 
