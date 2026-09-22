@@ -76,6 +76,15 @@ def init_workspace(force: bool = False):
             f.write("# MLflow Model Server target: models:/<name>@<alias>,\n")
             f.write("# runs:/<run-id>/<artifact-path>, or an s3:// path\n")
             f.write('# MODEL_URI="models:/my-model@champion"\n')
-            f.write('MODEL_URI=""\n')
+            f.write('MODEL_URI=""\n\n')
+
+            # ./feast is shipped with the workspace and carries configuration
+            # with no feature definitions, so the profile starts before you
+            # have written any. Point this at your own repository to use it.
+            f.write("# Feast feature repository: a directory holding\n")
+            f.write("# feature_store.yaml plus your feature definitions.\n")
+            f.write("# Run `feast apply` yourself; odctl ships no definitions.\n")
+            f.write('# FEAST_REPO="/path/to/your/feature_repo"\n')
+            f.write('FEAST_REPO="./feast"\n')
 
         print(f"  └─ Generated: .env (TAG={cli_version})")

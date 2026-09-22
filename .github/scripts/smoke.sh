@@ -307,7 +307,7 @@ smoke_metabase() {
 # asserts against.
 smoke_mlflow() {
   local run_id="$$"
-  retry 60 5 http_ok "http://127.0.0.1:5000/health" || fail "no HTTP response from :5000"
+  retry 60 5 http_ok "http://127.0.0.1:5004/health" || fail "no HTTP response from :5004"
   docker exec -i -e SMOKE_RUN_ID="$run_id" -e GIT_PYTHON_REFRESH=quiet -e MLFLOW_LOGGING_LEVEL=ERROR mlflow python - <<'PYEOF' || fail "could not log a run with a proxied artifact"
 import mlflow, os, pathlib, sys
 mlflow.set_tracking_uri("http://localhost:5000")
@@ -517,6 +517,30 @@ if d.get("status") != "success" or not d["data"]["result"]:
 ' || fail "prometheus could not answer a PromQL query"
   pass "PromQL query returned series"
 
+  # The OTLP receiver is off by default, so this asserts the flag took effect
+  # and that a metric posted over OTLP is queryable afterwards. Prometheus
+  # accepts the JSON encoding, which keeps this to curl with no SDK.
+  ts=$(python3 -c "import time;print(int(time.time()*1e9))")
+  cat > /tmp/odctl-otlp.json <<JSON
+{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"odctl-smoke"}}]},
+"scopeMetrics":[{"scope":{"name":"smoke"},"metrics":[{"name":"odctl_smoke_total","unit":"1",
+"sum":{"aggregationTemporality":2,"isMonotonic":true,"dataPoints":[
+{"asDouble":42,"timeUnixNano":"${ts}","startTimeUnixNano":"${ts}","attributes":[]}]}}]}]}]}
+JSON
+  curl -fsS --max-time 10 -X POST -H "Content-Type: application/json" \
+    --data-binary @/tmp/odctl-otlp.json \
+    "http://127.0.0.1:19090/api/v1/otlp/v1/metrics" >/dev/null \
+    || fail "prometheus rejected an OTLP metric, check --web.enable-otlp-receiver"
+  retry 12 5 bash -c '
+    curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/query?query=odctl_smoke_total" 2>/dev/null \
+      | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+r = d[\"data\"][\"result\"]
+sys.exit(0 if r and r[0][\"value\"][1] == \"42\" else 1)
+"' || fail "the OTLP metric never became queryable"
+  pass "OTLP metrics receiver accepted a metric and it queried back"
+
   retry 30 5 http_ok "http://127.0.0.1:19093/-/ready" || fail "alertmanager never became ready"
   curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/alertmanagers" 2>/dev/null \
     | grep -q activeAlertmanagers || fail "prometheus did not discover alertmanager"
@@ -701,6 +725,162 @@ smoke_metadata() {
     >/dev/null 2>&1 || true
 }
 
+# Feast keeps no feature values of its own, so liveness proves nothing here.
+# This builds a real Iceberg table through the catalog, registers a feature view
+# over it, takes a point-in-time join, materializes to Valkey and reads it back.
+# A failure in any of those is a broken profile even when both containers are up.
+smoke_feast() {
+  retry 60 5 http_ok "http://127.0.0.1:8890/api/v1/projects" || fail "no HTTP response from the feast UI on :8890"
+  pass "feast UI answering, registry reachable"
+
+  local work="${TMPDIR:-/tmp}/odctl-feast-smoke"
+  rm -rf "$work"; mkdir -p "$work/feature_repo"
+
+  # The offline half runs in the caller's environment, not in the container:
+  # the published image carries feast[minimal], which has no iceberg or duckdb.
+  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
+  VIRTUAL_ENV="$work/.venv" uv pip install -q \
+    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
+    || fail "could not install the feast client"
+
+  # warehouse="" is required. Feast's REST client puts warehouse into the URL
+  # path as a prefix for Polaris and Nessie style catalogs, and
+  # apache/iceberg-rest-fixture serves the spec with no prefix, so a real
+  # warehouse gives HTTP 400 "Ambiguous URI empty segment".
+  # A fresh project per run. `feast teardown` leaves rows in
+  # feature_view_version_history, so applying the same feature view into the
+  # same project twice hits the primary key on
+  # (feature_view_name, project_id, version_number) and the second run fails.
+  local proj="odctl_smoke_$(date -u +%Y%m%d%H%M%S)"
+
+  cat > "$work/feature_repo/feature_store.yaml" <<YAML
+project: ${proj}
+provider: local
+registry:
+  registry_type: sql
+  path: postgresql+psycopg://user:password@localhost:5432/feast
+offline_store:
+  type: duckdb
+online_store:
+  type: redis
+  connection_string: "localhost:6379,username=user,password=password"
+entity_key_serialization_version: 3
+YAML
+
+  cat > "$work/feature_repo/definitions.py" <<'PYDEF'
+from datetime import timedelta
+from feast import Entity, FeatureView, Field
+from feast.types import Float32
+from feast.infra.data_sources.contrib.iceberg_catalog.iceberg_source import IcebergSource
+
+driver = Entity(name="driver", join_keys=["driver_id"])
+src = IcebergSource(
+    warehouse="", namespace="smoke", table="driver_stats",
+    catalog_type="rest", catalog_name="odctl",
+    endpoint="http://localhost:8181",
+    timestamp_field="event_timestamp",
+)
+fv = FeatureView(
+    name="driver_stats", entities=[driver], ttl=timedelta(days=365),
+    schema=[Field(name="conv_rate", dtype=Float32)], source=src, online=True,
+)
+PYDEF
+
+  cat > "$work/build.py" <<'PYBUILD'
+import datetime, pyarrow as pa
+from pyiceberg.catalog import load_catalog
+cat = load_catalog("odctl")
+cat.create_namespace_if_not_exists("smoke")
+schema = pa.schema([
+    pa.field("driver_id", pa.int64(), nullable=False),
+    pa.field("event_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
+    pa.field("conv_rate", pa.float32(), nullable=False),
+])
+try: cat.drop_table("smoke.driver_stats")
+except Exception: pass
+t = cat.create_table("smoke.driver_stats", schema=schema)
+now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+t.append(pa.Table.from_pydict({
+    "driver_id": [1001, 1002],
+    "event_timestamp": [now - datetime.timedelta(hours=1)] * 2,
+    "conv_rate": [0.5, 0.75],
+}, schema=schema))
+print(t.scan().to_arrow().num_rows)
+PYBUILD
+
+  cat > "$work/check.py" <<'PYCHECK'
+import datetime, sys, pandas as pd
+from feast import FeatureStore
+fs = FeatureStore(repo_path="feature_repo")
+now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+hist = fs.get_historical_features(
+    entity_df=pd.DataFrame({"driver_id": [1001, 1002], "event_timestamp": [now] * 2}),
+    features=["driver_stats:conv_rate"],
+).to_df().sort_values("driver_id")
+if list(hist["conv_rate"].round(2)) != [0.5, 0.75]:
+    sys.exit(f"point-in-time join returned {list(hist['conv_rate'])}")
+print("offline ok")
+PYCHECK
+
+  cat > "$work/online.py" <<'PYONLINE'
+import sys
+from feast import FeatureStore
+fs = FeatureStore(repo_path="feature_repo")
+r = fs.get_online_features(
+    features=["driver_stats:conv_rate"],
+    entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
+).to_dict()
+got = [round(v, 2) for v in r["conv_rate"]]
+if got != [0.5, 0.75]:
+    sys.exit(f"online read returned {got}")
+print("online ok")
+PYONLINE
+
+  export PYICEBERG_CATALOG__ODCTL__TYPE=rest
+  export PYICEBERG_CATALOG__ODCTL__URI=http://localhost:8181
+  export PYICEBERG_CATALOG__ODCTL__WAREHOUSE=s3://warehouse/
+  export PYICEBERG_CATALOG__ODCTL__S3__ENDPOINT=http://localhost:8333
+  export PYICEBERG_CATALOG__ODCTL__S3__ACCESS_KEY_ID=user
+  export PYICEBERG_CATALOG__ODCTL__S3__SECRET_ACCESS_KEY=password
+  export PYICEBERG_CATALOG__ODCTL__S3__PATH_STYLE_ACCESS=true
+  export PYICEBERG_CATALOG__ODCTL__S3__REGION=us-east-1
+
+  local py="$work/.venv/bin/python"
+  local feast_bin="$work/.venv/bin/feast"
+  local log="$work/step.log"
+
+  # Output goes to a file rather than /dev/null: a swallowed stderr here turns
+  # a one-line cause into an afternoon, so a failure prints what actually broke.
+  run_step() {
+    local what="$1"; shift
+    if ! (cd "$work" && "$@") >"$log" 2>&1; then
+      echo "---- $what ----"
+      tail -25 "$log"
+      fail "$what"
+    fi
+  }
+
+  run_step "could not create the Iceberg table through the catalog" "$py" build.py
+  pass "Iceberg table created through the REST catalog on SeaweedFS"
+
+  run_step "feast apply failed" "$feast_bin" -c feature_repo apply
+  pass "feast apply registered the feature view against the catalog"
+
+  run_step "the point-in-time join returned the wrong values" "$py" check.py
+  pass "get_historical_features read Iceberg through DuckDB"
+
+  run_step "feast materialize into valkey failed" \
+    "$feast_bin" -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
+  run_step "the online read from valkey returned the wrong values" "$py" online.py
+  pass "materialize wrote to valkey and get_online_features read it back"
+
+  (cd "$work" && "$feast_bin" -c feature_repo teardown) >/dev/null 2>&1 || true
+  curl -fsS --max-time 10 -X DELETE \
+    "http://127.0.0.1:8181/v1/namespaces/smoke/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
+  curl -fsS --max-time 10 -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke" >/dev/null 2>&1 || true
+  rm -rf "$work"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -725,6 +905,8 @@ case "$PROFILE" in
   telemetry)  smoke_telemetry ;;
   metadata)   smoke_metadata ;;
   fluss)      smoke_fluss ;;
+  feast)      smoke_feast ;;
+  feast-serve) smoke_http_only "http://127.0.0.1:6566/health" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

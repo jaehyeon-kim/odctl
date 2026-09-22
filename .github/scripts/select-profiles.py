@@ -35,6 +35,9 @@ GROUPS = [
     "trino",
     "metabase",
     "mlflow",
+    # feast brings up postgres, storage, catalog and valkey with it, and its
+    # assertion installs a client to prove the offline and online halves work.
+    "feast",
     "lineage",
     "telemetry",
     "metadata",

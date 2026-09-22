@@ -554,3 +554,55 @@ class TestComposeShape:
             "the CLI writes these into .env and no compose file reads them: "
             + ", ".join(orphans)
         )
+
+
+def _published_ports_by_profile():
+    """Map each profile to the host ports its services publish."""
+    registry = load_registry()
+    resources = get_internal_resources_dir()
+    ports: dict[str, set[str]] = {}
+
+    for stack in registry.stacks.values():
+        data = yaml.safe_load((resources / stack.file).read_text())
+        for service in (data.get("services") or {}).values():
+            for profile in service.get("profiles") or []:
+                for mapping in service.get("ports") or []:
+                    host = str(mapping).split(":")[0].strip('"')
+                    if host.isdigit():
+                        ports.setdefault(profile, set()).add(host)
+    return ports
+
+
+def _mutually_exclusive(a: str, b: str) -> bool:
+    """True when two profiles are the lite and full variants of one stack.
+
+    Those are the only pairs that can publish the same host port safely,
+    because `odctl up` never starts both: they are alternate sizes of the
+    same service, not services that run side by side.
+    """
+
+    def strip(profile: str) -> str:
+        return profile.removesuffix("-lite").removesuffix("-full")
+
+    return strip(a) == strip(b) and a != b
+
+
+def test_no_host_port_is_published_by_two_profiles_that_run_together():
+    """A port collision surfaces as a bind failure at `up`, not at config time.
+
+    Compose validates the file without noticing, so the first sign is a
+    container that refuses to start once someone happens to run both profiles.
+    This catches it while adding the profile instead.
+    """
+    ports = _published_ports_by_profile()
+    clashes = []
+
+    for profile, published in ports.items():
+        for other, other_published in ports.items():
+            if profile >= other or _mutually_exclusive(profile, other):
+                continue
+            shared = published & other_published
+            if shared:
+                clashes.append(f"{profile} and {other} both publish {sorted(shared)}")
+
+    assert not clashes, "host port collisions: " + "; ".join(sorted(clashes))
