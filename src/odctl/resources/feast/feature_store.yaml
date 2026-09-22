@@ -1,0 +1,35 @@
+# Default feature repository, so `odctl up feast` starts without you writing one.
+# It carries configuration and no feature definitions: odctl ships none.
+#
+# For your own features, point FEAST_REPO at a directory holding this file plus
+# your definitions, then run `feast apply` from your own environment. That
+# environment needs feast[duckdb,iceberg,redis,postgres], because the offline
+# half runs in the caller's process and the published image has feast[minimal].
+#
+# On an IcebergSource against the catalog profile, pass warehouse="" and
+# catalog_name="odctl". Feast's REST client puts warehouse into the URL path as
+# a prefix for Polaris and Nessie style catalogs, and apache/iceberg-rest-fixture
+# serves the specification with no prefix, so a real warehouse returns
+# HTTP 400 "Ambiguous URI empty segment". PyIceberg still gets the real
+# warehouse, from the PYICEBERG_CATALOG__ODCTL__* variables in compose-mlops.yml.
+project: odctl
+provider: local
+
+# Definitions only. Feature values never land here.
+registry:
+  registry_type: sql
+  path: postgresql+psycopg://user:password@postgres:5432/feast
+  cache_ttl_seconds: 60
+
+# A join engine rather than storage: it reads your Iceberg tables in process.
+offline_store:
+  type: duckdb
+
+# Valkey speaks the Redis protocol, so the type stays redis. The ACL user is
+# required because the default user is disabled in compose-store.yml.
+online_store:
+  type: redis
+  connection_string: "valkey:6379,username=user,password=password"
+  key_ttl_seconds: 604800
+
+entity_key_serialization_version: 3

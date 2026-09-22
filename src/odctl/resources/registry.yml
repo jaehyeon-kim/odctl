@@ -250,13 +250,39 @@ stacks:
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
-          * External (Localhost): http://localhost:5000
+          * External (Localhost): http://localhost:5004
           * Internal (Docker): http://mlflow:5000
       mlflow-serve: |
         • MLflow Model Scoring Server (set MODEL_URI in .env before starting):
           * External (Localhost): http://localhost:5003/invocations
           * Internal (Docker): http://mlflow-serve:5003/invocations
         • Liveness: http://localhost:5003/ping and http://localhost:5003/health
+
+  feast:
+    file: "compose-mlops.yml"
+    description: "Feature store registry, point-in-time joins, and online feature serving."
+    profiles: ["feast", "feast-serve"]
+    capacities: ["mlops"]
+    depends_on:
+      feast: ["postgres", "storage", "catalog", "valkey"]
+      feast-serve: ["postgres", "valkey"]
+    role: "Holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey. It stores no feature values of its own."
+    usage:
+      feast: |
+        • Feast UI (registry browser, not data):
+          * External (Localhost): http://localhost:8890
+          * Internal (Docker): http://feast-ui:8888
+        • Set FEAST_REPO to your feature repository before starting, then run
+          `feast apply` from your own environment. odctl ships no definitions.
+        • Your environment needs: feast[duckdb,iceberg,redis,postgres]
+        • On an IcebergSource against catalog, pass warehouse="" and
+          catalog_name="odctl". The REST client puts warehouse in the URL path,
+          and iceberg-rest-fixture serves the spec with no prefix.
+      feast-serve: |
+        • Online feature server for get_online_features:
+          * External (Localhost): http://localhost:6566
+          * Internal (Docker): http://feast-serve:6566
+        • Liveness: http://localhost:6566/health
 
   obsv:
     file: "compose-obsv.yml"

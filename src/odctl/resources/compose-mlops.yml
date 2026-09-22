@@ -13,6 +13,19 @@ x-mlops-env: &mlops-env
   # is how a flavour the image does not carry gets added without a rebuild.
   _PIP_ADDITIONAL_REQUIREMENTS: ${_MLOPS_PIP_DEPS:-}
 
+# Feast reads S3 settings only from the environment; ODCTL must match the
+# catalog_name passed to IcebergSource.
+x-feast-env: &feast-env
+  TZ: ${TZ:-UTC}
+  PYICEBERG_CATALOG__ODCTL__TYPE: rest
+  PYICEBERG_CATALOG__ODCTL__URI: http://catalog:8181
+  PYICEBERG_CATALOG__ODCTL__WAREHOUSE: s3://warehouse/
+  PYICEBERG_CATALOG__ODCTL__S3__ENDPOINT: http://seaweed:8333
+  PYICEBERG_CATALOG__ODCTL__S3__ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+  PYICEBERG_CATALOG__ODCTL__S3__SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+  PYICEBERG_CATALOG__ODCTL__S3__PATH_STYLE_ACCESS: "true"
+  PYICEBERG_CATALOG__ODCTL__S3__REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+
 services:
   # ==========================================
   # MLflow: Experiment Tracking & Model Registry
@@ -24,7 +37,8 @@ services:
     networks:
       - odctl
     ports:
-      - "5000:5000"
+      # Host 5004: macOS binds 5000 to the AirPlay receiver.
+      - "5004:5000"
     mem_limit: 2500m
     environment:
       <<: *mlops-env
@@ -38,6 +52,10 @@ services:
     # 1.1G fixed plus 0.35G per worker: 1.46G at one, 1.81G at two and 2.58G at
     # the default four. Two is enough for a local stack. A comment cannot live
     # inside the folded block below, where it becomes an argument.
+    # allowed-hosts needs both the container port and the published one: 5000
+    # for anything inside, 5004 from the host. A missing entry gives 403 while
+    # /health still answers 200, so the container looks healthy.
+    # Never comment inside the command block: YAML folds it into the arguments.
     command: >
       mlflow server
       --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
@@ -45,7 +63,7 @@ services:
       --serve-artifacts
       --host 0.0.0.0
       --port 5000
-      --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000
+      --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000,localhost:5004,127.0.0.1:5004
       --workers 2
 
   # ==========================================
@@ -88,6 +106,61 @@ services:
     depends_on:
       mlflow:
         condition: service_healthy
+
+  # ==========================================
+  # Feast: Feature Store
+  # ==========================================
+  # Stores no feature values: offline in Iceberg, online in valkey, only
+  # definitions in the SQL registry.
+  #
+  # Point FEAST_REPO at your own feature repository and run `feast apply`
+  # yourself. Your environment needs feast[duckdb,iceberg,redis,postgres];
+  # the image needs no extras because neither service reads Iceberg.
+  #
+  # The image sets no CMD, so both services name their own command.
+  feast-ui:
+    image: &feast-image quay.io/feastdev/feature-server:0.66.0
+    container_name: feast-ui
+    profiles: ["feast"]
+    networks:
+      - odctl
+    ports:
+      - "8890:8888"
+    mem_limit: 1g
+    environment:
+      <<: *feast-env
+    volumes:
+      - ${FEAST_REPO:-./feast}:/feature_repo
+    command: >
+      feast -c /feature_repo ui --host 0.0.0.0 --port 8888
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/api/v1/projects || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  feast-serve:
+    image: *feast-image
+    container_name: feast-serve
+    profiles: ["feast-serve"]
+    networks:
+      - odctl
+    ports:
+      - "6566:6566"
+    mem_limit: 1g
+    environment:
+      <<: *feast-env
+    volumes:
+      - ${FEAST_REPO:-./feast}:/feature_repo
+    command: >
+      feast -c /feature_repo serve --host 0.0.0.0 --port 6566 --no-access-log
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6566/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
 networks:
   odctl:
