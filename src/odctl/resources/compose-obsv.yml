@@ -78,6 +78,8 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
+      # OTLP metrics at /api/v1/otlp/v1/metrics, off by default.
+      - "--web.enable-otlp-receiver"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
       interval: 10s
