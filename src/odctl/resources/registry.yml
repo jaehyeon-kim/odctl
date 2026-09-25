@@ -38,7 +38,7 @@ stacks:
     role: "The foundational state-store using pgvector. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata."
     usage: |
       • Postgres JDBC:
-        - External (Localhost): jdbc:postgresql://localhost:5432/odctl
+        - External (host): jdbc:postgresql://127.0.0.1:5432/odctl
         - Internal (Docker): jdbc:postgresql://postgres:5432/odctl
         - Credentials: user / password
 
@@ -53,10 +53,10 @@ stacks:
     role: "Acts as the physical data lake (S3 equivalent). Holds Parquet/Iceberg files and Airflow DAGs."
     usage: |
       • S3 Browser UI:
-        - External (Localhost): http://localhost:8889
+        - External (host): http://127.0.0.1:8889
         - Internal (Docker): http://seaweed:8888
       • S3 API Endpoint:
-        - External (Localhost): http://localhost:8333
+        - External (host): http://127.0.0.1:8333
         - Internal (Docker): http://seaweed:8333
         - Default AWS Keys: user / password
 
@@ -67,11 +67,11 @@ stacks:
     parent: "infra"
     capacities: []
     depends_on:
-      catalog: ["deps", "postgres", "storage"]
+      catalog: ["postgres", "storage"]
     role: "Central metadata gateway for Iceberg. All compute engines route through this REST API."
     usage: |
       • REST API Endpoint:
-        - External (Localhost): http://localhost:8181
+        - External (host): http://127.0.0.1:8181
         - Internal (Docker): http://catalog:8181
 
   kafka:
@@ -86,30 +86,30 @@ stacks:
     usage:
       kafka-lite: |
         • Kafka UI:
-          - External (Localhost): http://localhost:8086
+          - External (host): http://127.0.0.1:8086
           - Internal (Docker): http://kafka-ui:8080
         • Schema Registry & Connect:
-          - External (Localhost): http://localhost:8081 / http://localhost:8083
+          - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083
         • Bootstrap Servers (1-Node Lite):
-          - External (Localhost): localhost:9092
+          - External (host): 127.0.0.1:9092
           - Internal (Docker): broker-1:19092
         • Port 29092 is a minikube listener, not a host endpoint. It is
           advertised as host.minikube.internal:29092, which does not resolve
           on a normal host, so a client connects and then fails to produce.
-          Use localhost:9092 from the host.
+          Use 127.0.0.1:9092 from the host.
       kafka-full: |
         • Kafka UI:
-          - External (Localhost): http://localhost:8086
+          - External (host): http://127.0.0.1:8086
           - Internal (Docker): http://kafka-ui:8080
         • Schema Registry & Connect:
-          - External (Localhost): http://localhost:8081 / http://localhost:8083
+          - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083
         • Bootstrap Servers (3-Node Cluster):
-          - External (Localhost): localhost:9092, localhost:9093, localhost:9094
+          - External (host): 127.0.0.1:9092, 127.0.0.1:9093, 127.0.0.1:9094
           - Internal (Docker): broker-1:19092, broker-2:19093, broker-3:19094
         • Ports 29092, 29093 and 29094 are minikube listeners, not host
           endpoints. They are advertised as host.minikube.internal, which does
           not resolve on a normal host, so a client connects and then fails to
-          produce. Use localhost:9092, 9093 and 9094 from the host.
+          produce. Use 127.0.0.1:9092, 9093 and 9094 from the host.
 
   flink:
     file: "compose-flink.yml"
@@ -117,23 +117,23 @@ stacks:
     profiles: ["flink-lite", "flink-full"]
     capacities: ["stream_processing"]
     depends_on:
-      flink-lite: ["deps", "catalog", "storage"]
-      flink-full: ["deps", "catalog", "storage"]
+      flink-lite: ["catalog"]
+      flink-full: ["catalog"]
     role: "Executes continuous streaming pipelines. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     usage:
       flink-lite: |
         • Flink JobManager UI (1 TaskManager):
-          - External (Localhost): http://localhost:8082
+          - External (host): http://127.0.0.1:8082
           - Internal (Docker): http://jobmanager:8081
         • SQL Gateway REST:
-          - External (Localhost): http://localhost:8084
+          - External (host): http://127.0.0.1:8084
           - Internal (Docker): http://flink-sql-gateway:8083
       flink-full: |
         • Flink JobManager UI (3 TaskManagers):
-          - External (Localhost): http://localhost:8082
+          - External (host): http://127.0.0.1:8082
           - Internal (Docker): http://jobmanager:8081
         • SQL Gateway REST:
-          - External (Localhost): http://localhost:8084
+          - External (host): http://127.0.0.1:8084
           - Internal (Docker): http://flink-sql-gateway:8083
 
   spark:
@@ -142,29 +142,29 @@ stacks:
     profiles: ["spark-lite", "spark-full"]
     capacities: ["data_processing"]
     depends_on:
-      spark-lite: ["deps", "catalog", "storage"]
-      spark-full: ["deps", "catalog", "storage"]
+      spark-lite: ["catalog"]
+      spark-full: ["catalog"]
     role: "Distributed batch engine for data preparation and large-scale ETL."
     usage:
       spark-lite: |
         • Spark Master UI (1 Worker):
-          - External (Localhost): http://localhost:9080
+          - External (host): http://127.0.0.1:9080
           - Internal (Docker): http://spark-master:8080
         • Master RPC:
-          - External (Localhost): spark://localhost:7077
+          - External (host): spark://127.0.0.1:7077
           - Internal (Docker): spark://spark-master:7077
         • Spark History Server:
-          - External (Localhost): http://localhost:18080
+          - External (host): http://127.0.0.1:18080
           - Internal (Docker): http://spark-history:18080
       spark-full: |
         • Spark Master UI (3 Workers):
-          - External (Localhost): http://localhost:9080
+          - External (host): http://127.0.0.1:9080
           - Internal (Docker): http://spark-master:8080
         • Master RPC:
-          - External (Localhost): spark://localhost:7077
+          - External (host): spark://127.0.0.1:7077
           - Internal (Docker): spark://spark-master:7077
         • Spark History Server:
-          - External (Localhost): http://localhost:18080
+          - External (host): http://127.0.0.1:18080
           - Internal (Docker): http://spark-history:18080
 
   store:
@@ -178,11 +178,11 @@ stacks:
     usage:
       fluss: |
         • Fluss Coordinator API:
-          * External (Localhost): localhost:9123
+          * External (host): 127.0.0.1:9123
           * Internal (Docker): fluss-coordinator:9123
       valkey: |
         • Valkey (Multi-Model Data Store: Cache, JSON, Vector Search):
-          * External (Localhost): localhost:6379
+          * External (host): 127.0.0.1:6379
           * Internal (Docker): valkey:6379
           * Authentication: username 'user', password 'password'
 
@@ -194,22 +194,22 @@ stacks:
     depends_on:
       ch-lite: ["deps"]
       ch-full: ["deps"]
-      trino: ["deps", "postgres"]
-      metabase: ["deps", "postgres"]
+      trino: ["postgres"]
+      metabase: ["postgres"]
     role: "ClickHouse provides real-time OLAP; Trino federates queries across Iceberg/Postgres; Metabase handles visualization."
     usage:
       ch-lite: |
         • ClickHouse HTTP (Shard 1 / Replica 1 & 2):
-          * External (Localhost): http://localhost:8123, http://localhost:8124
+          * External (host): http://127.0.0.1:8123, http://127.0.0.1:8124
           * Internal (Docker): http://ch-11:8123, http://ch-12:8123
       ch-full: |
         • ClickHouse HTTP (Shards 1 & 2 / Replicas 1 & 2):
-          * External (Localhost): http://localhost:8123, http://localhost:8124, http://localhost:8125, http://localhost:8126
+          * External (host): http://127.0.0.1:8123, http://127.0.0.1:8124, http://127.0.0.1:8125, http://127.0.0.1:8126
           * Internal (Docker): http://ch-11:8123, http://ch-12:8123, http://ch-21:8123, http://ch-22:8123
       trino: |
         • Trino UI & JDBC connection (no password: no authenticator is
           configured, so any username is accepted):
-          * External (Localhost): http://localhost:8080
+          * External (host): http://127.0.0.1:8080
           * Internal (Docker): http://trino:8080
         • Identities: `docker exec -it trino trino` connects as `trino`, the
           CLI default. Pass `--user user` for the stack-wide convention, or
@@ -221,7 +221,7 @@ stacks:
           catalog, storage, kafka-lite, ch-lite or valkey is also up.
       metabase: |
         • Metabase Dashboard Engine:
-          * External (Localhost): http://localhost:3000
+          * External (host): http://127.0.0.1:3000
           * Internal (Docker): http://metabase:3000
 
   orch:
@@ -230,62 +230,51 @@ stacks:
     profiles: ["airflow"]
     capacities: ["orchestration"]
     depends_on:
-      airflow: ["deps", "postgres", "storage"]
+      airflow: ["postgres", "storage"]
     role: "Central nervous system for scheduling data pipelines, ETL, and ML training runs."
     usage:
       airflow: |
         • Airflow Web UI (Credentials: user / password):
-          * External (Localhost): http://localhost:8085
+          * External (host): http://127.0.0.1:8085
           * Internal (Docker): http://airflow:8080
         • DAGs: read from s3://airflow/dags every 15 seconds.
-        • Plugins: copied from s3://airflow/plugins at start. Airflow loads plugins only
-          once, so run `odctl restart airflow` after changing one.
+        • Plugins: copied from s3://airflow/plugins at start. Airflow loads
+          plugins only once, so run `odctl restart airflow` after changing one.
 
   mlops:
     file: "compose-mlops.yml"
-    description: "Machine learning experiment tracking, model registry, and model serving."
-    profiles: ["mlflow", "mlflow-serve"]
+    description: "Experiment tracking, model registry and model serving (MLflow), and the feature store (Feast)."
+    profiles: ["mlflow", "feast"]
     capacities: ["mlops"]
     depends_on:
-      mlflow: ["deps", "postgres", "storage"]
-      mlflow-serve: ["mlflow", "storage"]
-    role: "Manages the ML lifecycle: experiment tracking, the model registry, and scoring a registered model over HTTP (MLflow)."
+      mlflow: ["postgres", "storage"]
+      feast: ["catalog", "valkey"]
+    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
-          * External (Localhost): http://localhost:5004
+          * External (host): http://127.0.0.1:5004
           * Internal (Docker): http://mlflow:5000
-      mlflow-serve: |
-        • MLflow Model Scoring Server (set MODEL_URI in .env before starting):
-          * External (Localhost): http://localhost:5003/invocations
+        • MLflow Model Scoring Server, idle until MODEL_URI in .env names a model;
+          run `odctl up mlflow` again after setting it:
+          * External (host): http://127.0.0.1:5003/invocations
           * Internal (Docker): http://mlflow-serve:5003/invocations
-        • Liveness: http://localhost:5003/ping and http://localhost:5003/health
-
-  feast:
-    file: "compose-mlops.yml"
-    description: "Feature store registry, point-in-time joins, and online feature serving."
-    profiles: ["feast", "feast-serve"]
-    capacities: ["mlops"]
-    depends_on:
-      feast: ["postgres", "storage", "catalog", "valkey"]
-      feast-serve: ["postgres", "valkey"]
-    role: "Holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey. It stores no feature values of its own."
-    usage:
+        • Liveness: http://127.0.0.1:5003/ping and http://127.0.0.1:5003/health
       feast: |
         • Feast UI (registry browser, not data):
-          * External (Localhost): http://localhost:8890
+          * External (host): http://127.0.0.1:8890
           * Internal (Docker): http://feast-ui:8888
-        • Set FEAST_REPO to your feature repository before starting, then run
+        • Upload your feature repository to s3://feast/repo. The services check
+          it every 15 seconds and restart Feast when it changes. Run
           `feast apply` from your own environment. odctl ships no definitions.
         • Your environment needs: feast[duckdb,iceberg,redis,postgres]
         • On an IcebergSource against catalog, pass warehouse="" and
           catalog_name="odctl". The REST client puts warehouse in the URL path,
           and iceberg-rest-fixture serves the spec with no prefix.
-      feast-serve: |
         • Online feature server for get_online_features:
-          * External (Localhost): http://localhost:6566
+          * External (host): http://127.0.0.1:6566
           * Internal (Docker): http://feast-serve:6566
-        • Liveness: http://localhost:6566/health
+        • Liveness: http://127.0.0.1:6566/health
 
   obsv:
     file: "compose-obsv.yml"
@@ -293,26 +282,26 @@ stacks:
     profiles: ["lineage", "telemetry"]
     capacities: ["observability", "lineage"]
     depends_on:
-      lineage: ["deps", "postgres"]
+      lineage: ["postgres"]
       telemetry: ["deps"]
     role: "Data provenance tracking (Marquez), and metrics, traces and logs over OpenTelemetry in one grafana/otel-lgtm container (Prometheus, Tempo, Loki, Grafana)."
     usage:
       lineage: |
         • Marquez API Metadata Endpoint:
-          * External (Localhost): http://localhost:5002
+          * External (host): http://127.0.0.1:5002
           * Internal (Docker): http://marquez-api:5000
         • Marquez Lineage Graph Web UI:
-          * External (Localhost): http://localhost:3003
+          * External (host): http://127.0.0.1:3003
           * Internal (Docker): http://marquez-web:3000
       telemetry: |
         • Prometheus Time Series Engine (also takes OTLP at /api/v1/otlp/v1/metrics):
-          * External (Localhost): http://localhost:19090
+          * External (host): http://127.0.0.1:19090
           * Internal (Docker): http://prometheus:9090
         • Grafana Dashboards (Credentials: user / password):
-          * External (Localhost): http://localhost:3004
+          * External (host): http://127.0.0.1:3004
           * Internal (Docker): http://grafana:3000
         • OTLP Receiver (metrics, traces and logs):
-          * External (Localhost): localhost:4317 (gRPC), http://localhost:4318 (HTTP)
+          * External (host): 127.0.0.1:4317 (gRPC), http://127.0.0.1:4318 (HTTP)
           * Internal (Docker): otel-lgtm:4317 (gRPC), http://otel-lgtm:4318 (HTTP)
 
   metadata:
@@ -321,13 +310,13 @@ stacks:
     profiles: ["metadata"]
     capacities: ["metadata"]
     depends_on:
-      metadata: ["deps", "postgres"]
+      metadata: ["postgres"]
     role: "Enterprise data catalog utilizing Elasticsearch and Postgres backends."
     usage: |
       • OpenMetadata UI & REST API:
-        - External (Localhost): http://localhost:8585
+        - External (host): http://127.0.0.1:8585
         - Internal (Docker): http://openmetadata-server:8585
       • Ingestion Pipeline UI:
-        - External (Localhost): http://localhost:8087
+        - External (host): http://127.0.0.1:8087
         - Internal (Docker): http://openmetadata-ingestion:8080
       • Default Admin: admin@open-data.local / admin

@@ -25,6 +25,57 @@ x-feast-env: &feast-env
   PYICEBERG_CATALOG__ODCTL__S3__SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
   PYICEBERG_CATALOG__ODCTL__S3__PATH_STYLE_ACCESS: "true"
   PYICEBERG_CATALOG__ODCTL__S3__REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+  # For copying the feature repository from s3://feast/repo at start.
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+
+# The Feast services' start-up: the feature repository comes from s3://feast/repo,
+# as DAGs come from s3://airflow/dags, or from the bundled repository when that
+# prefix is empty. The prefix is listed every 15 seconds, and a change reloads the
+# repository and restarts Feast. The arguments after the script go to `feast`.
+x-feast-repo-sync: &feast-repo-sync |
+  import os, shutil, signal, subprocess, sys, time
+  import boto3
+  REPO = "/tmp/feature_repo"
+  s3 = boto3.client("s3", endpoint_url="http://seaweed:8333")
+  def listing():
+      pages = s3.get_paginator("list_objects_v2").paginate(Bucket="feast", Prefix="repo/")
+      return sorted((o["Key"], o["ETag"]) for p in pages for o in p.get("Contents", []) if not o["Key"].endswith("/"))
+  def load(objects):
+      shutil.rmtree(REPO, ignore_errors=True)
+      if not objects:
+          shutil.copytree("/bundled_repo", REPO)
+      for key, _ in objects:
+          path = os.path.join(REPO, key.removeprefix("repo/"))
+          os.makedirs(os.path.dirname(path), exist_ok=True)
+          s3.download_file("feast", key, path)
+      print("Feature repository:", "s3://feast/repo" if objects else "bundled", flush=True)
+  def start():
+      return subprocess.Popen(["feast", "-c", REPO, *sys.argv[1:]])
+  signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+  objects = listing()
+  load(objects)
+  feast = start()
+  try:
+      while feast.poll() is None:
+          time.sleep(15)
+          try:
+              latest = listing()
+          except Exception as error:
+              print("Listing s3://feast/repo failed:", error, flush=True)
+              continue
+          if latest != objects:
+              objects = latest
+              feast.terminate()
+              feast.wait()
+              load(objects)
+              feast = start()
+      sys.exit(feast.returncode)
+  finally:
+      if feast.poll() is None:
+          feast.terminate()
+          feast.wait()
 
 services:
   # ==========================================
@@ -72,12 +123,14 @@ services:
   # ==========================================
   # MLflow Model Server: scores one registered model
   # ==========================================
+  # Part of the mlflow profile. With MODEL_URI empty it waits and reports healthy;
+  # set MODEL_URI in .env and run `odctl up mlflow` again to serve that model.
   # One model per container, because --model-uri is singular. To serve a second
   # model, copy this block, rename it, and give it another host port.
   mlflow-serve:
     image: ghcr.io/jaehyeon-kim/odctl/mlops:${TAG:-latest}
     container_name: mlflow-serve
-    profiles: ["mlflow-serve"]
+    profiles: ["mlflow"]
     networks:
       - odctl
     ports:
@@ -86,22 +139,22 @@ services:
     environment:
       <<: *mlops-env
       MLFLOW_TRACKING_URI: http://mlflow:5000
-    # MODEL_URI has no default on purpose, so an unset value stops the container
-    # rather than serving something unintended. It is not written as
-    # ${MODEL_URI:?...}, because compose interpolates the whole file and that
-    # form would break `odctl up mlflow` as well. Accepts models:/name@alias,
-    # runs:/<run-id>/<path>, or an s3:// path.
-    command: >
-      mlflow models serve
-      --model-uri ${MODEL_URI}
-      --env-manager local
-      --host 0.0.0.0
-      --port 5003
+      # Accepts models:/name@alias, runs:/<run-id>/<path>, or an s3:// path.
+      MODEL_URI: ${MODEL_URI:-}
+    command:
+      - bash
+      - -c
+      - |
+        if [ -z "$${MODEL_URI}" ]; then
+          echo "MODEL_URI is empty: nothing to serve. Set it in .env and run odctl up mlflow."
+          exec sleep infinity
+        fi
+        exec mlflow models serve --model-uri "$${MODEL_URI}" --env-manager local --host 0.0.0.0 --port 5003
     # Loading the model can fail long after the process starts, for example when
-    # MODEL_URI names nothing. Without this check `odctl up mlflow-serve`
-    # reports success on a container that has already exited.
+    # MODEL_URI names nothing. Without this check `odctl up mlflow` reports
+    # success on a container that has already exited. Waiting idle is healthy.
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5003/ping || exit 1"]
+      test: ["CMD-SHELL", "[ -z \"$${MODEL_URI}\" ] || curl -f http://localhost:5003/ping || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -116,9 +169,10 @@ services:
   # Stores no feature values: offline in Iceberg, online in valkey, only
   # definitions in the SQL registry.
   #
-  # Point FEAST_REPO at your own feature repository and run `feast apply`
-  # yourself. Your environment needs feast[duckdb,iceberg,redis,postgres];
-  # the image needs no extras because neither service reads Iceberg.
+  # Upload your own feature repository to s3://feast/repo, as DAGs go to
+  # s3://airflow/dags, and run `feast apply` yourself. Your environment needs
+  # feast[duckdb,iceberg,redis,postgres]; the image needs no extras because
+  # neither service reads Iceberg.
   #
   # The image sets no CMD, so both services name their own command.
   feast-ui:
@@ -133,9 +187,8 @@ services:
     environment:
       <<: *feast-env
     volumes:
-      - ${FEAST_REPO:-./feast}:/feature_repo
-    command: >
-      feast -c /feature_repo ui --host 0.0.0.0 --port 8888
+      - ./feast:/bundled_repo:ro
+    command: ["python", "-c", *feast-repo-sync, "ui", "--host", "0.0.0.0", "--port", "8888"]
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8888/api/v1/projects || exit 1"]
       interval: 10s
@@ -146,7 +199,7 @@ services:
   feast-serve:
     image: *feast-image
     container_name: feast-serve
-    profiles: ["feast-serve"]
+    profiles: ["feast"]
     networks:
       - odctl
     ports:
@@ -155,10 +208,9 @@ services:
     environment:
       <<: *feast-env
     volumes:
-      - ${FEAST_REPO:-./feast}:/feature_repo
+      - ./feast:/bundled_repo:ro
     # --metrics starts Feast's Prometheus endpoint on port 8000, inside the network.
-    command: >
-      feast -c /feature_repo serve --host 0.0.0.0 --port 6566 --no-access-log --metrics
+    command: ["python", "-c", *feast-repo-sync, "serve", "--host", "0.0.0.0", "--port", "6566", "--no-access-log", "--metrics"]
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:6566/health || exit 1"]
       interval: 10s

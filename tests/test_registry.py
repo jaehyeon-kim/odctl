@@ -78,7 +78,7 @@ class TestUsageTextMatchesCompose:
                     ports.add(int(host))
         return ports
 
-    def test_every_localhost_port_in_usage_text_is_published(self):
+    def test_every_host_port_in_usage_text_is_published(self):
         import re
 
         _, registry, composes = self._load()
@@ -92,9 +92,9 @@ class TestUsageTextMatchesCompose:
                 continue
             for profile, text in usage.items():
                 published = self._published_ports(compose, profile)
-                for port in re.findall(r"localhost:(\d+)", text or ""):
+                for port in re.findall(r"127\.0\.0\.1:(\d+)", text or ""):
                     if int(port) not in published:
-                        wrong.append(f"{profile}: usage says localhost:{port}")
+                        wrong.append(f"{profile}: usage says 127.0.0.1:{port}")
         assert not wrong, (
             "usage text names ports the profile does not publish: " + "; ".join(wrong)
         )
@@ -129,7 +129,7 @@ class TestUsageTextMatchesCompose:
                 for host in re.findall(
                     r"(?:https?://)?([a-z][a-z0-9.-]*):\d+", text or ""
                 ):
-                    if host in ("localhost", "127.0.0.1") or host in allowed:
+                    if host == "127.0.0.1" or host in allowed:
                         continue
                     if host not in names:
                         unknown.append(f"{profile}: {host}")

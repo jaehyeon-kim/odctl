@@ -88,6 +88,19 @@ def test_explain_command(monkeypatch):
     assert result.exit_code == 0
 
 
+def test_explain_prints_the_host_address_note_once(monkeypatch, tmp_path):
+    """Every explain panel ends with why host addresses use 127.0.0.1, not localhost."""
+    from odctl.ui import HOST_ADDRESS_NOTE
+
+    monkeypatch.chdir(tmp_path)  # no workspace, so the bundled registry is read
+    result = runner.invoke(app, ["explain", "feast"])
+    assert result.exit_code == 0
+    # The note wraps inside the panel, so drop the borders before joining lines.
+    text = " ".join(result.stdout.replace("│", " ").split())
+    assert text.count(" ".join(HOST_ADDRESS_NOTE.split())) == 1
+    assert "localhost:" not in text
+
+
 def test_docker_not_running(monkeypatch):
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: False)
     result = runner.invoke(app, ["up", "kafka-lite"])

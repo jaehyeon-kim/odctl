@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -47,6 +48,16 @@ def print_profile_table(registry: Any, details: bool, get_details_func: Any):
             table.add_row(*row)
         table.add_section()
     console.print(table)
+
+
+# Printed under every `odctl explain`. With IPv6 enabled on the Docker network,
+# localhost reaches the container's IPv6 address, and services that listen on
+# IPv4 only reset that connection; 127.0.0.1 always goes over IPv4.
+HOST_ADDRESS_NOTE = (
+    "Host addresses use 127.0.0.1. With IPv6 enabled in Docker, localhost can reach "
+    "a service's IPv6 address, and services that listen on IPv4 only reset the "
+    "connection. localhost works when Docker's IPv6 is off."
+)
 
 
 def print_explain_panel(
@@ -161,7 +172,10 @@ def print_explain_panel(
     # Constructing the Output
     role_section = f"\n[bold]Architecture Role:[/bold]\n{role}\n" if role else ""
     usage_section = (
-        f"\n[bold green]🚀 How to Use It:[/bold green]\n{usage}\n" if usage else ""
+        # Usage text is plain: escape it, or Rich reads feast[duckdb,...] as markup.
+        f"\n[bold green]🚀 How to Use It:[/bold green]\n{escape(usage)}\n"
+        if usage
+        else ""
     )
 
     details = f"""
@@ -182,7 +196,8 @@ def print_explain_panel(
 
 [bold]Network Mapping (Host ➡️  Docker):[/bold]
 {ports_str}
-{usage_section}"""
+{usage_section}[bold]Note:[/bold]
+[dim]{HOST_ADDRESS_NOTE}[/dim]"""
 
     console.print(
         Panel(

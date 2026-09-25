@@ -117,11 +117,13 @@ def test_expansion_stays_within_the_file():
     would stop shared infrastructure other profiles may still be using.
     """
     registry = load_registry()
-    catalog_deps = None
+    postgres_deps = None
     for stack in registry.stacks.values():
-        if "catalog" in (stack.depends_on or {}):
-            catalog_deps = stack.depends_on["catalog"]
-    assert catalog_deps and "deps" in catalog_deps, "expected catalog to depend on deps"
+        if "postgres" in (stack.depends_on or {}):
+            postgres_deps = stack.depends_on["postgres"]
+    assert postgres_deps and "deps" in postgres_deps, (
+        "expected postgres to depend on deps"
+    )
 
     expanded = expand_same_file_dependencies(
         ["postgres", "storage", "catalog"], ["catalog"]
@@ -606,3 +608,30 @@ def test_no_host_port_is_published_by_two_profiles_that_run_together():
                 clashes.append(f"{profile} and {other} both publish {sorted(shared)}")
 
     assert not clashes, "host port collisions: " + "; ".join(sorted(clashes))
+
+
+def test_postgres_allows_many_profiles_at_once():
+    """The default of 100 connections runs out when many profiles share postgres."""
+    import yaml
+
+    from odctl.config import get_internal_resources_dir
+
+    compose = yaml.safe_load(
+        (get_internal_resources_dir() / "compose-infra.yml").read_text()
+    )
+    assert "max_connections=300" in compose["services"]["postgres"]["command"]
+
+
+def test_init_deps_copies_only_changed_jars_and_renames_them_into_place():
+    """Rewriting every jar on each `odctl up` let a running engine read a half-written one."""
+    import yaml
+
+    from odctl.config import get_internal_resources_dir
+
+    compose = yaml.safe_load(
+        (get_internal_resources_dir() / "compose-deps.yml").read_text()
+    )
+    script = compose["services"]["init-deps"]["command"][-1]
+    assert 'cmp -s "$$file" "$$dest"' in script
+    assert 'mv -f "$$dest.partial" "$$dest"' in script
+    assert "cp -r" not in script

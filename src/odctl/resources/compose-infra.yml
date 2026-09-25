@@ -20,6 +20,11 @@ services:
       TZ: ${TZ:-UTC}
     command:
       - "postgres"
+      # Every profile that keeps state here opens its own pool: Airflow, MLflow,
+      # Feast, Metabase, OpenMetadata, Marquez, the catalog and Trino. The default
+      # of 100 runs out when many profiles run together.
+      - "-c"
+      - "max_connections=300"
       - "-c"
       - "wal_level=logical"
       - "-c"
@@ -93,7 +98,7 @@ services:
       echo '...waiting for SeaweedFS Master...'
       sleep 2
 
-      BUCKETS='warehouse odctl-dev flink-checkpoints flink-savepoints airflow mlflow'
+      BUCKETS='warehouse odctl-dev flink-checkpoints flink-savepoints airflow mlflow feast'
       for bucket in \$$BUCKETS; do
         echo \"--- Creating S3 bucket natively: \$$bucket ---\"
         echo \"s3.bucket.create -name \$$bucket\" | weed shell -master=seaweed:9333

@@ -108,6 +108,8 @@ The `odctl` CLI orchestrates the Open Data Stack and is logically grouped by fun
 - `odctl ps`: List Docker containers managed by the Open Data Stack.
 - `odctl info`: View package and system-wide Docker daemon health status.
 
+Host addresses in `odctl explain` use `127.0.0.1`. With IPv6 enabled in Docker, `localhost` can reach a service's IPv6 address, and services that listen on IPv4 only reset the connection. `localhost` works when Docker's IPv6 is off.
+
 ### Workspace
 
 - `odctl init`: Initialize a local `.odctl` workspace for custom configurations.
