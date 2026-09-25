@@ -196,7 +196,7 @@ services:
   # [PROFILE: metabase] BI & Dashboarding
   # ==========================================
   metabase:
-    image: metabase/metabase:v0.63.16.6
+    image: metabase/metabase:v0.63.18.2
     container_name: metabase
     profiles:
       - metabase
@@ -214,6 +214,8 @@ services:
       MB_DB_USER: ${POSTGRES_USER:-user}
       MB_DB_PASS: ${POSTGRES_PASSWORD:-password}
       MB_DB_HOST: postgres
+      # Prometheus metrics on :9191, off unless this is set.
+      MB_PROMETHEUS_SERVER_PORT: 9191
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s

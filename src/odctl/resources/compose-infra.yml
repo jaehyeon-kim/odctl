@@ -53,7 +53,7 @@ services:
   # Object Storage (SeaweedFS - Single Node)
   # ==========================================
   seaweed:
-    image: &seaweed-image chrislusf/seaweedfs:4.40
+    image: &seaweed-image chrislusf/seaweedfs:4.47
     container_name: seaweed
     ports:
       - "8333:8333" # S3 API
@@ -69,7 +69,8 @@ services:
       # Mount the S3 credentials configuration
       - ./seaweed/s3.json:/etc/seaweedfs/s3.json:ro
     # Explicitly tell the S3 gateway to enforce the config file
-    command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed -ip.bind=0.0.0.0"
+    # -metricsPort serves Prometheus metrics for every component `weed server` runs.
+    command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed -ip.bind=0.0.0.0 -metricsPort=9327"
     mem_limit: 512m
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8888/ || exit 1"]
@@ -114,6 +115,9 @@ services:
     image: apache/iceberg-rest-fixture:1.10.1
     command:
       - java
+      # Prometheus metrics on :9404 through the JMX exporter agent from the shared
+      # volume, since the catalog has no metrics endpoint of its own.
+      - -javaagent:/mnt/shared-deps/agents/jmx_prometheus_javaagent.jar=9404:/etc/jmx/jmx-exporter.yml
       - -cp
       - /usr/lib/iceberg-rest/iceberg-rest-adapter.jar:/mnt/shared-deps/shared/postgresql.jar
       - org.apache.iceberg.rest.RESTCatalogServer
@@ -125,6 +129,7 @@ services:
     volumes:
       # Postgres JDBC driver, which the fixture image does not ship
       - odctl-shared-deps:/mnt/shared-deps:ro
+      - ./jmx:/etc/jmx:ro
     profiles:
       - catalog
     depends_on:

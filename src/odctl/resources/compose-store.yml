@@ -49,6 +49,8 @@ services:
         advertised.listeners: CLIENT://fluss-coordinator:9123
         internal.listener.name: INTERNAL
         remote.data.dir: /tmp/fluss/remote-data
+        metrics.reporters: prometheus
+        metrics.reporter.prometheus.port: 9249
     # bind.listeners binds the container hostname, not loopback, so localhost
     # is refused here. The CLIENT listener only opens once ZooKeeper is up.
     healthcheck:
@@ -84,12 +86,14 @@ services:
         kv.snapshot.interval: 0s
         data.dir: /tmp/fluss/data
         remote.data.dir: /tmp/fluss/remote-data
+        metrics.reporters: prometheus
+        metrics.reporter.prometheus.port: 9249
 
   # ==========================================
   # Valkey (Redis Alternative) + Valkey Search
   # ==========================================
   valkey:
-    image: valkey/valkey-bundle:9.1.2-alpine
+    image: valkey/valkey-bundle:9.1.3-alpine
     container_name: valkey
     ports:
       - "6379:6379"

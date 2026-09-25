@@ -55,6 +55,8 @@ services:
     # allowed-hosts needs both the container port and the published one: 5000
     # for anything inside, 5004 from the host. A missing entry gives 403 while
     # /health still answers 200, so the container looks healthy.
+    # --expose-prometheus serves request metrics at /metrics, keeping per-worker
+    # files in the given directory so both workers are counted.
     # Never comment inside the command block: YAML folds it into the arguments.
     command: >
       mlflow server
@@ -65,6 +67,7 @@ services:
       --port 5000
       --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000,localhost:5004,127.0.0.1:5004
       --workers 2
+      --expose-prometheus /tmp/mlflow-prometheus
 
   # ==========================================
   # MLflow Model Server: scores one registered model
@@ -153,8 +156,9 @@ services:
       <<: *feast-env
     volumes:
       - ${FEAST_REPO:-./feast}:/feature_repo
+    # --metrics starts Feast's Prometheus endpoint on port 8000, inside the network.
     command: >
-      feast -c /feature_repo serve --host 0.0.0.0 --port 6566 --no-access-log
+      feast -c /feature_repo serve --host 0.0.0.0 --port 6566 --no-access-log --metrics
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:6566/health || exit 1"]
       interval: 10s

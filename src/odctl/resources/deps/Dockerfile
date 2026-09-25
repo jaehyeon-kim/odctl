@@ -67,6 +67,7 @@ COPY --from=downloader /downloads/connect /workspace/connect/
 COPY --from=downloader /downloads/flink /workspace/flink/
 COPY --from=downloader /downloads/spark /workspace/spark/
 COPY --from=downloader /downloads/shared /workspace/shared/
+COPY --from=downloader /downloads/agents /workspace/agents/
 
 # Final cleanup (hadoop-client replaces legacy hadoop-core, so this delete is perfectly safe)
 RUN find /workspace -type f -name "*hadoop-core*" -delete

@@ -75,9 +75,7 @@
     {
       "description": "Group Observability stack updates together",
       "matchPackageNames": [
-        "prom/prometheus",
-        "prom/alertmanager",
-        "grafana/grafana"
+        "grafana/otel-lgtm"
       ],
       "groupName": "Observability Stack"
     },

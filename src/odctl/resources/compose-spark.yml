@@ -9,6 +9,7 @@ x-spark-base: &spark-base
     - spark-events-data:/tmp/spark-events
     - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     - ./spark/log4j2.properties:/opt/spark/conf/log4j2.properties:ro
+    - ./spark/metrics.properties:/opt/spark/conf/metrics.properties:ro
   environment:
     TZ: ${TZ:-UTC}
     SPARK_DIST_CLASSPATH: "/mnt/shared-deps/shared/*:/mnt/shared-deps/spark/*"

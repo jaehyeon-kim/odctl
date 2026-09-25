@@ -13,6 +13,16 @@ x-common-environment: &kafka_broker_common_env_vars
   KAFKA_LOG_RETENTION_MS: "86400000"
   KAFKA_GROUP_COORDINATOR_REBALANCE_PROTOCOLS: "classic,consumer,share"
   KAFKA_HEAP_OPTS: "-Xmx750m -Xms750m"
+  # Prometheus metrics on :9404 through the JMX exporter agent, which the deps
+  # image places in the shared volume. Kafka has no metrics endpoint of its own.
+  # Given to the broker process only, in its command: as KAFKA_OPTS in the
+  # environment, every CLI tool run with `docker exec` would load the agent too,
+  # fail to bind 9404 and exit.
+  ODCTL_JMX_AGENT: "-javaagent:/mnt/shared-deps/agents/jmx_prometheus_javaagent.jar=9404:/etc/jmx/jmx-exporter.yml"
+
+x-broker-volumes: &broker-volumes
+  - odctl-shared-deps:/mnt/shared-deps:ro
+  - ./jmx:/etc/jmx:ro
 
 services:
   # ==========================================
@@ -21,6 +31,8 @@ services:
   kafka:
     image: &kafka-image apache/kafka:4.3.1
     container_name: kafka
+    volumes: *broker-volumes
+    command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -56,6 +68,8 @@ services:
   kafka-1:
     image: *kafka-image
     container_name: kafka-1
+    volumes: *broker-volumes
+    command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -76,6 +90,8 @@ services:
   kafka-2:
     image: *kafka-image
     container_name: kafka-2
+    volumes: *broker-volumes
+    command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
       - "9093:9093"
       - "29093:29093"
@@ -96,6 +112,8 @@ services:
   kafka-3:
     image: *kafka-image
     container_name: kafka-3
+    volumes: *broker-volumes
+    command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
       - "9094:9094"
       - "29094:29094"
@@ -127,6 +145,7 @@ services:
     profiles: ["kafka-lite", "kafka-full"]
     volumes:
       - odctl-shared-deps:/mnt/shared-deps
+      - ./jmx:/etc/jmx:ro
     command: |
       bash -c '
       cat <<EOF > /tmp/connect.properties
@@ -153,17 +172,20 @@ services:
       rest.port=8083
       plugin.path=/mnt/shared-deps/connect
       EOF
-      /opt/kafka/bin/connect-distributed.sh /tmp/connect.properties
+      KAFKA_OPTS="$$ODCTL_JMX_AGENT" /opt/kafka/bin/connect-distributed.sh /tmp/connect.properties
       '
     mem_limit: 2g
     environment:
       KAFKA_HEAP_OPTS: "-Xmx1500m -Xms1500m"
+      # Prometheus metrics on :9404, as for the brokers, and for the same reason
+      # given to the worker process only.
+      ODCTL_JMX_AGENT: "-javaagent:/mnt/shared-deps/agents/jmx_prometheus_javaagent.jar=9404:/etc/jmx/jmx-exporter.yml"
 
   # ==========================================
   # Schema Registry & UI
   # ==========================================
   karapace:
-    image: ghcr.io/aiven-open/karapace:6.2.2
+    image: ghcr.io/aiven-open/karapace:6.2.3
     container_name: karapace
     entrypoint:
       - python3

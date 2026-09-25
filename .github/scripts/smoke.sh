@@ -176,7 +176,7 @@ smoke_infra() {
     storage)
       retry 30 5 http_reachable "http://127.0.0.1:8333" || fail "S3 API never answered"
       # A port that answers is not a bucket that stores anything. Spark, Flink,
-      # Iceberg and the airflow DAG sync all write here, so assert the round
+      # Iceberg and Airflow's DAG bundle all use it, so assert the round
       # trip. Signed, because the S3 API refuses anonymous requests with 403,
       # which also makes this a check on the credentials the whole stack uses.
       local s3="http://localhost:8333/warehouse/odctl-smoke-$$.txt"
@@ -386,67 +386,69 @@ server_down() {
 # Airflow: a healthy api-server proves nothing. On Airflow 3 the profile shipped
 # for months with no dag-processor, so DAG files were never parsed, and then with
 # tasks that could not reach the Execution API and whose tokens were rejected.
-# Four containers were healthy through all of it. Only a DAG run reaching success
+# The container was healthy through all of it. Only a DAG run reaching success
 # catches that, so this drives one the whole way: into s3://airflow, through the
-# sync, past the parser, to a task that actually executes.
+# S3 DAG bundle, past the parser, to a task that actually executes.
 smoke_airflow() {
   retry 60 5 http_ok "http://127.0.0.1:8085/api/v2/monitor/health" \
     || fail "no HTTP response from :8085"
 
-  # Scheduler and dag_processor both, because a missing dag-processor is exactly
-  # the fault this exists to catch and the endpoint answers without it.
+  # Every component, because the endpoint answers even when one is missing.
   local health
   health=$(curl -fsS --max-time 10 "http://127.0.0.1:8085/api/v2/monitor/health" 2>/dev/null)
   printf '%s' "$health" | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
-bad = [p for p in ("metadatabase", "scheduler", "dag_processor")
+bad = [p for p in ("metadatabase", "scheduler", "dag_processor", "triggerer")
        if d.get(p, {}).get("status") != "healthy"]
 if bad:
     sys.exit("unhealthy: " + ", ".join(bad))
 ' || fail "airflow component unhealthy: $health"
-  pass "metadatabase, scheduler and dag_processor all healthy"
+  pass "metadatabase, scheduler, dag_processor and triggerer all healthy"
+
+  # standalone forces SimpleAuthManager, so check the fixed login still holds.
+  curl -fsS --max-time 10 -X POST "http://127.0.0.1:8085/auth/token" \
+    -H 'Content-Type: application/json' -d '{"username":"user","password":"password"}' \
+    | grep -q access_token || fail "login as user/password was refused"
+  pass "login as user/password works"
 
   local dag_id="odctl_smoke_$$"
-  cat > /tmp/"$dag_id".py <<PYEOF
+  # Written to s3://airflow only. The S3 DAG bundle reads it from there, so this
+  # tests the real path rather than a file placed in the container.
+  docker exec -i airflow python - "$dag_id" >/dev/null 2>&1 <<'PYEOF' \
+    || fail "could not upload the DAG to s3://airflow/dags"
+import sys, boto3
+dag_id = sys.argv[1]
+body = f"""
 from airflow.sdk import DAG
 from airflow.providers.standard.operators.bash import BashOperator
 import pendulum
 
 with DAG(
-    dag_id="$dag_id",
+    dag_id="{dag_id}",
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     schedule=None,
     catchup=False,
 ):
     BashOperator(task_id="say_hello", bash_command="echo odctl-smoke-ran")
+"""
+boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(
+    Bucket="airflow", Key=f"dags/{dag_id}.py", Body=body.encode())
 PYEOF
 
-  # s3://airflow owns the DAGs. airflow-sync copies them into the volume, so
-  # writing there rather than into the container tests the real path.
-  docker cp /tmp/"$dag_id".py airflow-sync:/tmp/dag.py >/dev/null 2>&1 \
-    || fail "could not stage the DAG into airflow-sync"
-  docker exec airflow-sync sh -c \
-    "aws --endpoint-url http://seaweed:8333 s3 cp /tmp/dag.py s3://airflow/dags/$dag_id.py" \
-    >/dev/null 2>&1 || fail "could not upload the DAG to s3://airflow/dags"
-
-  retry 24 5 docker exec airflow-scheduler test -f /opt/airflow/dags/"$dag_id".py \
-    || fail "airflow-sync never delivered the DAG into /opt/airflow/dags"
-  pass "airflow-sync delivered the DAG from s3://airflow"
-
-  # The dag-processor scans on its own interval, so this is the slow step.
+  # The bundle refreshes every 30 seconds, then the dag-processor parses it.
   retry 30 10 bash -c \
-    "docker exec airflow-scheduler airflow dags list 2>/dev/null | grep -q $dag_id" \
-    || fail "dag-processor never parsed the DAG, so it is not in the database"
-  pass "dag-processor parsed the DAG"
+    "docker exec airflow airflow dags list 2>/dev/null | grep -q $dag_id" \
+    || fail "the S3 DAG bundle never delivered the DAG, or it was never parsed"
+  pass "the S3 DAG bundle delivered the DAG and it was parsed"
 
-  docker exec airflow-scheduler airflow dags unpause "$dag_id" >/dev/null 2>&1
-  docker exec airflow-scheduler airflow dags trigger "$dag_id" >/dev/null 2>&1 \
+  docker exec airflow airflow dags unpause "$dag_id" >/dev/null 2>&1
+  docker exec airflow airflow dags trigger "$dag_id" >/dev/null 2>&1 \
     || fail "could not trigger the DAG"
 
   local state=""
   for _ in $(seq 1 30); do
-    state=$(docker exec airflow-scheduler airflow dags list-runs "$dag_id" -o plain 2>/dev/null \
+    state=$(docker exec airflow airflow dags list-runs "$dag_id" -o plain 2>/dev/null \
       | grep -E "^$dag_id" | head -1 | tr -s ' ' | cut -d' ' -f3)
     case "$state" in success|failed) break ;; esac
     sleep 10
@@ -454,9 +456,7 @@ PYEOF
   [ "$state" = "success" ] || fail "DAG run finished in state ${state:-none}, not success"
   pass "DAG run reached success, so a task really executed"
 
-  docker exec airflow-sync sh -c \
-    "aws --endpoint-url http://seaweed:8333 s3 rm s3://airflow/dags/$dag_id.py" >/dev/null 2>&1 || true
-  rm -f /tmp/"$dag_id".py
+  docker exec airflow python -c "import boto3; boto3.client('s3', endpoint_url='http://seaweed:8333').delete_object(Bucket='airflow', Key='dags/$dag_id.py')" >/dev/null 2>&1 || true
 }
 
 # deps is a one-shot copy into a shared volume, so there is no container to
@@ -491,7 +491,9 @@ smoke_deps() {
 # an image bump moved looks identical from outside. The matrix runs telemetry on
 # its own, so the services it scrapes are absent and 8 of 9 targets are legitimately
 # down. Assert what holds alone: the config parsed into targets, the self-scrape
-# works, a query returns data, and alertmanager was discovered.
+# works, a query returns data, OTLP reaches Prometheus both directly and through
+# the collector, and Grafana logs in and queries Prometheus. All of it runs in the
+# one grafana/otel-lgtm container.
 smoke_telemetry() {
   retry 60 5 http_ok "http://127.0.0.1:19090/-/ready" || fail "no HTTP response from :19090"
 
@@ -541,10 +543,35 @@ sys.exit(0 if r and r[0][\"value\"][1] == \"42\" else 1)
 "' || fail "the OTLP metric never became queryable"
   pass "OTLP metrics receiver accepted a metric and it queried back"
 
-  retry 30 5 http_ok "http://127.0.0.1:19093/-/ready" || fail "alertmanager never became ready"
-  curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/alertmanagers" 2>/dev/null \
-    | grep -q activeAlertmanagers || fail "prometheus did not discover alertmanager"
-  pass "alertmanager ready and discovered by prometheus"
+  # The same encoding through the collector's OTLP HTTP receiver, which forwards
+  # to Prometheus. This is the path an OpenTelemetry SDK uses by default.
+  sed 's/odctl_smoke_total/odctl_smoke_collector_total/' /tmp/odctl-otlp.json > /tmp/odctl-otlp-collector.json
+  curl -fsS --max-time 10 -X POST -H "Content-Type: application/json" \
+    --data-binary @/tmp/odctl-otlp-collector.json \
+    "http://127.0.0.1:4318/v1/metrics" >/dev/null \
+    || fail "the OTLP collector rejected a metric on :4318"
+  retry 12 5 bash -c '
+    curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/query?query=odctl_smoke_collector_total" 2>/dev/null \
+      | python3 -c "
+import json, sys
+r = json.load(sys.stdin)[\"data\"][\"result\"]
+sys.exit(0 if r and r[0][\"value\"][1] == \"42\" else 1)
+"' || fail "a metric sent to the collector never reached Prometheus"
+  pass "OTLP collector on :4318 forwarded a metric to Prometheus"
+
+  # Grafana: the image enables anonymous Admin by default, and odctl turns that off
+  # in favour of user/password, so both the login and the data source are checked.
+  retry 30 5 http_ok "http://127.0.0.1:3004/api/health" || fail "grafana never answered on :3004"
+  curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "http://127.0.0.1:3004/api/datasources" 2>/dev/null \
+    | grep -q "^401$" || fail "grafana answered without a login, anonymous access is still on"
+  curl -fsS --max-time 10 -u user:password \
+    "http://127.0.0.1:3004/api/datasources/proxy/uid/prometheus/api/v1/query?query=up" 2>/dev/null \
+    | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+sys.exit(0 if d.get("status") == "success" and d["data"]["result"] else "no series")
+' || fail "grafana could not query prometheus through its data source"
+  pass "grafana logs in as user/password and queries prometheus"
 }
 
 # Marquez: the namespaces endpoint answers on an empty database, so it proves

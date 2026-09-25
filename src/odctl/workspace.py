@@ -1,4 +1,6 @@
+import os
 import shutil
+from typing import Optional
 from importlib.metadata import PackageNotFoundError, version
 
 from odctl.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
@@ -18,6 +20,32 @@ def get_cli_version() -> str:
     except PackageNotFoundError:
         # Fallback for when you are developing locally and haven't installed the package
         return "latest"
+
+
+def stale_workspace_tag() -> Optional[str]:
+    """
+    Return the workspace's TAG when it no longer matches this CLI's version.
+
+    `odctl init` writes TAG from the CLI version once, so upgrading the CLI later
+    leaves the workspace starting the old images and compose files, with no sign
+    of it. A TAG set in the shell is an explicit choice and is not reported.
+
+    Returns:
+        Optional[str]: The stale TAG, or None when there is no workspace, no TAG,
+        a shell override, or a match.
+    """
+    if os.environ.get("TAG"):
+        return None
+    env_file = get_workspace_dir() / ".env"
+    if not env_file.exists():
+        return None
+    for line in env_file.read_text().splitlines():
+        key, _, value = line.strip().partition("=")
+        if key == "TAG":
+            tag = value.strip().strip('"').strip("'")
+            cli = get_cli_version()
+            return tag if tag and cli != "latest" and tag != cli else None
+    return None
 
 
 def init_workspace(force: bool = False):
