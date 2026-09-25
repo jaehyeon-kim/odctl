@@ -64,4 +64,10 @@ make_dir "shared"
 fetch_artifact "shared/iceberg-aws-bundle.jar" "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_V}/iceberg-aws-bundle-${ICEBERG_V}.jar"
 fetch_artifact "shared/postgresql.jar" "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_V}/postgresql-${POSTGRES_V}.jar"
 
+echo "▶️  Fetching the Prometheus JMX exporter agent..."
+# In its own folder rather than shared/, because Flink copies shared/*.jar into
+# its lib directory and Spark puts shared/* on its classpath.
+make_dir "agents"
+fetch_artifact "agents/jmx_prometheus_javaagent.jar" "https://github.com/prometheus/jmx_exporter/releases/download/${JMX_EXPORTER_V}/jmx_prometheus_javaagent-${JMX_EXPORTER_V}.jar"
+
 echo "✅ Shared & Connect dependencies complete!"

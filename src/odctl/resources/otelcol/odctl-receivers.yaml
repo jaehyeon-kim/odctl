@@ -1,0 +1,28 @@
+# Merged over the image's own /otel-lgtm/otelcol-config.yaml through
+# OTELCOL_EXTRA_ARGS, so the image's pipelines stay as they are. PostgreSQL and
+# Valkey expose no Prometheus endpoint, and these receivers ship in the image's
+# otelcol-contrib, so their metrics need no exporter container.
+receivers:
+  postgresql:
+    endpoint: postgres:5432
+    transport: tcp
+    username: ${env:ODCTL_POSTGRES_USER}
+    password: ${env:ODCTL_POSTGRES_PASSWORD}
+    # Empty means every database on the server.
+    databases: []
+    collection_interval: 15s
+    tls:
+      insecure: true
+  # Valkey speaks the Redis protocol. Its default user is disabled in
+  # compose-store.yml, so the receiver logs in as the application user.
+  redis:
+    endpoint: valkey:6379
+    username: ${env:ODCTL_VALKEY_USER}
+    password: ${env:ODCTL_VALKEY_PASSWORD}
+    collection_interval: 15s
+
+service:
+  pipelines:
+    metrics:
+      # A merged list replaces the image's, so its two receivers are repeated here.
+      receivers: [otlp, prometheus/collector, postgresql, redis]

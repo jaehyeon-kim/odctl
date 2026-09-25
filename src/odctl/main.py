@@ -25,7 +25,12 @@ from odctl.planner import (
     warn_unreachable_profiles,
 )
 from odctl.registry import load_registry
-from odctl.workspace import get_workspace_dir, init_workspace
+from odctl.workspace import (
+    get_cli_version,
+    get_workspace_dir,
+    init_workspace,
+    stale_workspace_tag,
+)
 
 app = typer.Typer(
     name="odctl",
@@ -291,6 +296,15 @@ def up(
     if not dry_run and not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
+
+    stale = stale_workspace_tag()
+    if stale:
+        ui.print_info(
+            f"⚠️  .odctl/.env sets TAG={stale}, but this is odctl {get_cli_version()}. "
+            "The workspace keeps the old images and compose files. Run "
+            "`odctl init --force` to move it to this version (it resets local edits).",
+            style="yellow",
+        )
 
     plan = build_execution_plan(profiles, resolve_deps=True)
     # A profile resolves to one file. A service elsewhere declaring it is never
