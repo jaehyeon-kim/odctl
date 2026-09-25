@@ -1,4 +1,4 @@
-FROM ghcr.io/mlflow/mlflow:v3.16.0-full
+FROM ghcr.io/mlflow/mlflow:v3.16.1-full
 
 # Metadata Bindings for GHCR
 LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
