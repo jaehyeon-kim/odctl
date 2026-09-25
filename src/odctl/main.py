@@ -22,6 +22,7 @@ from odctl.planner import (
     build_execution_plan,
     expand_plan_dependencies,
     get_profile_map,
+    resolve_dependencies,
     warn_unreachable_profiles,
 )
 from odctl.registry import load_registry
@@ -154,10 +155,10 @@ def explain(
             profile, f"• No specific usage guide for profile: {profile}"
         )
 
-    if isinstance(stack.depends_on, dict):
-        resolved_deps = stack.depends_on.get(profile, [])
-    else:
-        resolved_deps = stack.depends_on
+    # The registry lists only direct prerequisites; show everything that starts.
+    resolved_deps = sorted(
+        resolve_dependencies([profile], profile_map, registry) - {profile}
+    )
 
     ui.print_explain_panel(
         profile,

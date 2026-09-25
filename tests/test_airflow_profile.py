@@ -61,3 +61,11 @@ def test_login_is_fixed_for_simple_auth_manager():
     assert env["AIRFLOW__CORE__AUTH_MANAGER"].endswith("SimpleAuthManager")
     assert env["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS"] == "user:admin"
     assert '{"user": "password"}' in _airflow_services()["airflow"]["command"][-1]
+
+
+def test_extra_packages_are_installed_by_the_image_entrypoint():
+    """No entrypoint override, so the image's entrypoint installs them before the command."""
+    service = _airflow_services()["airflow"]
+    assert "entrypoint" not in service
+    assert service["command"][:2] == ["bash", "-c"]
+    assert _env()["_PIP_ADDITIONAL_REQUIREMENTS"] == "${_AIRFLOW_PIP_DEPS:-}"

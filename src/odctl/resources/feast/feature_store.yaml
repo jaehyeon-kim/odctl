@@ -1,8 +1,9 @@
 # Default feature repository, so `odctl up feast` starts without you writing one.
 # It carries configuration and no feature definitions: odctl ships none.
 #
-# For your own features, point FEAST_REPO at a directory holding this file plus
-# your definitions, then run `feast apply` from your own environment. That
+# For your own features, upload a directory holding this file plus your
+# definitions to s3://feast/repo, then run `feast apply` from your own
+# environment. That
 # environment needs feast[duckdb,iceberg,redis,postgres], because the offline
 # half runs in the caller's process and the published image has feast[minimal].
 #
