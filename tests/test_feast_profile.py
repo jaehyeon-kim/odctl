@@ -25,12 +25,15 @@ def test_feast_services_sync_the_repository_from_s3():
         assert "time.sleep(15)" in script and "feast.terminate()" in script
         assert command[3] == verb
         assert service["volumes"] == ["./feast:/bundled_repo:ro"]
-        assert service["environment"]["AWS_ACCESS_KEY_ID"] == "${AWS_ACCESS_KEY_ID:-user}"
+        assert (
+            service["environment"]["AWS_ACCESS_KEY_ID"] == "${AWS_ACCESS_KEY_ID:-user}"
+        )
 
 
 def test_storage_creates_the_feast_bucket():
     init = next(
-        s for s in _compose("compose-infra.yml")["services"].values()
+        s
+        for s in _compose("compose-infra.yml")["services"].values()
         if "BUCKETS=" in str(s.get("entrypoint", ""))
     )
     assert " feast'" in init["entrypoint"]
