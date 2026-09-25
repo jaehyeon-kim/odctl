@@ -9,9 +9,47 @@ on:
           on a tag, and only the groups a change affects on a pull request.
         required: true
         type: string
+  # Rerun chosen groups by hand, for example after a registry timeout, without
+  # rebuilding the images or rerunning the whole matrix. Pick the tag whose
+  # images are published in "Use workflow from".
+  workflow_dispatch:
+    inputs:
+      profile_groups:
+        description: >-
+          Profile groups to run, comma-separated, as the matrix names them. For
+          example: feast, or feast,mlflow, or spark-lite spark-full.
+        required: true
+        default: feast
+        type: string
 
 jobs:
+  # The matrix needs a JSON array. A caller passes one; a manual run passes
+  # comma-separated text, which is converted here.
+  groups:
+    runs-on: ubuntu-latest
+    outputs:
+      json: ${{ steps.parse.outputs.json }}
+    steps:
+      - id: parse
+        env:
+          RAW: ${{ inputs.profile_groups }}
+        run: |
+          json=$(python3 -c '
+          import json, os
+          raw = os.environ["RAW"].strip()
+          try:
+              groups = json.loads(raw)
+          except ValueError:
+              groups = [g.strip() for g in raw.split(",") if g.strip()]
+          if not isinstance(groups, list) or not groups:
+              raise SystemExit("profile_groups is empty")
+          print(json.dumps(groups))
+          ')
+          echo "Profile groups: $json"
+          echo "json=$json" >> "$GITHUB_OUTPUT"
+
   e2e:
+    needs: groups
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,7 +59,7 @@ jobs:
       matrix:
         # Groups come from select-profiles.py, which pairs the lite and full
         # variants that share a large image so the pull is paid for once.
-        profile_group: ${{ fromJSON(inputs.profile_groups) }}
+        profile_group: ${{ fromJSON(needs.groups.outputs.json) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
