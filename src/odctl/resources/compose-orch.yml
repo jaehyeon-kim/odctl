@@ -38,6 +38,8 @@ x-airflow-common: &airflow-common
     # variables, as the feast services in compose-mlops.yml do; ODCTL must match
     # the catalog_name passed to IcebergSource.
     MLFLOW_TRACKING_URI: http://mlflow:5000
+    # Feast's SQL registry, for tasks that build a FeatureStore from their own config.
+    FEAST_REGISTRY: postgresql+psycopg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/feast
     # Scheduler, DAG processor and task metrics pushed over OTLP/HTTP to the
     # telemetry profile's collector. Without it, the exporter only logs failures.
     AIRFLOW__METRICS__OTEL_ON: "True"
@@ -81,8 +83,10 @@ services:
     ports:
       - "8085:8080"
     restart: unless-stopped
-    entrypoint: /bin/bash
+    # The image's own entrypoint runs first: it installs _PIP_ADDITIONAL_REQUIREMENTS,
+    # then runs this bash command unchanged.
     command:
+      - bash
       - -c
       - |
         set -e

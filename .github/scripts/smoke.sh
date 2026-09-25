@@ -163,7 +163,7 @@ smoke_infra() {
       # retrieval work would fail at first use rather than here.
       docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -q -c "
         CREATE TABLE IF NOT EXISTS odctl_smoke (id bigserial primary key, embedding vector(3));
-        TRUNCATE odctl_smoke;
+        TRUNCATE odctl_smoke RESTART IDENTITY;
         INSERT INTO odctl_smoke (embedding) VALUES ('[1,0,0]'), ('[0,1,0]'), ('[0.9,0.1,0]');
         CREATE INDEX IF NOT EXISTS odctl_smoke_hnsw ON odctl_smoke USING hnsw (embedding vector_l2_ops);
       " >/dev/null 2>&1 || fail "pgvector table, insert or HNSW index failed in the vector database"
@@ -200,6 +200,8 @@ smoke_infra() {
       pass "namespace created and listed through the REST API"
       # A namespace is metadata only. Creating a table exercises the JDBC
       # catalog backend and the S3FileIO write that every engine depends on.
+      # Drop a table an earlier failed run left behind, or the create gets 409.
+      curl -fsS -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" >/dev/null 2>&1 || true
       curl -fsS -X POST -H 'Content-Type: application/json' \
         -d '{"name":"t","schema":{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","required":true,"type":"long"}]}}' \
         "http://127.0.0.1:8181/v1/namespaces/smoke/tables" >/dev/null 2>&1 \
@@ -331,13 +333,14 @@ PYEOF
   smoke_model_server "$run_id"
 }
 
-# The mlflow-serve profile is asserted here rather than as its own e2e matrix
-# entry. The runner starts a profile before calling this script, and an empty
-# MODEL_URI stops that container by design, so a standalone entry could only
-# ever fail. A model has to exist first, which makes this the profile that can
-# create one.
+# mlflow-serve starts with the mlflow profile and waits idle while MODEL_URI is
+# empty. A model has to exist before it can serve one, so this registers a
+# model, sets MODEL_URI and runs `odctl up mlflow` again to recreate it.
 smoke_model_server() {
   local run_id="$1" name="odctl-smoke-$1"
+  [ "$(docker inspect -f '{{.State.Health.Status}}' mlflow-serve 2>/dev/null)" = healthy ] \
+    || fail "mlflow-serve is not waiting healthy with MODEL_URI empty"
+  pass "mlflow-serve waiting idle with MODEL_URI empty"
   docker exec -i -e SMOKE_MODEL_NAME="$name" -e GIT_PYTHON_REFRESH=quiet -e MLFLOW_LOGGING_LEVEL=ERROR \
     mlflow python - <<'PYEOF' || fail "could not register a model to serve"
 import mlflow, numpy as np, os, xgboost as xgb
@@ -360,7 +363,7 @@ PYEOF
   sed -i'' -e '/^MODEL_URI=/d' .odctl/.env
   echo "MODEL_URI=\"models:/$name@champion\"" >> .odctl/.env
 
-  odctl up mlflow-serve >/dev/null 2>&1 || fail "mlflow-serve did not start for models:/$name@champion"
+  odctl up mlflow >/dev/null 2>&1 || fail "mlflow-serve did not start for models:/$name@champion"
   retry 30 5 http_ok "http://127.0.0.1:5003/ping" || fail "no HTTP response from :5003"
 
   # Assert on the response body. The endpoint answers 200 with an error payload
@@ -370,17 +373,8 @@ PYEOF
     -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}' 2>/dev/null)
   case "$got" in
     *'"predictions"'*) pass "served models:/$name@champion and scored: $got" ;;
-    *) server_down; fail "/invocations returned no predictions: ${got:-<empty>}" ;;
+    *) fail "/invocations returned no predictions: ${got:-<empty>}" ;;
   esac
-  server_down
-}
-
-# Down by name, so tearing the mlflow profile down afterwards does not leave a
-# container behind that depends on it. Not `yes | odctl down`: this script runs
-# under pipefail, and odctl exits before `yes` does, so the pipeline reports
-# SIGPIPE as 141 and the whole smoke test fails after passing.
-server_down() {
-  printf 'y\n' | odctl down mlflow-serve >/dev/null 2>&1 || true
 }
 
 # Airflow: a healthy api-server proves nothing. On Airflow 3 the profile shipped
@@ -759,6 +753,8 @@ smoke_metadata() {
 smoke_feast() {
   retry 60 5 http_ok "http://127.0.0.1:8890/api/v1/projects" || fail "no HTTP response from the feast UI on :8890"
   pass "feast UI answering, registry reachable"
+  retry 30 5 http_ok "http://127.0.0.1:6566/health" || fail "no HTTP response from the feast online server on :6566"
+  pass "feast online server answering"
 
   local work="${TMPDIR:-/tmp}/odctl-feast-smoke"
   rm -rf "$work"; mkdir -p "$work/feature_repo"
@@ -933,7 +929,6 @@ case "$PROFILE" in
   metadata)   smoke_metadata ;;
   fluss)      smoke_fluss ;;
   feast)      smoke_feast ;;
-  feast-serve) smoke_http_only "http://127.0.0.1:6566/health" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

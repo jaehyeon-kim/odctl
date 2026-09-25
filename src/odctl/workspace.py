@@ -98,21 +98,12 @@ def init_workspace(force: bool = False):
             f.write('# _MLOPS_PIP_DEPS="pyod river"\n')
             f.write('_MLOPS_PIP_DEPS=""\n\n')
 
-            # Left empty on purpose. The mlflow-serve profile has nothing to
-            # serve until a model is logged, so an empty value stops that one
-            # container instead of serving something unintended.
+            # Left empty on purpose. mlflow-serve has nothing to serve until a
+            # model is logged, so an empty value keeps it waiting idle instead
+            # of serving something unintended.
             f.write("# MLflow Model Server target: models:/<name>@<alias>,\n")
             f.write("# runs:/<run-id>/<artifact-path>, or an s3:// path\n")
             f.write('# MODEL_URI="models:/my-model@champion"\n')
-            f.write('MODEL_URI=""\n\n')
-
-            # ./feast is shipped with the workspace and carries configuration
-            # with no feature definitions, so the profile starts before you
-            # have written any. Point this at your own repository to use it.
-            f.write("# Feast feature repository: a directory holding\n")
-            f.write("# feature_store.yaml plus your feature definitions.\n")
-            f.write("# Run `feast apply` yourself; odctl ships no definitions.\n")
-            f.write('# FEAST_REPO="/path/to/your/feature_repo"\n')
-            f.write('FEAST_REPO="./feast"\n')
+            f.write('MODEL_URI=""\n')
 
         print(f"  └─ Generated: .env (TAG={cli_version})")

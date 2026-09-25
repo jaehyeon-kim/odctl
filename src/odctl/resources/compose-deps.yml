@@ -14,6 +14,24 @@ services:
     volumes:
       # Mounts the named volume to the export path defined in the Dockerfile
       - odctl-shared-deps:/mnt/shared-deps/
+    # Replaces the image's `cp -r`, which rewrote every jar on each `odctl up`, so a
+    # running Spark or Flink could read a half-written jar. Only a missing or
+    # changed file is copied, to a temporary name and then renamed into place, so
+    # a reader sees either the old file or the new one.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        cd /workspace
+        find . -type f | while read -r file; do
+          dest="/mnt/shared-deps/$${file#./}"
+          cmp -s "$$file" "$$dest" 2>/dev/null && continue
+          mkdir -p "$$(dirname "$$dest")"
+          cp "$$file" "$$dest.partial"
+          mv -f "$$dest.partial" "$$dest"
+        done
+        echo '✅ Open Data Stack Dependencies populated.'
 
 networks:
   odctl:
