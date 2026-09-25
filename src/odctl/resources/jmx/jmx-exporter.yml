@@ -1,0 +1,5 @@
+# Prometheus JMX exporter configuration shared by the JVM services that have no
+# metrics endpoint of their own: the Kafka brokers, Kafka Connect and the Iceberg
+# REST catalog. With no rules, every MBean is exported under its default name.
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true

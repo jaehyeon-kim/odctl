@@ -1,4 +1,4 @@
-FROM ghcr.io/mlflow/mlflow:v3.16.0-full
+FROM ghcr.io/mlflow/mlflow:v3.16.1-full
 
 # Metadata Bindings for GHCR
 LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
@@ -16,6 +16,8 @@ RUN apt-get update \
 # Pinned to a minor, because a model is logged by one version and loaded back by
 # whichever version this image last built with. An unpinned rebuild can move a
 # runtime under a stored model and change its predictions or refuse to load it.
+# XGBoost and LightGBM match the airflow image, where models are trained. XGBoost
+# stops at 3.2 because 3.3 and later need Python 3.12 and this base runs 3.11.
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install \
     'onnxruntime~=1.29.0' \

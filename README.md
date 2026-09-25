@@ -23,14 +23,14 @@ The stack is organized into distinct profiles that can be launched independently
   - **Stack:** Apache Spark
 - **Analytics:** Real-time OLAP querying, federated SQL execution, and interactive BI dashboards.
   - **Stack:** ClickHouse, Trino, Metabase
-- **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation.
-  - **Stack:** Apache Airflow
+- **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation, in one container that reads DAGs from object storage.
+  - **Stack:** Apache Airflow (standalone, with the MLflow and Feast clients and the XGBoost, LightGBM and PyTorch runtimes)
 - **MLOps:** Machine learning experiment tracking, model registry, HTTP model serving, and a feature store.
   - **Stack:** MLflow, Feast
 - **Metadata:** Centralized data catalog, data discovery, and enterprise governance.
   - **Stack:** OpenMetadata
-- **Observability:** Metrics collection, intelligent alerting, and system telemetry visualization.
-  - **Stack:** Prometheus, Alertmanager, Grafana
+- **Observability:** Metrics, traces and logs over OpenTelemetry, with dashboards, in one container.
+  - **Stack:** grafana/otel-lgtm (OpenTelemetry Collector, Prometheus, Tempo, Loki, Grafana)
 - **Lineage:** Data provenance, pipeline dependency tracking, and troubleshooting.
   - **Stack:** OpenLineage, Marquez
 - **Foundational Storage, Data Store, & Catalog:** Persistent state, S3-compatible object storage, unified table metadata, high-performance caching/vector search, and unified stream storage.

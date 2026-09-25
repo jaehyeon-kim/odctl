@@ -24,5 +24,13 @@
         "GRANT_SELECT"
       ]
     }
+  ],
+  "system_information": [
+    {
+      "user": "prometheus",
+      "allow": [
+        "read"
+      ]
+    }
   ]
 }

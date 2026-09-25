@@ -59,73 +59,50 @@ services:
     restart: on-failure
 
   # ==========================================
-  # [PROFILE: telemetry] Prometheus
+  # [PROFILE: telemetry] grafana/otel-lgtm
   # ==========================================
-  prometheus:
-    image: prom/prometheus:v3.14.0
-    container_name: prometheus
+  # One container: OpenTelemetry Collector, Prometheus, Tempo, Loki, Pyroscope and
+  # Grafana. It replaces separate Prometheus, Alertmanager and Grafana services;
+  # odctl defines no alert rules, so Alertmanager did no work. The aliases keep
+  # http://prometheus:9090 and http://grafana:3000 resolving on the network.
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.33.1
+    container_name: otel-lgtm
     profiles:
       - telemetry
     networks:
-      - odctl
+      odctl:
+        aliases:
+          - prometheus
+          - grafana
     ports:
-      - "19090:9090"
-    mem_limit: 1g
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-      # OTLP metrics at /api/v1/otlp/v1/metrics, off by default.
-      - "--web.enable-otlp-receiver"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
-  # ==========================================
-  # [PROFILE: telemetry] Alertmanager
-  # ==========================================
-  alertmanager:
-    image: prom/alertmanager:v0.34.0
-    container_name: alertmanager
-    profiles:
-      - telemetry
-    networks:
-      - odctl
-    ports:
-      - "19093:9093"
-    mem_limit: 256m
-    volumes:
-      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-
-  # ==========================================
-  # [PROFILE: telemetry] Grafana
-  # ==========================================
-  grafana:
-    image: grafana/grafana:12.4
-    container_name: grafana
-    profiles:
-      - telemetry
-    networks:
-      - odctl
-    ports:
-      - "3004:3000"
-    mem_limit: 1g
+      - "19090:9090" # Prometheus, which also takes OTLP at /api/v1/otlp/v1/metrics
+      - "3004:3000" # Grafana
+      - "4317:4317" # OTLP gRPC, through the collector
+      - "4318:4318" # OTLP HTTP, through the collector
+    mem_limit: 2g
     environment:
+      # The image enables anonymous Admin by default; odctl keeps a login.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-user}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-password}
+      # The collector also reads odctl's receivers for PostgreSQL and Valkey.
+      OTELCOL_EXTRA_ARGS: --config=file:./odctl-receivers.yaml
+      ODCTL_POSTGRES_USER: ${POSTGRES_USER:-user}
+      ODCTL_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      ODCTL_VALKEY_USER: user
+      ODCTL_VALKEY_PASSWORD: password
     volumes:
-      - ./grafana:/etc/grafana/provisioning
-    depends_on:
-      prometheus:
-        condition: service_healthy
+      # odctl's scrape jobs, merged with the image's own settings.
+      - ./prometheus/prometheus.yml:/otel-lgtm/prometheus.yaml
+      - ./otelcol/odctl-receivers.yaml:/otel-lgtm/odctl-receivers.yaml
+    healthcheck:
+      # run-all.sh writes /tmp/ready once every component answers its /ready.
+      test: ["CMD-SHELL", "test -f /tmp/ready && curl -fsS http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
 
 networks:
   odctl:
