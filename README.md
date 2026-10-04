@@ -17,6 +17,7 @@ The stack is organized into distinct profiles that can be launched independently
 
 - **Messaging:** Real-time event streaming, schema validation, and robust data ingestion.
   - **Stack:** Kafka (KRaft), Schema Registry (Karapace), Kafka Connect, Kafka UI (kafbat)
+  - **Connect plugins:** Apache Iceberg sink (built from the Iceberg release the stack uses), Debezium PostgreSQL source, ClickHouse sink, Aiven JDBC and S3 sink, Redis, and the MSK data generator
 - **Stream Processing:** Stateful stream processing and continuous real-time data transformations.
   - **Stack:** Apache Flink
 - **Data Processing:** Distributed batch processing and large-scale ETL pipelines.
