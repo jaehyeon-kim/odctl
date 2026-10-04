@@ -307,9 +307,10 @@ smoke_infra() {
       retry 30 5 docker exec postgres pg_isready -U user || fail "postgres never became ready"
       docker exec postgres psql -U user -d odctl -c "SELECT 1" >/dev/null 2>&1 || fail "psql query failed"
       pass "accepting connections and running queries"
-      # The image is pgvector/pgvector and 01-init-databases.sh creates the
-      # extension in a `vector` database. SELECT 1 on `odctl` proves neither, so
-      # retrieval work would fail at first use rather than here.
+      # odctl's image adds pgvector, pg_textsearch and PostGIS, and
+      # 01-init-databases.sh creates them in a `vector` database. SELECT 1 on
+      # `odctl` proves none of that, so retrieval work would fail at first use
+      # rather than here.
       docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -q -c "
         CREATE TABLE IF NOT EXISTS odctl_smoke (id bigserial primary key, embedding vector(3));
         TRUNCATE odctl_smoke RESTART IDENTITY;
@@ -322,6 +323,29 @@ smoke_infra() {
       docker exec postgres psql -U user -d vector -q -c "DROP TABLE IF EXISTS odctl_smoke" >/dev/null 2>&1
       [ "$nearest" = "1" ] || fail "pgvector similarity returned row '$nearest', expected 1"
       pass "pgvector: vector column, HNSW index and similarity ordering all work"
+      # pg_textsearch only works when preloaded, so a BM25 index proves the
+      # shared_preload_libraries setting as well as the extension.
+      local bm25
+      bm25=$(docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -tAq -c "
+        DROP TABLE IF EXISTS odctl_smoke_docs;
+        CREATE TABLE odctl_smoke_docs (id int primary key, content text);
+        INSERT INTO odctl_smoke_docs VALUES
+          (1, 'PostgreSQL is a powerful database system'),
+          (2, 'BM25 is an effective ranking function'),
+          (3, 'Full text search with custom scoring');
+        CREATE INDEX odctl_smoke_docs_bm25 ON odctl_smoke_docs USING bm25(content) WITH (text_config='english');
+        SELECT id FROM odctl_smoke_docs ORDER BY content <@> 'ranking function' LIMIT 1;
+        DROP TABLE odctl_smoke_docs;
+      " 2>&1 | tr -d '[:space:]')
+      [ "$bm25" = "2" ] || fail "pg_textsearch BM25 query returned '$bm25', expected 2"
+      pass "pg_textsearch: BM25 index and ranking work"
+      local metres
+      metres=$(docker exec postgres psql -U user -d vector -tAc \
+        "SELECT round(ST_Distance('POINT(151.2093 -33.8688)'::geography, 'POINT(144.9631 -37.8136)'::geography) / 1000)" \
+        2>&1 | tr -d '[:space:]')
+      # Sydney to Melbourne is about 714 km on the spheroid.
+      [ "$metres" = "714" ] || fail "PostGIS distance returned '$metres' km, expected 714"
+      pass "PostGIS: geography distance works"
       # Read by the telemetry collector's postgresql receiver.
       assert_pushed_metrics 'postgresql_.+' PostgreSQL ;;
     storage)

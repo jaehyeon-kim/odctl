@@ -35,12 +35,17 @@ stacks:
     capacities: []
     depends_on:
       postgres: ["deps"]
-    role: "The foundational state-store using pgvector. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata."
+    role: "The foundational state-store. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata, and serves vector, BM25 keyword and geospatial queries."
     usage: |
       • Postgres JDBC:
         - External (host): jdbc:postgresql://127.0.0.1:5432/odctl
         - Internal (Docker): jdbc:postgresql://postgres:5432/odctl
         - Credentials: user / password
+      • Extensions, created in the `vector` database:
+        - vector (pgvector): vector columns and HNSW or IVFFlat indexes
+        - pg_textsearch: BM25 keyword ranking, for hybrid search with pgvector
+        - postgis: geometry and geography types and spatial queries
+        Run CREATE EXTENSION in another database to use them there.
 
   storage:
     file: "compose-infra.yml"

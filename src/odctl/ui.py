@@ -94,9 +94,9 @@ def print_explain_panel(
 
     # Container Context (Substring matching)
     container_roles = {
-        "pgvector": "Unified Metadata & Vector DB",
+        "odctl/postgres": "PostgreSQL with pgvector, pg_textsearch and PostGIS",
         "seaweedfs": "Object Storage (S3 API)",
-        "iceberg-rest": "Iceberg REST Catalog",
+        "zulu-openjdk": "Iceberg REST Catalog",
         "odctl/deps": "Dependency Initializer",
         "flink": "Flink Stream Processing Node",
         "apache/kafka": "Event Broker / Kafka Connect",

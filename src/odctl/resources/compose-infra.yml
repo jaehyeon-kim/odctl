@@ -4,8 +4,10 @@ services:
   # ==========================================
   # Unified Metadata & Vector DB (Postgres 18)
   # ==========================================
+  # odctl's image: postgres:18-trixie with pgvector, pg_textsearch (BM25) and
+  # PostGIS. Same user, data path and entrypoint as the official image.
   postgres:
-    image: pgvector/pgvector:0.8.7-pg18-trixie
+    image: ghcr.io/jaehyeon-kim/odctl/postgres:${TAG:-latest}
     container_name: postgres
     ports:
       - "5432:5432"
@@ -32,7 +34,8 @@ services:
       - "-c"
       - "max_wal_senders=4"
       - "-c"
-      - "shared_preload_libraries=pg_stat_statements"
+      # pg_textsearch must be preloaded; pgvector and PostGIS need not be.
+      - "shared_preload_libraries=pg_stat_statements,pg_textsearch"
       - "-c"
       - "pg_stat_statements.track=all"
       - "-c"

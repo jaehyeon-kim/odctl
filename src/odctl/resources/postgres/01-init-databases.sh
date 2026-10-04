@@ -41,9 +41,11 @@ for db in marquez omt vector iceberg airflow mlflow metabase feast evidently; do
 EOSQL
 done
 
-echo "Configuring vector extensions"
+echo "Configuring vector, BM25 and geospatial extensions"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "vector" <<-EOSQL
     CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE EXTENSION IF NOT EXISTS pg_textsearch;
+    CREATE EXTENSION IF NOT EXISTS postgis;
 EOSQL
 
 echo "Unified Database Initialization Complete"

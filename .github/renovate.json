@@ -48,6 +48,24 @@
       "matchStrings": ["(?m)^POSTGRES_V=\"(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "org.postgresql:postgresql",
       "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the pgvector version the odctl postgres image compiles. pgvector publishes tags, not releases.",
+      "managerFilePatterns": ["/^src/odctl/resources/docker/postgres/Dockerfile$/"],
+      "matchStrings": ["ARG PGVECTOR_V=(?<currentValue>\\S+)"],
+      "depNameTemplate": "pgvector/pgvector",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the pg_textsearch release the odctl postgres image installs.",
+      "managerFilePatterns": ["/^src/odctl/resources/docker/postgres/Dockerfile$/"],
+      "matchStrings": ["ARG PG_TEXTSEARCH_V=(?<currentValue>\\S+)"],
+      "depNameTemplate": "timescale/pg_textsearch",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
     }
   ],
   "packageRules": [
