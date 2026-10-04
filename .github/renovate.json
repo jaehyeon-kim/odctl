@@ -5,6 +5,8 @@
 
   "automerge": false,
 
+  "minimumReleaseAge": "3 days",
+
   "docker-compose": {
     "managerFilePatterns": ["/(^|/)compose-[^/]+\\.ya?ml$/"]
   },
