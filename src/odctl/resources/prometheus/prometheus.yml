@@ -96,6 +96,11 @@ scrape_configs:
     static_configs:
       - targets: ["feast-serve:8000"]
 
+  - job_name: "temporal"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["temporal:9090"]
+
   # JMX exporter agent from the deps image. kafka-1 to kafka-3 exist only in kafka-full.
   - job_name: "kafka"
     static_configs:

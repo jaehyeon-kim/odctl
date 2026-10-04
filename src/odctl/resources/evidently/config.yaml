@@ -1,0 +1,21 @@
+# Evidently UI service configuration, passed with --conf-path.
+#
+# A file rather than EVIDENTLY_* variables, because the service builds each
+# section in the order it reads them. The sql storage type is what registers the
+# database section, so `database` read ahead of `storage` fails at start with
+# "unknown config section database". Environment variables give no order to
+# rely on; this file does.
+
+# Projects, reports and dataset metadata, in their own database because the
+# tables have generic names such as users and projects. Tables are created or
+# migrated on the first request. @format reads the credentials from the
+# container's environment.
+storage:
+  type: sql
+database:
+  url: "@format postgresql://{env[POSTGRES_USER]}:{env[POSTGRES_PASSWORD]}@postgres:5432/evidently"
+
+# Dashboard panels default to JSON files in the container, which a recreate
+# loses. sql keeps them with the projects.
+dashboard:
+  storage_type: sql

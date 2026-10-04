@@ -1,0 +1,16 @@
+# Read by Grafana in grafana/otel-lgtm from its provisioning directory, next to
+# the image's own dashboard providers. Every file under dashboards/ loads into an
+# odctl folder. Each dashboard queries the image's Prometheus data source, uid
+# prometheus, and sources.yml records where each one came from.
+apiVersion: 1
+
+providers:
+  - name: odctl
+    folder: odctl
+    type: file
+    # Provisioned dashboards are replaced from these files on every start, so an
+    # edit in the UI would be lost. Save a copy to keep changes.
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/grafana/conf/provisioning/dashboards/odctl
+      foldersFromFilesStructure: false

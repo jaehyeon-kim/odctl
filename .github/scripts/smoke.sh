@@ -52,6 +52,47 @@ http_reachable() {
 
 ch() { docker exec "$1" clickhouse-client --password password -q "$2" 2>&1; }
 
+# Metrics: nothing else here reads a metrics endpoint, so a change that breaks
+# one goes unseen. In 0.8.0 the JMX agent in KAFKA_OPTS broke every Kafka CLI
+# run, and only an unrelated topic check caught it. So each profile reads its
+# scrape targets the way Prometheus does, by name on the odctl network, from a
+# throwaway alpine container, since most targets publish no port and some images
+# have no HTTP client. Any wget options go before the URL.
+metrics_ok() {
+  local out
+  out=$(docker run --rm --network odctl alpine wget -qO- -T 10 "$@" 2>/dev/null) || return 1
+  # A sample line, not a # TYPE line: Spark's servlet writes samples only.
+  grep -qE '^[a-zA-Z_:][a-zA-Z0-9_:]*(\{.*\})? [-+0-9.eEInfNa]+' <<<"$out"
+}
+
+# Retried, because a metrics reporter can start after the port a profile waits on.
+assert_metrics() {
+  local url
+  for url in "$@"; do
+    retry 12 5 metrics_ok "$url" || fail "no Prometheus samples at $url"
+  done
+  pass "Prometheus samples at$(printf ' %s' "$@")"
+}
+
+# Push and collector sources have no endpoint to read. When the telemetry
+# profile is up, their series must reach its Prometheus; when it is not, nothing
+# receives them, so there is nothing to assert.
+prom_has() {
+  curl -fsS --max-time 10 -G "http://127.0.0.1:19090/api/v1/query" \
+    --data-urlencode "query=count({__name__=~\"$1\"})" 2>/dev/null \
+    | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin)["data"]["result"] else 1)'
+}
+
+assert_pushed_metrics() {
+  local match="$1" what="$2"
+  if ! docker ps --format '{{.Names}}' | grep -qx otel-lgtm; then
+    echo "ℹ️  $PROFILE: telemetry is not up, so $what metrics are not checked"
+    return 0
+  fi
+  retry 12 10 prom_has "$match" || fail "no $what series ($match) in Prometheus"
+  pass "$what series ($match) in Prometheus"
+}
+
 kafka_topic() {
   docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 "$@"
 }
@@ -75,6 +116,87 @@ smoke_kafka() {
   pass "produced and consumed 5 messages through a consumer group"
 }
 
+# The plugins come from the deps volume, so a missing or misnamed folder only
+# shows up here: Connect starts and simply does not list the class.
+connect_plugins() {
+  retry 40 5 http_ok "http://127.0.0.1:8083/connector-plugins" || fail "Connect REST never answered"
+  local plugins
+  plugins=$(curl -fsS "http://127.0.0.1:8083/connector-plugins" 2>/dev/null)
+  for cls in org.apache.iceberg.connect.IcebergSinkConnector \
+    io.debezium.connector.postgresql.PostgresConnector \
+    com.clickhouse.kafka.connect.ClickHouseSinkConnector; do
+    grep -q "$cls" <<<"$plugins" || fail "Connect does not list $cls"
+  done
+  pass "Connect lists the Iceberg, Debezium and ClickHouse plugins"
+}
+
+# The Iceberg sink is built from source, so prove it commits a snapshot rather
+# than only loading. It needs the catalog, which kafka-lite does not start.
+smoke_iceberg_sink() {
+  odctl up catalog >/dev/null 2>&1 || fail "could not start the catalog for the Iceberg sink"
+  retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
+  local api="http://127.0.0.1:8181/v1/namespaces"
+  curl -fsS -X POST -H 'Content-Type: application/json' -d '{"namespace":["smoke"]}' "$api" >/dev/null 2>&1
+  curl -fsS -X DELETE "$api/smoke/tables/kc?purgeRequested=true" >/dev/null 2>&1 || true
+  curl -fsS -X POST -H 'Content-Type: application/json' \
+    -d '{"name":"kc","schema":{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","required":false,"type":"long"},{"id":2,"name":"name","required":false,"type":"string"}]}}' \
+    "$api/smoke/tables" >/dev/null 2>&1 || fail "could not create the sink's target table"
+
+  kafka_topic --create --if-not-exists --topic smoke-iceberg --partitions 1 --replication-factor 1 >/dev/null 2>&1
+  kafka_topic --create --if-not-exists --topic control-iceberg --partitions 1 --replication-factor 1 >/dev/null 2>&1
+  for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -i kafka \
+    /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic smoke-iceberg >/dev/null 2>&1 \
+    || fail "produce to smoke-iceberg failed"
+
+  curl -fsS -X DELETE "http://127.0.0.1:8083/connectors/smoke-iceberg" >/dev/null 2>&1 || true
+  curl -fsS -X POST -H 'Content-Type: application/json' "http://127.0.0.1:8083/connectors" -d '{
+    "name": "smoke-iceberg",
+    "config": {
+      "connector.class": "org.apache.iceberg.connect.IcebergSinkConnector",
+      "tasks.max": "1",
+      "topics": "smoke-iceberg",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+      "iceberg.tables": "smoke.kc",
+      "iceberg.control.commit.interval-ms": "10000",
+      "iceberg.kafka.session.timeout.ms": "300000",
+      "iceberg.kafka.heartbeat.interval.ms": "3000",
+      "iceberg.kafka.auto.offset.reset": "earliest",
+      "consumer.override.auto.offset.reset": "earliest",
+      "iceberg.catalog.type": "rest",
+      "iceberg.catalog.uri": "http://catalog:8181",
+      "iceberg.catalog.io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+      "iceberg.catalog.client.region": "us-east-1",
+      "iceberg.catalog.s3.endpoint": "http://seaweed:8333",
+      "iceberg.catalog.s3.path-style-access": "true",
+      "iceberg.catalog.s3.access-key-id": "user",
+      "iceberg.catalog.s3.secret-access-key": "password"
+    }}' >/dev/null 2>&1 || fail "Connect rejected the Iceberg sink configuration"
+
+  # The first commit waits for the control consumer to join its group, which
+  # takes a minute or more on a fresh worker.
+  local records=""
+  for _ in $(seq 1 60); do
+    records=$(curl -fsS "$api/smoke/tables/kc" 2>/dev/null | python3 -c '
+import json, sys
+m = json.load(sys.stdin)["metadata"]
+cur = m.get("current-snapshot-id")
+snap = [s for s in m.get("snapshots", []) if s["snapshot-id"] == cur]
+print(snap[0]["summary"].get("total-records", "") if snap else "")' 2>/dev/null)
+    [ "$records" = "5" ] && break
+    sleep 5
+  done
+  if [ "$records" != "5" ]; then
+    curl -fsS "http://127.0.0.1:8083/connectors/smoke-iceberg/status" 2>/dev/null; echo
+    docker logs --tail 40 connect 2>&1
+    fail "the Iceberg sink committed ${records:-no} records, expected 5"
+  fi
+  curl -fsS -X DELETE "http://127.0.0.1:8083/connectors/smoke-iceberg" >/dev/null 2>&1 || true
+  curl -fsS -X DELETE "$api/smoke/tables/kc?purgeRequested=true" >/dev/null 2>&1 || true
+  pass "the Iceberg sink committed 5 records to an Iceberg table"
+}
+
 smoke_flink() {
   retry 40 5 http_ok "http://127.0.0.1:8082/config" || fail "JobManager REST never answered"
   local out
@@ -89,6 +211,25 @@ SQL
   docker exec flink-jobmanager sh -c 'ps ax | grep -q "add-opens=java.base/java.nio"' \
     || fail "JVM module flags missing from the TaskManager command line"
   pass "Iceberg catalog registered and JVM module flags present"
+
+  # Registering the catalog loads the runtime jar but writes nothing. A batch
+  # insert and read proves the runtime, the Hadoop classes and S3FileIO work
+  # together on this Flink minor.
+  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+SET 'sql-client.execution.result-mode' = 'tableau';
+CREATE CATALOG ice WITH ('type'='iceberg','catalog-type'='rest','uri'='http://catalog:8181','warehouse'='s3://warehouse','s3.endpoint'='http://seaweed:8333','s3.path-style-access'='true','s3.access-key-id'='user','s3.secret-access-key'='password');
+CREATE DATABASE IF NOT EXISTS ice.smoke_flink;
+DROP TABLE IF EXISTS ice.smoke_flink.t;
+CREATE TABLE ice.smoke_flink.t (id BIGINT, name STRING);
+INSERT INTO ice.smoke_flink.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT 'rows=' || CAST(COUNT(*) AS STRING) AS c FROM ice.smoke_flink.t;
+DROP TABLE ice.smoke_flink.t;
+SQL
+)
+  grep -q "rows=3" <<<"$out" || { echo "$out" | tail -30; fail "Flink could not write and read an Iceberg table"; }
+  pass "Flink wrote 3 rows to an Iceberg table and read them back"
 }
 
 smoke_spark() {
@@ -114,6 +255,7 @@ smoke_ch_lite() {
   ch ch-11 "INSERT INTO default.smoke SELECT number FROM numbers(10)" >/dev/null
   [ "$(ch ch-11 "SELECT count() FROM default.smoke")" = "10" ] || fail "MergeTree round trip failed"
   pass "databases initialised and MergeTree round trip works"
+  assert_metrics http://ch-11:9363/metrics http://ch-12:9363/metrics
 }
 
 smoke_ch_full() {
@@ -129,6 +271,8 @@ smoke_ch_full() {
     || fail "rows never replicated to the sibling replica"
   [ "$(ch ch-21 "SELECT count() FROM default.repl")" = "0" ] || fail "shard 2 unexpectedly holds shard 1 data"
   pass "replicated table converged on shard 1 and stayed off shard 2"
+  assert_metrics http://ch-11:9363/metrics http://ch-12:9363/metrics \
+    http://ch-21:9363/metrics http://ch-22:9363/metrics
 }
 
 # Catalog registration finishes after the health endpoint starts answering, so
@@ -150,6 +294,11 @@ smoke_trino() {
   }
   docker exec trino trino --execute "SELECT 1" >/dev/null 2>&1 || fail "query execution failed"
   pass "all catalogs loaded and a query ran"
+  # As Prometheus logs in: user prometheus with no password, which rules.json
+  # allows to read system information.
+  retry 12 5 metrics_ok --header "Authorization: Basic $(printf 'prometheus:' | base64)" \
+    http://trino:8080/metrics || fail "no Prometheus samples at http://trino:8080/metrics"
+  pass "Prometheus samples at http://trino:8080/metrics"
 }
 
 smoke_infra() {
@@ -158,9 +307,10 @@ smoke_infra() {
       retry 30 5 docker exec postgres pg_isready -U user || fail "postgres never became ready"
       docker exec postgres psql -U user -d odctl -c "SELECT 1" >/dev/null 2>&1 || fail "psql query failed"
       pass "accepting connections and running queries"
-      # The image is pgvector/pgvector and 01-init-databases.sh creates the
-      # extension in a `vector` database. SELECT 1 on `odctl` proves neither, so
-      # retrieval work would fail at first use rather than here.
+      # odctl's image adds pgvector, pg_textsearch and PostGIS, and
+      # 01-init-databases.sh creates them in a `vector` database. SELECT 1 on
+      # `odctl` proves none of that, so retrieval work would fail at first use
+      # rather than here.
       docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -q -c "
         CREATE TABLE IF NOT EXISTS odctl_smoke (id bigserial primary key, embedding vector(3));
         TRUNCATE odctl_smoke RESTART IDENTITY;
@@ -172,7 +322,34 @@ smoke_infra() {
         "SELECT id FROM odctl_smoke ORDER BY embedding <-> '[1,0,0]' LIMIT 1" 2>/dev/null | tr -d '[:space:]')
       docker exec postgres psql -U user -d vector -q -c "DROP TABLE IF EXISTS odctl_smoke" >/dev/null 2>&1
       [ "$nearest" = "1" ] || fail "pgvector similarity returned row '$nearest', expected 1"
-      pass "pgvector: vector column, HNSW index and similarity ordering all work" ;;
+      pass "pgvector: vector column, HNSW index and similarity ordering all work"
+      # pg_textsearch only works when preloaded, so a BM25 index proves the
+      # shared_preload_libraries setting as well as the extension.
+      local bm25
+      # pg_textsearch reports its index build as NOTICE lines, so keep only warnings.
+      bm25=$(docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -tAq -c "
+        SET client_min_messages = warning;
+        DROP TABLE IF EXISTS odctl_smoke_docs;
+        CREATE TABLE odctl_smoke_docs (id int primary key, content text);
+        INSERT INTO odctl_smoke_docs VALUES
+          (1, 'PostgreSQL is a powerful database system'),
+          (2, 'BM25 is an effective ranking function'),
+          (3, 'Full text search with custom scoring');
+        CREATE INDEX odctl_smoke_docs_bm25 ON odctl_smoke_docs USING bm25(content) WITH (text_config='english');
+        SELECT id FROM odctl_smoke_docs ORDER BY content <@> 'ranking function' LIMIT 1;
+        DROP TABLE odctl_smoke_docs;
+      " 2>&1 | tr -d '[:space:]')
+      [ "$bm25" = "2" ] || fail "pg_textsearch BM25 query returned '$bm25', expected 2"
+      pass "pg_textsearch: BM25 index and ranking work"
+      local metres
+      metres=$(docker exec postgres psql -U user -d vector -tAc \
+        "SELECT round(ST_Distance('POINT(151.2093 -33.8688)'::geography, 'POINT(144.9631 -37.8136)'::geography) / 1000)" \
+        2>&1 | tr -d '[:space:]')
+      # Sydney to Melbourne is about 714 km on the spheroid.
+      [ "$metres" = "714" ] || fail "PostGIS distance returned '$metres' km, expected 714"
+      pass "PostGIS: geography distance works"
+      # Read by the telemetry collector's postgresql receiver.
+      assert_pushed_metrics 'postgresql_.+' PostgreSQL ;;
     storage)
       retry 30 5 http_reachable "http://127.0.0.1:8333" || fail "S3 API never answered"
       # A port that answers is not a bucket that stores anything. Spark, Flink,
@@ -190,7 +367,8 @@ smoke_infra() {
       body=$(docker exec seaweed sh -c "curl -fsS $sig '$cred' '$s3'" 2>/dev/null | tr -d '[:space:]')
       docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE '$s3'" >/dev/null 2>&1 || true
       [ "$body" = "odctl-smoke" ] || fail "read back '$body' from S3, expected odctl-smoke"
-      pass "signed write, read back and delete through the S3 API" ;;
+      pass "signed write, read back and delete through the S3 API"
+      assert_metrics http://seaweed:9327/metrics ;;
     catalog)
       retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
       curl -fsS -X POST -H 'Content-Type: application/json' \
@@ -209,7 +387,8 @@ smoke_infra() {
       curl -fsS "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" 2>/dev/null \
         | grep -q 'metadata-location' || fail "table metadata did not read back"
       curl -fsS -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" >/dev/null 2>&1 || true
-      pass "table created through the catalog and its metadata read back" ;;
+      pass "table created through the catalog and its metadata read back"
+      assert_metrics http://catalog:9404/metrics ;;
     valkey)
       local vk="redis://user:password@localhost:6379"
       retry 30 5 docker exec valkey valkey-cli -u "$vk" ping \
@@ -223,7 +402,9 @@ smoke_infra() {
       got=$(docker exec valkey valkey-cli -u "$vk" mget 'linucb:smoke-1' 'linucb:smoke-2' 2>/dev/null | grep -c '"a"')
       [ "$got" -eq 2 ] || fail "batch MGET returned $got of 2 values, expected 2"
       docker exec valkey valkey-cli -u "$vk" del 'linucb:smoke-1' 'linucb:smoke-2' >/dev/null 2>&1
-      pass "authenticated, multi-key write and batch MGET round-tripped" ;;
+      pass "authenticated, multi-key write and batch MGET round-tripped"
+      # Read by the telemetry collector's redis receiver.
+      assert_pushed_metrics 'redis_.+' Valkey ;;
   esac
 }
 
@@ -275,6 +456,7 @@ for db in (d.get("data") if isinstance(d, dict) else d) or []:
 smoke_metabase() {
   local sid
   retry 60 5 http_ok "http://127.0.0.1:3000/api/health" || fail "no HTTP response from :3000"
+  assert_metrics http://metabase:9191/metrics
   sid=$(retry_out 12 5 mb_session) || fail "could not obtain a Metabase session"
 
   # Postgres always: it is Metabase's own application database, so this proves
@@ -330,6 +512,7 @@ if "smoke.txt" not in names:
     sys.exit(f"artifact not listed back: {names}")
 PYEOF
   pass "logged a run with a proxied artifact and read it back"
+  assert_metrics http://mlflow:5000/metrics
   smoke_model_server "$run_id"
 }
 
@@ -451,6 +634,9 @@ PYEOF
   pass "DAG run reached success, so a task really executed"
 
   docker exec airflow python -c "import boto3; boto3.client('s3', endpoint_url='http://seaweed:8333').delete_object(Bucket='airflow', Key='dags/$dag_id.py')" >/dev/null 2>&1 || true
+
+  # Airflow pushes OTLP to the telemetry collector rather than being scraped.
+  assert_pushed_metrics 'airflow_.+' Airflow
 }
 
 # deps is a one-shot copy into a shared volume, so there is no container to
@@ -486,8 +672,8 @@ smoke_deps() {
 # its own, so the services it scrapes are absent and 8 of 9 targets are legitimately
 # down. Assert what holds alone: the config parsed into targets, the self-scrape
 # works, a query returns data, OTLP reaches Prometheus both directly and through
-# the collector, and Grafana logs in and queries Prometheus. All of it runs in the
-# one grafana/otel-lgtm container.
+# the collector, and Grafana logs in, queries Prometheus and loads odctl's
+# dashboards. All of it runs in the one grafana/otel-lgtm container.
 smoke_telemetry() {
   retry 60 5 http_ok "http://127.0.0.1:19090/-/ready" || fail "no HTTP response from :19090"
 
@@ -566,6 +752,17 @@ d = json.load(sys.stdin)
 sys.exit(0 if d.get("status") == "success" and d["data"]["result"] else "no series")
 ' || fail "grafana could not query prometheus through its data source"
   pass "grafana logs in as user/password and queries prometheus"
+
+  # A dashboard that fails to parse is logged and skipped, so count what loaded.
+  local want
+  want=$(find .odctl/grafana/dashboards -name '*.json' | wc -l | tr -d '[:space:]')
+  [ "$want" -gt 0 ] || fail "no dashboards in .odctl/grafana/dashboards"
+  retry 12 5 bash -c "
+    curl -fsS --max-time 10 -u user:password 'http://127.0.0.1:3004/api/search?type=dash-db' 2>/dev/null \
+      | python3 -c 'import json, sys
+sys.exit(0 if sum(d.get(\"folderTitle\") == \"odctl\" for d in json.load(sys.stdin)) == $want else 1)'
+  " || fail "grafana did not load all $want dashboards into the odctl folder"
+  pass "grafana loaded all $want dashboards into the odctl folder"
 }
 
 # Marquez: the namespaces endpoint answers on an empty database, so it proves
@@ -598,6 +795,7 @@ smoke_lineage() {
   curl -fsS "http://127.0.0.1:5002/api/v1/namespaces/$ns/jobs/smoke-job" 2>/dev/null \
     | grep -q smoke-job || fail "the job did not read back"
   pass "dataset and job both read back from Marquez"
+  assert_metrics http://marquez-api:5000/metrics
 }
 
 # Fluss: both containers ran while the cluster did nothing at all. The
@@ -632,6 +830,30 @@ smoke_fluss() {
     "docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active 2>/dev/null | grep -q fluss-coordinator:9123" \
     || fail "no active coordinator registered in ZooKeeper"
   pass "coordinator registered itself as the active leader"
+  assert_metrics http://fluss-coordinator:9249/metrics http://fluss-tablet-1:9249/metrics
+
+  # The Flink client jar comes from the deps image and must match the server
+  # version, so write and read a table through it.
+  odctl up flink-lite >/dev/null 2>&1 || fail "could not start flink-lite for the Fluss client check"
+  retry 40 5 http_ok "http://127.0.0.1:8082/config" || fail "JobManager REST never answered"
+  local out
+  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+SET 'sql-client.execution.result-mode' = 'tableau';
+CREATE CATALOG fluss_catalog WITH ('type' = 'fluss', 'bootstrap.servers' = 'fluss-coordinator:9123');
+CREATE DATABASE IF NOT EXISTS fluss_catalog.smoke;
+DROP TABLE IF EXISTS fluss_catalog.smoke.t;
+CREATE TABLE fluss_catalog.smoke.t (id BIGINT, name STRING, PRIMARY KEY (id) NOT ENFORCED);
+INSERT INTO fluss_catalog.smoke.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT 'id=' || CAST(id AS STRING) AS c FROM fluss_catalog.smoke.t LIMIT 10;
+DROP TABLE fluss_catalog.smoke.t;
+SQL
+)
+  local got
+  got=$(grep -c "id=[123]" <<<"$out")
+  [ "$got" -eq 3 ] || { echo "$out" | tail -30; fail "Flink read $got of 3 rows from a Fluss table"; }
+  pass "Flink wrote 3 rows to a Fluss table and read them back"
 }
 
 # OpenMetadata: the version endpoint answers through every failure the 2.0.1
@@ -648,6 +870,7 @@ smoke_metadata() {
   migrate=$(docker inspect -f '{{.State.ExitCode}}' openmetadata-migrate 2>/dev/null || echo NA)
   [ "$migrate" = "0" ] || fail "openmetadata-migrate exited $migrate, so the schema is not migrated"
   pass "schema migration completed"
+  assert_metrics http://openmetadata-server:8586/prometheus
 
   # The principal domain odctl sets is open-data.local, not the upstream
   # default. A wrong domain fails with a misleading invalid password error.
@@ -755,6 +978,7 @@ smoke_feast() {
   pass "feast UI answering, registry reachable"
   retry 30 5 http_ok "http://127.0.0.1:6566/health" || fail "no HTTP response from the feast online server on :6566"
   pass "feast online server answering"
+  assert_metrics http://feast-serve:8000/metrics
 
   local work="${TMPDIR:-/tmp}/odctl-feast-smoke"
   rm -rf "$work"; mkdir -p "$work/feature_repo"
@@ -768,7 +992,7 @@ smoke_feast() {
 
   # warehouse="" is required. Feast's REST client puts warehouse into the URL
   # path as a prefix for Polaris and Nessie style catalogs, and
-  # apache/iceberg-rest-fixture serves the spec with no prefix, so a real
+  # Iceberg's REST fixture server serves the spec with no prefix, so a real
   # warehouse gives HTTP 400 "Ambiguous URI empty segment".
   # A fresh project per run. `feast teardown` leaves rows in
   # feature_view_version_history, so applying the same feature view into the
@@ -904,6 +1128,181 @@ PYONLINE
   rm -rf "$work"
 }
 
+# Temporal: a healthy server proves only that it answers. Workflows run in the
+# caller's worker, so this runs one with the temporalio SDK from the host: an
+# activity that fails once and succeeds on retry, and a workflow that waits for
+# a signal. A third workflow is left waiting across `odctl restart`, then
+# signalled, which proves the history in the database file survived and the
+# workflow resumed from it.
+smoke_temporal() {
+  retry 60 5 http_ok "http://127.0.0.1:8233" || fail "no HTTP response from the Web UI on :8233"
+  pass "Web UI answering on :8233"
+
+  local work="${TMPDIR:-/tmp}/odctl-temporal-smoke"
+  rm -rf "$work"; mkdir -p "$work"
+  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the temporal client"
+  VIRTUAL_ENV="$work/.venv" uv pip install -q "temporalio==1.34.0" >/dev/null 2>&1 \
+    || fail "could not install the temporalio SDK"
+
+  cat > "$work/workflows.py" <<'PYEOF'
+import asyncio, os, sys
+from datetime import timedelta
+from temporalio import activity, workflow
+from temporalio.client import Client, WorkflowExecutionStatus
+from temporalio.common import RetryPolicy
+from temporalio.worker import Worker
+
+
+@activity.defn
+async def greet(name: str) -> str:
+    # Fails on the first attempt, so a result means the retry policy ran it again.
+    if activity.info().attempt < 2:
+        raise RuntimeError("first attempt fails on purpose")
+    return f"hello {name}"
+
+
+@workflow.defn
+class Greet:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_activity(
+            greet, name,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(initial_interval=timedelta(seconds=1), maximum_attempts=3),
+        )
+
+
+@workflow.defn
+class Approval:
+    def __init__(self) -> None:
+        self.approver = None
+
+    @workflow.signal
+    def approve(self, approver: str) -> None:
+        self.approver = approver
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.approver is not None)
+        return f"approved by {self.approver}"
+
+
+async def status(client, workflow_id):
+    return (await client.get_workflow_handle(workflow_id).describe()).status
+
+
+async def approve(client, workflow_id, approver):
+    if await status(client, workflow_id) != WorkflowExecutionStatus.RUNNING:
+        sys.exit(f"{workflow_id} is not waiting for its signal")
+    handle = client.get_workflow_handle(workflow_id)
+    await handle.signal(Approval.approve, approver)
+    got = await asyncio.wait_for(handle.result(), 60)
+    if got != f"approved by {approver}":
+        sys.exit(f"{workflow_id} returned {got!r}")
+
+
+async def main(phase: str) -> None:
+    run = os.environ["SMOKE_RUN"]
+    client = await Client.connect(os.environ["SMOKE_ADDRESS"])
+    queue = f"odctl-smoke-{run}"
+    async with Worker(client, task_queue=queue, workflows=[Greet, Approval], activities=[greet]):
+        if phase == "run":
+            got = await client.execute_workflow(
+                Greet.run, "odctl", id=f"greet-{run}", task_queue=queue,
+                execution_timeout=timedelta(seconds=60),
+            )
+            if got != "hello odctl":
+                sys.exit(f"greet-{run} returned {got!r}")
+            for workflow_id in (f"approval-{run}", f"pending-{run}"):
+                await client.start_workflow(Approval.run, id=workflow_id, task_queue=queue)
+            await approve(client, f"approval-{run}", "smoke")
+            if await status(client, f"pending-{run}") != WorkflowExecutionStatus.RUNNING:
+                sys.exit(f"pending-{run} is not waiting for its signal")
+        else:
+            if await status(client, f"greet-{run}") != WorkflowExecutionStatus.COMPLETED:
+                sys.exit(f"greet-{run} is not in the history as completed")
+            await approve(client, f"pending-{run}", "resume")
+    print(f"{phase} ok")
+
+
+# The workflow sandbox imports this file again, so running main on import fails.
+if __name__ == "__main__":
+    asyncio.run(main(sys.argv[1]))
+PYEOF
+
+  export SMOKE_RUN="$$-$(date -u +%Y%m%d%H%M%S)" SMOKE_ADDRESS="127.0.0.1:7233"
+  local py="$work/.venv/bin/python" log="$work/step.log"
+
+  # Output goes to a file, so a failure prints what broke rather than nothing.
+  run_temporal() {
+    local what="$1"; shift
+    if ! (cd "$work" && "$py" workflows.py "$@") >"$log" 2>&1; then
+      echo "---- $what ----"
+      tail -25 "$log"
+      fail "$what"
+    fi
+  }
+
+  run_temporal "the workflows did not complete against 127.0.0.1:7233" run
+  pass "an activity succeeded on retry, and a workflow completed once its signal was sent"
+
+  assert_metrics http://temporal:9090/metrics
+
+  # A restart keeps the container, so the database file and its history stay.
+  odctl restart temporal >/dev/null 2>&1 || fail "odctl restart temporal failed"
+  retry 24 5 docker exec temporal temporal operator cluster health --address 127.0.0.1:7233 >/dev/null 2>&1 \
+    || fail "temporal did not become healthy after odctl restart"
+  run_temporal "history did not survive odctl restart" resume
+  pass "history survived odctl restart, and a waiting workflow resumed and completed"
+
+  rm -rf "$work"
+}
+
+# Evidently answers /api/version with no database behind it, and its dataset
+# files go to a different store from its reports. So this pushes a data drift
+# report and reads it back through the API, which proves Postgres, and stores a
+# dataset and finds its file under s3://evidently, which proves SeaweedFS and
+# the s3fs the odctl image adds. It runs in the container, which already has
+# the evidently client.
+smoke_evidently() {
+  retry 60 5 http_ok "http://127.0.0.1:8089/api/v2/projects" || fail "no HTTP response from :8089"
+  pass "evidently answering and its database reachable"
+
+  docker exec -i -e SMOKE_RUN_ID="$$" evidently python - <<'PYEOF' || fail "report or dataset round trip failed"
+import os, sys
+import numpy as np, pandas as pd, requests
+from evidently import DataDefinition, Dataset, Report
+from evidently.presets import DataDriftPreset
+from evidently.ui.workspace import RemoteWorkspace
+url = "http://127.0.0.1:8000"
+ws = RemoteWorkspace(url)
+project = ws.create_project(f"odctl-smoke-{os.environ['SMOKE_RUN_ID']}")
+# Column x moves by three standard deviations and y does not, so exactly one
+# column should drift.
+rng = np.random.default_rng(7)
+reference = pd.DataFrame({"x": rng.normal(0, 1, 500), "y": rng.normal(0, 1, 500)})
+current = pd.DataFrame({"x": rng.normal(3, 1, 500), "y": rng.normal(0, 1, 500)})
+snapshot = Report([DataDriftPreset()]).run(current_data=current, reference_data=reference)
+run = ws.add_run(project.id, snapshot)
+listed = requests.get(f"{url}/api/projects/{project.id}/snapshots", timeout=30).json()
+if str(run.id) not in [s["id"] for s in listed]:
+    sys.exit(f"report {run.id} not listed back: {listed}")
+stored = requests.get(f"{url}/api/projects/{project.id}/{run.id}/download",
+                      params={"report_format": "json"}, timeout=30).json()
+drift = next(m for m in stored["metrics"] if m["metric_name"].startswith("DriftedColumnsCount"))
+if drift["value"]["count"] != 1:
+    sys.exit(f"stored report has {drift['value']} drifted columns, expected 1")
+print("report read back:", drift["metric_name"], drift["value"])
+data = pd.DataFrame({"id": [1, 2, 3], "score": [0.1, 0.5, 0.9]})
+dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definition=DataDefinition()), "odctl-smoke")
+back = ws.load_dataset(dataset_id).as_dataframe()
+pd.testing.assert_frame_equal(back[list(data.columns)].reset_index(drop=True), data, check_dtype=False)
+print("dataset read back")
+ws.delete_project(project.id)
+PYEOF
+  pass "pushed a drift report and read it back, and a dataset round-tripped"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -911,11 +1310,33 @@ smoke_http_only() {
   pass "HTTP endpoint answering at $url"
 }
 
+# The metrics targets for these profiles are the ones prometheus.yml lists for
+# each, except Spark's applications endpoint. It has samples only once an
+# application registers with the master, and smoke_spark's spark-sql runs in
+# local mode, so none does.
+KAFKA_SIDE=(http://connect:9404/metrics http://karapace:8081/metrics)
+SPARK_MASTER=http://spark-master:8080/metrics/master/prometheus/
+
 case "$PROFILE" in
-  kafka-lite)            smoke_kafka kafka ;;
-  kafka-full)            smoke_kafka kafka-1 ;;
-  flink-lite|flink-full) smoke_flink ;;
-  spark-lite|spark-full) smoke_spark ;;
+  kafka-lite)
+    smoke_kafka kafka; connect_plugins
+    assert_metrics http://kafka:9404/metrics "${KAFKA_SIDE[@]}"
+    smoke_iceberg_sink ;;
+  kafka-full)
+    smoke_kafka kafka-1; connect_plugins
+    assert_metrics http://kafka-{1,2,3}:9404/metrics "${KAFKA_SIDE[@]}" ;;
+  flink-lite)
+    smoke_flink
+    assert_metrics http://jobmanager:9249/metrics http://taskmanager-a:9249/metrics ;;
+  flink-full)
+    smoke_flink
+    assert_metrics http://jobmanager:9249/metrics http://taskmanager-{a,b,c}:9249/metrics ;;
+  spark-lite)
+    smoke_spark
+    assert_metrics "$SPARK_MASTER" http://spark-worker-1:8081/metrics/prometheus/ ;;
+  spark-full)
+    smoke_spark
+    assert_metrics "$SPARK_MASTER" http://spark-worker-{1,2,3}:8081/metrics/prometheus/ ;;
   ch-lite)               smoke_ch_lite ;;
   ch-full)               smoke_ch_full ;;
   trino)                 smoke_trino ;;
@@ -923,12 +1344,14 @@ case "$PROFILE" in
   postgres|storage|catalog|valkey) smoke_infra ;;
   metabase)   smoke_metabase ;;
   airflow)    smoke_airflow ;;
+  temporal)   smoke_temporal ;;
   mlflow)     smoke_mlflow ;;
   lineage)    smoke_lineage ;;
   telemetry)  smoke_telemetry ;;
   metadata)   smoke_metadata ;;
   fluss)      smoke_fluss ;;
   feast)      smoke_feast ;;
+  evidently)  smoke_evidently ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

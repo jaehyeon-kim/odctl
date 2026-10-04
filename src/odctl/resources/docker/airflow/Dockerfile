@@ -30,10 +30,10 @@ RUN --mount=type=cache,target=/home/airflow/.cache/pip \
     'mlflow~=3.16.0' \
     'feast[duckdb,iceberg,postgres,redis]==0.66.0'
 
-# Model runtimes, pinned to the same minors as the mlops image, because a model
+# Model runtimes, pinned to the same minors as the mlflow image, because a model
 # trained here is loaded there. A model saved by a newer runtime is not
 # guaranteed to load in an older one. Raise both images together. XGBoost is held
-# at 3.2 by the mlops image, whose Python 3.11 cannot install 3.3 or later.
+# at 3.2 by the mlflow image, whose Python 3.11 cannot install 3.3 or later.
 RUN --mount=type=cache,target=/home/airflow/.cache/pip \
     pip install \
     'xgboost~=3.2.0' \

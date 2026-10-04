@@ -21,20 +21,14 @@ get_maven_version() {
 echo "▶️  Resolving Shared & Connector Versions..."
 
 # 🔒 HARDCODED: Lock core dependencies; Iceberg comes from versions.env
-DEB_V="3.5.1.Final"
-POSTGRES_V="42.7.3"  # Pinned. 42.7.13 is current, so raise this deliberately.
-
-# Fetch GitHub metadata for connectors we still want to dynamically track
-ICEBERG_KC_JSON=$(curl -sL https://api.github.com/repos/tabular-io/iceberg-kafka-connect/releases/latest)
-ICEBERG_KC_URL=$(echo "$ICEBERG_KC_JSON" | grep -Eo '"browser_download_url":\s*"[^"]+\.zip"' | grep -v 'hive' | head -1 | awk -F'"' '{print $4}' || true)
-if [ -z "$ICEBERG_KC_URL" ]; then echo "❌ Error: Could not resolve Tabular Iceberg Kafka Connect URL! (Check GitHub rate limits)"; exit 1; fi
+DEB_V="3.7.0.Final"
+POSTGRES_V="42.7.13"
 
 echo "▶️  Fetching Kafka Connectors..."
 make_dir "connect/clickhouse-sink"
 make_dir "connect/msk-datagen"
 make_dir "connect/debezium-postgres"
 make_dir "connect/redis"
-make_dir "connect/iceberg-sink"
 
 CH_URL=$(curl -sL https://api.github.com/repos/ClickHouse/clickhouse-kafka-connect/releases/latest | grep -Eo '"browser_download_url":\s*"[^"]+\.zip"' | head -1 | awk -F'"' '{print $4}' || true)
 if [ -z "$CH_URL" ]; then echo "❌ Error: Could not resolve ClickHouse Kafka Connect URL!"; exit 1; fi
@@ -50,8 +44,7 @@ if [ -z "$REDIS_URL" ]; then echo "❌ Error: Could not resolve Redis Kafka Conn
 fetch_artifact "redis.zip" "$REDIS_URL"
 if [ "$DRY_RUN" -eq 0 ]; then unzip -qq redis.zip -d connect/redis && rm redis.zip; fi
 
-fetch_artifact "iceberg-sink.zip" "$ICEBERG_KC_URL"
-if [ "$DRY_RUN" -eq 0 ]; then unzip -qq iceberg-sink.zip -d connect/iceberg-sink && rm iceberg-sink.zip; fi
+# The Iceberg sink is built from source in the Dockerfile's iceberg-builder stage.
 
 fetch_artifact "deb.tar.gz" "https://repo1.maven.org/maven2/io/debezium/debezium-connector-postgres/${DEB_V}/debezium-connector-postgres-${DEB_V}-plugin.tar.gz"
 if [ "$DRY_RUN" -eq 0 ]; then tar -xzf deb.tar.gz -C connect/debezium-postgres --strip-components=1 && rm deb.tar.gz; fi

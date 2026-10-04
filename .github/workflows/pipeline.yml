@@ -44,7 +44,7 @@ jobs:
       # A tag runs every profile. A pull request runs only the groups its
       # changed files affect, because the full matrix pulls roughly 10 GB per
       # entry and paying that on every push is not worth the signal.
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
       - name: Choose profile groups
         id: profiles
         run: |

@@ -20,7 +20,7 @@ jobs:
       - name: Install uv
         # Pinned to a full version on purpose: setup-uv stopped publishing
         # moving major tags at v8, so astral-sh/setup-uv@v10 does not exist.
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
 

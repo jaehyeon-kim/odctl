@@ -30,19 +30,22 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     CREATE DATABASE mlflow OWNER "$POSTGRES_USER";
     CREATE DATABASE metabase OWNER "$POSTGRES_USER";
     CREATE DATABASE feast OWNER "$POSTGRES_USER";
+    CREATE DATABASE evidently OWNER "$POSTGRES_USER";
 EOSQL
 
 # Loop through and add pg_stat_statements to all
-for db in marquez omt vector iceberg airflow mlflow metabase feast; do
+for db in marquez omt vector iceberg airflow mlflow metabase feast evidently; do
     echo "Configuring database: $db"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$db" <<-EOSQL
         CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 EOSQL
 done
 
-echo "Configuring vector extensions"
+echo "Configuring vector, BM25 and geospatial extensions"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "vector" <<-EOSQL
     CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE EXTENSION IF NOT EXISTS pg_textsearch;
+    CREATE EXTENSION IF NOT EXISTS postgis;
 EOSQL
 
 echo "Unified Database Initialization Complete"
