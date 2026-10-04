@@ -586,8 +586,8 @@ smoke_deps() {
 # its own, so the services it scrapes are absent and 8 of 9 targets are legitimately
 # down. Assert what holds alone: the config parsed into targets, the self-scrape
 # works, a query returns data, OTLP reaches Prometheus both directly and through
-# the collector, and Grafana logs in and queries Prometheus. All of it runs in the
-# one grafana/otel-lgtm container.
+# the collector, and Grafana logs in, queries Prometheus and loads odctl's
+# dashboards. All of it runs in the one grafana/otel-lgtm container.
 smoke_telemetry() {
   retry 60 5 http_ok "http://127.0.0.1:19090/-/ready" || fail "no HTTP response from :19090"
 
@@ -666,6 +666,17 @@ d = json.load(sys.stdin)
 sys.exit(0 if d.get("status") == "success" and d["data"]["result"] else "no series")
 ' || fail "grafana could not query prometheus through its data source"
   pass "grafana logs in as user/password and queries prometheus"
+
+  # A dashboard that fails to parse is logged and skipped, so count what loaded.
+  local want
+  want=$(find .odctl/grafana/dashboards -name '*.json' | wc -l | tr -d '[:space:]')
+  [ "$want" -gt 0 ] || fail "no dashboards in .odctl/grafana/dashboards"
+  retry 12 5 bash -c "
+    curl -fsS --max-time 10 -u user:password 'http://127.0.0.1:3004/api/search?type=dash-db' 2>/dev/null \
+      | python3 -c 'import json, sys
+sys.exit(0 if sum(d.get(\"folderTitle\") == \"odctl\" for d in json.load(sys.stdin)) == $want else 1)'
+  " || fail "grafana did not load all $want dashboards into the odctl folder"
+  pass "grafana loaded all $want dashboards into the odctl folder"
 }
 
 # Marquez: the namespaces endpoint answers on an empty database, so it proves

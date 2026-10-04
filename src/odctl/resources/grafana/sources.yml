@@ -1,0 +1,79 @@
+# Where each dashboard under dashboards/ comes from and what it covers. `jobs`
+# are scrape jobs in prometheus/prometheus.yml, `receivers` are receivers in
+# otelcol/odctl-receivers.yaml, and `otlp` names services that push OTLP. Every
+# dashboard queries the data source with uid prometheus, and each one taken from
+# elsewhere has its queries fixed to the metric names odctl's versions export.
+dashboards:
+  airflow.json:
+    source: written for odctl
+    otlp: [airflow]
+  clickhouse.json:
+    source: https://github.com/ClickHouse/clickhouse-mixin/blob/46e0587a3565acb9186e2ca31870aa4488a783f0/dashboard.json
+    jobs: [clickhouse]
+    changes: ClickHouse Cloud panels removed, filesystem and page cache panels removed, CPU from cgroup time
+  feast.json:
+    source: https://github.com/ntkathole/feast-automated-setups/blob/09dac28f95671bdfb93c5b34fa50bab6af808644/feast-prometheus-metrics/grafana_dashboard.json
+    jobs: [feast-serve]
+    changes: queries filtered to the feast-serve job
+  flink.json:
+    source: grafana.com
+    id: 14911
+    revision: 1
+    jobs: [flink]
+    changes: metrics Flink 2.2 removed are dropped, garbage collector panels match any collector
+  fluss.json:
+    source: https://github.com/apache/fluss/blob/v1.0.0/website/docs/assets/fluss-quickstart-observability.zip
+    file: grafana/provisioning/dashboards/fluss/fluss-detail.json
+    jobs: [fluss]
+    changes: Flink rows removed, metric names renamed in 1.0.0 updated
+  iceberg-catalog.json:
+    source: written for odctl
+    jobs: [iceberg-catalog]
+  kafka-connect.json:
+    source: written for odctl
+    jobs: [kafka-connect]
+  kafka.json:
+    source: written for odctl
+    jobs: [kafka]
+  karapace.json:
+    source: https://github.com/Aiven-Open/karapace/blob/6.2.4/container/grafana/dashboards/karapace.json
+    jobs: [karapace]
+    changes: OpenTelemetry counter panels removed, HTTP and process panels added
+  marquez.json:
+    source: written for odctl
+    jobs: [marquez]
+  metabase.json:
+    source: grafana.com
+    id: 24133
+    revision: 1
+    jobs: [metabase]
+    changes: semantic search panels removed, they are updated only by the enterprise edition
+  mlflow.json:
+    source: written for odctl
+    jobs: [mlflow]
+  openmetadata.json:
+    source: written for odctl
+    jobs: [openmetadata]
+  postgresql.json:
+    source: written for odctl
+    receivers: [postgresql]
+  seaweedfs.json:
+    source: https://github.com/seaweedfs/seaweedfs/blob/4.48/other/metrics/grafana_seaweedfs.json
+    jobs: [seaweedfs]
+    changes: panels for processes `weed server` does not start removed
+  spark.json:
+    source: written for odctl
+    jobs: [spark-master, spark-applications, spark-worker]
+  temporal.json:
+    source: https://github.com/temporalio/dashboards/blob/aa9bdf1657146eabd1bded1a70ad4a0f9d3e1e53/server/server-general.json
+    jobs: [temporal]
+    changes: label names updated for the server the CLI dev server embeds
+  trino.json:
+    source: written for odctl
+    jobs: [trino]
+  valkey.json:
+    source: written for odctl
+    receivers: [redis]
+
+no_dashboard:
+  prometheus: otel-lgtm's Prometheus scraping itself, not an odctl service.
