@@ -1,5 +1,5 @@
-# Pinned to the 4.1 series on purpose. Iceberg 1.11.0 publishes
-# iceberg-spark-runtime for 4.0 and 4.1 only, so a 4.2 image loads a runtime
+# Pinned to the 4.1 series on purpose. Iceberg 1.12.0 publishes no
+# iceberg-spark-runtime for 4.2 on Maven, so a 4.2 image loads a runtime
 # built against 4.1 and every Iceberg statement dies with
 # IncompatibleClassChangeError on connector.catalog.View. HADOOP_AWS_V in
 # versions.env is also matched to the Hadoop this series bundles, and the
