@@ -46,5 +46,22 @@ def test_feast_serve_enables_its_metrics_server():
 def test_airflow_pushes_otlp_to_the_telemetry_collector():
     env = _services("compose-orch.yml")["airflow"]["environment"]
     assert env["AIRFLOW__METRICS__OTEL_ON"] == "True"
-    assert env["AIRFLOW__METRICS__OTEL_HOST"] == "otel-lgtm"
-    assert env["AIRFLOW__METRICS__OTEL_PORT"] == "4318"
+    assert (
+        env["OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"] == "http://otel-lgtm:4318/v1/metrics"
+    )
+    assert "AIRFLOW__METRICS__OTEL_HOST" not in env
+
+
+def test_airflow_quiets_the_otlp_exporter_through_its_logging_config():
+    service = _services("compose-orch.yml")["airflow"]
+    module = "odctl_log_config"
+    assert (
+        service["environment"]["AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS"]
+        == f"{module}.LOGGING_CONFIG"
+    )
+    assert (
+        f"./airflow/{module}.py:/opt/airflow/config/{module}.py:ro"
+        in service["volumes"]
+    )
+    source = (get_internal_resources_dir() / "airflow" / f"{module}.py").read_text()
+    assert '"opentelemetry.exporter.otlp.proto.http.metric_exporter"' in source
