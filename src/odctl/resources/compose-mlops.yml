@@ -218,6 +218,53 @@ services:
       retries: 12
       start_period: 20s
 
+  # ==========================================
+  # Evidently: ML Monitoring
+  # ==========================================
+  # Keeps data drift, prediction drift, data quality and model quality reports,
+  # and dashboards over them. Reports are computed by the client, for example an
+  # Airflow task, and pushed here with RemoteWorkspace.
+  #
+  # evidently/config.yaml keeps projects, reports and dashboards in the
+  # evidently database and dataset files in s3://evidently/datasets. The odctl
+  # image adds s3fs to evidently/evidently-service for the second. There is no
+  # login, and no secret is set, so anything that reaches the port can write.
+  evidently:
+    image: ghcr.io/jaehyeon-kim/odctl/evidently:${TAG:-latest}
+    container_name: evidently
+    profiles: ["evidently"]
+    networks:
+      - odctl
+    ports:
+      # Host 8089: 8000 is the default for uvicorn, Django and mkdocs serve, so
+      # it often clashes with the user's own apps.
+      - "8089:8000"
+    mem_limit: 1g
+    environment:
+      TZ: ${TZ:-UTC}
+      # Read by @format in evidently/config.yaml.
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      # fsspec passes FSSPEC_S3_<name> to s3fs as the <name> argument.
+      FSSPEC_S3_ENDPOINT_URL: http://seaweed:8333
+      FSSPEC_S3_KEY: ${AWS_ACCESS_KEY_ID:-user}
+      FSSPEC_S3_SECRET: ${AWS_SECRET_ACCESS_KEY:-password}
+      # Usage telemetry to Evidently is on unless this is set.
+      DO_NOT_TRACK: "1"
+    volumes:
+      - ./evidently/config.yaml:/etc/evidently/config.yaml:ro
+    # Appended to the image's entrypoint, `evidently ui --host 0.0.0.0`.
+    command: ["--conf-path", "/etc/evidently/config.yaml"]
+    # /api/v2/projects rather than /api/version, because listing projects opens
+    # the database and runs the migrations. /api/version answers with no
+    # database at all. The image has no curl.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/projects', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
 networks:
   odctl:
     name: odctl

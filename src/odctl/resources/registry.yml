@@ -5,7 +5,7 @@ capacities:
   data_processing: "batch processing distributed computing large scale data transformation pipelines"
   stream_processing: "real-time stream processing stateful streaming continuous data flows"
   analytics: "real-time OLAP interactive querying data warehouse business intelligence dashboards reporting"
-  mlops: "machine learning training pipelines model serving feature store experiments tracking"
+  mlops: "machine learning training pipelines model serving feature store experiments tracking model monitoring data drift"
   messaging: "event delivery pub sub queues streaming storage message broker"
   orchestration: "workflow scheduling DAGs pipeline execution automation"
   metadata: "data catalog governance discovery search data dictionary"
@@ -258,13 +258,14 @@ stacks:
 
   mlops:
     file: "compose-mlops.yml"
-    description: "Experiment tracking, model registry and model serving (MLflow), and the feature store (Feast)."
-    profiles: ["mlflow", "feast"]
+    description: "Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently)."
+    profiles: ["mlflow", "feast", "evidently"]
     capacities: ["mlops"]
     depends_on:
       mlflow: ["postgres", "storage"]
       feast: ["catalog", "valkey"]
-    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own."
+      evidently: ["postgres", "storage"]
+    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own. Evidently keeps data drift, prediction drift, data quality and model quality reports over time, with projects and reports on Postgres and dataset files on SeaweedFS."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
@@ -290,6 +291,17 @@ stacks:
           * External (host): http://127.0.0.1:6566
           * Internal (Docker): http://feast-serve:6566
         • Liveness: http://127.0.0.1:6566/health
+      evidently: |
+        • Evidently UI & API (no login, and writes are open):
+          * External (host): http://127.0.0.1:8089
+          * Internal (Docker): http://evidently:8000
+        • Push reports with RemoteWorkspace("http://127.0.0.1:8089") from the
+          host, or RemoteWorkspace("http://evidently:8000") from a container.
+          Reports are computed by the client, so it needs evidently==0.7.23.
+          In Airflow, set _AIRFLOW_PIP_DEPS="evidently==0.7.23" in .env.
+        • Projects, reports and dashboards: the evidently database on Postgres.
+          Dataset files: s3://evidently/datasets.
+        • Settings: evidently/config.yaml in the workspace.
 
   obsv:
     file: "compose-obsv.yml"

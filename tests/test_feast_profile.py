@@ -36,7 +36,7 @@ def test_storage_creates_the_feast_bucket():
         for s in _compose("compose-infra.yml")["services"].values()
         if "BUCKETS=" in str(s.get("entrypoint", ""))
     )
-    assert " feast'" in init["entrypoint"]
+    assert " feast " in init["entrypoint"]
 
 
 def test_airflow_knows_the_feast_registry():

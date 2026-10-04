@@ -1039,6 +1039,59 @@ PYEOF
   rm -rf "$work"
 }
 
+# Evidently answers /api/version with no database behind it, and its dataset
+# files go to a different store from its reports. So this pushes a data drift
+# report and reads it back through the API, which proves Postgres, and stores a
+# dataset and finds its file under s3://evidently, which proves SeaweedFS and
+# the s3fs the odctl image adds. It runs in the container, which already has
+# the evidently client.
+smoke_evidently() {
+  retry 60 5 http_ok "http://127.0.0.1:8089/api/v2/projects" || fail "no HTTP response from :8089"
+  pass "evidently answering and its database reachable"
+
+  docker exec -i -e SMOKE_RUN_ID="$$" evidently python - <<'PYEOF' || fail "report or dataset round trip failed"
+import os, sys
+import numpy as np, pandas as pd, requests, s3fs
+from evidently import DataDefinition, Dataset, Report
+from evidently.presets import DataDriftPreset
+from evidently.ui.workspace import RemoteWorkspace
+url = "http://127.0.0.1:8000"
+ws = RemoteWorkspace(url)
+project = ws.create_project(f"odctl-smoke-{os.environ['SMOKE_RUN_ID']}")
+# Column x moves by three standard deviations and y does not, so exactly one
+# column should drift.
+rng = np.random.default_rng(7)
+reference = pd.DataFrame({"x": rng.normal(0, 1, 500), "y": rng.normal(0, 1, 500)})
+current = pd.DataFrame({"x": rng.normal(3, 1, 500), "y": rng.normal(0, 1, 500)})
+snapshot = Report([DataDriftPreset()]).run(current_data=current, reference_data=reference)
+run = ws.add_run(project.id, snapshot)
+listed = requests.get(f"{url}/api/projects/{project.id}/snapshots", timeout=30).json()
+if str(run.id) not in [s["id"] for s in listed]:
+    sys.exit(f"report {run.id} not listed back: {listed}")
+stored = requests.get(f"{url}/api/projects/{project.id}/{run.id}/download",
+                      params={"report_format": "json"}, timeout=30).json()
+drift = next(m for m in stored["metrics"] if m["metric_name"].startswith("DriftedColumnsCount"))
+if drift["value"]["count"] != 1:
+    sys.exit(f"stored report has {drift['value']} drifted columns, expected 1")
+print("report read back:", drift["metric_name"], drift["value"])
+data = pd.DataFrame({"id": [1, 2, 3], "score": [0.1, 0.5, 0.9]})
+dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definition=DataDefinition()), "odctl-smoke")
+back = ws.load_dataset(dataset_id).as_dataframe()
+pd.testing.assert_frame_equal(back[list(data.columns)].reset_index(drop=True), data, check_dtype=False)
+# The dataset could have read back from Postgres had the config fallen back to
+# it, so find the file on SeaweedFS. s3fs takes its settings from FSSPEC_S3_*.
+fs = s3fs.S3FileSystem()
+prefix = f"evidently/datasets/{project.id}"
+files = fs.find(prefix)
+if not any(str(dataset_id) in f for f in files):
+    sys.exit(f"dataset {dataset_id} has no file under s3://{prefix}: {files}")
+print("dataset read back, stored at:", files)
+fs.rm(prefix, recursive=True)
+ws.delete_project(project.id)
+PYEOF
+  pass "pushed a drift report and read it back, and a dataset round-tripped through s3://evidently"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -1065,6 +1118,7 @@ case "$PROFILE" in
   metadata)   smoke_metadata ;;
   fluss)      smoke_fluss ;;
   feast)      smoke_feast ;;
+  evidently)  smoke_evidently ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

@@ -25,8 +25,8 @@ The stack is organized into distinct profiles that can be launched independently
   - **Stack:** ClickHouse, Trino, Metabase
 - **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation, in one container that reads DAGs from object storage. Durable workflows written in code, such as one that waits days for a person to approve an agent's action, in a second container.
   - **Stack:** Apache Airflow (standalone, with the MLflow and Feast clients and the XGBoost, LightGBM and PyTorch runtimes), Temporal (development server with the Web UI and a SQLite database)
-- **MLOps:** Machine learning experiment tracking, model registry, HTTP model serving, and a feature store.
-  - **Stack:** MLflow, Feast
+- **MLOps:** Machine learning experiment tracking, model registry, HTTP model serving, a feature store, and monitoring of data drift and model quality over time.
+  - **Stack:** MLflow, Feast, Evidently
 - **Metadata:** Centralized data catalog, data discovery, and enterprise governance.
   - **Stack:** OpenMetadata
 - **Observability:** Metrics, traces and logs over OpenTelemetry, with dashboards, in one container.
