@@ -57,6 +57,4 @@ def test_image_is_built_and_published_with_the_others():
     workflow = (
         REPO / ".github" / "workflows" / "build-platform-images.yml"
     ).read_text()
-    assert (
-        workflow.count("component: [airflow, evidently, mlflow, postgres, spark]") == 2
-    )
+    assert workflow.count("component: [airflow, mlflow, postgres, spark]") == 2

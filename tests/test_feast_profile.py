@@ -4,6 +4,8 @@ With nothing there they use the repository bundled with odctl, so the profile
 starts before any definitions exist. Nothing here needs Docker.
 """
 
+import re
+
 import yaml
 
 from odctl.config import get_internal_resources_dir
@@ -36,7 +38,8 @@ def test_storage_creates_the_feast_bucket():
         for s in _compose("compose-infra.yml")["services"].values()
         if "BUCKETS=" in str(s.get("entrypoint", ""))
     )
-    assert " feast " in init["entrypoint"]
+    buckets = re.search(r"BUCKETS='([^']*)'", init["entrypoint"]).group(1).split()
+    assert "feast" in buckets
 
 
 def test_airflow_knows_the_feast_registry():

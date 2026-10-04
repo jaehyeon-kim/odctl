@@ -1270,7 +1270,7 @@ smoke_evidently() {
 
   docker exec -i -e SMOKE_RUN_ID="$$" evidently python - <<'PYEOF' || fail "report or dataset round trip failed"
 import os, sys
-import numpy as np, pandas as pd, requests, s3fs
+import numpy as np, pandas as pd, requests
 from evidently import DataDefinition, Dataset, Report
 from evidently.presets import DataDriftPreset
 from evidently.ui.workspace import RemoteWorkspace
@@ -1297,18 +1297,10 @@ data = pd.DataFrame({"id": [1, 2, 3], "score": [0.1, 0.5, 0.9]})
 dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definition=DataDefinition()), "odctl-smoke")
 back = ws.load_dataset(dataset_id).as_dataframe()
 pd.testing.assert_frame_equal(back[list(data.columns)].reset_index(drop=True), data, check_dtype=False)
-# The dataset could have read back from Postgres had the config fallen back to
-# it, so find the file on SeaweedFS. s3fs takes its settings from FSSPEC_S3_*.
-fs = s3fs.S3FileSystem()
-prefix = f"evidently/datasets/{project.id}"
-files = fs.find(prefix)
-if not any(str(dataset_id) in f for f in files):
-    sys.exit(f"dataset {dataset_id} has no file under s3://{prefix}: {files}")
-print("dataset read back, stored at:", files)
-fs.rm(prefix, recursive=True)
+print("dataset read back")
 ws.delete_project(project.id)
 PYEOF
-  pass "pushed a drift report and read it back, and a dataset round-tripped through s3://evidently"
+  pass "pushed a drift report and read it back, and a dataset round-tripped"
 }
 
 # A profile with no functional assertion yet still has to expose its endpoint.

@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, evidently, mlflow, postgres, spark]
+        component: [airflow, mlflow, postgres, spark]
         platform:
           - os: ubuntu-latest
             arch: linux/amd64
@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [airflow, evidently, mlflow, postgres, spark]
+        component: [airflow, mlflow, postgres, spark]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v8

@@ -40,14 +40,13 @@ The stack is organized into distinct profiles that can be launched independently
 
 ## Images
 
-Most services run their projects' official images, pinned to exact versions. odctl builds six images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`, tagged with the CLI version, so `odctl` 0.10.0 runs images tagged `0.10.0`:
+Most services run their projects' official images, pinned to exact versions. odctl builds five images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`, tagged with the CLI version, so `odctl` 0.10.0 runs images tagged `0.10.0`:
 
 - `deps`: fills a shared volume with connectors, jars and the Prometheus JMX agent, including the Iceberg REST catalog and the Kafka Connect Iceberg sink, both built from the Iceberg release the stack uses.
 - `postgres`: PostgreSQL 18 from the official image, with pgvector, pg_textsearch and PostGIS.
 - `airflow`: Airflow with the MLflow and Feast clients and the model runtimes.
 - `mlflow`: the MLflow server and model server with the model runtimes.
 - `spark`: Spark with the Python clients jobs use (ClickHouse, PostgreSQL, Valkey, MLflow and boto3). Its Iceberg and OpenLineage jars come from the `deps` volume.
-- `evidently`: the Evidently UI with s3fs, so datasets can be stored on SeaweedFS.
 
 ## Prerequisites & Installation
 

@@ -269,8 +269,8 @@ stacks:
     depends_on:
       mlflow: ["postgres", "storage"]
       feast: ["catalog", "valkey"]
-      evidently: ["postgres", "storage"]
-    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own. Evidently keeps data drift, prediction drift, data quality and model quality reports over time, with projects and reports on Postgres and dataset files on SeaweedFS."
+      evidently: ["postgres"]
+    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own. Evidently keeps data drift, prediction drift, data quality and model quality reports over time, with projects, reports and datasets on Postgres."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
@@ -304,8 +304,8 @@ stacks:
           host, or RemoteWorkspace("http://evidently:8000") from a container.
           Reports are computed by the client, so it needs evidently==0.7.23.
           In Airflow, set _AIRFLOW_PIP_DEPS="evidently==0.7.23" in .env.
-        • Projects, reports and dashboards: the evidently database on Postgres.
-          Dataset files: s3://evidently/datasets.
+        • Projects, reports, dashboards and datasets: the evidently database
+          on Postgres.
         • Settings: evidently/config.yaml in the workspace.
 
   obsv:

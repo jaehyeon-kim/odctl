@@ -19,9 +19,3 @@ database:
 # loses. sql keeps them with the projects.
 dashboard:
   storage_type: sql
-
-# Dataset files go to SeaweedFS. s3fs reads the endpoint and keys from the
-# FSSPEC_S3_* variables in compose-mlops.yml.
-dataset_storage:
-  type: fsspec
-  path: s3://evidently/datasets
