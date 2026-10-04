@@ -191,7 +191,7 @@ If you want to contribute to the CLI itself, we welcome pull requests!
    ```
 4. Install the pre-commit hooks to ensure formatting checks pass:
    ```bash
-   uv run pre-commit install
+   uvx pre-commit install
    ```
 5. Run the test suite:
    ```bash
