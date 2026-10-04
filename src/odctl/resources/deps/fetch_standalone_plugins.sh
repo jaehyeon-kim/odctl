@@ -21,8 +21,8 @@ get_maven_version() {
 echo "▶️  Resolving Shared & Connector Versions..."
 
 # 🔒 HARDCODED: Lock core dependencies; Iceberg comes from versions.env
-DEB_V="3.5.1.Final"
-POSTGRES_V="42.7.3"  # Pinned. 42.7.13 is current, so raise this deliberately.
+DEB_V="3.7.0.Final"
+POSTGRES_V="42.7.13"
 
 echo "▶️  Fetching Kafka Connectors..."
 make_dir "connect/clickhouse-sink"
