@@ -52,6 +52,47 @@ http_reachable() {
 
 ch() { docker exec "$1" clickhouse-client --password password -q "$2" 2>&1; }
 
+# Metrics: nothing else here reads a metrics endpoint, so a change that breaks
+# one goes unseen. In 0.8.0 the JMX agent in KAFKA_OPTS broke every Kafka CLI
+# run, and only an unrelated topic check caught it. So each profile reads its
+# scrape targets the way Prometheus does, by name on the odctl network, from a
+# throwaway alpine container, since most targets publish no port and some images
+# have no HTTP client. Any wget options go before the URL.
+metrics_ok() {
+  local out
+  out=$(docker run --rm --network odctl alpine wget -qO- -T 10 "$@" 2>/dev/null) || return 1
+  # A sample line, not a # TYPE line: Spark's servlet writes samples only.
+  grep -qE '^[a-zA-Z_:][a-zA-Z0-9_:]*(\{.*\})? [-+0-9.eEInfNa]+' <<<"$out"
+}
+
+# Retried, because a metrics reporter can start after the port a profile waits on.
+assert_metrics() {
+  local url
+  for url in "$@"; do
+    retry 12 5 metrics_ok "$url" || fail "no Prometheus samples at $url"
+  done
+  pass "Prometheus samples at$(printf ' %s' "$@")"
+}
+
+# Push and collector sources have no endpoint to read. When the telemetry
+# profile is up, their series must reach its Prometheus; when it is not, nothing
+# receives them, so there is nothing to assert.
+prom_has() {
+  curl -fsS --max-time 10 -G "http://127.0.0.1:19090/api/v1/query" \
+    --data-urlencode "query=count({__name__=~\"$1\"})" 2>/dev/null \
+    | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin)["data"]["result"] else 1)'
+}
+
+assert_pushed_metrics() {
+  local match="$1" what="$2"
+  if ! docker ps --format '{{.Names}}' | grep -qx otel-lgtm; then
+    echo "ℹ️  $PROFILE: telemetry is not up, so $what metrics are not checked"
+    return 0
+  fi
+  retry 12 10 prom_has "$match" || fail "no $what series ($match) in Prometheus"
+  pass "$what series ($match) in Prometheus"
+}
+
 kafka_topic() {
   docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 "$@"
 }
@@ -214,6 +255,7 @@ smoke_ch_lite() {
   ch ch-11 "INSERT INTO default.smoke SELECT number FROM numbers(10)" >/dev/null
   [ "$(ch ch-11 "SELECT count() FROM default.smoke")" = "10" ] || fail "MergeTree round trip failed"
   pass "databases initialised and MergeTree round trip works"
+  assert_metrics http://ch-11:9363/metrics http://ch-12:9363/metrics
 }
 
 smoke_ch_full() {
@@ -229,6 +271,8 @@ smoke_ch_full() {
     || fail "rows never replicated to the sibling replica"
   [ "$(ch ch-21 "SELECT count() FROM default.repl")" = "0" ] || fail "shard 2 unexpectedly holds shard 1 data"
   pass "replicated table converged on shard 1 and stayed off shard 2"
+  assert_metrics http://ch-11:9363/metrics http://ch-12:9363/metrics \
+    http://ch-21:9363/metrics http://ch-22:9363/metrics
 }
 
 # Catalog registration finishes after the health endpoint starts answering, so
@@ -250,6 +294,11 @@ smoke_trino() {
   }
   docker exec trino trino --execute "SELECT 1" >/dev/null 2>&1 || fail "query execution failed"
   pass "all catalogs loaded and a query ran"
+  # As Prometheus logs in: user prometheus with no password, which rules.json
+  # allows to read system information.
+  retry 12 5 metrics_ok --header "Authorization: Basic $(printf 'prometheus:' | base64)" \
+    http://trino:8080/metrics || fail "no Prometheus samples at http://trino:8080/metrics"
+  pass "Prometheus samples at http://trino:8080/metrics"
 }
 
 smoke_infra() {
@@ -272,7 +321,9 @@ smoke_infra() {
         "SELECT id FROM odctl_smoke ORDER BY embedding <-> '[1,0,0]' LIMIT 1" 2>/dev/null | tr -d '[:space:]')
       docker exec postgres psql -U user -d vector -q -c "DROP TABLE IF EXISTS odctl_smoke" >/dev/null 2>&1
       [ "$nearest" = "1" ] || fail "pgvector similarity returned row '$nearest', expected 1"
-      pass "pgvector: vector column, HNSW index and similarity ordering all work" ;;
+      pass "pgvector: vector column, HNSW index and similarity ordering all work"
+      # Read by the telemetry collector's postgresql receiver.
+      assert_pushed_metrics 'postgresql_.+' PostgreSQL ;;
     storage)
       retry 30 5 http_reachable "http://127.0.0.1:8333" || fail "S3 API never answered"
       # A port that answers is not a bucket that stores anything. Spark, Flink,
@@ -290,7 +341,8 @@ smoke_infra() {
       body=$(docker exec seaweed sh -c "curl -fsS $sig '$cred' '$s3'" 2>/dev/null | tr -d '[:space:]')
       docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE '$s3'" >/dev/null 2>&1 || true
       [ "$body" = "odctl-smoke" ] || fail "read back '$body' from S3, expected odctl-smoke"
-      pass "signed write, read back and delete through the S3 API" ;;
+      pass "signed write, read back and delete through the S3 API"
+      assert_metrics http://seaweed:9327/metrics ;;
     catalog)
       retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
       curl -fsS -X POST -H 'Content-Type: application/json' \
@@ -309,7 +361,8 @@ smoke_infra() {
       curl -fsS "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" 2>/dev/null \
         | grep -q 'metadata-location' || fail "table metadata did not read back"
       curl -fsS -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" >/dev/null 2>&1 || true
-      pass "table created through the catalog and its metadata read back" ;;
+      pass "table created through the catalog and its metadata read back"
+      assert_metrics http://catalog:9404/metrics ;;
     valkey)
       local vk="redis://user:password@localhost:6379"
       retry 30 5 docker exec valkey valkey-cli -u "$vk" ping \
@@ -323,7 +376,9 @@ smoke_infra() {
       got=$(docker exec valkey valkey-cli -u "$vk" mget 'linucb:smoke-1' 'linucb:smoke-2' 2>/dev/null | grep -c '"a"')
       [ "$got" -eq 2 ] || fail "batch MGET returned $got of 2 values, expected 2"
       docker exec valkey valkey-cli -u "$vk" del 'linucb:smoke-1' 'linucb:smoke-2' >/dev/null 2>&1
-      pass "authenticated, multi-key write and batch MGET round-tripped" ;;
+      pass "authenticated, multi-key write and batch MGET round-tripped"
+      # Read by the telemetry collector's redis receiver.
+      assert_pushed_metrics 'redis_.+' Valkey ;;
   esac
 }
 
@@ -375,6 +430,7 @@ for db in (d.get("data") if isinstance(d, dict) else d) or []:
 smoke_metabase() {
   local sid
   retry 60 5 http_ok "http://127.0.0.1:3000/api/health" || fail "no HTTP response from :3000"
+  assert_metrics http://metabase:9191/metrics
   sid=$(retry_out 12 5 mb_session) || fail "could not obtain a Metabase session"
 
   # Postgres always: it is Metabase's own application database, so this proves
@@ -430,6 +486,7 @@ if "smoke.txt" not in names:
     sys.exit(f"artifact not listed back: {names}")
 PYEOF
   pass "logged a run with a proxied artifact and read it back"
+  assert_metrics http://mlflow:5000/metrics
   smoke_model_server "$run_id"
 }
 
@@ -551,6 +608,9 @@ PYEOF
   pass "DAG run reached success, so a task really executed"
 
   docker exec airflow python -c "import boto3; boto3.client('s3', endpoint_url='http://seaweed:8333').delete_object(Bucket='airflow', Key='dags/$dag_id.py')" >/dev/null 2>&1 || true
+
+  # Airflow pushes OTLP to the telemetry collector rather than being scraped.
+  assert_pushed_metrics 'airflow_.+' Airflow
 }
 
 # deps is a one-shot copy into a shared volume, so there is no container to
@@ -709,6 +769,7 @@ smoke_lineage() {
   curl -fsS "http://127.0.0.1:5002/api/v1/namespaces/$ns/jobs/smoke-job" 2>/dev/null \
     | grep -q smoke-job || fail "the job did not read back"
   pass "dataset and job both read back from Marquez"
+  assert_metrics http://marquez-api:5000/metrics
 }
 
 # Fluss: both containers ran while the cluster did nothing at all. The
@@ -743,6 +804,7 @@ smoke_fluss() {
     "docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active 2>/dev/null | grep -q fluss-coordinator:9123" \
     || fail "no active coordinator registered in ZooKeeper"
   pass "coordinator registered itself as the active leader"
+  assert_metrics http://fluss-coordinator:9249/metrics http://fluss-tablet-1:9249/metrics
 
   # The Flink client jar comes from the deps image and must match the server
   # version, so write and read a table through it.
@@ -782,6 +844,7 @@ smoke_metadata() {
   migrate=$(docker inspect -f '{{.State.ExitCode}}' openmetadata-migrate 2>/dev/null || echo NA)
   [ "$migrate" = "0" ] || fail "openmetadata-migrate exited $migrate, so the schema is not migrated"
   pass "schema migration completed"
+  assert_metrics http://openmetadata-server:8586/prometheus
 
   # The principal domain odctl sets is open-data.local, not the upstream
   # default. A wrong domain fails with a misleading invalid password error.
@@ -889,6 +952,7 @@ smoke_feast() {
   pass "feast UI answering, registry reachable"
   retry 30 5 http_ok "http://127.0.0.1:6566/health" || fail "no HTTP response from the feast online server on :6566"
   pass "feast online server answering"
+  assert_metrics http://feast-serve:8000/metrics
 
   local work="${TMPDIR:-/tmp}/odctl-feast-smoke"
   rm -rf "$work"; mkdir -p "$work/feature_repo"
@@ -1156,13 +1220,7 @@ PYEOF
   run_temporal "the workflows did not complete against 127.0.0.1:7233" run
   pass "an activity succeeded on retry, and a workflow completed once its signal was sent"
 
-  # The metrics port is not published, so read it from inside the container. Read
-  # into a variable first: with pipefail, grep -q closing the pipe early would
-  # fail wget with SIGPIPE.
-  local metrics
-  metrics=$(docker exec temporal wget -qO- http://127.0.0.1:9090/metrics 2>/dev/null)
-  grep -q '^# TYPE' <<<"$metrics" || fail "no Prometheus metrics on temporal:9090/metrics"
-  pass "Prometheus metrics served on :9090 for the telemetry profile"
+  assert_metrics http://temporal:9090/metrics
 
   # Without --volumes, so the temporal-data volume and its database stay.
   odctl down temporal >/dev/null 2>&1 || fail "odctl down temporal failed"
@@ -1233,11 +1291,33 @@ smoke_http_only() {
   pass "HTTP endpoint answering at $url"
 }
 
+# The metrics targets for these profiles are the ones prometheus.yml lists for
+# each, except Spark's applications endpoint. It has samples only once an
+# application registers with the master, and smoke_spark's spark-sql runs in
+# local mode, so none does.
+KAFKA_SIDE=(http://connect:9404/metrics http://karapace:8081/metrics)
+SPARK_MASTER=http://spark-master:8080/metrics/master/prometheus/
+
 case "$PROFILE" in
-  kafka-lite)            smoke_kafka kafka; connect_plugins; smoke_iceberg_sink ;;
-  kafka-full)            smoke_kafka kafka-1; connect_plugins ;;
-  flink-lite|flink-full) smoke_flink ;;
-  spark-lite|spark-full) smoke_spark ;;
+  kafka-lite)
+    smoke_kafka kafka; connect_plugins
+    assert_metrics http://kafka:9404/metrics "${KAFKA_SIDE[@]}"
+    smoke_iceberg_sink ;;
+  kafka-full)
+    smoke_kafka kafka-1; connect_plugins
+    assert_metrics http://kafka-{1,2,3}:9404/metrics "${KAFKA_SIDE[@]}" ;;
+  flink-lite)
+    smoke_flink
+    assert_metrics http://jobmanager:9249/metrics http://taskmanager-a:9249/metrics ;;
+  flink-full)
+    smoke_flink
+    assert_metrics http://jobmanager:9249/metrics http://taskmanager-{a,b,c}:9249/metrics ;;
+  spark-lite)
+    smoke_spark
+    assert_metrics "$SPARK_MASTER" http://spark-worker-1:8081/metrics/prometheus/ ;;
+  spark-full)
+    smoke_spark
+    assert_metrics "$SPARK_MASTER" http://spark-worker-{1,2,3}:8081/metrics/prometheus/ ;;
   ch-lite)               smoke_ch_lite ;;
   ch-full)               smoke_ch_full ;;
   trino)                 smoke_trino ;;
