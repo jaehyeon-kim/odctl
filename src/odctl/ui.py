@@ -106,6 +106,8 @@ def print_explain_panel(
         "openmetadata/server": "OpenMetadata Server",
         "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
         "odctl/airflow": "Airflow Orchestrator",
+        "odctl/mlflow": "MLflow Tracking and Model Server",
+        "odctl/evidently": "ML Monitoring (Evidently UI)",
         "temporalio/temporal": "Temporal Development Server and Web UI",
         "marquez-web": "Lineage Dashboard",
         "marquezproject/marquez": "Lineage API Server",
