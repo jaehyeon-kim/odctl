@@ -75,6 +75,87 @@ smoke_kafka() {
   pass "produced and consumed 5 messages through a consumer group"
 }
 
+# The plugins come from the deps volume, so a missing or misnamed folder only
+# shows up here: Connect starts and simply does not list the class.
+connect_plugins() {
+  retry 40 5 http_ok "http://127.0.0.1:8083/connector-plugins" || fail "Connect REST never answered"
+  local plugins
+  plugins=$(curl -fsS "http://127.0.0.1:8083/connector-plugins" 2>/dev/null)
+  for cls in org.apache.iceberg.connect.IcebergSinkConnector \
+    io.debezium.connector.postgresql.PostgresConnector \
+    com.clickhouse.kafka.connect.ClickHouseSinkConnector; do
+    grep -q "$cls" <<<"$plugins" || fail "Connect does not list $cls"
+  done
+  pass "Connect lists the Iceberg, Debezium and ClickHouse plugins"
+}
+
+# The Iceberg sink is built from source, so prove it commits a snapshot rather
+# than only loading. It needs the catalog, which kafka-lite does not start.
+smoke_iceberg_sink() {
+  odctl up catalog >/dev/null 2>&1 || fail "could not start the catalog for the Iceberg sink"
+  retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
+  local api="http://127.0.0.1:8181/v1/namespaces"
+  curl -fsS -X POST -H 'Content-Type: application/json' -d '{"namespace":["smoke"]}' "$api" >/dev/null 2>&1
+  curl -fsS -X DELETE "$api/smoke/tables/kc?purgeRequested=true" >/dev/null 2>&1 || true
+  curl -fsS -X POST -H 'Content-Type: application/json' \
+    -d '{"name":"kc","schema":{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","required":false,"type":"long"},{"id":2,"name":"name","required":false,"type":"string"}]}}' \
+    "$api/smoke/tables" >/dev/null 2>&1 || fail "could not create the sink's target table"
+
+  kafka_topic --create --if-not-exists --topic smoke-iceberg --partitions 1 --replication-factor 1 >/dev/null 2>&1
+  kafka_topic --create --if-not-exists --topic control-iceberg --partitions 1 --replication-factor 1 >/dev/null 2>&1
+  for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -i kafka \
+    /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic smoke-iceberg >/dev/null 2>&1 \
+    || fail "produce to smoke-iceberg failed"
+
+  curl -fsS -X DELETE "http://127.0.0.1:8083/connectors/smoke-iceberg" >/dev/null 2>&1 || true
+  curl -fsS -X POST -H 'Content-Type: application/json' "http://127.0.0.1:8083/connectors" -d '{
+    "name": "smoke-iceberg",
+    "config": {
+      "connector.class": "org.apache.iceberg.connect.IcebergSinkConnector",
+      "tasks.max": "1",
+      "topics": "smoke-iceberg",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+      "iceberg.tables": "smoke.kc",
+      "iceberg.control.commit.interval-ms": "10000",
+      "iceberg.kafka.session.timeout.ms": "300000",
+      "iceberg.kafka.heartbeat.interval.ms": "3000",
+      "iceberg.kafka.auto.offset.reset": "earliest",
+      "consumer.override.auto.offset.reset": "earliest",
+      "iceberg.catalog.type": "rest",
+      "iceberg.catalog.uri": "http://catalog:8181",
+      "iceberg.catalog.io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+      "iceberg.catalog.client.region": "us-east-1",
+      "iceberg.catalog.s3.endpoint": "http://seaweed:8333",
+      "iceberg.catalog.s3.path-style-access": "true",
+      "iceberg.catalog.s3.access-key-id": "user",
+      "iceberg.catalog.s3.secret-access-key": "password"
+    }}' >/dev/null 2>&1 || fail "Connect rejected the Iceberg sink configuration"
+
+  # The first commit waits for the control consumer to join its group, which
+  # takes a minute or more on a fresh worker.
+  local records=""
+  for _ in $(seq 1 60); do
+    records=$(curl -fsS "$api/smoke/tables/kc" 2>/dev/null | python3 -c '
+import json, sys
+m = json.load(sys.stdin)["metadata"]
+cur = m.get("current-snapshot-id")
+snap = [s for s in m.get("snapshots", []) if s["snapshot-id"] == cur]
+print(snap[0]["summary"].get("total-records", "") if snap else "")' 2>/dev/null)
+    [ "$records" = "5" ] && break
+    sleep 5
+  done
+  if [ "$records" != "5" ]; then
+    curl -fsS "http://127.0.0.1:8083/connectors/smoke-iceberg/status" 2>/dev/null; echo
+    docker logs --tail 40 connect 2>&1
+    fail "the Iceberg sink committed ${records:-no} records, expected 5"
+  fi
+  curl -fsS -X DELETE "http://127.0.0.1:8083/connectors/smoke-iceberg" >/dev/null 2>&1 || true
+  curl -fsS -X DELETE "$api/smoke/tables/kc?purgeRequested=true" >/dev/null 2>&1 || true
+  pass "the Iceberg sink committed 5 records to an Iceberg table"
+}
+
 smoke_flink() {
   retry 40 5 http_ok "http://127.0.0.1:8082/config" || fail "JobManager REST never answered"
   local out
@@ -89,6 +170,25 @@ SQL
   docker exec flink-jobmanager sh -c 'ps ax | grep -q "add-opens=java.base/java.nio"' \
     || fail "JVM module flags missing from the TaskManager command line"
   pass "Iceberg catalog registered and JVM module flags present"
+
+  # Registering the catalog loads the runtime jar but writes nothing. A batch
+  # insert and read proves the runtime, the Hadoop classes and S3FileIO work
+  # together on this Flink minor.
+  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+SET 'sql-client.execution.result-mode' = 'tableau';
+CREATE CATALOG ice WITH ('type'='iceberg','catalog-type'='rest','uri'='http://catalog:8181','warehouse'='s3://warehouse','s3.endpoint'='http://seaweed:8333','s3.path-style-access'='true','s3.access-key-id'='user','s3.secret-access-key'='password');
+CREATE DATABASE IF NOT EXISTS ice.smoke_flink;
+DROP TABLE IF EXISTS ice.smoke_flink.t;
+CREATE TABLE ice.smoke_flink.t (id BIGINT, name STRING);
+INSERT INTO ice.smoke_flink.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT 'rows=' || CAST(COUNT(*) AS STRING) AS c FROM ice.smoke_flink.t;
+DROP TABLE ice.smoke_flink.t;
+SQL
+)
+  grep -q "rows=3" <<<"$out" || { echo "$out" | tail -30; fail "Flink could not write and read an Iceberg table"; }
+  pass "Flink wrote 3 rows to an Iceberg table and read them back"
 }
 
 smoke_spark() {
@@ -632,6 +732,29 @@ smoke_fluss() {
     "docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active 2>/dev/null | grep -q fluss-coordinator:9123" \
     || fail "no active coordinator registered in ZooKeeper"
   pass "coordinator registered itself as the active leader"
+
+  # The Flink client jar comes from the deps image and must match the server
+  # version, so write and read a table through it.
+  odctl up flink-lite >/dev/null 2>&1 || fail "could not start flink-lite for the Fluss client check"
+  retry 40 5 http_ok "http://127.0.0.1:8082/config" || fail "JobManager REST never answered"
+  local out
+  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+SET 'sql-client.execution.result-mode' = 'tableau';
+CREATE CATALOG fluss_catalog WITH ('type' = 'fluss', 'bootstrap.servers' = 'fluss-coordinator:9123');
+CREATE DATABASE IF NOT EXISTS fluss_catalog.smoke;
+DROP TABLE IF EXISTS fluss_catalog.smoke.t;
+CREATE TABLE fluss_catalog.smoke.t (id BIGINT, name STRING, PRIMARY KEY (id) NOT ENFORCED);
+INSERT INTO fluss_catalog.smoke.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT 'id=' || CAST(id AS STRING) AS c FROM fluss_catalog.smoke.t LIMIT 10;
+DROP TABLE fluss_catalog.smoke.t;
+SQL
+)
+  local got
+  got=$(grep -c "id=[123]" <<<"$out")
+  [ "$got" -eq 3 ] || { echo "$out" | tail -30; fail "Flink read $got of 3 rows from a Fluss table"; }
+  pass "Flink wrote 3 rows to a Fluss table and read them back"
 }
 
 # OpenMetadata: the version endpoint answers through every failure the 2.0.1
@@ -768,7 +891,7 @@ smoke_feast() {
 
   # warehouse="" is required. Feast's REST client puts warehouse into the URL
   # path as a prefix for Polaris and Nessie style catalogs, and
-  # apache/iceberg-rest-fixture serves the spec with no prefix, so a real
+  # Iceberg's REST fixture server serves the spec with no prefix, so a real
   # warehouse gives HTTP 400 "Ambiguous URI empty segment".
   # A fresh project per run. `feast teardown` leaves rows in
   # feature_view_version_history, so applying the same feature view into the
@@ -1100,8 +1223,8 @@ smoke_http_only() {
 }
 
 case "$PROFILE" in
-  kafka-lite)            smoke_kafka kafka ;;
-  kafka-full)            smoke_kafka kafka-1 ;;
+  kafka-lite)            smoke_kafka kafka; connect_plugins; smoke_iceberg_sink ;;
+  kafka-full)            smoke_kafka kafka-1; connect_plugins ;;
   flink-lite|flink-full) smoke_flink ;;
   spark-lite|spark-full) smoke_spark ;;
   ch-lite)               smoke_ch_lite ;;
