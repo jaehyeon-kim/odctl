@@ -112,19 +112,19 @@ services:
   # Iceberg REST Catalog
   # ==========================================
   catalog:
-    # apache/iceberg-rest-fixture is the maintained successor to
-    # tabulario/iceberg-rest, which stopped at Iceberg 1.6 and rejects table
-    # format version 3. Same RESTCatalogServer codebase and the same CATALOG_*
-    # environment convention, but it ships no JDBC driver and its default
-    # `java -jar` command cannot pick one up, hence the explicit classpath.
-    image: apache/iceberg-rest-fixture:1.10.1
+    # Iceberg's REST fixture server (RESTCatalogServer), built by the deps image
+    # from the apache-iceberg-${ICEBERG_V} tag, because Apache stopped publishing
+    # the apache/iceberg-rest-fixture image at 1.10.1. It runs on the same JRE
+    # base that image used. The jar ships no JDBC driver, hence the explicit
+    # classpath with the PostgreSQL driver from the shared volume.
+    image: azul/zulu-openjdk:17-jre-headless
     command:
       - java
       # Prometheus metrics on :9404 through the JMX exporter agent from the shared
       # volume, since the catalog has no metrics endpoint of its own.
       - -javaagent:/mnt/shared-deps/agents/jmx_prometheus_javaagent.jar=9404:/etc/jmx/jmx-exporter.yml
       - -cp
-      - /usr/lib/iceberg-rest/iceberg-rest-adapter.jar:/mnt/shared-deps/shared/postgresql.jar
+      - /mnt/shared-deps/iceberg-rest/iceberg-rest-adapter.jar:/mnt/shared-deps/shared/postgresql.jar
       - org.apache.iceberg.rest.RESTCatalogServer
     container_name: iceberg-catalog
     ports:
@@ -132,7 +132,7 @@ services:
     networks:
       - odctl
     volumes:
-      # Postgres JDBC driver, which the fixture image does not ship
+      # The catalog server jar and the Postgres JDBC driver
       - odctl-shared-deps:/mnt/shared-deps:ro
       - ./jmx:/etc/jmx:ro
     profiles:
@@ -163,6 +163,9 @@ services:
       - CATALOG_URI=jdbc:postgresql://postgres:5432/iceberg
       - CATALOG_JDBC_USER=${POSTGRES_USER:-user}
       - CATALOG_JDBC_PASSWORD=${POSTGRES_PASSWORD:-password}
+      # Set by the apache/iceberg-rest-fixture image, which this no longer uses
+      - CATALOG_JDBC_STRICT__MODE=true
+      - REST_PORT=8181
 
 networks:
   odctl:

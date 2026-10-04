@@ -270,7 +270,7 @@ stacks:
         • Your environment needs: feast[duckdb,iceberg,redis,postgres]
         • On an IcebergSource against catalog, pass warehouse="" and
           catalog_name="odctl". The REST client puts warehouse in the URL path,
-          and iceberg-rest-fixture serves the spec with no prefix.
+          and Iceberg's REST fixture server serves the spec with no prefix.
         • Online feature server for get_online_features:
           * External (host): http://127.0.0.1:6566
           * Internal (Docker): http://feast-serve:6566
