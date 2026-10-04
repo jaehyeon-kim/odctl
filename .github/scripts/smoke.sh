@@ -326,7 +326,9 @@ smoke_infra() {
       # pg_textsearch only works when preloaded, so a BM25 index proves the
       # shared_preload_libraries setting as well as the extension.
       local bm25
+      # pg_textsearch reports its index build as NOTICE lines, so keep only warnings.
       bm25=$(docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -tAq -c "
+        SET client_min_messages = warning;
         DROP TABLE IF EXISTS odctl_smoke_docs;
         CREATE TABLE odctl_smoke_docs (id int primary key, content text);
         INSERT INTO odctl_smoke_docs VALUES
