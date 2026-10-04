@@ -1,4 +1,4 @@
-# odctl
+# Open Data Stack (odctl)
 
 odctl is a command-line tool that runs an open data stack on your machine with Docker Compose. You name the profiles you want, such as `kafka-lite` or `airflow`, and odctl starts them together with the services they depend on.
 
