@@ -226,12 +226,13 @@ stacks:
 
   orch:
     file: "compose-orch.yml"
-    description: "Workflow orchestration and pipeline scheduling."
-    profiles: ["airflow"]
+    description: "Workflow orchestration and pipeline scheduling (Airflow), and durable workflows written in code (Temporal)."
+    profiles: ["airflow", "temporal"]
     capacities: ["orchestration"]
     depends_on:
       airflow: ["postgres", "storage"]
-    role: "Central nervous system for scheduling data pipelines, ETL, and ML training runs."
+      temporal: ["deps"]
+    role: "Airflow schedules data pipelines, ETL and ML training runs. Temporal runs long-lived workflows with retries, workflows that wait days for a signal such as a person approving an agent's action, and resumes them after a crash."
     usage:
       airflow: |
         • Airflow Web UI (Credentials: user / password):
@@ -240,6 +241,20 @@ stacks:
         • DAGs: read from s3://airflow/dags every 15 seconds.
         • Plugins: copied from s3://airflow/plugins at start. Airflow loads
           plugins only once, so run `odctl restart airflow` after changing one.
+      temporal: |
+        • Temporal Web UI:
+          * External (host): http://127.0.0.1:8233
+          * Internal (Docker): http://temporal:8233
+        • gRPC endpoint for SDK clients and workers (namespace "default"):
+          * External (host): 127.0.0.1:7233
+          * Internal (Docker): temporal:7233
+        • Your environment needs: temporalio. odctl runs only the server, so
+          your own process runs the worker that executes workflows and
+          activities.
+        • Development server: the server, the UI and a SQLite database in one
+          process. History lives in the temporal-data volume, so it survives
+          `odctl down` and is wiped by `odctl down --volumes`.
+        • Prometheus metrics: http://temporal:9090/metrics, inside the network.
 
   mlops:
     file: "compose-mlops.yml"

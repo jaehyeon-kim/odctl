@@ -42,6 +42,7 @@ GROUPS = [
     "telemetry",
     "metadata",
     "airflow",
+    "temporal",
     "postgres",
     "storage",
     "catalog",

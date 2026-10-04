@@ -904,6 +904,141 @@ PYONLINE
   rm -rf "$work"
 }
 
+# Temporal: a healthy server proves only that it answers. Workflows run in the
+# caller's worker, so this runs one with the temporalio SDK from the host: an
+# activity that fails once and succeeds on retry, and a workflow that waits for
+# a signal. A third workflow is left waiting across `odctl down` and `odctl up`,
+# then signalled, which proves the history in the volume survived and the
+# workflow resumed from it.
+smoke_temporal() {
+  retry 60 5 http_ok "http://127.0.0.1:8233" || fail "no HTTP response from the Web UI on :8233"
+  pass "Web UI answering on :8233"
+
+  local work="${TMPDIR:-/tmp}/odctl-temporal-smoke"
+  rm -rf "$work"; mkdir -p "$work"
+  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the temporal client"
+  VIRTUAL_ENV="$work/.venv" uv pip install -q "temporalio==1.34.0" >/dev/null 2>&1 \
+    || fail "could not install the temporalio SDK"
+
+  cat > "$work/workflows.py" <<'PYEOF'
+import asyncio, os, sys
+from datetime import timedelta
+from temporalio import activity, workflow
+from temporalio.client import Client, WorkflowExecutionStatus
+from temporalio.common import RetryPolicy
+from temporalio.worker import Worker
+
+
+@activity.defn
+async def greet(name: str) -> str:
+    # Fails on the first attempt, so a result means the retry policy ran it again.
+    if activity.info().attempt < 2:
+        raise RuntimeError("first attempt fails on purpose")
+    return f"hello {name}"
+
+
+@workflow.defn
+class Greet:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_activity(
+            greet, name,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(initial_interval=timedelta(seconds=1), maximum_attempts=3),
+        )
+
+
+@workflow.defn
+class Approval:
+    def __init__(self) -> None:
+        self.approver = None
+
+    @workflow.signal
+    def approve(self, approver: str) -> None:
+        self.approver = approver
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.approver is not None)
+        return f"approved by {self.approver}"
+
+
+async def status(client, workflow_id):
+    return (await client.get_workflow_handle(workflow_id).describe()).status
+
+
+async def approve(client, workflow_id, approver):
+    if await status(client, workflow_id) != WorkflowExecutionStatus.RUNNING:
+        sys.exit(f"{workflow_id} is not waiting for its signal")
+    handle = client.get_workflow_handle(workflow_id)
+    await handle.signal(Approval.approve, approver)
+    got = await asyncio.wait_for(handle.result(), 60)
+    if got != f"approved by {approver}":
+        sys.exit(f"{workflow_id} returned {got!r}")
+
+
+async def main(phase: str) -> None:
+    run = os.environ["SMOKE_RUN"]
+    client = await Client.connect(os.environ["SMOKE_ADDRESS"])
+    queue = f"odctl-smoke-{run}"
+    async with Worker(client, task_queue=queue, workflows=[Greet, Approval], activities=[greet]):
+        if phase == "run":
+            got = await client.execute_workflow(
+                Greet.run, "odctl", id=f"greet-{run}", task_queue=queue,
+                execution_timeout=timedelta(seconds=60),
+            )
+            if got != "hello odctl":
+                sys.exit(f"greet-{run} returned {got!r}")
+            for workflow_id in (f"approval-{run}", f"pending-{run}"):
+                await client.start_workflow(Approval.run, id=workflow_id, task_queue=queue)
+            await approve(client, f"approval-{run}", "smoke")
+            if await status(client, f"pending-{run}") != WorkflowExecutionStatus.RUNNING:
+                sys.exit(f"pending-{run} is not waiting for its signal")
+        else:
+            if await status(client, f"greet-{run}") != WorkflowExecutionStatus.COMPLETED:
+                sys.exit(f"greet-{run} is not in the history as completed")
+            await approve(client, f"pending-{run}", "resume")
+    print(f"{phase} ok")
+
+
+# The workflow sandbox imports this file again, so running main on import fails.
+if __name__ == "__main__":
+    asyncio.run(main(sys.argv[1]))
+PYEOF
+
+  export SMOKE_RUN="$$-$(date -u +%Y%m%d%H%M%S)" SMOKE_ADDRESS="127.0.0.1:7233"
+  local py="$work/.venv/bin/python" log="$work/step.log"
+
+  # Output goes to a file, so a failure prints what broke rather than nothing.
+  run_temporal() {
+    local what="$1"; shift
+    if ! (cd "$work" && "$py" workflows.py "$@") >"$log" 2>&1; then
+      echo "---- $what ----"
+      tail -25 "$log"
+      fail "$what"
+    fi
+  }
+
+  run_temporal "the workflows did not complete against 127.0.0.1:7233" run
+  pass "an activity succeeded on retry, and a workflow completed once its signal was sent"
+
+  # The metrics port is not published, so read it from inside the container. Read
+  # into a variable first: with pipefail, grep -q closing the pipe early would
+  # fail wget with SIGPIPE.
+  local metrics
+  metrics=$(docker exec temporal wget -qO- http://127.0.0.1:9090/metrics 2>/dev/null)
+  grep -q '^# TYPE' <<<"$metrics" || fail "no Prometheus metrics on temporal:9090/metrics"
+  pass "Prometheus metrics served on :9090 for the telemetry profile"
+
+  # Without --volumes, so the temporal-data volume and its database stay.
+  odctl down temporal >/dev/null 2>&1 || fail "odctl down temporal failed"
+  odctl up temporal >/dev/null 2>&1 || fail "odctl up temporal failed after odctl down"
+  run_temporal "history did not survive odctl down and up" resume
+  pass "history survived odctl down and up, and a waiting workflow resumed and completed"
+
+  rm -rf "$work"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -923,6 +1058,7 @@ case "$PROFILE" in
   postgres|storage|catalog|valkey) smoke_infra ;;
   metabase)   smoke_metabase ;;
   airflow)    smoke_airflow ;;
+  temporal)   smoke_temporal ;;
   mlflow)     smoke_mlflow ;;
   lineage)    smoke_lineage ;;
   telemetry)  smoke_telemetry ;;
