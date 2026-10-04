@@ -109,15 +109,12 @@ jobs:
       - name: Build the site
         run: uv run mkdocs build --strict
 
-  # The site is published only from a tag, and only once e2e has passed for it,
-  # so a release whose e2e run fails publishes no docs. Each minor version gets
-  # its own copy, because each CLI version runs images with its own tag.
+  # The site is published from main, as dynamic-des does, after the unit tests
+  # and lint pass. Each minor version gets its own copy, because each CLI version
+  # runs images with its own tag.
   docs:
-    needs: [e2e]
-    if: >-
-      always() &&
-      startsWith(github.ref, 'refs/tags/v') &&
-      needs.e2e.result == 'success'
+    needs: [ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -132,8 +129,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          # v0.10.0 is published as 0.10.
-          minor=$(echo "${GITHUB_REF_NAME#v}" | cut -d. -f1,2)
+          # Version 0.10.0 in pyproject.toml is published as 0.10.
+          minor=$(grep -m1 '^version = ' pyproject.toml | cut -d '"' -f 2 | cut -d. -f1,2)
           echo "Deploying docs version $minor"
           uv run mike deploy --push --update-aliases "$minor" latest
           uv run mike set-default --push latest
