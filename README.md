@@ -175,7 +175,7 @@ The CLI will always prioritize the files in your local `./.odctl/` directory. If
 Blog posts that use this CLI:
 
 - [Productionizing an Online Product Recommender using Event Driven Architecture](https://jaehyeon.me/blog/2026-02-23-productionize-recommender-with-eda/): splits a contextual bandit recommender into a serving layer and a training layer on Kafka, Flink and Valkey.
-- [Introducing odctl: One CLI for a Local Open Data Stack](https://jaehyeon.me/blog/2026-07-16-odctl-open-data-stack/): why the tool exists and how one command launches the stack.
+- [Running Kafka, Flink, Spark, Trino and Iceberg Locally with One CLI](https://jaehyeon.me/blog/2026-07-16-odctl-open-data-stack/): why the tool exists and how one command launches the stack.
 - [Building an Agentic Analytics System over an Iceberg Lakehouse](https://jaehyeon.me/blog/2026-07-18-agentic-analytics-system/): runs Trino, Iceberg and object storage from this CLI under a semantic layer an agent queries.
 
 ## Local Development & Contributing
