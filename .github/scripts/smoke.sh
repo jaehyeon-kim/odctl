@@ -1129,8 +1129,8 @@ PYONLINE
 # Temporal: a healthy server proves only that it answers. Workflows run in the
 # caller's worker, so this runs one with the temporalio SDK from the host: an
 # activity that fails once and succeeds on retry, and a workflow that waits for
-# a signal. A third workflow is left waiting across `odctl down` and `odctl up`,
-# then signalled, which proves the history in the volume survived and the
+# a signal. A third workflow is left waiting across `odctl restart`, then
+# signalled, which proves the history in the database file survived and the
 # workflow resumed from it.
 smoke_temporal() {
   retry 60 5 http_ok "http://127.0.0.1:8233" || fail "no HTTP response from the Web UI on :8233"
@@ -1246,11 +1246,12 @@ PYEOF
 
   assert_metrics http://temporal:9090/metrics
 
-  # Without --volumes, so the temporal-data volume and its database stay.
-  odctl down temporal >/dev/null 2>&1 || fail "odctl down temporal failed"
-  odctl up temporal >/dev/null 2>&1 || fail "odctl up temporal failed after odctl down"
-  run_temporal "history did not survive odctl down and up" resume
-  pass "history survived odctl down and up, and a waiting workflow resumed and completed"
+  # A restart keeps the container, so the database file and its history stay.
+  odctl restart temporal >/dev/null 2>&1 || fail "odctl restart temporal failed"
+  retry 24 5 docker exec temporal temporal operator cluster health --address 127.0.0.1:7233 >/dev/null 2>&1 \
+    || fail "temporal did not become healthy after odctl restart"
+  run_temporal "history did not survive odctl restart" resume
+  pass "history survived odctl restart, and a waiting workflow resumed and completed"
 
   rm -rf "$work"
 }

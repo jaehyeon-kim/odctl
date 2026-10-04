@@ -2,7 +2,7 @@
 
 These checks pin what the profile relies on: gRPC and the Web UI on host ports 7233
 and 8233, a listener on every interface rather than the default of localhost, the
-SQLite database in a named volume so history survives `odctl down`, and metrics
+SQLite database in the container with no volume, as for every odctl service, and metrics
 on a fixed port that the telemetry profile scrapes. Nothing here needs Docker.
 """
 
@@ -53,13 +53,12 @@ def test_temporal_listens_beyond_localhost():
     assert _flag("--ip") == "0.0.0.0"
 
 
-def test_history_is_kept_in_a_named_volume():
+def test_history_is_in_the_container_with_no_volume():
+    # Like every odctl service, Temporal keeps no data across `odctl down`.
     service = _temporal_services()["temporal"]
-    database = _flag("--db-filename")
-    assert database.startswith("/home/temporal/")
-    assert "temporal-data:/home/temporal" in service["volumes"]
-    declared = _compose()["volumes"]["temporal-data"]
-    assert not declared.get("external")
+    assert _flag("--db-filename").startswith("/home/temporal/")
+    assert "volumes" not in service
+    assert "volumes" not in _compose()
 
 
 def test_telemetry_scrapes_the_metrics_port():

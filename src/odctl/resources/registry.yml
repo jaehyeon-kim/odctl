@@ -257,8 +257,8 @@ stacks:
           your own process runs the worker that executes workflows and
           activities.
         • Development server: the server, the UI and a SQLite database in one
-          process. History lives in the temporal-data volume, so it survives
-          `odctl down` and is wiped by `odctl down --volumes`.
+          process. History survives `odctl restart` and is lost on
+          `odctl down`, like every odctl service's data.
         • Prometheus metrics: http://temporal:9090/metrics, inside the network.
 
   mlops:
