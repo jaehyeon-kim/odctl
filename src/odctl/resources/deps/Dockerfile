@@ -11,6 +11,33 @@ RUN --mount=type=cache,target=/root/.gradle \
     chmod +x build_connectors.sh && ./build_connectors.sh
 
 # ==========================================
+# Stage 1b: Source Builder (Iceberg REST catalog and Kafka Connect sink)
+# ==========================================
+# Apache publishes neither artifact for current releases: the REST fixture image
+# stopped at 1.10.1, and the Kafka Connect runtime zip is not on Maven Central.
+# Both are built from the Iceberg release tag that ICEBERG_V names, so they
+# always match the client libraries the other stages fetch. version.txt is how
+# Iceberg's own release builds set the version; without it a tag checkout is
+# labelled as the next minor's SNAPSHOT.
+FROM debian:bookworm-slim AS iceberg-builder
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y openjdk-17-jdk-headless git curl unzip && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY versions.env .
+RUN --mount=type=cache,target=/root/.gradle \
+    . ./versions.env \
+    && git clone --branch "apache-iceberg-${ICEBERG_V}" --depth 1 https://github.com/apache/iceberg.git \
+    && cd iceberg \
+    && echo "${ICEBERG_V}" > version.txt \
+    && ./gradlew --no-daemon \
+        :iceberg-open-api:shadowJar \
+        :iceberg-kafka-connect:iceberg-kafka-connect-runtime:distZip \
+    && mkdir -p /build/dist/iceberg-rest /build/dist/connect/iceberg-sink \
+    && cp "open-api/build/libs/iceberg-open-api-test-fixtures-runtime-${ICEBERG_V}.jar" /build/dist/iceberg-rest/iceberg-rest-adapter.jar \
+    && unzip -qq "kafka-connect/kafka-connect-runtime/build/distributions/iceberg-kafka-connect-runtime-${ICEBERG_V}.zip" -d /build/dist/connect/iceberg-sink
+
+# ==========================================
 # Stage 2: Gradle Resolver (Schema Converters & Flink Parquet)
 # ==========================================
 FROM gradle:8.14-jdk17 AS gradle-resolver
@@ -54,6 +81,9 @@ LABEL org.opencontainers.image.description="Ephemeral dependency initializer for
 
 # Grab source-built Aiven JARs
 COPY --from=source-builder /build/dist/ /workspace/connect/
+
+# Grab the source-built Iceberg REST catalog jar and Kafka Connect sink
+COPY --from=iceberg-builder /build/dist/ /workspace/
 
 # Grab perfectly resolved Schema Converters
 COPY --from=gradle-resolver /app/build/confluent-converters/ /workspace/connect/confluent-converters/

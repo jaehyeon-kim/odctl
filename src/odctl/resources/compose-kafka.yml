@@ -171,6 +171,11 @@ services:
       rest.advertised.host.name=connect
       rest.port=8083
       plugin.path=/mnt/shared-deps/connect
+      # A sink task handles its control topic only when offsets flush, so with
+      # the default of 60 s the Iceberg sink needs about five minutes to join its
+      # control group and commit the first snapshot. 10 s brings that to under a
+      # minute.
+      offset.flush.interval.ms=10000
       EOF
       KAFKA_OPTS="$$ODCTL_JMX_AGENT" /opt/kafka/bin/connect-distributed.sh /tmp/connect.properties
       '
@@ -185,7 +190,7 @@ services:
   # Schema Registry & UI
   # ==========================================
   karapace:
-    image: ghcr.io/aiven-open/karapace:6.2.3
+    image: ghcr.io/aiven-open/karapace:6.2.4
     container_name: karapace
     entrypoint:
       - python3

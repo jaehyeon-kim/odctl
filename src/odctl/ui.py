@@ -94,9 +94,9 @@ def print_explain_panel(
 
     # Container Context (Substring matching)
     container_roles = {
-        "pgvector": "Unified Metadata & Vector DB",
+        "odctl/postgres": "PostgreSQL with pgvector, pg_textsearch and PostGIS",
         "seaweedfs": "Object Storage (S3 API)",
-        "iceberg-rest": "Iceberg REST Catalog",
+        "zulu-openjdk": "Iceberg REST Catalog",
         "odctl/deps": "Dependency Initializer",
         "flink": "Flink Stream Processing Node",
         "apache/kafka": "Event Broker / Kafka Connect",
@@ -106,6 +106,9 @@ def print_explain_panel(
         "openmetadata/server": "OpenMetadata Server",
         "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
         "odctl/airflow": "Airflow Orchestrator",
+        "odctl/mlflow": "MLflow Tracking and Model Server",
+        "evidently-service": "ML Monitoring (Evidently UI)",
+        "temporalio/temporal": "Temporal Development Server and Web UI",
         "marquez-web": "Lineage Dashboard",
         "marquezproject/marquez": "Lineage API Server",
         "otel-lgtm": "Telemetry: OTLP, Prometheus, Tempo, Loki, Grafana",

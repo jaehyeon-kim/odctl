@@ -41,11 +41,13 @@ x-airflow-common: &airflow-common
     # Feast's SQL registry, for tasks that build a FeatureStore from their own config.
     FEAST_REGISTRY: postgresql+psycopg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/feast
     # Scheduler, DAG processor and task metrics pushed over OTLP/HTTP to the
-    # telemetry profile's collector. Without it, the exporter only logs failures.
+    # telemetry profile's collector, through the standard OpenTelemetry
+    # variables. Airflow 3.3 deprecates its own otel_host and otel_port.
     AIRFLOW__METRICS__OTEL_ON: "True"
-    AIRFLOW__METRICS__OTEL_HOST: otel-lgtm
-    AIRFLOW__METRICS__OTEL_PORT: "4318"
-    AIRFLOW__METRICS__OTEL_INTERVAL_MILLISECONDS: "15000"
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://otel-lgtm:4318/v1/metrics
+    OTEL_METRIC_EXPORT_INTERVAL: "15000"
+    # Quiets the exporter's retries and failures while telemetry is not running.
+    AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: odctl_log_config.LOGGING_CONFIG
     PYICEBERG_CATALOG__ODCTL__TYPE: rest
     PYICEBERG_CATALOG__ODCTL__URI: http://catalog:8181
     PYICEBERG_CATALOG__ODCTL__WAREHOUSE: s3://warehouse/
@@ -68,6 +70,9 @@ x-airflow-common: &airflow-common
     # For quick experiments
     _PIP_ADDITIONAL_REQUIREMENTS: ${_AIRFLOW_PIP_DEPS:-}
   user: "${AIRFLOW_UID:-50000}:0"
+  volumes:
+    # Airflow adds $AIRFLOW_HOME/config to sys.path, which is where it finds this.
+    - ./airflow/odctl_log_config.py:/opt/airflow/config/odctl_log_config.py:ro
 
 services:
   # ==========================================
@@ -113,6 +118,47 @@ services:
       timeout: 10s
       retries: 20
       start_period: 60s
+
+  # ==========================================
+  # [PROFILE: temporal] Durable workflows
+  # ==========================================
+  # One container: the development server runs the Temporal server, the Web UI
+  # and an embedded SQLite database in one process. Airflow schedules batch
+  # pipelines; Temporal runs long-lived workflows written in code, such as one
+  # that waits for a person to approve an agent's action.
+  temporal:
+    image: temporalio/temporal:1.9.1
+    container_name: temporal
+    profiles:
+      - temporal
+    networks:
+      - odctl
+    ports:
+      - "7233:7233" # gRPC, for SDK clients and workers
+      - "8233:8233" # Web UI
+    restart: unless-stopped
+    mem_limit: 1g
+    # The image's entrypoint is the temporal binary. --ip 0.0.0.0 binds gRPC and
+    # the UI to every interface, since the default of localhost is unreachable
+    # from outside the container. The database file is in the container, so
+    # history survives `odctl restart` and, like every odctl service's data,
+    # not `odctl down`. --metrics-port serves /metrics on the network for the
+    # telemetry profile.
+    command:
+      - server
+      - start-dev
+      - --ip
+      - 0.0.0.0
+      - --db-filename
+      - /home/temporal/temporal.db
+      - --metrics-port
+      - "9090"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 networks:
   odctl:

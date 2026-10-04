@@ -38,10 +38,14 @@ GROUPS = [
     # feast brings up postgres, storage, catalog and valkey with it, and its
     # assertion installs a client to prove the offline and online halves work.
     "feast",
+    # evidently brings up postgres and storage, and its assertion round-trips a
+    # dataset through SeaweedFS as well as a report through Postgres.
+    "evidently",
     "lineage",
     "telemetry",
     "metadata",
     "airflow",
+    "temporal",
     "postgres",
     "storage",
     "catalog",

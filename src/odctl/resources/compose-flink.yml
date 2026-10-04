@@ -9,9 +9,9 @@ x-flink-common: &flink-common
 
 x-flink-base: &flink-base
   <<: *flink-common
-  # Pinned to 2.1 because Iceberg publishes iceberg-flink-runtime for 2.0 and
-  # 2.1 only, and Fluss has no 2.0 build. See issue #9.
-  image: flink:2.1-java17
+  # Pinned to 2.2, the newest minor with Kafka and JDBC connector releases. Keep
+  # it equal to FLINK_MINOR in deps/versions.env. See issue #9.
+  image: flink:2.2-java17
   environment:
     TZ: ${TZ:-UTC}
     # SeaweedFS ignores the region, but the AWS SDK refuses to build a client

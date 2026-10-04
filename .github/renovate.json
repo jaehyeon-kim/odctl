@@ -1,9 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":dependencyDashboard"],
+  "extends": ["config:recommended", ":disableDependencyDashboard"],
   "schedule": ["before 6am on monday"],
 
   "automerge": false,
+
+  "minimumReleaseAge": "3 days",
 
   "docker-compose": {
     "managerFilePatterns": ["/(^|/)compose-[^/]+\\.ya?ml$/"]
@@ -22,6 +24,48 @@
       "matchStrings": ["(?m)^ICEBERG_V=(?<currentValue>\\S+)\\s*$"],
       "depNameTemplate": "org.apache.iceberg:iceberg-aws-bundle",
       "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Track FLUSS_V in versions.env, the Flink client for Fluss. It must match the apache/fluss image, so the two are grouped below.",
+      "managerFilePatterns": ["/^src/odctl/resources/deps/versions\\.env$/"],
+      "matchStrings": ["(?m)^FLUSS_V=(?<currentValue>\\S+)\\s*$"],
+      "depNameTemplate": "org.apache.fluss:fluss-client",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Track DEB_V in fetch_standalone_plugins.sh, which no built-in manager reads.",
+      "managerFilePatterns": ["/^src/odctl/resources/deps/fetch_standalone_plugins\\.sh$/"],
+      "matchStrings": ["(?m)^DEB_V=\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "io.debezium:debezium-connector-postgres",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Track POSTGRES_V in fetch_standalone_plugins.sh, which no built-in manager reads.",
+      "managerFilePatterns": ["/^src/odctl/resources/deps/fetch_standalone_plugins\\.sh$/"],
+      "matchStrings": ["(?m)^POSTGRES_V=\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "org.postgresql:postgresql",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the pgvector version the odctl postgres image compiles. pgvector publishes tags, not releases.",
+      "managerFilePatterns": ["/^src/odctl/resources/docker/postgres/Dockerfile$/"],
+      "matchStrings": ["ARG PGVECTOR_V=(?<currentValue>\\S+)"],
+      "depNameTemplate": "pgvector/pgvector",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the pg_textsearch release the odctl postgres image installs.",
+      "managerFilePatterns": ["/^src/odctl/resources/docker/postgres/Dockerfile$/"],
+      "matchStrings": ["ARG PG_TEXTSEARCH_V=(?<currentValue>\\S+)"],
+      "depNameTemplate": "timescale/pg_textsearch",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
     }
   ],
   "packageRules": [
@@ -31,14 +75,14 @@
       "schedule": ["at any time"]
     },
     {
-      "description": "Flink stays on 2.1: Iceberg publishes iceberg-flink-runtime for 2.0 and 2.1 only, and fluss-flink has no 2.0 build. Raise this when Iceberg ships a runtime for a newer minor. See issue #9.",
+      "description": "Flink stays on 2.2: it is the newest minor with Kafka and JDBC connector releases. Raise this when both connectors publish a build for the next minor, and move FLINK_MINOR in versions.env with it. See issue #9.",
       "matchPackageNames": ["flink", "org.apache.flink:{/,}**"],
-      "allowedVersions": "<2.2"
+      "allowedVersions": "<2.3"
     },
     {
-      "description": "Fluss stays on 0.8.x because 0.9.x requires Flink 2.2, which has no Iceberg runtime. Moves together with the Flink ceiling above.",
+      "description": "Fluss stays on 1.0.x until a newer release is checked against the Flink 2.2 client. Moves together with the Flink ceiling above.",
       "matchPackageNames": ["apache/fluss", "org.apache.fluss:{/,}**"],
-      "allowedVersions": "<0.9"
+      "allowedVersions": "<1.1"
     },
     {
       "description": "Spark stays on 4.1: Iceberg publishes iceberg-spark-runtime for 4.0 and 4.1 only, so a 4.2 image loads a 4.1 runtime and every Iceberg statement dies with IncompatibleClassChangeError. HADOOP_AWS_V in versions.env is matched to the Hadoop this series bundles, and the airflow image pins pyspark to the same minor. Raise this only when Iceberg ships a runtime for a newer minor, and move SPARK_COMPAT_MINOR, HADOOP_AWS_V and the pyspark pin with it. See PR #29.",
@@ -65,12 +109,14 @@
       "groupName": "Spark Ecosystem"
     },
     {
-      "description": "Group the Iceberg REST catalog image with the ICEBERG_V client jars, because the catalog and the engine clients have to speak the same table format version",
-      "matchPackageNames": [
-        "apache/iceberg-rest-fixture",
-        "org.apache.iceberg:{/,}**"
-      ],
+      "description": "Group the Iceberg client jars. The REST catalog and the Kafka Connect sink are built from the same ICEBERG_V tag in the deps image, so this one value moves all of them.",
+      "matchPackageNames": ["org.apache.iceberg:{/,}**"],
       "groupName": "Iceberg Ecosystem"
+    },
+    {
+      "description": "Group the Fluss server image with the FLUSS_V client, because the two must be the same version",
+      "matchPackageNames": ["apache/fluss", "org.apache.fluss:{/,}**"],
+      "groupName": "Fluss"
     },
     {
       "description": "Group Observability stack updates together",

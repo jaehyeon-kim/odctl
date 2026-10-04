@@ -66,7 +66,7 @@ services:
   # odctl defines no alert rules, so Alertmanager did no work. The aliases keep
   # http://prometheus:9090 and http://grafana:3000 resolving on the network.
   otel-lgtm:
-    image: grafana/otel-lgtm:0.33.1
+    image: grafana/otel-lgtm:0.35.0
     container_name: otel-lgtm
     profiles:
       - telemetry
@@ -96,6 +96,9 @@ services:
       # odctl's scrape jobs, merged with the image's own settings.
       - ./prometheus/prometheus.yml:/otel-lgtm/prometheus.yaml
       - ./otelcol/odctl-receivers.yaml:/otel-lgtm/odctl-receivers.yaml
+      # A dashboard per service, loaded through Grafana's provisioning directory.
+      - ./grafana/odctl-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/odctl.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/odctl:ro
     healthcheck:
       # run-all.sh writes /tmp/ready once every component answers its /ready.
       test: ["CMD-SHELL", "test -f /tmp/ready && curl -fsS http://localhost:9090/-/ready"]

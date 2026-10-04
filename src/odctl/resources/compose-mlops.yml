@@ -82,7 +82,7 @@ services:
   # MLflow: Experiment Tracking & Model Registry
   # ==========================================
   mlflow:
-    image: ghcr.io/jaehyeon-kim/odctl/mlops:${TAG:-latest}
+    image: ghcr.io/jaehyeon-kim/odctl/mlflow:${TAG:-latest}
     container_name: mlflow
     profiles: ["mlflow"]
     networks:
@@ -99,7 +99,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    # Each worker imports the ML runtimes in the mlops image, so memory is about
+    # Each worker imports the ML runtimes in the mlflow image, so memory is about
     # 1.1G fixed plus 0.35G per worker: 1.46G at one, 1.81G at two and 2.58G at
     # the default four. Two is enough for a local stack. A comment cannot live
     # inside the folded block below, where it becomes an argument.
@@ -128,7 +128,7 @@ services:
   # One model per container, because --model-uri is singular. To serve a second
   # model, copy this block, rename it, and give it another host port.
   mlflow-serve:
-    image: ghcr.io/jaehyeon-kim/odctl/mlops:${TAG:-latest}
+    image: ghcr.io/jaehyeon-kim/odctl/mlflow:${TAG:-latest}
     container_name: mlflow-serve
     profiles: ["mlflow"]
     networks:
@@ -215,6 +215,48 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:6566/health || exit 1"]
       interval: 10s
       timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # ==========================================
+  # Evidently: ML Monitoring
+  # ==========================================
+  # Keeps data drift, prediction drift, data quality and model quality reports,
+  # and dashboards over them. Reports are computed by the client, for example an
+  # Airflow task, and pushed here with RemoteWorkspace.
+  #
+  # evidently/config.yaml keeps projects, reports, dashboards and datasets in the
+  # evidently database. There is no login, and no secret is set, so anything
+  # that reaches the port can write.
+  evidently:
+    image: evidently/evidently-service:0.7.23
+    container_name: evidently
+    profiles: ["evidently"]
+    networks:
+      - odctl
+    ports:
+      # Host 8089: 8000 is the default for uvicorn, Django and mkdocs serve, so
+      # it often clashes with the user's own apps.
+      - "8089:8000"
+    mem_limit: 1g
+    environment:
+      TZ: ${TZ:-UTC}
+      # Read by @format in evidently/config.yaml.
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      # Usage telemetry to Evidently is on unless this is set.
+      DO_NOT_TRACK: "1"
+    volumes:
+      - ./evidently/config.yaml:/etc/evidently/config.yaml:ro
+    # Appended to the image's entrypoint, `evidently ui --host 0.0.0.0`.
+    command: ["--conf-path", "/etc/evidently/config.yaml"]
+    # /api/v2/projects rather than /api/version, because listing projects opens
+    # the database and runs the migrations. /api/version answers with no
+    # database at all. The image has no curl.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/projects', timeout=5)"]
+      interval: 10s
+      timeout: 10s
       retries: 12
       start_period: 20s
 

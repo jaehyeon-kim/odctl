@@ -17,24 +17,36 @@ The stack is organized into distinct profiles that can be launched independently
 
 - **Messaging:** Real-time event streaming, schema validation, and robust data ingestion.
   - **Stack:** Kafka (KRaft), Schema Registry (Karapace), Kafka Connect, Kafka UI (kafbat)
+  - **Connect plugins:** Apache Iceberg sink (built from the Iceberg release the stack uses), Debezium PostgreSQL source, ClickHouse sink, Aiven JDBC and S3 sink, Redis, and the MSK data generator
 - **Stream Processing:** Stateful stream processing and continuous real-time data transformations.
   - **Stack:** Apache Flink
 - **Data Processing:** Distributed batch processing and large-scale ETL pipelines.
   - **Stack:** Apache Spark
 - **Analytics:** Real-time OLAP querying, federated SQL execution, and interactive BI dashboards.
   - **Stack:** ClickHouse, Trino, Metabase
-- **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation, in one container that reads DAGs from object storage.
-  - **Stack:** Apache Airflow (standalone, with the MLflow and Feast clients and the XGBoost, LightGBM and PyTorch runtimes)
-- **MLOps:** Machine learning experiment tracking, model registry, HTTP model serving, and a feature store.
-  - **Stack:** MLflow, Feast
+- **Orchestration:** Workflow scheduling, DAG execution, and complex pipeline automation, in one container that reads DAGs from object storage. Durable workflows written in code, such as one that waits days for a person to approve an agent's action, in a second container.
+  - **Stack:** Apache Airflow (standalone, with the MLflow and Feast clients and the XGBoost, LightGBM and PyTorch runtimes), Temporal (development server with the Web UI and a SQLite database)
+- **MLOps:** Machine learning experiment tracking, model registry, HTTP model serving, a feature store, and monitoring of data drift and model quality over time.
+  - **Stack:** MLflow, Feast, Evidently
 - **Metadata:** Centralized data catalog, data discovery, and enterprise governance.
   - **Stack:** OpenMetadata
-- **Observability:** Metrics, traces and logs over OpenTelemetry, with dashboards, in one container.
+- **Observability:** Metrics, traces and logs over OpenTelemetry in one container, with a Grafana dashboard for each service in an `odctl` folder.
   - **Stack:** grafana/otel-lgtm (OpenTelemetry Collector, Prometheus, Tempo, Loki, Grafana)
 - **Lineage:** Data provenance, pipeline dependency tracking, and troubleshooting.
   - **Stack:** OpenLineage, Marquez
-- **Foundational Storage, Data Store, & Catalog:** Persistent state, S3-compatible object storage, unified table metadata, high-performance caching/vector search, and unified stream storage.
-  - **Stack:** PostgreSQL (pgvector), SeaweedFS (S3), Iceberg REST Catalog, Valkey Bundle, Apache Fluss
+- **Foundational Storage, Data Store, & Catalog:** Persistent state, S3-compatible object storage, unified table metadata, vector, keyword and geospatial search, caching, and unified stream storage.
+  - **Stack:** PostgreSQL 18, SeaweedFS (S3), Iceberg REST Catalog, Valkey Bundle, Apache Fluss
+  - **PostgreSQL extensions:** pgvector (vector search), pg_textsearch (BM25 keyword search, for hybrid search with pgvector) and PostGIS (geospatial queries), created in the `vector` database
+
+## Images
+
+Most services run their projects' official images, pinned to exact versions. odctl builds five images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`, tagged with the CLI version, so `odctl` 0.10.0 runs images tagged `0.10.0`:
+
+- `deps`: fills a shared volume with connectors, jars and the Prometheus JMX agent, including the Iceberg REST catalog and the Kafka Connect Iceberg sink, both built from the Iceberg release the stack uses.
+- `postgres`: PostgreSQL 18 from the official image, with pgvector, pg_textsearch and PostGIS.
+- `airflow`: Airflow with the MLflow and Feast clients and the model runtimes.
+- `mlflow`: the MLflow server and model server with the model runtimes.
+- `spark`: Spark with the Python clients jobs use (ClickHouse, PostgreSQL, Valkey, MLflow and boto3). Its Iceberg and OpenLineage jars come from the `deps` volume.
 
 ## Prerequisites & Installation
 
@@ -153,6 +165,7 @@ This folder contains all the underlying configurations that power the stack:
 - `compose-*.yml`: The actual Docker Compose definitions. You can edit these to change exposed ports, adjust memory limits, or inject new environment variables.
 - `registry.yml`: The internal dependency graph.
 - `.env`: The environment variables used across the stack (e.g., default credentials or timezones).
+- `grafana/dashboards/`: The Grafana dashboard for each service. Edit a file and restart the `telemetry` profile to load it; changes made in the Grafana UI are not kept.
 - `trino/rules.json`: Trino's file-based access control. The shipped policy is deliberately generic: it grants every identity full table privileges and denies `analyst` schema ownership, and it names no catalog, schema or table, because those belong to your project rather than to this tool. Add your own table rules here for row filtering and column masking, and restart Trino afterwards, since the file is read at startup.
 
 The CLI will always prioritize the files in your local `./.odctl/` directory. If you make a mistake, you can always revert to the pristine default state by running `odctl init --force`.
@@ -177,7 +190,7 @@ If you want to contribute to the CLI itself, we welcome pull requests!
    ```
 4. Install the pre-commit hooks to ensure formatting checks pass:
    ```bash
-   uv run pre-commit install
+   uvx pre-commit install
    ```
 5. Run the test suite:
    ```bash

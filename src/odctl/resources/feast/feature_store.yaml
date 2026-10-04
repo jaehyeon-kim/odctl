@@ -9,7 +9,7 @@
 #
 # On an IcebergSource against the catalog profile, pass warehouse="" and
 # catalog_name="odctl". Feast's REST client puts warehouse into the URL path as
-# a prefix for Polaris and Nessie style catalogs, and apache/iceberg-rest-fixture
+# a prefix for Polaris and Nessie style catalogs, and Iceberg's REST fixture server
 # serves the specification with no prefix, so a real warehouse returns
 # HTTP 400 "Ambiguous URI empty segment". PyIceberg still gets the real
 # warehouse, from the PYICEBERG_CATALOG__ODCTL__* variables in compose-mlops.yml.
