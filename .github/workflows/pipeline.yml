@@ -97,3 +97,43 @@ jobs:
     uses: ./.github/workflows/e2e-test.yml
     with:
       profile_groups: ${{ needs.changes.outputs.profile_groups }}
+
+  # Pull requests build the site in strict mode, so a broken link or a page
+  # missing from the nav fails here. Nothing is deployed.
+  docs-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Build the site
+        run: uv run mkdocs build --strict
+
+  # The site is published only from a tag, and only once e2e has passed for it,
+  # so a release whose e2e run fails publishes no docs. Each minor version gets
+  # its own copy, because each CLI version runs images with its own tag.
+  docs:
+    needs: [e2e]
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.e2e.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # mike needs the full history to update the gh-pages branch
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Build the site
+        run: uv run mkdocs build --strict
+      - name: Deploy with mike
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # v0.10.0 is published as 0.10.
+          minor=$(echo "${GITHUB_REF_NAME#v}" | cut -d. -f1,2)
+          echo "Deploying docs version $minor"
+          uv run mike deploy --push --update-aliases "$minor" latest
+          uv run mike set-default --push latest

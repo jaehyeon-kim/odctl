@@ -1,0 +1,66 @@
+site_name: odctl
+site_description: One CLI for a local open data stack.
+repo_url: https://github.com/jaehyeon-kim/odctl
+repo_name: odctl
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: black
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  # Writes the profile pages, the CLI reference and the diagram at build time.
+  - gen-files:
+      scripts:
+        - scripts/gen_pages.py
+  # Reads profiles/SUMMARY.md, which gen_pages.py writes, for the Profiles section.
+  - literate-nav
+
+extra:
+  version:
+    provider: mike
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - How it works: how-it-works.md
+  - Guides:
+      - Streaming and lakehouse:
+          - Produce and consume with Kafka: guides/kafka.md
+          - Ingest into Iceberg: guides/iceberg-ingestion.md
+      - Orchestration:
+          - Airflow DAGs from S3: guides/airflow-dags.md
+          - Temporal workers: guides/temporal-workers.md
+      - ML and AI:
+          - Feast with Iceberg: guides/feast-iceberg.md
+          - Evidently reports: guides/evidently-reports.md
+          - Hybrid search in PostgreSQL: guides/hybrid-search.md
+      - Operations:
+          - Telemetry and dashboards: guides/telemetry.md
+          - Customise the workspace: guides/workspace.md
+  - Projects: projects.md
+  - Profiles: profiles/
+  - CLI reference: cli.md
+  - Troubleshooting: troubleshooting.md
+  - Development: development.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
