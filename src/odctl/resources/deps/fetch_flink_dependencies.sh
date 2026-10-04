@@ -49,9 +49,7 @@ if [ -z "$J_V" ]; then echo "❌ Error: JDBC connector for Flink ${FLINK_MINOR} 
 fetch_artifact "flink/2.x/jdbc-core.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc-core/${J_V}/flink-connector-jdbc-core-${J_V}.jar"
 fetch_artifact "flink/2.x/jdbc-postgres.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc-postgres/${J_V}/flink-connector-jdbc-postgres-${J_V}.jar"
 
-# Fluss
-F_V=$(get_maven_version "org/apache/fluss/fluss-flink-${FLINK_MINOR}" "[0-9]+\.[0-9]+\.[0-9]+(-incubating)?")
-if [ -z "$F_V" ]; then echo "❌ Error: Fluss connector for Flink ${FLINK_MINOR} is not published yet!"; exit 1; fi
-fetch_artifact "flink/2.x/fluss.jar" "https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-${FLINK_MINOR}/${F_V}/fluss-flink-${FLINK_MINOR}-${F_V}.jar"
+# Fluss, pinned in versions.env to match the server image
+fetch_artifact "flink/2.x/fluss.jar" "https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-${FLINK_MINOR}/${FLUSS_V}/fluss-flink-${FLINK_MINOR}-${FLUSS_V}.jar"
 
 echo "✅ Flink dependencies complete!"
