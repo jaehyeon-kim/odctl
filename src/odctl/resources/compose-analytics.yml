@@ -57,7 +57,7 @@ services:
   # This container ONLY boots in the single profile to instantly
   # resolve DNS for the missing Shard 2, preventing the 22s timeout.
   ch-shard2-stub:
-    image: alpine:3.22
+    image: alpine:3.24
     container_name: ch-shard2-stub
     command: sleep infinity
     mem_limit: 64m
@@ -165,7 +165,7 @@ services:
   # [PROFILE: trino] Federated SQL Engine
   # ==========================================
   trino:
-    image: trinodb/trino:480
+    image: trinodb/trino:483
     container_name: trino
     profiles:
       - trino
@@ -196,7 +196,7 @@ services:
   # [PROFILE: metabase] BI & Dashboarding
   # ==========================================
   metabase:
-    image: metabase/metabase:v0.63.18.2
+    image: metabase/metabase:v0.63.19.1
     container_name: metabase
     profiles:
       - metabase

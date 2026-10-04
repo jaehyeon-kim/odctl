@@ -5,7 +5,7 @@ services:
   # Unified Metadata & Vector DB (Postgres 18)
   # ==========================================
   postgres:
-    image: pgvector/pgvector:0.8.6-pg18-trixie
+    image: pgvector/pgvector:0.8.7-pg18-trixie
     container_name: postgres
     ports:
       - "5432:5432"
@@ -58,7 +58,7 @@ services:
   # Object Storage (SeaweedFS - Single Node)
   # ==========================================
   seaweed:
-    image: &seaweed-image chrislusf/seaweedfs:4.47
+    image: &seaweed-image chrislusf/seaweedfs:4.48
     container_name: seaweed
     ports:
       - "8333:8333" # S3 API
