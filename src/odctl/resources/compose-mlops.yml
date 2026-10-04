@@ -189,6 +189,12 @@ services:
     volumes:
       - ./feast:/bundled_repo:ro
     command: ["python", "-c", *feast-repo-sync, "ui", "--host", "0.0.0.0", "--port", "8888"]
+    # Every Feast process creates the registry tables when it starts. Started
+    # together on a fresh database, the two containers both try, and the loser
+    # exits. Waiting for feast-serve means the tables already exist.
+    depends_on:
+      feast-serve:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8888/api/v1/projects || exit 1"]
       interval: 10s
