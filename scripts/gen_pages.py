@@ -1,7 +1,7 @@
 """
 Generate the documentation pages that must match what odctl runs.
 
-mkdocs-gen-files runs this file during every build. It writes one page per stack
+mkdocs-gen-files runs this file during every build. It writes one page per technology
 in registry.yml, built from the registry and the compose files, and a CLI
 reference built from the `--help` output of each command. Neither is kept in
 the repository, so a change to the registry, a compose file or a command shows
@@ -91,29 +91,90 @@ def _usage(stack: StackConfig, profile: str) -> str:
     return stack.usage or ""
 
 
-def _stack_title(stack_id: str, stack: StackConfig) -> str:
-    if stack.profiles == [stack_id]:
-        return stack_id
-    return f"{stack_id}: {', '.join(stack.profiles)}"
+# The areas the README uses, in the order the Profiles nav and the index show
+# them. Each entry is one page for one technology: its slug, its title and the
+# profiles it covers. A technology with a lite and a full profile, such as
+# Kafka, gets one page with a section for each. registry.yml has no such
+# grouping, so it lives here, and a test fails when a profile is on no page or
+# on two.
+TECH_GROUPS: List[Tuple[str, List[Tuple[str, str, List[str]]]]] = [
+    ("Messaging", [("kafka", "Kafka", ["kafka-lite", "kafka-full"])]),
+    (
+        "Stream and batch processing",
+        [
+            ("flink", "Apache Flink", ["flink-lite", "flink-full"]),
+            ("spark", "Apache Spark", ["spark-lite", "spark-full"]),
+        ],
+    ),
+    (
+        "Analytics",
+        [
+            ("clickhouse", "ClickHouse", ["ch-lite", "ch-full"]),
+            ("trino", "Trino", ["trino"]),
+            ("metabase", "Metabase", ["metabase"]),
+        ],
+    ),
+    (
+        "Orchestration",
+        [
+            ("airflow", "Apache Airflow", ["airflow"]),
+            ("temporal", "Temporal", ["temporal"]),
+        ],
+    ),
+    (
+        "MLOps",
+        [
+            ("mlflow", "MLflow", ["mlflow"]),
+            ("feast", "Feast", ["feast"]),
+            ("evidently", "Evidently", ["evidently"]),
+        ],
+    ),
+    (
+        "Metadata and lineage",
+        [
+            ("openmetadata", "OpenMetadata", ["metadata"]),
+            ("marquez", "Marquez", ["lineage"]),
+        ],
+    ),
+    ("Observability", [("telemetry", "Telemetry (grafana/otel-lgtm)", ["telemetry"])]),
+    (
+        "Storage and catalog",
+        [
+            ("postgres", "PostgreSQL", ["postgres"]),
+            ("seaweedfs", "SeaweedFS", ["storage"]),
+            ("iceberg-catalog", "Iceberg REST catalog", ["catalog"]),
+            ("valkey", "Valkey", ["valkey"]),
+            ("fluss", "Apache Fluss", ["fluss"]),
+            ("deps", "Shared dependencies", ["deps"]),
+        ],
+    ),
+]
 
 
-def stack_page(
-    stack_id: str, registry: Registry, resources: Path, profile_map: Dict[str, dict]
+def _stack_of(registry: Registry, profile: str) -> Tuple[str, StackConfig]:
+    for stack_id, stack in registry.stacks.items():
+        if profile in stack.profiles:
+            return stack_id, stack
+    raise KeyError(f"profile {profile!r} is not in registry.yml")
+
+
+def tech_page(
+    title: str,
+    profiles: List[str],
+    registry: Registry,
+    resources: Path,
+    profile_map: Dict[str, dict],
 ) -> str:
-    """Render the page for one stack."""
-    stack = registry.stacks[stack_id]
+    """Render the page for one technology and the profiles that run it."""
+    stack_id, stack = _stack_of(registry, profiles[0])
     compose = yaml.safe_load((resources / stack.file).read_text()) or {}
     lines = [
-        f"# {_stack_title(stack_id, stack)}",
+        f"# {title}",
         "",
-        stack.description,
+        f"Profiles: {', '.join(f'`{p}`' for p in profiles)}. Stack `{stack_id}`, defined in `{stack.file}`.",
         "",
     ]
-    if stack.role:
-        lines += [stack.role, ""]
-    lines += [f"Compose file: `{stack.file}`.", ""]
-
-    for profile in stack.profiles:
+    for profile in profiles:
         direct = stack.depends_on.get(profile, [])
         started = sorted(
             resolve_dependencies([profile], profile_map, registry) - {profile}
@@ -134,34 +195,12 @@ def stack_page(
     return "\n".join(lines)
 
 
-# The groups the README and the diagram use, in the order the Profiles nav and
-# the index show them. registry.yml has no category for every stack, so the
-# mapping lives here, and a test fails when a stack is in no group or in two.
-# obsv holds both lineage and telemetry; it sits under Observability, and the
-# Metadata and lineage group notes where the lineage profile is.
-STACK_GROUPS: List[Tuple[str, List[str]]] = [
-    ("Foundation", ["deps", "postgres", "storage", "catalog", "store"]),
-    ("Messaging", ["kafka"]),
-    ("Stream processing", ["flink"]),
-    ("Data processing", ["spark"]),
-    ("Analytics", ["analytics"]),
-    ("Orchestration", ["orch"]),
-    ("MLOps", ["mlops"]),
-    ("Metadata and lineage", ["metadata"]),
-    ("Observability", ["obsv"]),
-]
-
-_GROUP_NOTES = {
-    "Metadata and lineage": "The `lineage` profile (Marquez) is in the obsv stack, listed under Observability.",
-}
-
-
 def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
     """
-    Build the profile section: an index, one page per stack and its nav file.
+    Build the profile section: an index, one page per technology and its nav file.
 
-    The nav and the index group the stacks by STACK_GROUPS. The nav has one entry
-    per stack; each profile is a section on its stack's page.
+    The nav and the index group the pages by TECH_GROUPS, with one nav entry per
+    technology; each profile is a section on its technology's page.
 
     Returns:
         Dict[str, str]: Page content keyed by its path under the docs directory.
@@ -173,26 +212,28 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
     index = [
         "# Profiles",
         "",
-        "A profile is what `odctl up` starts. Profiles are grouped into stacks, and each stack's services are defined in one compose file. These pages are generated from `registry.yml` and the compose files when the site is built.",
+        "A profile is what `odctl up` starts. These pages are generated from `registry.yml` and the compose files when the site is built.",
         "",
     ]
     summary = ["- [Overview](index.md)"]
-    for group, stack_ids in STACK_GROUPS:
-        index += [f"## {group}", ""]
-        if group in _GROUP_NOTES:
-            index += [_GROUP_NOTES[group], ""]
-        index += ["| Profile | Stack | Description |", "| --- | --- | --- |"]
+    for group, techs in TECH_GROUPS:
+        index += [
+            f"## {group}",
+            "",
+            "| Profile | Page | Description |",
+            "| --- | --- | --- |",
+        ]
         summary.append(f"- {group}")
-        for stack_id in stack_ids:
-            stack = registry.stacks[stack_id]
-            path = f"{stack_id}.md"
-            pages[f"profiles/{path}"] = stack_page(
-                stack_id, registry, resources, profile_map
+        for slug, title, profiles in techs:
+            path = f"{slug}.md"
+            pages[f"profiles/{path}"] = tech_page(
+                title, profiles, registry, resources, profile_map
             )
-            summary.append(f"    - [{stack_id}]({path})")
-            for profile in stack.profiles:
+            summary.append(f"    - [{title}]({path})")
+            for profile in profiles:
+                _, stack = _stack_of(registry, profile)
                 index.append(
-                    f"| [`{profile}`]({path}#{profile}) | {stack_id} | {stack.description} |"
+                    f"| [`{profile}`]({path}#{profile}) | {title} | {stack.description} |"
                 )
         index.append("")
 

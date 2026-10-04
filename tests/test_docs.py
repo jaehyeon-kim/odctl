@@ -29,44 +29,37 @@ def pages(gen_pages):
     return gen_pages.profile_pages(INTERNAL_RESOURCES_DIR)
 
 
-def test_every_profile_has_a_section_on_its_stack_page(gen_pages, pages):
+def _techs(gen_pages):
+    return [tech for _, techs in gen_pages.TECH_GROUPS for tech in techs]
+
+
+def test_every_profile_is_on_exactly_one_page(gen_pages):
     registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
-    for stack_id, stack in registry.stacks.items():
-        page = pages[f"profiles/{stack_id}.md"]
+    placed = [p for _, _, profiles in _techs(gen_pages) for p in profiles]
+    for stack in registry.stacks.values():
         for profile in stack.profiles:
-            assert f"\n## {profile}\n" in page, f"{profile} missing from {stack_id}.md"
-            assert (
-                f"[`{profile}`]({stack_id}.md#{profile})" in pages["profiles/index.md"]
+            assert placed.count(profile) == 1, (
+                f"{profile} is on {placed.count(profile)} pages"
             )
+    known = {p for stack in registry.stacks.values() for p in stack.profiles}
+    assert set(placed) <= known, "a page names a profile not in registry.yml"
 
 
-def test_every_stack_page_is_in_the_profiles_nav(gen_pages, pages):
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+def test_every_profile_has_a_section_and_an_index_row(gen_pages, pages):
+    for slug, _, profiles in _techs(gen_pages):
+        page = pages[f"profiles/{slug}.md"]
+        for profile in profiles:
+            assert f"\n## {profile}\n" in page, f"{profile} missing from {slug}.md"
+            assert f"[`{profile}`]({slug}.md#{profile})" in pages["profiles/index.md"]
+
+
+def test_profiles_nav_has_one_entry_per_technology(gen_pages, pages):
     summary = pages["profiles/SUMMARY.md"]
-    for stack_id in registry.stacks:
-        assert f"]({stack_id}.md)" in summary
-
-
-def test_every_stack_is_in_exactly_one_group(gen_pages):
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
-    grouped = [s for _, stacks in gen_pages.STACK_GROUPS for s in stacks]
-    for stack_id in registry.stacks:
-        assert grouped.count(stack_id) == 1, (
-            f"{stack_id} is in {grouped.count(stack_id)} groups"
-        )
-    assert set(grouped) <= set(registry.stacks), (
-        "a group names a stack not in registry.yml"
-    )
-
-
-def test_profiles_nav_has_one_entry_per_stack(gen_pages, pages):
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
-    summary = pages["profiles/SUMMARY.md"]
-    for group, _ in gen_pages.STACK_GROUPS:
+    for group, _ in gen_pages.TECH_GROUPS:
         assert f"\n- {group}\n" in summary
-    for stack_id in registry.stacks:
-        assert summary.count(f"]({stack_id}.md") == 1
-        assert f"[{stack_id}]({stack_id}.md)" in summary
+    for slug, title, _ in _techs(gen_pages):
+        assert summary.count(f"]({slug}.md") == 1
+        assert f"[{title}]({slug}.md)" in summary
     assert "#" not in summary
 
 
