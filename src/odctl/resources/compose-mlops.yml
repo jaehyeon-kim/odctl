@@ -82,7 +82,7 @@ services:
   # MLflow: Experiment Tracking & Model Registry
   # ==========================================
   mlflow:
-    image: ghcr.io/jaehyeon-kim/odctl/mlops:${TAG:-latest}
+    image: ghcr.io/jaehyeon-kim/odctl/mlflow:${TAG:-latest}
     container_name: mlflow
     profiles: ["mlflow"]
     networks:
@@ -99,7 +99,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    # Each worker imports the ML runtimes in the mlops image, so memory is about
+    # Each worker imports the ML runtimes in the mlflow image, so memory is about
     # 1.1G fixed plus 0.35G per worker: 1.46G at one, 1.81G at two and 2.58G at
     # the default four. Two is enough for a local stack. A comment cannot live
     # inside the folded block below, where it becomes an argument.
@@ -128,7 +128,7 @@ services:
   # One model per container, because --model-uri is singular. To serve a second
   # model, copy this block, rename it, and give it another host port.
   mlflow-serve:
-    image: ghcr.io/jaehyeon-kim/odctl/mlops:${TAG:-latest}
+    image: ghcr.io/jaehyeon-kim/odctl/mlflow:${TAG:-latest}
     container_name: mlflow-serve
     profiles: ["mlflow"]
     networks:
