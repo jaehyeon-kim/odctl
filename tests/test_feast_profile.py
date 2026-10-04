@@ -61,3 +61,11 @@ def test_one_profile_starts_mlflow_and_its_model_server():
     script = serve["command"][-1]
     assert 'if [ -z "$${MODEL_URI}" ]' in script and "exec sleep infinity" in script
     assert serve["healthcheck"]["test"][1].startswith('[ -z "$${MODEL_URI}" ] ||')
+
+
+def test_feast_ui_waits_for_a_healthy_feast_serve():
+    # Both create the registry tables at start; together, the loser exits.
+    services = _compose("compose-mlops.yml")["services"]
+    assert services["feast-ui"]["depends_on"] == {
+        "feast-serve": {"condition": "service_healthy"}
+    }

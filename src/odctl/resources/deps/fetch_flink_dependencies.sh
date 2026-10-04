@@ -48,6 +48,8 @@ J_V=$(get_maven_version "org/apache/flink/flink-connector-jdbc-core" "[0-9]+\.[0
 if [ -z "$J_V" ]; then echo "❌ Error: JDBC connector for Flink ${FLINK_MINOR} is not published yet!"; exit 1; fi
 fetch_artifact "flink/2.x/jdbc-core.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc-core/${J_V}/flink-connector-jdbc-core-${J_V}.jar"
 fetch_artifact "flink/2.x/jdbc-postgres.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc-postgres/${J_V}/flink-connector-jdbc-postgres-${J_V}.jar"
+# The JDBC connector needs the OpenLineage client at runtime. See versions.env.
+fetch_artifact "flink/2.x/openlineage-java.jar" "https://repo1.maven.org/maven2/io/openlineage/openlineage-java/${OPENLINEAGE_V}/openlineage-java-${OPENLINEAGE_V}.jar"
 
 # Fluss, pinned in versions.env to match the server image
 fetch_artifact "flink/2.x/fluss.jar" "https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-${FLINK_MINOR}/${FLUSS_V}/fluss-flink-${FLINK_MINOR}-${FLUSS_V}.jar"

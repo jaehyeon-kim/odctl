@@ -232,6 +232,41 @@ SQL
   pass "Flink wrote 3 rows to an Iceberg table and read them back"
 }
 
+# The Kafka, Avro with schema registry, and JDBC jars come from the deps image
+# and must match the Flink minor. Write Avro to Kafka through Karapace, read it
+# back, and write an aggregate to PostgreSQL over JDBC. flink-lite already starts
+# PostgreSQL through the catalog; Kafka is started here.
+smoke_flink_kafka_jdbc() {
+  odctl up kafka-lite >/dev/null 2>&1 || fail "could not start kafka-lite for the Flink Kafka and JDBC check"
+  retry 30 5 kafka_topic --list >/dev/null 2>&1 || fail "broker never became reachable"
+  kafka_topic --create --if-not-exists --topic smoke-flink-orders --partitions 1 --replication-factor 1 >/dev/null 2>&1
+  # Right after it starts, Karapace answers its health check but times out on a
+  # schema write until its producer reaches the broker. Wait for a write.
+  retry 24 5 curl -fsS --max-time 10 -X POST -H 'Content-Type: application/vnd.schemaregistry.v1+json' \
+    -d '{"schema": "{\"type\":\"string\"}"}' http://127.0.0.1:8081/subjects/smoke-ready/versions \
+    >/dev/null 2>&1 || fail "Karapace never accepted a schema"
+  docker exec postgres psql -U user -d odctl -q -v ON_ERROR_STOP=1 -c "
+    DROP TABLE IF EXISTS smoke_flink_stats;
+    CREATE TABLE smoke_flink_stats (supplier TEXT PRIMARY KEY, orders BIGINT, total DOUBLE PRECISION);
+  " >/dev/null 2>&1 || fail "could not create the JDBC target table"
+  local out
+  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+CREATE TABLE orders (supplier STRING, price DOUBLE) WITH ('connector'='kafka','topic'='smoke-flink-orders','properties.bootstrap.servers'='broker-1:19092','scan.startup.mode'='earliest-offset','scan.bounded.mode'='latest-offset','format'='avro-confluent','avro-confluent.url'='http://karapace:8081');
+INSERT INTO orders VALUES ('a', 10.0), ('a', 5.0), ('b', 7.5);
+CREATE TABLE stats (supplier STRING, orders BIGINT, total DOUBLE, PRIMARY KEY (supplier) NOT ENFORCED) WITH ('connector'='jdbc','url'='jdbc:postgresql://postgres:5432/odctl','table-name'='smoke_flink_stats','username'='user','password'='password');
+INSERT INTO stats SELECT supplier, COUNT(*), SUM(price) FROM orders GROUP BY supplier;
+SQL
+)
+  local rows
+  rows=$(docker exec postgres psql -U user -d odctl -tAc \
+    "SELECT string_agg(supplier || '=' || orders || '/' || total, ',' ORDER BY supplier) FROM smoke_flink_stats" 2>/dev/null)
+  docker exec postgres psql -U user -d odctl -q -c "DROP TABLE IF EXISTS smoke_flink_stats" >/dev/null 2>&1
+  [ "$rows" = "a=2/15,b=1/7.5" ] || { echo "$out" | grep -iE "error|exception" | tail -10; fail "Kafka Avro to JDBC through Flink SQL gave '$rows', expected a=2/15,b=1/7.5"; }
+  pass "Flink read Avro from Kafka through the schema registry and wrote an aggregate to PostgreSQL over JDBC"
+}
+
 smoke_spark() {
   local out
   out=$(docker exec spark-master /opt/spark/bin/spark-sql -e "
@@ -1327,6 +1362,7 @@ case "$PROFILE" in
     assert_metrics http://kafka-{1,2,3}:9404/metrics "${KAFKA_SIDE[@]}" ;;
   flink-lite)
     smoke_flink
+    smoke_flink_kafka_jdbc
     assert_metrics http://jobmanager:9249/metrics http://taskmanager-a:9249/metrics ;;
   flink-full)
     smoke_flink
