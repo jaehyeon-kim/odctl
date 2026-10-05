@@ -120,7 +120,7 @@ services:
     # the apache/iceberg-rest-fixture image at 1.10.1. It runs on the same JRE
     # base that image used. The jar ships no JDBC driver, hence the explicit
     # classpath with the PostgreSQL driver from the shared volume.
-    image: azul/zulu-openjdk:17-jre-headless
+    image: azul/zulu-openjdk:25-jre-headless
     command:
       - java
       # Prometheus metrics on :9404 through the JMX exporter agent from the shared
