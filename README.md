@@ -172,11 +172,13 @@ The CLI will always prioritize the files in your local `./.odctl/` directory. If
 
 ## Related reading
 
-Blog posts that use this CLI:
+Blog posts about odctl and the projects built on it are tagged [odctl](https://jaehyeon.me/tags/odctl/) on jaehyeon.me.
 
-- [Productionizing an Online Product Recommender using Event Driven Architecture](https://jaehyeon.me/blog/2026-02-23-productionize-recommender-with-eda/): splits a contextual bandit recommender into a serving layer and a training layer on Kafka, Flink and Valkey.
-- [Running Kafka, Flink, Spark, Trino and Iceberg Locally with One CLI](https://jaehyeon.me/blog/2026-07-16-odctl-open-data-stack/): why the tool exists and how one command launches the stack.
-- [Building an Agentic Analytics System over an Iceberg Lakehouse](https://jaehyeon.me/blog/2026-07-18-agentic-analytics-system/): runs Trino, Iceberg and object storage from this CLI under a semantic layer an agent queries.
+Projects that use odctl:
+
+- [benchtop](https://github.com/jaehyeon-kim/benchtop): hands-on data engineering and machine learning demos that run locally, each on the odctl stack.
+- [dynamic-des](https://github.com/jaehyeon-kim/dynamic-des): a SimPy library for simulations that stream to Kafka, PostgreSQL, Redis and Iceberg; its examples and integration tests run their infrastructure with odctl.
+- [agentic-analytics-system](https://github.com/jaehyeon-kim/agentic-analytics-system): conversational analytics over an Iceberg lakehouse, with Trino, Iceberg and object storage started by odctl.
 
 ## Local Development & Contributing
 
