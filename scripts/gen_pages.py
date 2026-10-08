@@ -92,60 +92,60 @@ def _usage(stack: StackConfig, profile: str) -> str:
 
 
 # The areas the README uses, in the order the Profiles nav and the index show
-# them. Each entry is one page for one technology: its slug, its title and the
-# profiles it covers. A technology with a lite and a full profile, such as
-# Kafka, gets one page with a section for each. registry.yml has no such
-# grouping, so it lives here, and a test fails when a profile is on no page or
-# on two.
-TECH_GROUPS: List[Tuple[str, List[Tuple[str, str, List[str]]]]] = [
-    ("Messaging", [("kafka", "Kafka", ["kafka-lite", "kafka-full"])]),
+# them. Each area is one page, with a section for each technology: its title and
+# the profiles it covers, each profile a subsection. A technology with a lite and
+# a full profile, such as Kafka, has a subsection for each. registry.yml has no
+# such grouping, so it lives here, and a test fails when a profile is on no page
+# or on two.
+TECH_GROUPS: List[Tuple[str, List[Tuple[str, List[str]]]]] = [
+    ("Messaging", [("Kafka", ["kafka-lite", "kafka-full"])]),
     (
         "Stream and batch processing",
         [
-            ("flink", "Apache Flink", ["flink-lite", "flink-full"]),
-            ("spark", "Apache Spark", ["spark-lite", "spark-full"]),
+            ("Apache Flink", ["flink-lite", "flink-full"]),
+            ("Apache Spark", ["spark-lite", "spark-full"]),
         ],
     ),
     (
         "Analytics",
         [
-            ("clickhouse", "ClickHouse", ["ch-lite", "ch-full"]),
-            ("trino", "Trino", ["trino"]),
-            ("metabase", "Metabase", ["metabase"]),
+            ("ClickHouse", ["ch-lite", "ch-full"]),
+            ("Trino", ["trino"]),
+            ("Metabase", ["metabase"]),
         ],
     ),
     (
         "Orchestration",
         [
-            ("airflow", "Apache Airflow", ["airflow"]),
-            ("temporal", "Temporal", ["temporal"]),
+            ("Apache Airflow", ["airflow"]),
+            ("Temporal", ["temporal"]),
         ],
     ),
     (
         "MLOps",
         [
-            ("mlflow", "MLflow", ["mlflow"]),
-            ("feast", "Feast", ["feast"]),
-            ("evidently", "Evidently", ["evidently"]),
+            ("MLflow", ["mlflow"]),
+            ("Feast", ["feast"]),
+            ("Evidently", ["evidently"]),
         ],
     ),
     (
         "Metadata and lineage",
         [
-            ("openmetadata", "OpenMetadata", ["metadata"]),
-            ("marquez", "Marquez", ["lineage"]),
+            ("OpenMetadata", ["metadata"]),
+            ("Marquez", ["lineage"]),
         ],
     ),
-    ("Observability", [("telemetry", "Telemetry (grafana/otel-lgtm)", ["telemetry"])]),
+    ("Observability", [("Telemetry (grafana/otel-lgtm)", ["telemetry"])]),
     (
         "Storage and catalog",
         [
-            ("postgres", "PostgreSQL", ["postgres"]),
-            ("seaweedfs", "SeaweedFS", ["storage"]),
-            ("iceberg-catalog", "Iceberg REST catalog", ["catalog"]),
-            ("valkey", "Valkey", ["valkey"]),
-            ("fluss", "Apache Fluss", ["fluss"]),
-            ("deps", "Shared dependencies", ["deps"]),
+            ("PostgreSQL", ["postgres"]),
+            ("SeaweedFS", ["storage"]),
+            ("Iceberg REST catalog", ["catalog"]),
+            ("Valkey", ["valkey"]),
+            ("Apache Fluss", ["fluss"]),
+            ("Shared dependencies", ["deps"]),
         ],
     ),
 ]
@@ -158,18 +158,23 @@ def _stack_of(registry: Registry, profile: str) -> Tuple[str, StackConfig]:
     raise KeyError(f"profile {profile!r} is not in registry.yml")
 
 
-def tech_page(
+def _slug(text: str) -> str:
+    """The page name for an area, such as stream-and-batch-processing."""
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def tech_section(
     title: str,
     profiles: List[str],
     registry: Registry,
     resources: Path,
     profile_map: Dict[str, dict],
-) -> str:
-    """Render the page for one technology and the profiles that run it."""
+) -> List[str]:
+    """Render one technology's section of an area page, a subsection per profile."""
     stack_id, stack = _stack_of(registry, profiles[0])
     compose = yaml.safe_load((resources / stack.file).read_text()) or {}
     lines = [
-        f"# {title}",
+        f"## {title}",
         "",
         f"Profiles: {', '.join(f'`{p}`' for p in profiles)}. Stack `{stack_id}`, defined in `{stack.file}`.",
         "",
@@ -180,7 +185,7 @@ def tech_page(
             resolve_dependencies([profile], profile_map, registry) - {profile}
         )
         lines += [
-            f"## {profile}",
+            f"### {profile}",
             "",
             f"Depends on: {', '.join(f'`{d}`' for d in direct) or 'nothing'}. "
             f"`odctl up {profile}` also starts: "
@@ -191,16 +196,15 @@ def tech_page(
         if usage:
             lines += ["```text", usage, "```", ""]
         lines += _services_table(compose, profile) + [""]
-
-    return "\n".join(lines)
+    return lines
 
 
 def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
     """
-    Build the profile section: an index, one page per technology and its nav file.
+    Build the profile section: an index, one page per area and its nav file.
 
-    The nav and the index group the pages by TECH_GROUPS, with one nav entry per
-    technology; each profile is a section on its technology's page.
+    The nav has one entry per area in TECH_GROUPS. Each area page has a section
+    per technology, and each profile is a subsection, which the index links to.
 
     Returns:
         Dict[str, str]: Page content keyed by its path under the docs directory.
@@ -217,25 +221,24 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
     ]
     summary = ["- [Overview](index.md)"]
     for group, techs in TECH_GROUPS:
+        path = f"{_slug(group)}.md"
+        page = [f"# {group}", ""]
         index += [
-            f"## {group}",
+            f"## [{group}]({path})",
             "",
-            "| Profile | Page | Description |",
+            "| Profile | Technology | Description |",
             "| --- | --- | --- |",
         ]
-        summary.append(f"- {group}")
-        for slug, title, profiles in techs:
-            path = f"{slug}.md"
-            pages[f"profiles/{path}"] = tech_page(
-                title, profiles, registry, resources, profile_map
-            )
-            summary.append(f"    - [{title}]({path})")
+        summary.append(f"- [{group}]({path})")
+        for title, profiles in techs:
+            page += tech_section(title, profiles, registry, resources, profile_map)
             for profile in profiles:
                 _, stack = _stack_of(registry, profile)
                 index.append(
                     f"| [`{profile}`]({path}#{profile}) | {title} | {stack.description} |"
                 )
         index.append("")
+        pages[f"profiles/{path}"] = "\n".join(page)
 
     pages["profiles/index.md"] = "\n".join(index)
     pages["profiles/SUMMARY.md"] = "\n".join(summary) + "\n"

@@ -34,4 +34,8 @@ SELECT id FROM docs ORDER BY content <@> 'ranking function' LIMIT 1;
 
 Ordering by `content <@> 'query'` puts the best BM25 match first. pg_textsearch works only when PostgreSQL preloads it, and odctl's compose file sets `shared_preload_libraries` to do that.
 
+Each query returns the expected row:
+
+![psql output of the vector and BM25 queries](../images/hybrid-search.png){ .screenshot }
+
 To use the extensions in another database, run `CREATE EXTENSION vector;` or `CREATE EXTENSION pg_textsearch;` there. From the host, connect to `127.0.0.1:5432` as `user` with password `password`.

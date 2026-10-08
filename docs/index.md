@@ -24,3 +24,11 @@ Kafka Connect ships with the Apache Iceberg sink, the Debezium PostgreSQL source
 - [Getting started](getting-started.md) installs odctl and starts a first profile.
 - [Profiles](profiles/index.md) lists every profile with its ports, images and memory limits.
 - [Guides](guides/iceberg-ingestion.md) show how to use the services together.
+
+## Projects that use odctl
+
+- [benchtop](https://github.com/jaehyeon-kim/benchtop): small data engineering and machine learning projects, each run from a cold clone on odctl.
+- [dynamic-des](https://github.com/jaehyeon-kim/dynamic-des): a SimPy library for simulations that stream to Kafka, PostgreSQL, Redis and Iceberg.
+- [agentic-analytics-system](https://github.com/jaehyeon-kim/agentic-analytics-system): conversational analytics over an Iceberg lakehouse.
+
+Blog posts about odctl and these projects are tagged [odctl](https://jaehyeon.me/tags/odctl/) on jaehyeon.me.

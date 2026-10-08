@@ -82,6 +82,10 @@ async with Worker(client, task_queue="demo", workflows=[Greet, Approval], activi
 
 Until the signal arrives, the Web UI lists the workflow as running.
 
+The Web UI at `http://127.0.0.1:8233` lists each workflow. Here `approval-2` was started without a signal, so it is still running:
+
+![Temporal Web UI with two completed workflows and one waiting for its signal](../images/temporal.png){ .screenshot }
+
 ## History
 
 Workflow history is in the database file inside the container. It survives `odctl restart temporal`, and the tests check that a workflow left waiting for its signal resumes and completes afterwards. `odctl down` removes the history, as it removes every odctl service's data.

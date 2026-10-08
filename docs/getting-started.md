@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Docker Engine or Docker Desktop, running. Give Docker 8 to 16 GB of memory, because the processing engines need it.
+- Docker Engine or Docker Desktop, running. Give Docker 8 to 16 GB of memory.
 - Python 3.10 or later.
 
 ## Install
@@ -23,7 +23,7 @@ pipx install odctl
 odctl init
 ```
 
-This copies the compose files and their settings into `.odctl` in the current directory, and writes `.odctl/.env` with `TAG` set to the CLI version. odctl reads from `.odctl` whenever it exists, so you can edit any file there. See [Customise the workspace](guides/workspace.md).
+This copies the compose files and their settings into `.odctl` in the current directory, and writes `.odctl/.env` with `TAG` set to the CLI version. odctl reads from `.odctl` whenever it exists, so you can edit any file there. [Workspace](how-it-works.md#workspace) explains what changes with and without it, and how to customise it.
 
 ## Start a profile
 
@@ -34,13 +34,17 @@ odctl list
 odctl up kafka-lite --dry-run
 ```
 
+The dry run prints which compose files and profiles it would start:
+
+![odctl up kafka-lite --dry-run output](images/odctl-dry-run.png){ .screenshot }
+
 Start it:
 
 ```bash
 odctl up kafka-lite
 ```
 
-odctl starts the profiles `kafka-lite` depends on first, then Kafka. It waits until the services are running, and healthy where they define a health check. `odctl explain kafka-lite` prints its addresses, and the [kafka page](profiles/kafka.md) lists the same.
+odctl starts the profiles `kafka-lite` depends on first, then Kafka. It waits until the services are running, and healthy where they define a health check. `odctl explain kafka-lite` prints its addresses, and the [Messaging page](profiles/messaging.md#kafka-lite) lists the same.
 
 Check what is running, and stop everything when you are done:
 

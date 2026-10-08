@@ -1,4 +1,4 @@
-# Telemetry and dashboards
+# Telemetry
 
 The `telemetry` profile runs the grafana/otel-lgtm image: an OpenTelemetry Collector, Prometheus, Tempo, Loki and Grafana in one container. Start it next to the profiles you want to watch:
 
@@ -19,6 +19,10 @@ Prometheus scrapes the services that publish a metrics endpoint, by container na
 ## Dashboards
 
 Grafana has a dashboard per service in a folder named `odctl`. A dashboard fills in once its service's profile is up. The dashboards are JSON files in `.odctl/grafana/dashboards/`. Edit a file and run `odctl restart telemetry` to load it. Changes made in the Grafana UI are not kept.
+
+For example, the PostgreSQL dashboard:
+
+![Grafana PostgreSQL dashboard from the odctl folder](../images/grafana.png){ .screenshot }
 
 ## Send your own metrics
 

@@ -1,18 +1,46 @@
 # How it works
 
-## Profiles and dependencies
+## What `odctl up` does
 
-`registry.yml` maps each profile to a compose file and lists the profiles it needs directly. `odctl up` follows those lists until nothing new is added. For example, `odctl up flink-lite` also starts `catalog`, which needs `postgres` and `storage`, which need `deps`. It starts `deps` first, `postgres` and `storage` next, `catalog` after them, and the profiles you named last. `odctl up <profile> --dry-run` prints the plan without starting anything, and each [profile page](profiles/index.md) lists what a profile starts.
+Take `odctl up flink-lite` as an example. Flink keeps its tables in Iceberg, so it needs the Iceberg REST catalog. The catalog keeps its metadata in PostgreSQL and its files in SeaweedFS. All of them need the shared jars in `deps`.
 
-Commands other than `up`, such as `down`, `ps`, `logs`, `restart` and `recreate`, act only on the profiles you name. They add a dependency only when it is in the same compose file, because Docker Compose rejects the project otherwise.
+![odctl up flink-lite starts deps, then postgres and storage, then catalog, then flink-lite](images/odctl-up.png)
 
-## Shared jars in the deps volume
+odctl reads these links from `registry.yml` and starts the profiles from left to right:
 
-The `deps` profile runs one short-lived container, `odctl-init-deps`. It copies connectors, jars and the Prometheus JMX agent into a Docker volume named `odctl-shared-deps`, then exits. The Kafka brokers, Kafka Connect, Flink, Spark and the Iceberg REST catalog mount that volume. The copy writes only missing or changed files and renames each into place, so a running engine never reads a half-written jar.
+1. `deps` copies connectors and jars into a shared Docker volume, creates the `odctl` network, and exits.
+2. `postgres` and `storage` start, and odctl waits until they are healthy.
+3. `catalog` starts once both are healthy.
+4. `flink-lite` starts last.
 
-The `deps` project also creates the `odctl` Docker network that every service joins. Services reach each other by container name on that network, for example `http://catalog:8181`.
+`odctl up flink-lite --dry-run` prints this plan without starting anything. Each [profile page](profiles/index.md) lists what its profile also starts.
 
-## Image tags follow the CLI version
+`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles.
+
+## How you reach a service
+
+Every service publishes its ports on the host, so a browser or client on your machine uses `http://127.0.0.1:<port>`. Docker publishes them on all of the host's network interfaces, so other machines on your network can reach them too. Each profile page lists the ports.
+
+Inside Docker, services reach each other by container name on the `odctl` network, for example `http://catalog:8181` or `broker-1:19092` for Kafka. A container of your own reaches them the same way when it joins that network:
+
+```bash
+docker run --rm --network odctl curlimages/curl http://catalog:8181/v1/config
+```
+
+## Where data lives
+
+Services keep their data inside their containers.
+
+| Command | Containers | Your data |
+| --- | --- | --- |
+| `odctl restart` | kept | kept |
+| `odctl recreate` | replaced | lost |
+| `odctl down` | removed | lost |
+| `odctl down --volumes` | removed, with the `odctl-shared-deps` volume | lost |
+
+So a database, a bucket, a topic or an Iceberg table lasts until the profile is stopped. This keeps every `odctl up` a clean start. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
+
+## Which images run
 
 Most services run their project's official image, pinned to an exact version. odctl builds five images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`:
 
@@ -24,16 +52,76 @@ Most services run their project's official image, pinned to an exact version. od
 | `mlflow` | The MLflow server and model server with the model runtimes |
 | `spark` | Spark with the Python clients jobs use |
 
-The compose files tag these images `${TAG:-latest}`. `odctl init` writes `TAG=<CLI version>` to `.odctl/.env`, so odctl 1.0.0 runs images tagged `1.0.0`. Without a workspace, `TAG` is unset and the tag is `latest`. A `TAG` set in the shell takes precedence over `.env`.
+These five are tagged with the CLI version through `TAG`. [Workspace](#workspace) explains how `TAG` is set with and without `odctl init`.
 
-Upgrading the CLI does not change `.odctl/.env`. Every command except `odctl init` then warns that the workspace's `TAG` differs from the CLI version. `odctl init --force` moves the workspace to the new version, and it also resets your edits.
+## Workspace
 
-## Data does not survive `odctl down`
+odctl runs from one of two places: the files bundled with the CLI, or a workspace that `odctl init` copies them into.
 
-Services keep their data inside their containers. `odctl down` removes the containers, so databases, buckets, topics and Iceberg tables are gone afterwards. Spark's event logs are on `spark-events-data`, a volume held in memory, so they go too. The only volume that outlasts `odctl down` is `odctl-shared-deps`, which holds no data of yours, and `odctl down --volumes` removes it.
+### With and without `odctl init`
 
-`odctl restart` keeps the containers, so data survives it. `odctl recreate` replaces them, so data does not. Use `recreate` to apply an edited compose file, because a restart never applies a new memory limit, port, image tag or environment variable.
+| | Without a workspace | With a workspace |
+| --- | --- | --- |
+| Files odctl reads | the compose files and `registry.yml` inside the installed package | the copies in `.odctl` in the current directory |
+| Image tag of odctl's own images | `latest`, because no `.env` sets `TAG` | the CLI version, written to `.odctl/.env` as `TAG` |
+| Your changes | none; the package is replaced on every upgrade | any file in `.odctl` |
+| After a CLI upgrade | new files and images at once | the old files and images, with a warning on every command until `odctl init --force` |
 
-## Workspace directory
+Without a workspace, `latest` can be newer than the CLI you run, so use `odctl init` for anything you want to repeat. A `TAG` set in the shell overrides both.
 
-odctl reads its compose files, `registry.yml` and `.env` from `.odctl` in the current directory when that directory exists. Otherwise it reads the files bundled with the CLI. `--workspace PATH` points it at another directory. [Customise the workspace](guides/workspace.md) lists what you can change there.
+odctl looks for `.odctl` in the current directory. `--workspace PATH` points it at another directory, so one workspace can serve several projects.
+
+### Customise it
+
+`odctl init` copies everything odctl runs into `.odctl`. It copies only files that are missing, so running it again keeps your edits.
+
+| File | What to change |
+| --- | --- |
+| `compose-*.yml` | Host ports, memory limits and environment variables of each service |
+| `registry.yml` | The profiles, their compose files and their dependencies |
+| `.env` | `TAG`, extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`) and the MLflow services (`_MLOPS_PIP_DEPS`), and the model the MLflow model server serves (`MODEL_URI`) |
+| `grafana/dashboards/` | The Grafana dashboard for each service |
+| `trino/rules.json` | Trino's file-based access control |
+| `evidently/config.yaml` | The Evidently server's settings |
+
+### Apply a change
+
+A restart keeps the container, so it does not apply an edited compose file or `.env`. Run `odctl recreate <profile>` to replace the profile's containers from their current definition, and add `--pull` to fetch images again. Recreating discards the data in those containers. `odctl restart <profile>` is enough for files a service reads when it starts, such as `trino/rules.json` and the Grafana dashboards.
+
+### Examples
+
+Each example edits the workspace, then applies the change. `sed -i.bak` works with both GNU and macOS `sed`, and keeps the original as a `.bak` file.
+
+Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it:
+
+```bash
+sed -i.bak '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' .odctl/compose-infra.yml
+odctl recreate storage
+docker inspect seaweed --format '{{.HostConfig.Memory}}'   # 2147483648
+```
+
+Publish Trino on port 8180 instead of 8080, when another program already uses 8080:
+
+```bash
+sed -i.bak 's/"8080:8080" # Trino/"8180:8080" # Trino/' .odctl/compose-analytics.yml
+odctl up trino
+docker port trino   # 8080/tcp -> 0.0.0.0:8180
+```
+
+Install extra Python packages in the Airflow container, for DAGs that import them:
+
+```bash
+sed -i.bak 's/^_AIRFLOW_PIP_DEPS=.*/_AIRFLOW_PIP_DEPS="dateparser==1.4.3"/' .odctl/.env
+odctl up airflow
+docker exec airflow python -c "import dateparser"
+```
+
+The packages install when the container starts, so the first start after the change takes longer. `_MLOPS_PIP_DEPS` does the same for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `MODEL_URI` in the same file sets the model `mlflow-serve` serves, as [MLflow tracking and model serving](guides/mlflow.md) shows.
+
+### Trino access rules
+
+The shipped `trino/rules.json` grants every identity full table privileges and denies `analyst` schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.
+
+### Start again
+
+`odctl init --force` deletes `.odctl` and copies the bundled files again, with `TAG` set to the current CLI version. Your edits are lost, so it asks for confirmation first.

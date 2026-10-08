@@ -35,7 +35,7 @@ def _techs(gen_pages):
 
 def test_every_profile_is_on_exactly_one_page(gen_pages):
     registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
-    placed = [p for _, _, profiles in _techs(gen_pages) for p in profiles]
+    placed = [p for _, profiles in _techs(gen_pages) for p in profiles]
     for stack in registry.stacks.values():
         for profile in stack.profiles:
             assert placed.count(profile) == 1, (
@@ -46,20 +46,21 @@ def test_every_profile_is_on_exactly_one_page(gen_pages):
 
 
 def test_every_profile_has_a_section_and_an_index_row(gen_pages, pages):
-    for slug, _, profiles in _techs(gen_pages):
-        page = pages[f"profiles/{slug}.md"]
-        for profile in profiles:
-            assert f"\n## {profile}\n" in page, f"{profile} missing from {slug}.md"
-            assert f"[`{profile}`]({slug}.md#{profile})" in pages["profiles/index.md"]
+    for group, techs in gen_pages.TECH_GROUPS:
+        path = f"{gen_pages._slug(group)}.md"
+        page = pages[f"profiles/{path}"]
+        for title, profiles in techs:
+            assert f"\n## {title}\n" in page, f"{title} missing from {path}"
+            for profile in profiles:
+                assert f"\n### {profile}\n" in page, f"{profile} missing from {path}"
+                assert f"[`{profile}`]({path}#{profile})" in pages["profiles/index.md"]
 
 
-def test_profiles_nav_has_one_entry_per_technology(gen_pages, pages):
+def test_profiles_nav_has_one_entry_per_area(gen_pages, pages):
     summary = pages["profiles/SUMMARY.md"]
     for group, _ in gen_pages.TECH_GROUPS:
-        assert f"\n- {group}\n" in summary
-    for slug, title, _ in _techs(gen_pages):
-        assert summary.count(f"]({slug}.md") == 1
-        assert f"[{title}]({slug}.md)" in summary
+        assert f"\n- [{group}]({gen_pages._slug(group)}.md)\n" in summary
+    assert len(summary.strip().splitlines()) == len(gen_pages.TECH_GROUPS) + 1
     assert "#" not in summary
 
 
@@ -67,7 +68,8 @@ def test_version_tags_are_shown_as_the_cli_version(pages):
     text = "".join(pages.values())
     assert "${TAG" not in text
     assert (
-        "`ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>`" in pages["profiles/deps.md"]
+        "`ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>`"
+        in pages["profiles/storage-and-catalog.md"]
     )
 
 
@@ -102,3 +104,19 @@ def test_docs_only_changes_select_no_e2e_groups():
         "README.md",
     ]
     assert selector.select(changed, registry) == []
+
+
+def test_local_addresses_become_nofollow_links():
+    hook = _load("local_links", REPO / "scripts" / "local_links.py")
+    html = (
+        "<p>Open <code>http://127.0.0.1:8123/play</code> or "
+        "<code>kafka:19092</code>.</p>"
+        "<pre><code>http://127.0.0.1:8123</code></pre>"
+    )
+    out = hook.link_local_addresses(html)
+    assert (
+        '<a href="http://127.0.0.1:8123/play" rel="nofollow">'
+        "<code>http://127.0.0.1:8123/play</code></a>" in out
+    )
+    assert "<code>kafka:19092</code>" in out
+    assert "<pre><code>http://127.0.0.1:8123</code></pre>" in out

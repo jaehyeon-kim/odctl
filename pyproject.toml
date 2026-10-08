@@ -71,3 +71,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/odctl"]
+
+# The docs site and its images are published to GitHub Pages, not with the package.
+[tool.hatch.build.targets.sdist]
+exclude = ["/docs", "/.claude", "/site"]

@@ -37,6 +37,10 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server br
 
 The consumer reads through a consumer group, so its offsets are stored in the broker's `__consumer_offsets` topic. Kafka UI shows the topic, its messages and the consumer groups.
 
+Kafka UI at `http://127.0.0.1:8086` shows the topics, their messages and the schemas in Karapace.
+
+![Kafka UI listing the topics of odctl-cluster](../images/kafka-ui.png){ .screenshot }
+
 ## Kafka Connect plugins
 
 Connect loads its plugins from the shared volume that the `deps` profile fills. List what it has loaded:

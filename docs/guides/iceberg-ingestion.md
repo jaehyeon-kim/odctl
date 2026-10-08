@@ -62,6 +62,10 @@ curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:8083/connector
 
 The first commit can take a minute or more, because the sink waits for its control consumer to join a group. After that, `curl $api/demo/tables/kc` shows a snapshot whose summary has `"total-records": "5"`.
 
+The table's data and metadata files are in SeaweedFS, whose browser at `http://127.0.0.1:8889` lists the buckets, including `warehouse`.
+
+![SeaweedFS listing the buckets](../images/seaweedfs.png){ .screenshot }
+
 ## Flink SQL
 
 ```bash

@@ -30,6 +30,10 @@ ws.add_run(project.id, snapshot)
 
 Column `x` moves by three standard deviations and `y` does not, so the report in the UI shows one drifted column.
 
+Open the report under the project's Reports tab:
+
+![Evidently drift report with one drifted column](../images/evidently.png){ .screenshot }
+
 ## Store a dataset
 
 ```python

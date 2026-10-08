@@ -97,3 +97,7 @@ feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
 ## Serve from the stack
 
 The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes.
+
+Once the repository is uploaded, the UI lists the project and its feature views:
+
+![Feast UI showing the driver_stats feature view](../images/feast-ui.png){ .screenshot }

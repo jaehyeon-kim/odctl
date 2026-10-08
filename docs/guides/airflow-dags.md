@@ -46,6 +46,10 @@ docker exec airflow airflow dags trigger hello
 docker exec airflow airflow dags list-runs hello
 ```
 
+The DAG page shows the run and the `say_hello` task.
+
+![Airflow showing the hello DAG and its successful run](../images/airflow.png){ .screenshot }
+
 ## Plugins and packages
 
 Plugins are copied from `s3://airflow/plugins` when the container starts, because Airflow loads plugins only once. Run `odctl restart airflow` after changing one.
