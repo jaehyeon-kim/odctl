@@ -24,7 +24,7 @@ Show a tiny snippet of how you would want the CLI or registry to look if this fe
 
 ```bash
 # Example of the CLI command you wish existed
-dml up dagster --pull
+odctl up dagster --pull
 
 ```
 
