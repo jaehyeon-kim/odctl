@@ -700,6 +700,17 @@ smoke_deps() {
   jars=$(docker run --rm -v "$vol":/d alpine sh -c 'find /d -name "*.jar" | wc -l' 2>/dev/null | tr -d '[:space:]')
   [ "${jars:-0}" -gt 0 ] || fail "no jars under $vol, so the Flink and Spark copies would be silent no-ops"
   pass "$jars jars present for the Flink and Spark profiles to copy"
+
+  # An upgrade must not leave the previous version's jars beside the new ones:
+  # Kafka Connect loaded Debezium 3.5.1 over 3.7.0 that way (#126). Plant a jar
+  # the image does not ship, run deps again, and expect it gone.
+  docker run --rm -v "$vol":/d alpine sh -c \
+    'mkdir -p /d/connect/old-plugin && echo x > /d/connect/old-plugin/stale-1.0.jar' \
+    || fail "could not plant a stale jar in $vol"
+  odctl up deps >/dev/null 2>&1 || fail "odctl up deps failed on the second run"
+  docker run --rm -v "$vol":/d alpine sh -c '[ ! -e /d/connect/old-plugin ]' \
+    || fail "a jar the image does not ship stayed in $vol after odctl up deps"
+  pass "deps removed a jar the image no longer ships"
 }
 
 # Prometheus: /-/ready answers before the config is loaded, and a scrape config

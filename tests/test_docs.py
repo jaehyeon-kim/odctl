@@ -156,3 +156,43 @@ def test_readme_diagram_names_every_technology(gen_pages):
             re.search(rf"(?<![a-z0-9-]){re.escape(c)}(?![a-z0-9-])", text)
             for c in candidates
         ), f"{title} is not in image/diagram.drawio"
+
+
+def test_client_versions_in_guides_match_the_stack():
+    """The guides tell readers which client version to install, because it has to
+    match the server. Renovate updates the compose files and Dockerfiles but not
+    the guides, so each version written in a guide is checked against its source."""
+    import re
+
+    res = INTERNAL_RESOURCES_DIR
+    guides = REPO / "docs" / "guides"
+
+    def one(pattern, text, where):
+        found = set(re.findall(pattern, text))
+        assert len(found) == 1, f"{where}: expected one version, found {found}"
+        return found.pop()
+
+    evidently = one(
+        r"evidently/evidently-service:([\d.]+)",
+        (res / "compose-mlops.yml").read_text(),
+        "compose-mlops.yml",
+    )
+    feast = one(
+        r"feastdev/feature-server:([\d.]+)",
+        (res / "compose-mlops.yml").read_text(),
+        "compose-mlops.yml",
+    )
+    dockerfile = (res / "docker" / "mlflow" / "Dockerfile").read_text()
+    mlflow = one(r"mlflow/mlflow:v([\d.]+)", dockerfile, "mlflow Dockerfile")
+    xgboost = ".".join(
+        one(r"xgboost~=([\d.]+)", dockerfile, "mlflow Dockerfile").split(".")[:2]
+    )
+
+    text = (guides / "evidently-reports.md").read_text()
+    assert set(re.findall(r"evidently==([\d.]+)", text)) == {evidently}
+    assert set(re.findall(r"Evidently (\d[\d.]*)", text)) == {evidently}
+    text = (guides / "feast-iceberg.md").read_text()
+    assert set(re.findall(r"feast\[[^\]]*\]==([\d.]+)", text)) == {feast}
+    text = (guides / "mlflow.md").read_text()
+    assert set(re.findall(r"MLflow (\d[\d.]*)", text)) == {mlflow}
+    assert set(re.findall(r"XGBoost (\d[\d.]*)", text)) == {xgboost}

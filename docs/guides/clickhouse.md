@@ -1,6 +1,6 @@
 # ClickHouse
 
-The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. Both run `clickhouse/clickhouse-server:25.12-alpine`. The commands below come from the end-to-end tests, with the names changed.
+The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. The commands below come from the end-to-end tests, with the names changed.
 
 ```bash
 odctl up ch-lite
