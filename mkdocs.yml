@@ -1,0 +1,94 @@
+site_name: Open Data Stack (odctl)
+site_description: One CLI for a local open data stack.
+# mike appends a folder to site_url when it deploys a version. canonical_version
+# below makes that folder latest/, so every version's pages name the same page
+# under latest/ as canonical and search engines index one copy, not one per release.
+site_url: https://jaehyeon.me/odctl/
+repo_url: https://github.com/jaehyeon-kim/odctl
+repo_name: odctl
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: black
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mike:
+      canonical_version: latest
+  # Writes the profile pages, the CLI reference and the diagram at build time.
+  - gen-files:
+      scripts:
+        - scripts/gen_pages.py
+  # Reads profiles/SUMMARY.md, which gen_pages.py writes, for the Profiles section.
+  - literate-nav
+
+# Makes local service addresses clickable, with rel="nofollow".
+hooks:
+  - scripts/local_links.py
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  version:
+    provider: mike
+  # Same property as the blog and dynamic-des, so all sit in one view. Filter by /odctl/.
+  analytics:
+    provider: google
+    property: G-076N8WCGWZ
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - How it works: how-it-works.md
+  - Profiles: profiles/
+  - Guides:
+      - Streaming:
+          - Produce and consume with Kafka: guides/kafka.md
+          - Kafka Connect: guides/kafka-connect.md
+          - "Flink SQL: Kafka to PostgreSQL": guides/flink-sql.md
+          - Fluss: guides/fluss.md
+      - Lakehouse and batch:
+          - Ingest into Iceberg: guides/iceberg-ingestion.md
+          - Spark: guides/spark.md
+      - Analytics:
+          - ClickHouse: guides/clickhouse.md
+          - Trino and Metabase: guides/trino-metabase.md
+      - Orchestration:
+          - Airflow DAGs from S3: guides/airflow-dags.md
+          - Temporal workers: guides/temporal-workers.md
+      - ML and AI:
+          - MLflow tracking and model serving: guides/mlflow.md
+          - Feast with Iceberg: guides/feast-iceberg.md
+          - Evidently reports: guides/evidently-reports.md
+          - Hybrid search in PostgreSQL: guides/hybrid-search.md
+          - Valkey: guides/valkey.md
+      - Governance and operations:
+          - OpenLineage and Marquez: guides/lineage.md
+          - OpenMetadata: guides/openmetadata.md
+          - Telemetry: guides/telemetry.md
+  - Labs: labs.md
+  - CLI reference: cli.md
+  - Troubleshooting: troubleshooting.md
+
+markdown_extensions:
+  - attr_list
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences

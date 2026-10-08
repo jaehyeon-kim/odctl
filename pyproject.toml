@@ -1,6 +1,6 @@
 [project]
 name = "odctl"
-version = "0.10.0"
+version = "1.0.0"
 description = "Orchestrator for the Open Data Stack"
 readme = "README.md"
 authors = [
@@ -17,7 +17,7 @@ keywords = [
 ]
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Intended Audience :: System Administrators",
@@ -46,7 +46,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/jaehyeon-kim/odctl"
 Repository = "https://github.com/jaehyeon-kim/odctl"
-Documentation = "https://github.com/jaehyeon-kim/odctl"
+Documentation = "https://jaehyeon.me/odctl/"
 Issues = "https://github.com/jaehyeon-kim/odctl/issues"
 
 [project.scripts]
@@ -58,6 +58,11 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "mike>=2.2.0",
+    "mkdocs>=1.6.1,<2.0",
+    "mkdocs-gen-files>=0.6.1",
+    "mkdocs-literate-nav>=0.6.3",
+    "mkdocs-material>=9.7.7",
     "mypy>=1.19.1",
     "pytest>=9.0.2",
     "pytest-cov>=7.1.0",
@@ -66,3 +71,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/odctl"]
+
+# The docs site and its images are published to GitHub Pages, not with the package.
+[tool.hatch.build.targets.sdist]
+exclude = ["/docs", "/.claude", "/site"]

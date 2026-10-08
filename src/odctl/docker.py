@@ -343,6 +343,23 @@ def pull_stack_images(compose_filename: str, profiles: List[str]):
     stack_client.compose.pull()
 
 
+# Containers that do one job and exit, such as creating the SeaweedFS buckets.
+# `docker compose up --wait` fails when a container it finds running exits during
+# the wait, even with code 0. `recreate storage` returns while seaweed-init is
+# still creating buckets, so an `up` straight after it failed until it finished.
+_ONE_SHOT_CONTAINERS = ("seaweed-init",)
+
+
+def _wait_for_one_shot_containers():
+    """Block until any one-shot container that is still running has exited."""
+    for name in _ONE_SHOT_CONTAINERS:
+        if (
+            client.container.exists(name)
+            and client.container.inspect(name).state.running
+        ):
+            client.container.wait(name)
+
+
 def launch_stack(compose_filename: str, profiles: List[str]):
     """
     Start the stack via docker compose up.
@@ -364,6 +381,7 @@ def launch_stack(compose_filename: str, profiles: List[str]):
         stack_client.compose.up(detach=False)
     else:
         # For all other long-running services, we detach and wait for healthchecks
+        _wait_for_one_shot_containers()
         stack_client.compose.up(detach=True, wait=True)
 
 
@@ -468,12 +486,16 @@ def recreate_managed_containers(
         pull (bool, optional): Pull images before recreating. Defaults to False.
     """
     compose_client = _build_compose_client(execution_plan)
+    _wait_for_one_shot_containers()
     compose_client.compose.up(
         detach=True,
         wait=True,
         force_recreate=True,
         pull="always" if pull else "missing",
     )
+    # The wait above passes while a one-shot container is still at work, so the
+    # next command could find it running; wait here until it has finished.
+    _wait_for_one_shot_containers()
 
 
 def get_managed_logs(

@@ -82,6 +82,18 @@ def main(
     config.set_workspace_override(workspace)
     ctx.obj = {"verbose": verbose, "workspace": workspace}
 
+    # Every command except init reads the workspace, so an old one changes what
+    # list, explain and info show as well as what up starts. init is how it is fixed.
+    if ctx.invoked_subcommand not in (None, "init"):
+        stale = stale_workspace_tag()
+        if stale:
+            ui.print_info(
+                f"⚠️  .odctl/.env sets TAG={stale}, but this is odctl {get_cli_version()}. "
+                "The workspace keeps the old profiles, images and compose files. Run "
+                "`odctl init --force` to move it to this version (it resets local edits).",
+                style="yellow",
+            )
+
 
 @app.command(
     name="list",
@@ -297,15 +309,6 @@ def up(
     if not dry_run and not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
-
-    stale = stale_workspace_tag()
-    if stale:
-        ui.print_info(
-            f"⚠️  .odctl/.env sets TAG={stale}, but this is odctl {get_cli_version()}. "
-            "The workspace keeps the old images and compose files. Run "
-            "`odctl init --force` to move it to this version (it resets local edits).",
-            style="yellow",
-        )
 
     plan = build_execution_plan(profiles, resolve_deps=True)
     # A profile resolves to one file. A service elsewhere declaring it is never
