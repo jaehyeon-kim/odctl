@@ -84,7 +84,6 @@ class TestUnreachableProfiles:
         from odctl.planner import find_unreachable_profiles
 
         registry = Registry(
-            capacities={},
             stacks={
                 "store": StackConfig(
                     file="compose-store.yml", description="d", profiles=["fluss"]
@@ -112,7 +111,6 @@ class TestUnreachableProfiles:
         from odctl.planner import find_unreachable_profiles
 
         registry = Registry(
-            capacities={},
             stacks={
                 "store": StackConfig(
                     file="compose-store.yml", description="d", profiles=["fluss"]
@@ -139,7 +137,6 @@ class TestUnreachableProfiles:
         from odctl.planner import find_unreachable_profiles
 
         registry = Registry(
-            capacities={},
             stacks={
                 "store": StackConfig(
                     file="compose-store.yml", description="d", profiles=["fluss"]
@@ -161,7 +158,6 @@ class TestUnreachableProfiles:
         from odctl.planner import find_unreachable_profiles
 
         registry = Registry(
-            capacities={},
             stacks={
                 "gone": StackConfig(
                     file="compose-gone.yml", description="d", profiles=["a"]

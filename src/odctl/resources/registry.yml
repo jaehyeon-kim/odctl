@@ -1,17 +1,4 @@
 # ==========================================
-# Semantic Capacities (The Engine's Vocabulary)
-# ==========================================
-capacities:
-  data_processing: "batch processing distributed computing large scale data transformation pipelines"
-  stream_processing: "real-time stream processing stateful streaming continuous data flows"
-  analytics: "real-time OLAP interactive querying data warehouse business intelligence dashboards reporting"
-  mlops: "machine learning training pipelines model serving feature store experiments tracking model monitoring data drift"
-  messaging: "event delivery pub sub queues streaming storage message broker"
-  orchestration: "workflow scheduling DAGs pipeline execution automation"
-  metadata: "data catalog governance discovery search data dictionary"
-  observability: "metrics monitoring traces logs opentelemetry otlp grafana prometheus telemetry dashboards"
-  lineage: "data lineage provenance data flow troubleshooting tracing marquez"
-# ==========================================
 # Stack Registry (The Execution Map)
 # ==========================================
 stacks:
@@ -19,7 +6,6 @@ stacks:
     file: "compose-deps.yml"
     description: "Shared dependencies, JARs, connectors, and Docker network"
     profiles: ["deps"]
-    capacities: []
     depends_on:
       deps: []
     role: "Ephemeral init-container. It populates the shared Docker volume with downloaded JARs (Iceberg, Flink, Spark) and Kafka connectors before shutting down."
@@ -32,7 +18,6 @@ stacks:
     description: "PostgreSQL metadata backend."
     profiles: ["postgres"]
     parent: "infra"
-    capacities: []
     depends_on:
       postgres: ["deps"]
     role: "The foundational state-store. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata, and serves vector, BM25 keyword and geospatial queries."
@@ -52,7 +37,6 @@ stacks:
     description: "SeaweedFS S3-compatible object storage."
     profiles: ["storage"]
     parent: "infra"
-    capacities: []
     depends_on:
       storage: ["deps"]
     role: "Acts as the physical data lake (S3 equivalent). Holds Parquet/Iceberg files and Airflow DAGs."
@@ -70,7 +54,6 @@ stacks:
     description: "Iceberg REST Catalog."
     profiles: ["catalog"]
     parent: "infra"
-    capacities: []
     depends_on:
       catalog: ["postgres", "storage"]
     role: "Central metadata gateway for Iceberg. All compute engines route through this REST API."
@@ -83,7 +66,6 @@ stacks:
     file: "compose-kafka.yml"
     description: "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers."
     profiles: ["kafka-lite", "kafka-full"]
-    capacities: ["messaging"]
     depends_on:
       kafka-lite: ["deps"]
       kafka-full: ["deps"]
@@ -120,7 +102,6 @@ stacks:
     file: "compose-flink.yml"
     description: "Stateful, real-time stream processing engine. Lite uses 1 TaskManager; Full uses 3 TaskManagers."
     profiles: ["flink-lite", "flink-full"]
-    capacities: ["stream_processing"]
     depends_on:
       flink-lite: ["catalog"]
       flink-full: ["catalog"]
@@ -145,7 +126,6 @@ stacks:
     file: "compose-spark.yml"
     description: "Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers."
     profiles: ["spark-lite", "spark-full"]
-    capacities: ["data_processing"]
     depends_on:
       spark-lite: ["catalog"]
       spark-full: ["catalog"]
@@ -195,7 +175,6 @@ stacks:
     file: "compose-analytics.yml"
     description: "Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase)."
     profiles: ["ch-lite", "ch-full", "trino", "metabase"]
-    capacities: ["analytics"]
     depends_on:
       ch-lite: ["deps"]
       ch-full: ["deps"]
@@ -233,7 +212,6 @@ stacks:
     file: "compose-orch.yml"
     description: "Workflow orchestration and pipeline scheduling (Airflow), and durable workflows written in code (Temporal)."
     profiles: ["airflow", "temporal"]
-    capacities: ["orchestration"]
     depends_on:
       airflow: ["postgres", "storage"]
       temporal: ["deps"]
@@ -265,7 +243,6 @@ stacks:
     file: "compose-mlops.yml"
     description: "Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently)."
     profiles: ["mlflow", "feast", "evidently"]
-    capacities: ["mlops"]
     depends_on:
       mlflow: ["postgres", "storage"]
       feast: ["catalog", "valkey"]
@@ -312,7 +289,6 @@ stacks:
     file: "compose-obsv.yml"
     description: "System telemetry, monitoring, and data lineage."
     profiles: ["lineage", "telemetry"]
-    capacities: ["observability", "lineage"]
     depends_on:
       lineage: ["postgres"]
       telemetry: ["deps"]
@@ -342,7 +318,6 @@ stacks:
     file: "compose-metadata.yml"
     description: "Data catalog, discovery, and governance platform."
     profiles: ["metadata"]
-    capacities: ["metadata"]
     depends_on:
       metadata: ["postgres"]
     role: "Enterprise data catalog utilizing Elasticsearch and Postgres backends."

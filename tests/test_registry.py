@@ -6,9 +6,26 @@ from odctl.registry import Registry, load_registry
 
 def test_registry_pydantic_validation(mock_registry_data):
     """Ensures a populated Pydantic model instantiates flawlessly with correct types."""
-    assert isinstance(mock_registry_data.capacities, dict)
     assert "infra" in mock_registry_data.stacks
     assert mock_registry_data.stacks["infra"].file == "compose-infra.yml"
+
+
+def test_registry_from_before_1_0_still_loads():
+    """A workspace registry.yml written by 0.10.0 or earlier keeps its capacities
+    sections. They are no longer read, and must not stop the registry loading."""
+    old = {
+        "capacities": {"messaging": "event delivery pub sub"},
+        "stacks": {
+            "kafka": {
+                "file": "compose-kafka.yml",
+                "description": "Kafka",
+                "profiles": ["kafka-lite"],
+                "capacities": ["messaging"],
+            }
+        },
+    }
+    registry = Registry(**old)
+    assert registry.stacks["kafka"].profiles == ["kafka-lite"]
 
 
 def test_registry_validation_missing_fields():

@@ -30,7 +30,7 @@ def pages(gen_pages):
 
 
 def _techs(gen_pages):
-    return [tech for _, techs in gen_pages.TECH_GROUPS for tech in techs]
+    return [tech for _, _, techs in gen_pages.TECH_GROUPS for tech in techs]
 
 
 def test_every_profile_is_on_exactly_one_page(gen_pages):
@@ -46,7 +46,7 @@ def test_every_profile_is_on_exactly_one_page(gen_pages):
 
 
 def test_every_profile_has_a_section_and_an_index_row(gen_pages, pages):
-    for group, techs in gen_pages.TECH_GROUPS:
+    for group, _, techs in gen_pages.TECH_GROUPS:
         path = f"{gen_pages._slug(group)}.md"
         page = pages[f"profiles/{path}"]
         for title, profiles in techs:
@@ -58,7 +58,7 @@ def test_every_profile_has_a_section_and_an_index_row(gen_pages, pages):
 
 def test_profiles_nav_has_one_entry_per_area(gen_pages, pages):
     summary = pages["profiles/SUMMARY.md"]
-    for group, _ in gen_pages.TECH_GROUPS:
+    for group, _, _ in gen_pages.TECH_GROUPS:
         assert f"\n- [{group}]({gen_pages._slug(group)}.md)\n" in summary
     assert len(summary.strip().splitlines()) == len(gen_pages.TECH_GROUPS) + 1
     assert "#" not in summary
@@ -120,3 +120,39 @@ def test_local_addresses_become_nofollow_links():
     )
     assert "<code>kafka:19092</code>" in out
     assert "<pre><code>http://127.0.0.1:8123</code></pre>" in out
+
+
+def test_home_page_table_comes_from_the_area_list(gen_pages):
+    """The home page holds the marker, and the table built for it has one row per
+    area linking that area's profile page, so the two can never disagree."""
+    home = (REPO / "docs" / "index.md").read_text()
+    assert gen_pages.AREAS_MARKER in home
+    assert "| Area | Technologies |" not in home, "the table is written by hand again"
+    table = gen_pages.areas_table()
+    for group, summary, _ in gen_pages.TECH_GROUPS:
+        assert (
+            f"| [{group}](profiles/{gen_pages._slug(group)}.md) | {summary} |" in table
+        )
+
+
+def test_readme_diagram_names_every_technology(gen_pages):
+    """The README diagram is drawn by hand, so a profile added to the area list
+    has to be added to it too. Each technology counts as shown when the diagram
+    names it, one of its profiles, or a part of the image in its brackets."""
+    import re
+
+    import html
+
+    drawio = (REPO / "image" / "diagram.drawio").read_text()
+    labels = " ".join(html.unescape(v) for v in re.findall(r'value="([^"]*)"', drawio))
+    text = re.sub(r"<[^>]+>", " ", labels).lower()
+    for title, profiles in _techs(gen_pages):
+        name = re.sub(r"^apache ", "", re.sub(r"\s*\(.*\)", "", title.lower()))
+        bracket = re.search(r"\((.*)\)", title.lower())
+        candidates = [name.split()[0], *profiles]
+        if bracket:
+            candidates += bracket.group(1).split("/")
+        assert any(
+            re.search(rf"(?<![a-z0-9-]){re.escape(c)}(?![a-z0-9-])", text)
+            for c in candidates
+        ), f"{title} is not in image/diagram.drawio"
