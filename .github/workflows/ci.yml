@@ -23,12 +23,17 @@ jobs:
         uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
+          # The default key holds the runner's Python, not the matrix one, so
+          # every job saved under one key and all but the first failed to save.
+          cache-suffix: py${{ matrix.python-version }}
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
+      # The same command pre-commit/action runs. That action's last release,
+      # v3.0.1, uses actions/cache@v4, which runs on the deprecated Node.js 20.
       - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
+        run: uvx pre-commit run --show-diff-on-failure --color=always --all-files
 
       - name: Run Tests
         # Target your test folder and output coverage for src/odctl

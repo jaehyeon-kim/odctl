@@ -76,3 +76,19 @@ def test_no_workspace_is_not_reported(tmp_path, monkeypatch):
     )
     monkeypatch.delenv("TAG", raising=False)
     assert stale_workspace_tag() is None
+
+
+def test_stale_workspace_warns_on_every_command_but_init(tmp_path, monkeypatch):
+    """An old workspace changes what list shows, not only what up starts."""
+    from typer.testing import CliRunner
+
+    from odctl.main import app
+
+    _workspace_with_tag(tmp_path, monkeypatch, "0.7.0")
+    runner = CliRunner()
+
+    listed = runner.invoke(app, ["list"])
+    assert "TAG=0.7.0" in listed.stdout
+
+    init_help = runner.invoke(app, ["init", "--help"])
+    assert "TAG=0.7.0" not in init_help.stdout
