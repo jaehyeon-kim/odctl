@@ -1716,6 +1716,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#after-an-upgrade-a-connector-or-job-runs-an-old-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After an upgrade, a connector or job runs an old version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-service-is-up-but-does-not-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1816,6 +1827,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#after-an-upgrade-a-connector-or-job-runs-an-old-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After an upgrade, a connector or job runs an old version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-service-is-up-but-does-not-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1858,6 +1880,13 @@
 <p>The usual causes are a CLI version whose images are not published yet, or a <code>TAG</code> in <code>.odctl/.env</code> that you changed by hand. Set <code>TAG</code> to a published version in <code>.odctl/.env</code>, or install a CLI version whose images exist.</p>
 <h2 id="workspace-tag-differs-from-the-cli-version">Workspace TAG differs from the CLI version</h2>
 <p>After you upgrade the CLI, every command except <code>odctl init</code> warns that <code>.odctl/.env</code> sets an older <code>TAG</code>. The workspace keeps the old profiles, images and compose files until you run <code>odctl init --force</code>, which also resets your edits.</p>
+<h2 id="after-an-upgrade-a-connector-or-job-runs-an-old-version">After an upgrade, a connector or job runs an old version</h2>
+<p>The shared jar volume, <code>odctl-shared-deps</code>, keeps jars from earlier odctl versions. An upgrade adds the new jars beside the old ones, and a service can load the old one. For example, after upgrading to 1.0.0, Kafka Connect loaded Debezium 3.5.1 instead of 3.7.0. Remove the volume, and the next <code>odctl up</code> fills it again with only the current jars:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>down<span class="w"> </span>--all<span class="w"> </span>--volumes
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>&lt;profiles&gt;
+</span></code></pre></div>
+<p><code>odctl down</code> removes your data anyway, so removing the volume costs only the time to copy the jars again. <a href="https://github.com/jaehyeon-kim/odctl/issues/126">Issue #126</a> tracks the fix.</p>
+<p>Without a workspace, odctl runs its own images tagged <code>latest</code>, and Docker does not pull an image it already has. An older <code>latest</code> from before the upgrade then keeps running. Run <code>odctl init</code> to use images tagged with the CLI version, or add <code>--pull</code> to <code>odctl up</code> to fetch <code>latest</code> again. <a href="https://github.com/jaehyeon-kim/odctl/issues/127">Issue #127</a> tracks this.</p>
 <h2 id="a-service-is-up-but-does-not-work">A service is up but does not work</h2>
 <p><code>odctl logs &lt;profile&gt;</code> shows the logs of a profile's containers. Add <code>-s &lt;service&gt;</code> for one service, or <code>-f</code> to follow them. <code>odctl ps --all</code> shows every container odctl manages and its state.</p>
 
