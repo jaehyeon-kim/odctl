@@ -1,6 +1,6 @@
 # Trino and Metabase
 
-The `trino` profile runs Trino 483, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The `metabase` profile runs Metabase v0.63.19.1, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start `postgres`. The commands below come from the end-to-end tests, with the names changed.
+The `trino` profile runs Trino 483, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The `metabase` profile runs Metabase v0.63.19.2, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start `postgres`. The commands below come from the end-to-end tests, with the names changed.
 
 ```bash
 odctl up trino metabase
