@@ -22,6 +22,22 @@ def get_cli_version() -> str:
         return "latest"
 
 
+def default_tag_to_cli_version() -> None:
+    """
+    Run this CLI version's images when no workspace sets TAG.
+
+    The compose files tag odctl's own images `${TAG:-latest}`. Without a
+    workspace there is no `.env` to set TAG, so the images ran as `latest`, and
+    Docker does not pull an image it already has: after an upgrade an older
+    `latest` kept running (#127). Setting TAG here, as `odctl init` writes it,
+    reaches both Docker Compose, which inherits the environment, and
+    `resolve_image_tag`. A TAG already set in the shell is left alone.
+    """
+    if "TAG" in os.environ or get_workspace_dir().exists():
+        return
+    os.environ["TAG"] = get_cli_version()
+
+
 def stale_workspace_tag() -> Optional[str]:
     """
     Return the workspace's TAG when it no longer matches this CLI's version.

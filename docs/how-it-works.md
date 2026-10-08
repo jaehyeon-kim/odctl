@@ -63,11 +63,11 @@ odctl runs from one of two places: the files bundled with the CLI, or a workspac
 | | Without a workspace | With a workspace |
 | --- | --- | --- |
 | Files odctl reads | the compose files and `registry.yml` inside the installed package | the copies in `.odctl` in the current directory |
-| Image tag of odctl's own images | `latest`, because no `.env` sets `TAG` | the CLI version, written to `.odctl/.env` as `TAG` |
+| Image tag of odctl's own images | the CLI version | the CLI version, written to `.odctl/.env` as `TAG` |
 | Your changes | none; the package is replaced on every upgrade | any file in `.odctl` |
 | After a CLI upgrade | new files and images at once | the old files and images, with a warning on every command until `odctl init --force` |
 
-Without a workspace, `latest` can be newer than the CLI you run, so use `odctl init` for anything you want to repeat. A `TAG` set in the shell overrides both.
+A `TAG` set in the shell overrides both.
 
 odctl looks for `.odctl` in the current directory. `--workspace PATH` points it at another directory, so one workspace can serve several projects.
 

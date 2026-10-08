@@ -1,6 +1,6 @@
 # Fluss
 
-The `fluss` profile runs Apache Fluss 1.0.0: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the `deps` profile fills. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+The `fluss` profile runs Apache Fluss: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the `deps` profile fills. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
 
 ```bash
 odctl up fluss flink-lite

@@ -1,6 +1,6 @@
 # OpenLineage and Marquez
 
-The `lineage` profile runs Marquez 0.51.1: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. Anything that sends OpenLineage events over HTTP can report to it. The commands below come from the end-to-end tests, with the names changed.
+The `lineage` profile runs Marquez: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. Anything that sends OpenLineage events over HTTP can report to it. The commands below come from the end-to-end tests, with the names changed.
 
 ```bash
 odctl up lineage
