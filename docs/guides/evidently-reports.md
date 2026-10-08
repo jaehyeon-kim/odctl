@@ -1,6 +1,6 @@
 # Evidently reports
 
-The `evidently` profile runs the Evidently UI and API. It keeps projects and reports in the `evidently` database on PostgreSQL and dataset files under `s3://evidently/datasets` on SeaweedFS. The client computes each report and pushes the result. The code below comes from the end-to-end tests.
+The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The code below comes from the end-to-end tests.
 
 ```bash
 odctl up evidently
@@ -40,7 +40,7 @@ dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definitio
 ws.load_dataset(dataset_id).as_dataframe()
 ```
 
-The file lands under `s3://evidently/datasets/<project id>/`.
+The dataset is stored in the `evidently` database, with the projects and reports.
 
 ## From Airflow or another container
 

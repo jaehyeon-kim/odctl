@@ -20,7 +20,7 @@ The usual causes are a CLI version whose images are not published yet, or a `TAG
 
 ## Workspace TAG differs from the CLI version
 
-After you upgrade the CLI, `odctl up` warns that `.odctl/.env` sets an older `TAG`. The workspace keeps the old images and compose files until you run `odctl init --force`, which also resets your edits.
+After you upgrade the CLI, every command except `odctl init` warns that `.odctl/.env` sets an older `TAG`. The workspace keeps the old profiles, images and compose files until you run `odctl init --force`, which also resets your edits.
 
 ## A service is up but does not work
 

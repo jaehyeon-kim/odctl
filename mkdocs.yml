@@ -1,5 +1,9 @@
 site_name: Open Data Stack (odctl)
 site_description: One CLI for a local open data stack.
+# mike appends a folder to site_url when it deploys a version. canonical_version
+# below makes that folder latest/, so every version's pages name the same page
+# under latest/ as canonical and search engines index one copy, not one per release.
+site_url: https://jaehyeon.me/odctl/
 repo_url: https://github.com/jaehyeon-kim/odctl
 repo_name: odctl
 
@@ -21,6 +25,8 @@ theme:
 
 plugins:
   - search
+  - mike:
+      canonical_version: latest
   # Writes the profile pages, the CLI reference and the diagram at build time.
   - gen-files:
       scripts:

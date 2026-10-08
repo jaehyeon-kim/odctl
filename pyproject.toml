@@ -1,6 +1,6 @@
 [project]
 name = "odctl"
-version = "0.10.0"
+version = "1.0.0"
 description = "Orchestrator for the Open Data Stack"
 readme = "README.md"
 authors = [
@@ -17,7 +17,7 @@ keywords = [
 ]
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Intended Audience :: System Administrators",

@@ -14,7 +14,7 @@ The `deps` project also creates the `odctl` Docker network that every service jo
 
 ## Image tags follow the CLI version
 
-Most services run their project's official image, pinned to an exact version. odctl builds six images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`:
+Most services run their project's official image, pinned to an exact version. odctl builds five images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`:
 
 | Image | Contents |
 | --- | --- |
@@ -23,11 +23,10 @@ Most services run their project's official image, pinned to an exact version. od
 | `airflow` | Airflow with the MLflow and Feast clients and the model runtimes |
 | `mlflow` | The MLflow server and model server with the model runtimes |
 | `spark` | Spark with the Python clients jobs use |
-| `evidently` | The Evidently UI with s3fs, so datasets can be stored on SeaweedFS |
 
-The compose files tag these images `${TAG:-latest}`. `odctl init` writes `TAG=<CLI version>` to `.odctl/.env`, so odctl 0.10.0 runs images tagged `0.10.0`. Without a workspace, `TAG` is unset and the tag is `latest`. A `TAG` set in the shell takes precedence over `.env`.
+The compose files tag these images `${TAG:-latest}`. `odctl init` writes `TAG=<CLI version>` to `.odctl/.env`, so odctl 1.0.0 runs images tagged `1.0.0`. Without a workspace, `TAG` is unset and the tag is `latest`. A `TAG` set in the shell takes precedence over `.env`.
 
-Upgrading the CLI does not change `.odctl/.env`. `odctl up` then warns that the workspace's `TAG` differs from the CLI version. `odctl init --force` moves the workspace to the new version, and it also resets your edits.
+Upgrading the CLI does not change `.odctl/.env`. Every command except `odctl init` then warns that the workspace's `TAG` differs from the CLI version. `odctl init --force` moves the workspace to the new version, and it also resets your edits.
 
 ## Data does not survive `odctl down`
 

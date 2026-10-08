@@ -34,13 +34,19 @@ odctl down --all
 
 `odctl up` starts the profiles each one depends on first, here PostgreSQL, SeaweedFS (S3) and the Iceberg REST catalog. See [Getting started](https://jaehyeon.me/odctl/latest/getting-started/) for more.
 
+## Compatibility
+
+From 1.0.0, odctl follows semantic versioning. Within 1.x, command names, option names and profile names do not change or disappear, and a profile keeps the ports it publishes on the host. Minor releases add profiles, services and options, and move bundled images to newer versions. Anything that breaks a working `odctl up` command waits for 2.0.
+
 ## Related reading
 
-Blog posts that use this CLI:
+Blog posts about odctl and the projects built on it are tagged [odctl](https://jaehyeon.me/tags/odctl/) on jaehyeon.me.
 
-- [Productionizing an Online Product Recommender using Event Driven Architecture](https://jaehyeon.me/blog/2026-02-23-productionize-recommender-with-eda/): splits a contextual bandit recommender into a serving layer and a training layer on Kafka, Flink and Valkey.
-- [Introducing odctl: One CLI for a Local Open Data Stack](https://jaehyeon.me/blog/2026-07-16-odctl-open-data-stack/): why the tool exists and how one command launches the stack.
-- [Building an Agentic Analytics System over an Iceberg Lakehouse](https://jaehyeon.me/blog/2026-07-18-agentic-analytics-system/): runs Trino, Iceberg and object storage from this CLI under a semantic layer an agent queries.
+Projects that use odctl:
+
+- [benchtop](https://github.com/jaehyeon-kim/benchtop): hands-on data engineering and machine learning demos that run locally, each on the odctl stack.
+- [dynamic-des](https://github.com/jaehyeon-kim/dynamic-des): a SimPy library for simulations that stream to Kafka, PostgreSQL, Redis and Iceberg; its examples and integration tests run their infrastructure with odctl.
+- [agentic-analytics-system](https://github.com/jaehyeon-kim/agentic-analytics-system): conversational analytics over an Iceberg lakehouse, with Trino, Iceberg and object storage started by odctl.
 
 ## License
 
