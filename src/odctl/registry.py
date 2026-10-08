@@ -14,7 +14,6 @@ class StackConfig(BaseModel):
         file (str): The docker-compose filename.
         description (str): A brief description of the stack's purpose.
         profiles (List[str]): A list of compose profiles provided by this stack.
-        capacities (List[str]): Semantic tags mapping to the stack's capabilities.
         depends_on (List[str]): Other stack profiles required for this stack to function.
         parent (Optional[str]): An optional grouping identifier.
         role (Optional[str]): A detailed explanation of the stack's architectural role.
@@ -25,7 +24,6 @@ class StackConfig(BaseModel):
     file: str
     description: str
     profiles: List[str]
-    capacities: List[str] = Field(default_factory=list)
     depends_on: Dict[str, List[str]] = Field(default_factory=dict)
     parent: Optional[str] = None
     role: Optional[str] = None
@@ -37,11 +35,9 @@ class Registry(BaseModel):
     Pydantic model representing the entire `registry.yml` configuration.
 
     Attributes:
-        capacities (Dict[str, str]): A map of broad capability names to specific keywords.
         stacks (Dict[str, StackConfig]): A map of stack IDs to their configurations.
     """
 
-    capacities: Dict[str, str]
     stacks: Dict[str, StackConfig]
 
 

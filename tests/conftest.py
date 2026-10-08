@@ -7,20 +7,17 @@ from odctl.registry import Registry, StackConfig
 def mock_registry_data():
     """Provides a valid, minimal Registry structure for testing."""
     return Registry(
-        capacities={"compute": "spark", "messaging": "kafka"},
         stacks={
             "infra": StackConfig(
                 file="compose-infra.yml",
                 description="Core infrastructure",
                 profiles=["storage", "kafka"],
-                capacities=["messaging"],
                 depends_on={"storage": [], "kafka": []},
             ),
             "spark": StackConfig(
                 file="compose-spark.yml",
                 description="Spark compute layer",
                 profiles=["spark-master", "spark-worker"],
-                capacities=["compute"],
                 depends_on={"spark-master": ["storage"], "spark-worker": ["storage"]},
             ),
         },
