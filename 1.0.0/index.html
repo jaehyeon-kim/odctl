@@ -1776,9 +1776,6 @@
                   
 
 
-  
-  
-
 
 <h1 id="open-data-stack-odctl">Open Data Stack (odctl)</h1>
 <p>odctl is a command-line tool that runs an open data stack on your machine with Docker Compose. You name the profiles you want, such as <code>kafka-lite</code> or <code>airflow</code>, and odctl starts them together with the services they depend on.</p>
@@ -1793,40 +1790,40 @@
 </thead>
 <tbody>
 <tr>
-<td>Messaging</td>
+<td><a href="profiles/messaging/">Messaging</a></td>
 <td>Kafka (KRaft), Karapace schema registry, Kafka Connect, Kafka UI (kafbat)</td>
 </tr>
 <tr>
-<td>Stream and batch processing</td>
+<td><a href="profiles/stream-and-batch-processing/">Stream and batch processing</a></td>
 <td>Apache Flink, Apache Spark</td>
 </tr>
 <tr>
-<td>Analytics</td>
+<td><a href="profiles/analytics/">Analytics</a></td>
 <td>ClickHouse, Trino, Metabase</td>
 </tr>
 <tr>
-<td>Orchestration</td>
+<td><a href="profiles/orchestration/">Orchestration</a></td>
 <td>Apache Airflow, Temporal</td>
 </tr>
 <tr>
-<td>MLOps</td>
+<td><a href="profiles/mlops/">MLOps</a></td>
 <td>MLflow, Feast, Evidently</td>
 </tr>
 <tr>
-<td>Metadata and lineage</td>
+<td><a href="profiles/metadata-and-lineage/">Metadata and lineage</a></td>
 <td>OpenMetadata, Marquez</td>
 </tr>
 <tr>
-<td>Observability</td>
+<td><a href="profiles/observability/">Observability</a></td>
 <td>grafana/otel-lgtm (OpenTelemetry Collector, Prometheus, Tempo, Loki, Grafana)</td>
 </tr>
 <tr>
-<td>Storage and catalog</td>
+<td><a href="profiles/storage-and-catalog/">Storage and catalog</a></td>
 <td>PostgreSQL 18 with pgvector, pg_textsearch and PostGIS, SeaweedFS (S3), Iceberg REST catalog, Valkey Bundle, Apache Fluss</td>
 </tr>
 </tbody>
 </table>
-<p>Kafka Connect ships with the Apache Iceberg sink, the Debezium PostgreSQL source, the ClickHouse sink, the Aiven JDBC and S3 sinks, a Redis connector and the MSK data generator.</p>
+<p>Kafka Connect comes with a set of connectors, such as the Iceberg sink and the Debezium PostgreSQL source. <a href="guides/kafka-connect/">Kafka Connect</a> lists them all.</p>
 <h2 id="where-to-go-next">Where to go next</h2>
 <ul>
 <li><a href="getting-started/">Getting started</a> installs odctl and starts a first profile.</li>
