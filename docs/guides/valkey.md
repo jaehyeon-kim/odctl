@@ -1,6 +1,6 @@
 # Valkey
 
-The `valkey` profile runs the Valkey Bundle image, `valkey/valkey-bundle:9.1.3-alpine`, as one container named `valkey`. The registry describes it as a cache and data store with JSON, Bloom and vector search capabilities. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+The `valkey` profile runs the Valkey Bundle image as one container named `valkey`. The registry describes it as a cache and data store with JSON, Bloom and vector search capabilities. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
 
 ```bash
 odctl up valkey

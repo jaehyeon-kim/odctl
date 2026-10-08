@@ -94,7 +94,10 @@ def get_stack_details(
                 services.append(svc_name)
 
                 if "image" in svc_data:
-                    images.append(f"{svc_name} -> {svc_data['image']}")
+                    # Shown as it will run: `${TAG:-latest}` resolves the way compose
+                    # resolves it, which is the CLI version without a workspace.
+                    image = _expand(svc_data["image"], _interpolation_env())
+                    images.append(f"{svc_name} -> {image}")
 
                 if "ports" in svc_data:
                     for p in svc_data["ports"]:

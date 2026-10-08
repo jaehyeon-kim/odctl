@@ -18,6 +18,11 @@ services:
     # running Spark or Flink could read a half-written jar. Only a missing or
     # changed file is copied, to a temporary name and then renamed into place, so
     # a reader sees either the old file or the new one.
+    #
+    # Files the image no longer contains are then removed. Without that, an
+    # upgrade left the previous version's jars beside the new ones, and Kafka
+    # Connect loaded Debezium 3.5.1 instead of 3.7.0 (#126). A service that
+    # already opened an old jar keeps reading it until it restarts.
     command:
       - /bin/sh
       - -c
@@ -31,6 +36,13 @@ services:
           cp "$$file" "$$dest.partial"
           mv -f "$$dest.partial" "$$dest"
         done
+        cd /mnt/shared-deps
+        find . -type f | while read -r file; do
+          [ -e "/workspace/$${file#./}" ] && continue
+          rm -f "$$file"
+          echo "Removed $${file#./}, which this version no longer ships"
+        done
+        find . -mindepth 1 -type d -empty -delete
         echo '✅ Open Data Stack Dependencies populated.'
 
 networks:

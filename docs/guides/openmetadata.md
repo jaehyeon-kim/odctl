@@ -1,6 +1,6 @@
 # Catalogue a database with OpenMetadata
 
-The `metadata` profile runs OpenMetadata 2.0.1: the server with its UI and REST API, Elasticsearch 9.3.0 for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The commands below come from the end-to-end tests, with the names changed.
+The `metadata` profile runs OpenMetadata: the server with its UI and REST API, Elasticsearch for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The commands below come from the end-to-end tests, with the names changed.
 
 ```bash
 odctl up metadata

@@ -30,6 +30,7 @@ from odctl.workspace import (
     get_cli_version,
     get_workspace_dir,
     init_workspace,
+    default_tag_to_cli_version,
     stale_workspace_tag,
 )
 
@@ -81,6 +82,7 @@ def main(
     )
     config.set_workspace_override(workspace)
     ctx.obj = {"verbose": verbose, "workspace": workspace}
+    default_tag_to_cli_version()
 
     # Every command except init reads the workspace, so an old one changes what
     # list, explain and info show as well as what up starts. init is how it is fixed.

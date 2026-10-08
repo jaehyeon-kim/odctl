@@ -92,3 +92,52 @@ def test_stale_workspace_warns_on_every_command_but_init(tmp_path, monkeypatch):
 
     init_help = runner.invoke(app, ["init", "--help"])
     assert "TAG=0.7.0" not in init_help.stdout
+
+
+def test_tag_defaults_to_the_cli_version_without_a_workspace(tmp_path, monkeypatch):
+    """Without a workspace the images used to run as `latest`, and a cached older
+    `latest` kept running after an upgrade (#127)."""
+    import os
+
+    from odctl.workspace import default_tag_to_cli_version
+
+    monkeypatch.setattr(
+        "odctl.workspace.get_workspace_dir", lambda: tmp_path / ".odctl"
+    )
+    monkeypatch.setattr("odctl.workspace.get_cli_version", lambda: "1.0.1")
+    default_tag_to_cli_version()
+    assert os.environ["TAG"] == "1.0.1"
+
+
+def test_tag_is_left_alone_with_a_workspace_or_a_shell_tag(tmp_path, monkeypatch):
+    import os
+
+    from odctl.workspace import default_tag_to_cli_version
+
+    monkeypatch.setattr("odctl.workspace.get_cli_version", lambda: "1.0.1")
+
+    workspace = tmp_path / ".odctl"
+    workspace.mkdir()
+    monkeypatch.setattr("odctl.workspace.get_workspace_dir", lambda: workspace)
+    default_tag_to_cli_version()
+    assert "TAG" not in os.environ, "the workspace's .env decides the tag"
+
+    monkeypatch.setattr("odctl.workspace.get_workspace_dir", lambda: tmp_path / "none")
+    monkeypatch.setenv("TAG", "0.10.0")
+    default_tag_to_cli_version()
+    assert os.environ["TAG"] == "0.10.0"
+
+
+def test_cli_commands_resolve_the_cli_version_without_a_workspace(
+    tmp_path, monkeypatch
+):
+    """The tag odctl checks before starting is the one compose will use."""
+    from typer.testing import CliRunner
+
+    from odctl.docker import resolve_image_tag
+    from odctl.main import app
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("odctl.workspace.get_cli_version", lambda: "1.0.1")
+    CliRunner().invoke(app, ["list"])
+    assert resolve_image_tag() == "1.0.1"

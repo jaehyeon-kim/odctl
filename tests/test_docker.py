@@ -280,3 +280,19 @@ def test_recreate_waits_for_one_shot_containers_before_and_after(monkeypatch):
     )
     docker.recreate_managed_containers({"compose-infra.yml": ["storage"]})
     assert calls == ["wait", "up", "wait"]
+
+
+def test_get_stack_details_shows_the_tag_that_will_run(tmp_path, monkeypatch):
+    """explain printed `${TAG:-latest}` as written, not the tag compose uses."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text("""
+services:
+  db:
+    image: ghcr.io/jaehyeon-kim/odctl/postgres:${TAG:-latest}
+    profiles: ["postgres"]
+""")
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.setenv("TAG", "1.0.1")
+    _, _, images, _ = docker.get_stack_details("compose-test.yml", ["postgres"])
+    assert images == ["db -> ghcr.io/jaehyeon-kim/odctl/postgres:1.0.1"]
