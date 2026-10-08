@@ -22,6 +22,19 @@ The usual causes are a CLI version whose images are not published yet, or a `TAG
 
 After you upgrade the CLI, every command except `odctl init` warns that `.odctl/.env` sets an older `TAG`. The workspace keeps the old profiles, images and compose files until you run `odctl init --force`, which also resets your edits.
 
+## After an upgrade, a connector or job runs an old version
+
+The shared jar volume, `odctl-shared-deps`, keeps jars from earlier odctl versions. An upgrade adds the new jars beside the old ones, and a service can load the old one. For example, after upgrading to 1.0.0, Kafka Connect loaded Debezium 3.5.1 instead of 3.7.0. Remove the volume, and the next `odctl up` fills it again with only the current jars:
+
+```bash
+odctl down --all --volumes
+odctl up <profiles>
+```
+
+`odctl down` removes your data anyway, so removing the volume costs only the time to copy the jars again. [Issue #126](https://github.com/jaehyeon-kim/odctl/issues/126) tracks the fix.
+
+Without a workspace, odctl runs its own images tagged `latest`, and Docker does not pull an image it already has. An older `latest` from before the upgrade then keeps running. Run `odctl init` to use images tagged with the CLI version, or add `--pull` to `odctl up` to fetch `latest` again. [Issue #127](https://github.com/jaehyeon-kim/odctl/issues/127) tracks this.
+
 ## A service is up but does not work
 
 `odctl logs <profile>` shows the logs of a profile's containers. Add `-s <service>` for one service, or `-f` to follow them. `odctl ps --all` shows every container odctl manages and its state.
