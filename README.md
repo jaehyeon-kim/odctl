@@ -34,6 +34,8 @@ odctl down --all
 
 `odctl up` starts the profiles each one depends on first, here PostgreSQL, SeaweedFS (S3) and the Iceberg REST catalog. See [Getting started](https://jaehyeon.me/odctl/latest/getting-started/) for more.
 
+![Installing odctl, previewing what flink-lite starts, starting kafka-lite, listing the containers and stopping them](https://raw.githubusercontent.com/jaehyeon-kim/odctl/refs/heads/main/image/demo.gif)
+
 ## Compatibility
 
 From 1.0.0, odctl follows semantic versioning. Within 1.x, command names, option names and profile names do not change or disappear, and a profile keeps the ports it publishes on the host. Minor releases add profiles, services and options, and move bundled images to newer versions. Anything that breaks a working `odctl up` command waits for 2.0.

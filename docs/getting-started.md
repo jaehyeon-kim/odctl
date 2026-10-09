@@ -1,5 +1,9 @@
 # Getting started
 
+The recording shows the steps on this page: install odctl, preview a profile, start it, list the containers and stop them.
+
+![Installing odctl, previewing what flink-lite starts, starting kafka-lite, listing the containers and stopping them](assets/demo.gif)
+
 ## Requirements
 
 - Docker Engine or Docker Desktop, running. Give Docker 8 to 16 GB of memory.
