@@ -358,9 +358,11 @@ def _write_site_files() -> None:
     with mkdocs_gen_files.open("cli.md", "w") as f:
         f.write(cli_reference())
 
-    # The README and the site share one diagram, kept where the README links it.
-    with mkdocs_gen_files.open("assets/diagram.png", "wb") as f:
-        f.write((REPO / "image" / "diagram.png").read_bytes())
+    # The README and the site share one diagram and one recording, kept where
+    # the README links them.
+    for name in ("diagram.png", "demo.gif"):
+        with mkdocs_gen_files.open(f"assets/{name}", "wb") as f:
+            f.write((REPO / "image" / name).read_bytes())
 
 
 # mkdocs-gen-files runs this file with runpy, which names it "<run_path>".
