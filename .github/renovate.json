@@ -70,11 +70,6 @@
   ],
   "packageRules": [
     {
-      "description": "Patch, pin and digest updates run as soon as they are found. Holding a bug fix for up to a week gains nothing, and these updates are the ones least likely to change behaviour.",
-      "matchUpdateTypes": ["patch", "pin", "pinDigest", "digest"],
-      "schedule": ["at any time"]
-    },
-    {
       "description": "Flink stays on 2.2: it is the newest minor with Kafka and JDBC connector releases. Raise this when both connectors publish a build for the next minor, and move FLINK_MINOR in versions.env with it. See issue #9.",
       "matchPackageNames": ["flink", "org.apache.flink:{/,}**"],
       "allowedVersions": "<2.3"
@@ -92,6 +87,12 @@
         "org.apache.spark:{/,}**"
       ],
       "allowedVersions": "<4.2"
+    },
+    {
+      "description": "Group minor and patch image updates by compose file, so one PR touches one profile group (#102). The named groups below come later and win for their packages.",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "{{packageFile}}"
     },
     {
       "description": "Group all Python dependencies from pyproject.toml into a single PR",
