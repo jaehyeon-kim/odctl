@@ -332,6 +332,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#why-not-plain-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not plain Docker Compose?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-it-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1728,6 +1739,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#why-not-plain-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not plain Docker Compose?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-it-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1780,6 +1802,13 @@
 <h1 id="open-data-stack-odctl">Open Data Stack (odctl)</h1>
 <p>odctl is a command-line tool that runs an open data stack on your machine with Docker Compose. You name the profiles you want, such as <code>kafka-lite</code> or <code>airflow</code>, and odctl starts them together with the services they depend on.</p>
 <p><img alt="odctl architecture" src="assets/diagram.png" /></p>
+<h2 id="why-not-plain-docker-compose">Why not plain Docker Compose?</h2>
+<p>odctl is Docker Compose: it runs Compose files and selects services with Compose profiles. For one small project with two or three services, a Compose file of your own is enough. odctl helps when there are more.</p>
+<ul>
+<li><strong>One set of files for every project.</strong> Projects need different tools. One uses MLflow, Feast and Airflow, and another does not need Airflow. Copied compose files drift apart, for example when an image is upgraded in one copy only. odctl keeps the files in one place. Each release fixes the image versions and runs an end-to-end test for every profile, so a project pins an odctl version instead of keeping its own files.</li>
+<li><strong>The services are already connected.</strong> PostgreSQL creates the databases for MLflow, Feast and the others when it first starts. MLflow keeps its artifacts in S3 storage. Feast's config points to its registry in PostgreSQL, to Iceberg for offline features and to Valkey for online features. The Airflow image has the MLflow and Feast clients installed. Kafka Connect, Flink and Spark take connector jars with matching versions from one shared image.</li>
+<li><strong>Commands show what is running.</strong> <code>odctl explain</code> shows a profile's services, ports and dependencies. <code>odctl up --dry-run</code> shows what would start, in order. <code>odctl ps</code> lists the running containers with their health and ports. The <a href="cli/">CLI reference</a> lists every command.</li>
+</ul>
 <h2 id="what-it-runs">What it runs</h2>
 <table>
 <thead>
