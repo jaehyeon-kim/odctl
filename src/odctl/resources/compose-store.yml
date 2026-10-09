@@ -9,7 +9,7 @@ services:
   # Fluss needs a real ZooKeeper. ClickHouse Keeper refuses opcode 19,
   # createContainer, which Curator uses, and drops the session repeatedly.
   fluss-zookeeper:
-    image: zookeeper:3.9.5
+    image: zookeeper:3.9.6
     container_name: fluss-zookeeper
     profiles: ["fluss"]
     networks:
