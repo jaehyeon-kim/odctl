@@ -1932,9 +1932,9 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  it every 15 seconds and restart Feast when it changes. Run
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  `feast apply` from your own environment. odctl ships no definitions.
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>• Your environment needs: feast[duckdb,iceberg,redis,postgres]
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>• On an IcebergSource against catalog, pass warehouse=&quot;&quot; and
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  catalog_name=&quot;odctl&quot;. The REST client puts warehouse in the URL path,
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  and Iceberg&#39;s REST fixture server serves the spec with no prefix.
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>• On an IcebergSource against catalog, pass warehouse="" and
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  catalog_name="odctl". The REST client puts warehouse in the URL path,
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  and Iceberg's REST fixture server serves the spec with no prefix.
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>• Online feature server for get_online_features:
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  * External (host): http://127.0.0.1:6566
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  * Internal (Docker): http://feast-serve:6566
@@ -1971,10 +1971,10 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>• Evidently UI &amp; API (no login, and writes are open):
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  * External (host): http://127.0.0.1:8089
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  * Internal (Docker): http://evidently:8000
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>• Push reports with RemoteWorkspace(&quot;http://127.0.0.1:8089&quot;) from the
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  host, or RemoteWorkspace(&quot;http://evidently:8000&quot;) from a container.
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>• Push reports with RemoteWorkspace("http://127.0.0.1:8089") from the
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  host, or RemoteWorkspace("http://evidently:8000") from a container.
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  Reports are computed by the client, so it needs evidently==0.7.23.
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  In Airflow, set _AIRFLOW_PIP_DEPS=&quot;evidently==0.7.23&quot; in .env.
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  In Airflow, set _AIRFLOW_PIP_DEPS="evidently==0.7.23" in .env.
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>• Projects, reports, dashboards and datasets: the evidently database
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>  on Postgres.
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>• Settings: evidently/config.yaml in the workspace.

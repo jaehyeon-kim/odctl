@@ -1809,7 +1809,7 @@
 </tbody>
 </table>
 <h2 id="trino-catalogs">Trino catalogs</h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">&quot;SHOW CATALOGS&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">"SHOW CATALOGS"</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1849,7 +1849,7 @@
 </table>
 <p>Every catalog loads when Trino starts, even when its service is not running. A query against such a catalog fails until you start that profile. Catalogs finish loading after Trino's health endpoint starts answering, so <code>SHOW CATALOGS</code> can take a minute to list them all.</p>
 <p>Run a query:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">&quot;SELECT 1&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">"SELECT 1"</span>
 </span></code></pre></div>
 <p>Trino has no password authentication, so it accepts any user name. <code>docker exec -it trino trino</code> connects as <code>trino</code>. Pass <code>--user user</code> to use the name the rest of the stack uses. <a href="../../how-it-works/#workspace">Workspace</a> explains the access rules in <code>trino/rules.json</code>.</p>
 <p>The Trino UI at <a href="http://127.0.0.1:8080" rel="nofollow"><code>http://127.0.0.1:8080</code></a> asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.</p>
