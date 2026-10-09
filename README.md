@@ -23,6 +23,8 @@ uv tool install odctl
 pipx install odctl
 ```
 
+odctl follows semantic versioning from 1.0, so a project can pin `odctl>=1.0,<2`.
+
 ## Quick Start
 
 ```bash
@@ -36,9 +38,9 @@ odctl down --all
 
 ![Installing odctl, previewing what flink-lite starts, starting kafka-lite, listing the containers and stopping them](https://raw.githubusercontent.com/jaehyeon-kim/odctl/refs/heads/main/image/demo.gif)
 
-## Compatibility
+## Why not plain Docker Compose?
 
-From 1.0.0, odctl follows semantic versioning. Within 1.x, command names, option names and profile names do not change or disappear, and a profile keeps the ports it publishes on the host. Minor releases add profiles, services and options, and move bundled images to newer versions. Anything that breaks a working `odctl up` command waits for 2.0.
+odctl runs Docker Compose underneath, and a Compose file of your own is enough for one small project. odctl helps when you have several projects: the compose files live in one tested place instead of drifting apart in copies, the services are already connected to each other, and commands such as `odctl ps` and `odctl explain` show what is running and on which ports. [Why not plain Docker Compose?](https://jaehyeon.me/odctl/latest/#why-not-plain-docker-compose) explains it in more detail.
 
 ## Related reading
 
