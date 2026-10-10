@@ -2,134 +2,134 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://jaehyeon.me/odctl/latest/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/cli/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/getting-started/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/how-it-works/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/labs/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/troubleshooting/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/airflow-dags/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/clickhouse/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/evidently-reports/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/feast-iceberg/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/flink-sql/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/fluss/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/hybrid-search/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/kafka-connect/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/kafka/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/lineage/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/mlflow/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/openmetadata/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/spark/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/telemetry/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/temporal-workers/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/trino-metabase/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/guides/valkey/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/analytics/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/messaging/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/mlops/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/observability/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/orchestration/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
     <url>
          <loc>https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/</loc>
-         <lastmod>2026-10-09</lastmod>
+         <lastmod>2026-10-10</lastmod>
     </url>
 </urlset>
