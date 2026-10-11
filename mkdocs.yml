@@ -35,10 +35,19 @@ plugins:
         - scripts/gen_pages.py
   # Reads profiles/SUMMARY.md, which gen_pages.py writes, for the Profiles section.
   - literate-nav
+  # llms.txt and llms-full.txt for AI assistants (#132): an index of the pages with
+  # their links, and the pages themselves as Markdown. scripts/llmstxt_sections.py
+  # builds the sections from the nav. mike serves each version under its own folder,
+  # so the links point at latest/, where the current pages are.
+  - llmstxt:
+      base_url: https://jaehyeon.me/odctl/latest/
+      full_output: llms-full.txt
+      sections: {} # required by the plugin; filled from the nav by the hook
 
 # Makes local service addresses clickable, with rel="nofollow".
 hooks:
   - scripts/local_links.py
+  - scripts/llmstxt_sections.py
 
 extra_css:
   - stylesheets/extra.css
