@@ -22,7 +22,7 @@ echo "▶️  Resolving Shared & Connector Versions..."
 
 # 🔒 HARDCODED: Lock core dependencies; Iceberg comes from versions.env
 DEB_V="3.7.0.Final"
-POSTGRES_V="42.7.13"
+POSTGRES_V="42.7.14"
 
 echo "▶️  Fetching Kafka Connectors..."
 make_dir "connect/clickhouse-sink"
