@@ -766,7 +766,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -822,7 +822,7 @@
   <span class="md-ellipsis">
     
   
-    Flink SQL: Kafka to PostgreSQL
+    Flink SQL
   
 
     
@@ -1346,7 +1346,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1430,7 +1430,7 @@
   <span class="md-ellipsis">
     
   
-    Hybrid search in PostgreSQL
+    Hybrid search
   
 
     
@@ -1505,7 +1505,7 @@
   <span class="md-ellipsis">
     
   
-    Governance and operations
+    Metadata and operations
   
 
     
@@ -1521,7 +1521,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Governance and operations
+    Metadata and operations
   
 
           </label>
@@ -1787,7 +1787,7 @@
 
 
 <h1 id="fluss">Fluss</h1>
-<p>The <code>fluss</code> profile runs Apache Fluss: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the <code>deps</code> profile fills. The commands below come from the end-to-end tests, which run them on every release, with the names changed.</p>
+<p>The <code>fluss</code> profile runs Apache Fluss: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the <code>deps</code> profile fills. The end-to-end tests run the commands below on every release.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>fluss<span class="w"> </span>flink-lite
 </span></code></pre></div>
 <table>
@@ -1811,14 +1811,14 @@
 <p>The coordinator is also published on <code>127.0.0.1:9123</code> and the tablet server on <code>127.0.0.1:9124</code>. Both advertise their container names, which resolve only inside the <code>odctl</code> network, so run Fluss clients in a container, such as Flink.</p>
 <h2 id="check-the-cluster-formed">Check the cluster formed</h2>
 <p>The servers register in ZooKeeper once they are up. List the tablet servers and read the active coordinator:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>fluss-zookeeper<span class="w"> </span>zkCli.sh<span class="w"> </span>-server<span class="w"> </span>localhost:2181<span class="w"> </span>ls<span class="w"> </span>/fluss/tabletservers/ids
+<div class="language-bash highlight"><span class="filename">docs/snippets/fluss/commands.sh:registrations</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>fluss-zookeeper<span class="w"> </span>zkCli.sh<span class="w"> </span>-server<span class="w"> </span>localhost:2181<span class="w"> </span>ls<span class="w"> </span>/fluss/tabletservers/ids
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>fluss-zookeeper<span class="w"> </span>zkCli.sh<span class="w"> </span>-server<span class="w"> </span>localhost:2181<span class="w"> </span>get<span class="w"> </span>/fluss/coordinators/active
 </span></code></pre></div>
 <p>The first prints <code>[0]</code>, the id of the one tablet server. The second names <code>fluss-coordinator:9123</code>.</p>
 <h2 id="write-and-read-a-table-with-flink-sql">Write and read a table with Flink SQL</h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>flink-jobmanager<span class="w"> </span>/opt/flink/bin/sql-client.sh
+<div class="language-bash highlight"><span class="filename">docs/snippets/fluss/commands.sh:sql-client</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>flink-jobmanager<span class="w"> </span>/opt/flink/bin/sql-client.sh
 </span></code></pre></div>
-<div class="language-sql highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">SET</span><span class="w"> </span><span class="s1">'execution.runtime-mode'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'batch'</span><span class="p">;</span>
+<div class="language-sql highlight"><span class="filename">docs/snippets/fluss/steps.sql:table</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">SET</span><span class="w"> </span><span class="s1">'execution.runtime-mode'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'batch'</span><span class="p">;</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">SET</span><span class="w"> </span><span class="s1">'table.dml-sync'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'true'</span><span class="p">;</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">SET</span><span class="w"> </span><span class="s1">'sql-client.execution.result-mode'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'tableau'</span><span class="p">;</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">CATALOG</span><span class="w"> </span><span class="n">fluss_catalog</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="p">(</span><span class="s1">'type'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'fluss'</span><span class="p">,</span><span class="w"> </span><span class="s1">'bootstrap.servers'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'fluss-coordinator:9123'</span><span class="p">);</span>
@@ -1832,7 +1832,7 @@
 <p>The Flink UI lists the two jobs:</p>
 <p><img alt="Flink UI with the Fluss insert and select jobs" class="screenshot" src="../../images/fluss-flink.png" /></p>
 <h2 id="from-another-container">From another container</h2>
-<p>Inside the <code>odctl</code> network, set a Fluss client's bootstrap servers to <code>fluss-coordinator:9123</code>.</p>
+<p>Inside the <a href="../../how-it-works/#how-you-reach-a-service"><code>odctl</code> network</a>, set a Fluss client's bootstrap servers to <code>fluss-coordinator:9123</code>.</p>
 
 
 

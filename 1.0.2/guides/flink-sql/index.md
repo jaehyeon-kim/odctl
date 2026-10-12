@@ -1,6 +1,6 @@
 # Flink SQL: Kafka to PostgreSQL
 
-The `flink-lite` profile runs a Flink JobManager, one TaskManager and the SQL Gateway. `flink-full` runs three TaskManagers. Flink's connector jars for Kafka, Avro with the schema registry, JDBC and Iceberg come from the shared volume that the `deps` profile fills. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+The `flink-lite` profile runs a Flink JobManager, one TaskManager and the SQL Gateway. `flink-full` runs three TaskManagers. Flink's connector jars for Kafka, Avro with the schema registry, JDBC and Iceberg come from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
 
 This guide reads Avro records from Kafka through the Karapace schema registry and writes an aggregate to PostgreSQL over JDBC. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) shows Flink writing an Iceberg table.
 
@@ -19,6 +19,8 @@ odctl up flink-lite kafka-lite
 
 ## Create the topic and the target table
 
+docs/snippets/flink-sql/commands.sh:create-topic-table
+
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --if-not-exists --topic orders --partitions 1 --replication-factor 1
@@ -31,9 +33,13 @@ docker exec postgres psql -U user -d odctl -c "
 
 Open the SQL client in the JobManager container:
 
+docs/snippets/flink-sql/commands.sh:sql-client
+
 ```bash
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
+
+docs/snippets/flink-sql/steps.sql:kafka-to-postgres
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -50,6 +56,8 @@ Right after Kafka starts, Karapace can answer its health check and still time ou
 
 ## Check the result
 
+docs/snippets/flink-sql/commands.sh:check
+
 ```bash
 docker exec postgres psql -U user -d odctl -c "SELECT * FROM supplier_stats ORDER BY supplier"
 ```
@@ -60,4 +68,4 @@ The two `INSERT` statements run as two batch jobs, listed under Completed Jobs.
 
 ## From another container
 
-Inside the `odctl` network, Flink's REST API is `http://jobmanager:8081` and the SQL Gateway is `http://flink-sql-gateway:8083`. In Flink SQL, Kafka is `broker-1:19092`, Karapace is `http://karapace:8081` and PostgreSQL is `jdbc:postgresql://postgres:5432/odctl`.
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), Flink's REST API is `http://jobmanager:8081` and the SQL Gateway is `http://flink-sql-gateway:8083`. In Flink SQL, Kafka is `broker-1:19092`, Karapace is `http://karapace:8081` and PostgreSQL is `jdbc:postgresql://postgres:5432/odctl`.

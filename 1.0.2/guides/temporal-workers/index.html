@@ -764,7 +764,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -820,7 +820,7 @@
   <span class="md-ellipsis">
     
   
-    Flink SQL: Kafka to PostgreSQL
+    Flink SQL
   
 
     
@@ -1346,7 +1346,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1430,7 +1430,7 @@
   <span class="md-ellipsis">
     
   
-    Hybrid search in PostgreSQL
+    Hybrid search
   
 
     
@@ -1505,7 +1505,7 @@
   <span class="md-ellipsis">
     
   
-    Governance and operations
+    Metadata and operations
   
 
     
@@ -1521,7 +1521,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Governance and operations
+    Metadata and operations
   
 
           </label>
@@ -1787,14 +1787,14 @@
 
 
 <h1 id="temporal-workers">Temporal workers</h1>
-<p>The <code>temporal</code> profile runs the Temporal development server: the server, the Web UI and a SQLite database in one container. odctl runs only the server. Your own process runs the worker that executes workflows and activities. The code below comes from the end-to-end tests.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>temporal
+<p>The <code>temporal</code> profile runs the Temporal development server: the server, the Web UI and a SQLite database in one container. odctl runs only the server. Your own process runs the worker that executes workflows and activities. The end-to-end tests run the code below on every release.</p>
+<div class="language-bash highlight"><span class="filename">docs/snippets/temporal-workers/commands.sh:install</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>temporal
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">temporalio</span><span class="o">==</span><span class="m">1</span>.34.0
 </span></code></pre></div>
 <p>The gRPC endpoint is <code>127.0.0.1:7233</code> with the namespace <code>default</code>, and the Web UI is at <a href="http://127.0.0.1:8233" rel="nofollow"><code>http://127.0.0.1:8233</code></a>.</p>
 <h2 id="a-worker-and-a-workflow">A worker and a workflow</h2>
 <p>The activity fails on its first attempt, so the result shows that the retry policy ran it again.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/temporal-workers/steps.py:worker</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">timedelta</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">temporalio</span><span class="w"> </span><span class="kn">import</span> <span class="n">activity</span><span class="p">,</span> <span class="n">workflow</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">temporalio.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
@@ -1832,7 +1832,7 @@
 </span></code></pre></div>
 <h2 id="wait-for-an-approval">Wait for an approval</h2>
 <p>A workflow can wait for a signal, for example a person approving an agent's action. The workflow below waits until its <code>approve</code> signal arrives, and then returns who approved it:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nd">@workflow</span><span class="o">.</span><span class="n">defn</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/temporal-workers/steps.py:approval-workflow</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nd">@workflow</span><span class="o">.</span><span class="n">defn</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Approval</span><span class="p">:</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">approver</span> <span class="o">=</span> <span class="kc">None</span>
@@ -1847,7 +1847,7 @@
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"approved by </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">approver</span><span class="si">}</span><span class="s2">"</span>
 </span></code></pre></div>
 <p>In <code>main</code> above, register it with the worker, start it, then send the signal:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">async</span> <span class="k">with</span> <span class="n">Worker</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">task_queue</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">,</span> <span class="n">workflows</span><span class="o">=</span><span class="p">[</span><span class="n">Greet</span><span class="p">,</span> <span class="n">Approval</span><span class="p">],</span> <span class="n">activities</span><span class="o">=</span><span class="p">[</span><span class="n">greet</span><span class="p">]):</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/temporal-workers/steps.py:approval-run</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">async</span> <span class="k">with</span> <span class="n">Worker</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">task_queue</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">,</span> <span class="n">workflows</span><span class="o">=</span><span class="p">[</span><span class="n">Greet</span><span class="p">,</span> <span class="n">Approval</span><span class="p">],</span> <span class="n">activities</span><span class="o">=</span><span class="p">[</span><span class="n">greet</span><span class="p">]):</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">handle</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">start_workflow</span><span class="p">(</span><span class="n">Approval</span><span class="o">.</span><span class="n">run</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="s2">"approval-1"</span><span class="p">,</span> <span class="n">task_queue</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">await</span> <span class="n">handle</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">Approval</span><span class="o">.</span><span class="n">approve</span><span class="p">,</span> <span class="s2">"alice"</span><span class="p">)</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="k">await</span> <span class="n">handle</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>

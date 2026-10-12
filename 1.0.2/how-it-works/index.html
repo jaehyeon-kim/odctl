@@ -396,6 +396,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What odctl up does">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependencies-and-the-start-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies and the start order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#before-anything-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before anything starts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-containers-a-command-touches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which containers a command touches
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -936,7 +975,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -992,7 +1031,7 @@
   <span class="md-ellipsis">
     
   
-    Flink SQL: Kafka to PostgreSQL
+    Flink SQL
   
 
     
@@ -1436,7 +1475,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1520,7 +1559,7 @@
   <span class="md-ellipsis">
     
   
-    Hybrid search in PostgreSQL
+    Hybrid search
   
 
     
@@ -1595,7 +1634,7 @@
   <span class="md-ellipsis">
     
   
-    Governance and operations
+    Metadata and operations
   
 
     
@@ -1611,7 +1650,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Governance and operations
+    Metadata and operations
   
 
           </label>
@@ -1832,6 +1871,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What odctl up does">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependencies-and-the-start-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies and the start order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#before-anything-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before anything starts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-containers-a-command-touches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which containers a command touches
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1973,7 +2051,7 @@
 <h1 id="how-it-works">How it works</h1>
 <h2 id="what-odctl-up-does">What <code>odctl up</code> does</h2>
 <p>Take <code>odctl up flink-lite</code> as an example. Flink keeps its tables in Iceberg, so it needs the Iceberg REST catalog. The catalog keeps its metadata in PostgreSQL and its files in SeaweedFS. All of them need the shared jars in <code>deps</code>.</p>
-<p><img alt="odctl up flink-lite starts deps, then postgres and storage, then catalog, then flink-lite" src="../images/odctl-up.png" /></p>
+<p><img alt="odctl up flink-lite, step by step: deps, then postgres and storage, then catalog, then flink-lite" src="../images/odctl-up.gif" /></p>
 <p>odctl reads these links from <code>registry.yml</code> and starts the profiles from left to right:</p>
 <ol>
 <li><code>deps</code> copies connectors and jars into a shared Docker volume, creates the <code>odctl</code> network, and exits.</li>
@@ -1982,7 +2060,21 @@
 <li><code>flink-lite</code> starts last.</li>
 </ol>
 <p><code>odctl up flink-lite --dry-run</code> prints this plan without starting anything. Each <a href="../profiles/">profile page</a> lists what its profile also starts.</p>
-<p><code>down</code>, <code>ps</code>, <code>logs</code>, <code>restart</code> and <code>recreate</code> act only on the profiles you name. <code>odctl down flink-lite</code> stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles.</p>
+<h3 id="dependencies-and-the-start-order">Dependencies and the start order</h3>
+<p>Each profile lists the profiles it needs under <code>depends_on</code> in <code>registry.yml</code>. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: <code>deps</code> first, <code>postgres</code> and <code>storage</code> next, <code>catalog</code> after them, and every other profile last, in alphabetical order.</p>
+<p>The profiles are then grouped by compose file, in that order, and each file is started with one <code>docker compose up --wait</code>. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. <code>deps</code> is the exception: it starts attached, because its init container copies the jars and exits, and <code>--wait</code> treats an exiting container as a failure.</p>
+<h3 id="before-anything-starts">Before anything starts</h3>
+<p><img alt="odctl up checks that Docker runs, the profiles exist and the images are published before it starts a container" src="../images/odctl-up-checks.png" /></p>
+<p><code>odctl up</code> checks four things before it starts a container:</p>
+<ol>
+<li><strong>Docker is reachable.</strong> If not, it stops.</li>
+<li><strong>Every profile you name is in <code>registry.yml</code>.</strong> An unknown name stops it, with the name in the error.</li>
+<li><strong>Every service can be started.</strong> A service that declares a profile owned by another compose file would never start, so odctl warns about it and carries on.</li>
+<li><strong>odctl's own images exist for the tag.</strong> It resolves <code>TAG</code> as compose does and asks the registry for each odctl image that is not already on your machine. If the registry says one is missing, odctl stops and names the tag, rather than leaving Docker to fail on one service. If the registry cannot be reached, it starts anyway, so a machine with no network can run images it pulled before.</li>
+</ol>
+<h3 id="which-containers-a-command-touches">Which containers a command touches</h3>
+<p><code>down</code>, <code>ps</code>, <code>logs</code>, <code>restart</code> and <code>recreate</code> act only on the profiles you name, not on their dependencies. <code>odctl down flink-lite</code> stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project name starts with <code>odctl-</code>, and the service belongs to one of the named profiles.</p>
+<p>There is one exception. When a profile depends on another profile in the same compose file, both are included, because compose refuses a command on a service whose dependency is left out. <code>odctl down --volumes</code> removes the shared <code>deps</code> volume and the <code>odctl</code> network only when no other profile has a container left.</p>
 <h2 id="how-you-reach-a-service">How you reach a service</h2>
 <p>Every service publishes its ports on the host, so a browser or client on your machine uses <a href="http://127.0.0.1:&lt;port&gt;" rel="nofollow"><code>http://127.0.0.1:&lt;port&gt;</code></a>. Docker publishes them on all of the host's network interfaces, so other machines on your network can reach them too. Each profile page lists the ports.</p>
 <p>Inside Docker, services reach each other by container name on the <code>odctl</code> network, for example <code>http://catalog:8181</code> or <code>broker-1:19092</code> for Kafka. A container of your own reaches them the same way when it joins that network:</p>

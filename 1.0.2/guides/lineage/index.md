@@ -1,6 +1,6 @@
 # OpenLineage and Marquez
 
-The `lineage` profile runs Marquez: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. Anything that sends OpenLineage events over HTTP can report to it. The commands below come from the end-to-end tests, with the names changed.
+The `lineage` profile runs Marquez: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. Anything that sends OpenLineage events over HTTP can report to it. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up lineage
@@ -15,6 +15,8 @@ odctl up lineage
 ## Send OpenLineage events
 
 A run is reported as a `START` event and a `COMPLETE` event with the same run id. The job reads one dataset and writes another:
+
+docs/snippets/lineage/commands.sh:send
 
 ```bash
 RUN_ID=a1b2c3d4-0000-4000-8000-000000000001
@@ -36,6 +38,8 @@ The run id is a UUID, as OpenLineage requires.
 
 ## Read the lineage back
 
+docs/snippets/lineage/commands.sh:read
+
 ```bash
 curl http://127.0.0.1:5002/api/v1/namespaces
 curl http://127.0.0.1:5002/api/v1/namespaces/demo/jobs/demo-job
@@ -48,4 +52,4 @@ The UI draws the job between the datasets it read and wrote:
 
 ## From another container
 
-Inside the `odctl` network, send events to `http://marquez-api:5000/api/v1/lineage`. For an OpenLineage client's HTTP transport, set the URL to `http://marquez-api:5000`, because the transport adds `api/v1/lineage` by default.
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), send events to `http://marquez-api:5000/api/v1/lineage`. For an OpenLineage client's HTTP transport, set the URL to `http://marquez-api:5000`, because the transport adds `api/v1/lineage` by default.

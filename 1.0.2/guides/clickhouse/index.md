@@ -1,6 +1,6 @@
 # ClickHouse
 
-The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. The commands below come from the end-to-end tests, with the names changed.
+The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up ch-lite
@@ -17,6 +17,8 @@ Every server creates the `feature_store` and `odctl` databases when it starts wi
 ## Create a table and query it
 
 `clickhouse-client` is in each server container:
+
+docs/snippets/clickhouse/commands.sh:merge-tree
 
 ```bash
 docker exec ch-11 clickhouse-client --password password -q "SHOW DATABASES"
@@ -37,6 +39,8 @@ ClickHouse also serves a query page at `http://127.0.0.1:8123/play`. Enter `defa
 
 In `ch-full`, `{cluster}` names `odctl_cluster`, which has two shards of two replicas. A table created `ON CLUSTER` with `ReplicatedMergeTree` is created on all four servers, and Keeper keeps the two replicas of each shard in step:
 
+docs/snippets/clickhouse/commands.sh:replicated
+
 ```bash
 odctl up ch-full
 
@@ -55,4 +59,4 @@ In `ch-lite`, `{cluster}` names `odctl_single_shard`, which holds `ch-11` and `c
 
 ## From another container
 
-Inside the `odctl` network, connect to `ch-11:8123` over HTTP or `ch-11:9000` with the native protocol, with the same users. Trino's `clickhouse` catalog reads the `feature_store` database on `ch-11`, as [Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md) shows.
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), connect to `ch-11:8123` over HTTP or `ch-11:9000` with the native protocol, with the same users. Trino's `clickhouse` catalog reads the `feature_store` database on `ch-11`, as [Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md) shows.

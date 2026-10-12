@@ -1,6 +1,8 @@
 # Evidently reports
 
-The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The code below comes from the end-to-end tests.
+The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The end-to-end tests run the code below on every release.
+
+docs/snippets/evidently-reports/commands.sh:install
 
 ```bash
 odctl up evidently
@@ -10,6 +12,8 @@ pip install evidently==0.7.23
 The server runs Evidently 0.7.23, so install the same client version. The UI is at `http://127.0.0.1:8089`, with no login.
 
 ## Push a data drift report
+
+docs/snippets/evidently-reports/steps.py:report
 
 ```python
 import numpy as np, pandas as pd
@@ -33,6 +37,8 @@ Column `x` moves by three standard deviations and `y` does not, so the report in
 Open the report under the project's Reports tab:
 
 ## Store a dataset
+
+docs/snippets/evidently-reports/steps.py:dataset
 
 ```python
 from evidently import DataDefinition, Dataset

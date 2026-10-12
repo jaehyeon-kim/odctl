@@ -764,7 +764,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -820,7 +820,7 @@
   <span class="md-ellipsis">
     
   
-    Flink SQL: Kafka to PostgreSQL
+    Flink SQL
   
 
     
@@ -1266,7 +1266,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1430,7 +1430,7 @@
   <span class="md-ellipsis">
     
   
-    Hybrid search in PostgreSQL
+    Hybrid search
   
 
     
@@ -1505,7 +1505,7 @@
   <span class="md-ellipsis">
     
   
-    Governance and operations
+    Metadata and operations
   
 
     
@@ -1521,7 +1521,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Governance and operations
+    Metadata and operations
   
 
           </label>
@@ -1787,13 +1787,13 @@
 
 
 <h1 id="evidently-reports">Evidently reports</h1>
-<p>The <code>evidently</code> profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the <code>evidently</code> database on PostgreSQL. The client computes each report and pushes the result. The code below comes from the end-to-end tests.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>evidently
+<p>The <code>evidently</code> profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the <code>evidently</code> database on PostgreSQL. The client computes each report and pushes the result. The end-to-end tests run the code below on every release.</p>
+<div class="language-bash highlight"><span class="filename">docs/snippets/evidently-reports/commands.sh:install</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>evidently
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">evidently</span><span class="o">==</span><span class="m">0</span>.7.23
 </span></code></pre></div>
 <p>The server runs Evidently 0.7.23, so install the same client version. The UI is at <a href="http://127.0.0.1:8089" rel="nofollow"><code>http://127.0.0.1:8089</code></a>, with no login.</p>
 <h2 id="push-a-data-drift-report">Push a data drift report</h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/evidently-reports/steps.py:report</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">evidently</span><span class="w"> </span><span class="kn">import</span> <span class="n">Report</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">evidently.presets</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataDriftPreset</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">evidently.ui.workspace</span><span class="w"> </span><span class="kn">import</span> <span class="n">RemoteWorkspace</span>
@@ -1812,7 +1812,7 @@
 <p>Open the report under the project's Reports tab:</p>
 <p><img alt="Evidently drift report with one drifted column" class="screenshot" src="../../images/evidently.png" /></p>
 <h2 id="store-a-dataset">Store a dataset</h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">evidently</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataDefinition</span><span class="p">,</span> <span class="n">Dataset</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/evidently-reports/steps.py:dataset</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">evidently</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataDefinition</span><span class="p">,</span> <span class="n">Dataset</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"id"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="s2">"score"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">]})</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">dataset_id</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">add_dataset</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">Dataset</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">data_definition</span><span class="o">=</span><span class="n">DataDefinition</span><span class="p">()),</span> <span class="s2">"demo"</span><span class="p">)</span>

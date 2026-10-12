@@ -26,6 +26,8 @@ For example, the PostgreSQL dashboard:
 
 Point an OpenTelemetry SDK at `http://127.0.0.1:4318`, its default HTTP port. The end-to-end tests post one metric with curl, which shows the path:
 
+docs/snippets/telemetry/commands.sh:send-metric
+
 ```bash
 ts=$(python3 -c "import time;print(int(time.time()*1e9))")
 cat > /tmp/otlp.json <<JSON

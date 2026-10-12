@@ -1,6 +1,6 @@
 # Kafka Connect
 
-Both Kafka profiles run one Kafka Connect worker, `connect`, beside the brokers. It loads its plugins from the shared volume that the `deps` profile fills, and you manage connectors through its REST API. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+Both Kafka profiles run one Kafka Connect worker, `connect`, beside the brokers. It loads its plugins from the shared volume that the `deps` profile fills, and you manage connectors through its REST API. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up kafka-lite
@@ -18,6 +18,8 @@ odctl up kafka-lite
 
 The `deps` image puts these connectors in the plugin folder: the Apache Iceberg sink, the Debezium PostgreSQL source, the ClickHouse sink, the Aiven JDBC connector, the Aiven S3 sink, the Redis connector and the MSK data generator. List the classes Connect has loaded:
 
+docs/snippets/kafka-connect/commands.sh:plugins
+
 ```bash
 curl -s http://127.0.0.1:8083/connector-plugins
 ```
@@ -28,6 +30,8 @@ The tests check that the list includes `org.apache.iceberg.connect.IcebergSinkCo
 
 A connector is a name and a `config` object, posted to `/connectors`. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) has a complete Iceberg sink configuration. Save it as `demo-iceberg.json` and post it:
 
+docs/snippets/kafka-connect/commands.sh:register
+
 ```bash
 curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-iceberg.json
@@ -37,12 +41,16 @@ The worker's default converters expect JSON with a schema envelope. A connector 
 
 ## Check and remove it
 
+docs/snippets/kafka-connect/commands.sh:status-remove
+
 ```bash
 curl -s http://127.0.0.1:8083/connectors/demo-iceberg/status
 curl -X DELETE http://127.0.0.1:8083/connectors/demo-iceberg
 ```
 
 The status shows the connector and each task as `RUNNING` or `FAILED`, with the error for a failed task. The worker's log has the rest:
+
+docs/snippets/kafka-connect/commands.sh:logs
 
 ```bash
 docker logs --tail 40 connect
@@ -60,4 +68,4 @@ odctl up postgres kafka-lite
 
 ## From another container
 
-Inside the `odctl` network, the REST API is `http://connect:8083`, and connectors reach the brokers at `broker-1:19092`, the catalog at `http://catalog:8181` and SeaweedFS at `http://seaweed:8333`.
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), the REST API is `http://connect:8083`, and connectors reach the brokers at `broker-1:19092`, the catalog at `http://catalog:8181` and SeaweedFS at `http://seaweed:8333`.

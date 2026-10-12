@@ -27,7 +27,7 @@
     
     
       
-        <title>Produce and consume with Kafka - Open Data Stack (odctl)</title>
+        <title>Kafka - Open Data Stack (odctl)</title>
       
     
     
@@ -129,7 +129,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Produce and consume with Kafka
+              Kafka
             
           </span>
         </div>
@@ -775,7 +775,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -793,7 +793,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -841,10 +841,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#kafka-connect-plugins" class="md-nav__link">
+  <a href="#kafka-connect" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Kafka Connect plugins
+        Kafka Connect
       
     </span>
   </a>
@@ -902,7 +902,7 @@
   <span class="md-ellipsis">
     
   
-    Flink SQL: Kafka to PostgreSQL
+    Flink SQL
   
 
     
@@ -1346,7 +1346,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1430,7 +1430,7 @@
   <span class="md-ellipsis">
     
   
-    Hybrid search in PostgreSQL
+    Hybrid search
   
 
     
@@ -1505,7 +1505,7 @@
   <span class="md-ellipsis">
     
   
-    Governance and operations
+    Metadata and operations
   
 
     
@@ -1521,7 +1521,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Governance and operations
+    Metadata and operations
   
 
           </label>
@@ -1756,10 +1756,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#kafka-connect-plugins" class="md-nav__link">
+  <a href="#kafka-connect" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Kafka Connect plugins
+        Kafka Connect
       
     </span>
   </a>
@@ -1787,7 +1787,7 @@
 
 
 <h1 id="produce-and-consume-with-kafka">Produce and consume with Kafka</h1>
-<p>The <code>kafka-lite</code> profile runs one Kafka broker in KRaft mode, the Karapace schema registry, Kafka Connect and Kafka UI. <code>kafka-full</code> runs three brokers with the same services beside them. The commands below come from the end-to-end tests, with the names changed.</p>
+<p>The <code>kafka-lite</code> profile runs one Kafka broker in KRaft mode, the Karapace schema registry, Kafka Connect and Kafka UI. <code>kafka-full</code> runs three brokers with the same services beside them. The end-to-end tests run the commands below on every release.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
 </span></code></pre></div>
 <table>
@@ -1823,11 +1823,11 @@
 <p>Port 29092 is a listener for minikube. It advertises <code>host.minikube.internal</code>, which does not resolve on a normal host, so a client connects and then fails to produce. Use <code>127.0.0.1:9092</code> from the host.</p>
 <h2 id="create-a-topic">Create a topic</h2>
 <p>The Kafka command-line tools are in the broker container, which is <code>kafka</code> in <code>kafka-lite</code> and <code>kafka-1</code> in <code>kafka-full</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-topics.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><span class="filename">docs/snippets/kafka/commands.sh:create-topic</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-topics.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--create<span class="w"> </span>--topic<span class="w"> </span>demo<span class="w"> </span>--partitions<span class="w"> </span><span class="m">1</span><span class="w"> </span>--replication-factor<span class="w"> </span><span class="m">1</span>
 </span></code></pre></div>
 <h2 id="produce-and-consume">Produce and consume</h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"{\"n\":</span><span class="nv">$i</span><span class="s2">}"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>kafka<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><span class="filename">docs/snippets/kafka/commands.sh:produce-consume</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"{\"n\":</span><span class="nv">$i</span><span class="s2">}"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>kafka<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>/opt/kafka/bin/kafka-console-producer.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span>--topic<span class="w"> </span>demo
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-console-consumer.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
@@ -1836,11 +1836,8 @@
 <p>The consumer reads through a consumer group, so its offsets are stored in the broker's <code>__consumer_offsets</code> topic. Kafka UI shows the topic, its messages and the consumer groups.</p>
 <p>Kafka UI at <a href="http://127.0.0.1:8086" rel="nofollow"><code>http://127.0.0.1:8086</code></a> shows the topics, their messages and the schemas in Karapace.</p>
 <p><img alt="Kafka UI listing the topics of odctl-cluster" class="screenshot" src="../../images/kafka-ui.png" /></p>
-<h2 id="kafka-connect-plugins">Kafka Connect plugins</h2>
-<p>Connect loads its plugins from the shared volume that the <code>deps</code> profile fills. List what it has loaded:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:8083/connector-plugins
-</span></code></pre></div>
-<p>The list includes <code>org.apache.iceberg.connect.IcebergSinkConnector</code>, <code>io.debezium.connector.postgresql.PostgresConnector</code> and <code>com.clickhouse.kafka.connect.ClickHouseSinkConnector</code>, which the tests check on every release. <a href="../iceberg-ingestion/">Ingest into Iceberg</a> registers the Iceberg sink.</p>
+<h2 id="kafka-connect">Kafka Connect</h2>
+<p>Both Kafka profiles run a Kafka Connect worker beside the brokers. <a href="../kafka-connect/">Kafka Connect</a> lists the plugins it loads and shows how to register a connector.</p>
 
 
 

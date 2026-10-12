@@ -27,7 +27,7 @@
     
     
       
-        <title>MLflow tracking and model serving - Open Data Stack (odctl)</title>
+        <title>MLflow - Open Data Stack (odctl)</title>
       
     
     
@@ -129,7 +129,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              MLflow tracking and model serving
+              MLflow
             
           </span>
         </div>
@@ -764,7 +764,7 @@
   <span class="md-ellipsis">
     
   
-    Produce and consume with Kafka
+    Kafka
   
 
     
@@ -820,7 +820,7 @@
   <span class="md-ellipsis">
     
   
-    Flink SQL: Kafka to PostgreSQL
+    Flink SQL
   
 
     
@@ -1275,7 +1275,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1293,7 +1293,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow tracking and model serving
+    MLflow
   
 
     
@@ -1441,7 +1441,7 @@
   <span class="md-ellipsis">
     
   
-    Hybrid search in PostgreSQL
+    Hybrid search
   
 
     
@@ -1516,7 +1516,7 @@
   <span class="md-ellipsis">
     
   
-    Governance and operations
+    Metadata and operations
   
 
     
@@ -1532,7 +1532,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Governance and operations
+    Metadata and operations
   
 
           </label>
@@ -1809,7 +1809,8 @@
 
 
 <h1 id="mlflow-tracking-and-model-serving">MLflow tracking and model serving</h1>
-<p>The <code>mlflow</code> profile runs two containers. <code>mlflow</code> is the tracking server and model registry, with runs on PostgreSQL and artifacts on SeaweedFS under <code>s3://mlflow</code>. <code>mlflow-serve</code> scores a registered model over HTTP. The commands below come from the end-to-end tests, with the names changed.</p>
+<p>The <code>mlflow</code> profile runs two containers. <code>mlflow</code> is the tracking server and model registry, with runs on PostgreSQL and artifacts on SeaweedFS under <code>s3://mlflow</code>. <code>mlflow-serve</code> scores a registered model over HTTP. The end-to-end tests run the commands below on every release.</p>
+<p><img alt="Your code logs runs and models to the mlflow server, which keeps them in PostgreSQL and SeaweedFS; mlflow-serve loads a model from it and answers /invocations" src="../../images/path-mlflow.png" /></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>mlflow
 </span></code></pre></div>
 <table>
@@ -1840,7 +1841,7 @@
 </table>
 <p>The server runs MLflow 3.16.1, so install the same client version on the host.</p>
 <h2 id="log-a-run-with-an-artifact">Log a run with an artifact</h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/mlflow/steps.py:log-run</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">mlflow</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">mlflow</span><span class="o">.</span><span class="n">set_tracking_uri</span><span class="p">(</span><span class="s2">"http://127.0.0.1:5004"</span><span class="p">)</span>
@@ -1860,7 +1861,7 @@
 <p>The runs are listed under the experiment in the Model training view:</p>
 <p><img alt="MLflow runs of the demo experiment" class="screenshot" src="../../images/mlflow.png" /></p>
 <h2 id="register-a-model">Register a model</h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">mlflow</span><span class="o">,</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">xgboost</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xgb</span>
+<div class="language-python highlight"><span class="filename">docs/snippets/mlflow/steps.py:register-model</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">mlflow</span><span class="o">,</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">xgboost</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xgb</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mlflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">MlflowClient</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">mlflow</span><span class="o">.</span><span class="n">set_tracking_uri</span><span class="p">(</span><span class="s2">"http://127.0.0.1:5004"</span><span class="p">)</span>
@@ -1880,10 +1881,10 @@
 <p><img alt="MLflow model registry with demo-model and its champion alias" class="screenshot" src="../../images/mlflow-model.png" /></p>
 <h2 id="serve-the-model">Serve the model</h2>
 <p><code>mlflow-serve</code> starts with the profile and waits idle while <code>MODEL_URI</code> is empty. <code>MODEL_URI</code> is set in <code>.odctl/.env</code>, which <code>odctl init</code> writes. Change its line there to:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">MODEL_URI</span><span class="o">=</span><span class="s2">"models:/demo-model@champion"</span>
+<div class="language-bash highlight"><span class="filename">docs/snippets/mlflow/model-uri.env</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">MODEL_URI</span><span class="o">=</span><span class="s2">"models:/demo-model@champion"</span>
 </span></code></pre></div>
 <p>Then run <code>odctl up mlflow</code> again, so the container starts with the new value, and score two rows:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>mlflow
+<div class="language-bash highlight"><span class="filename">docs/snippets/mlflow/commands.sh:serve</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>mlflow
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:5003/invocations<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{"inputs": [[0.0], [3.0]]}'</span>
 </span></code></pre></div>

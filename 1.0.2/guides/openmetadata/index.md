@@ -1,6 +1,6 @@
 # Catalogue a database with OpenMetadata
 
-The `metadata` profile runs OpenMetadata: the server with its UI and REST API, Elasticsearch for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The commands below come from the end-to-end tests, with the names changed.
+The `metadata` profile runs OpenMetadata: the server with its UI and REST API, Elasticsearch for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up metadata
@@ -18,6 +18,8 @@ Log in as `admin@open-data.local` with the password `admin`. The domain is `open
 
 The login API takes the password base64-encoded and returns a JWT:
 
+docs/snippets/openmetadata/commands.sh:login
+
 ```bash
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
   -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \
@@ -30,6 +32,8 @@ AUTH="Authorization: Bearer $TOKEN"
 
 PostgreSQL is already running, so it serves as the source. The server reaches it by its container name:
 
+docs/snippets/openmetadata/commands.sh:service
+
 ```bash
 SVC=$(curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"name":"demo_pg","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}' \
@@ -40,6 +44,8 @@ SVC=$(curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
 ## Run a metadata ingestion
 
 Create a pipeline, deploy it as a DAG into the ingestion Airflow, and trigger it:
+
+docs/snippets/openmetadata/commands.sh:pipeline
 
 ```bash
 PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
@@ -53,6 +59,8 @@ curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipeli
 
 Airflow has to parse the new DAG file before the trigger works, so repeat the trigger every few seconds until it answers that the pipeline has been triggered. Then read the run's state:
 
+docs/snippets/openmetadata/commands.sh:status
+
 ```bash
 curl -s -H "$AUTH" \
   "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/demo_pg.demo_pg_metadata?fields=pipelineStatuses"
@@ -64,6 +72,8 @@ The first entry of `pipelineStatuses` reaches `success` when the tables are cata
 
 Rebuild the search index, then query it:
 
+docs/snippets/openmetadata/commands.sh:search
+
 ```bash
 curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/apps/trigger/SearchIndexingApplication
 curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_search_index&size=1"
@@ -73,9 +83,11 @@ curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_se
 
 ## From another container
 
-Inside the `odctl` network, call the API at `http://openmetadata-server:8585`. The server also answers the Model Context Protocol at `http://127.0.0.1:8585/mcp` with the same token.
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), call the API at `http://openmetadata-server:8585`. The server also answers the Model Context Protocol at `http://127.0.0.1:8585/mcp` with the same token.
 
 ## Remove the example
+
+docs/snippets/openmetadata/commands.sh:remove
 
 ```bash
 curl -s -X DELETE -H "$AUTH" \

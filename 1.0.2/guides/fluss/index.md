@@ -1,6 +1,6 @@
 # Fluss
 
-The `fluss` profile runs Apache Fluss: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the `deps` profile fills. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+The `fluss` profile runs Apache Fluss: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up fluss flink-lite
@@ -17,6 +17,8 @@ The coordinator is also published on `127.0.0.1:9123` and the tablet server on `
 
 The servers register in ZooKeeper once they are up. List the tablet servers and read the active coordinator:
 
+docs/snippets/fluss/commands.sh:registrations
+
 ```bash
 docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids
 docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active
@@ -26,9 +28,13 @@ The first prints `[0]`, the id of the one tablet server. The second names `fluss
 
 ## Write and read a table with Flink SQL
 
+docs/snippets/fluss/commands.sh:sql-client
+
 ```bash
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
+
+docs/snippets/fluss/steps.sql:table
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -49,4 +55,4 @@ The Flink UI lists the two jobs:
 
 ## From another container
 
-Inside the `odctl` network, set a Fluss client's bootstrap servers to `fluss-coordinator:9123`.
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), set a Fluss client's bootstrap servers to `fluss-coordinator:9123`.

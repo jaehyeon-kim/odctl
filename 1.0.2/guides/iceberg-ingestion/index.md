@@ -1,6 +1,6 @@
 # Ingest into Iceberg
 
-Kafka Connect, Flink and Spark all write Iceberg tables through the same REST catalog, `http://catalog:8181`, with the files on SeaweedFS under `s3://warehouse`. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+Kafka Connect, Flink and Spark all write Iceberg tables through the same REST catalog, `http://catalog:8181`, with the files on SeaweedFS under `s3://warehouse`. The end-to-end tests run the commands below on every release.
 
 ## Kafka Connect sink
 
@@ -12,6 +12,8 @@ odctl up kafka-lite catalog
 
 Create a namespace and a table through the catalog's REST API:
 
+docs/snippets/iceberg-ingestion/commands.sh:create-table
+
 ```bash
 api=http://127.0.0.1:8181/v1/namespaces
 curl -X POST -H 'Content-Type: application/json' -d '{"namespace":["demo"]}' "$api"
@@ -22,6 +24,8 @@ curl -X POST -H 'Content-Type: application/json' \
 
 Create the topic and the sink's control topic, then write some JSON records:
 
+docs/snippets/iceberg-ingestion/commands.sh:topics-produce
+
 ```bash
 for topic in demo-iceberg control-iceberg; do
   docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
@@ -31,10 +35,12 @@ for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -
   /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic demo-iceberg
 ```
 
-Register the sink:
+Save the sink's configuration as `demo-iceberg.json`:
 
-```bash
-curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:8083/connectors -d '{
+docs/snippets/kafka-connect/demo-iceberg.json
+
+```json
+{
   "name": "demo-iceberg",
   "config": {
     "connector.class": "org.apache.iceberg.connect.IcebergSinkConnector",
@@ -57,7 +63,17 @@ curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:8083/connector
     "iceberg.catalog.s3.path-style-access": "true",
     "iceberg.catalog.s3.access-key-id": "user",
     "iceberg.catalog.s3.secret-access-key": "password"
-  }}'
+  }
+}
+```
+
+Register it with Kafka Connect:
+
+docs/snippets/kafka-connect/commands.sh:register
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  http://127.0.0.1:8083/connectors -d @demo-iceberg.json
 ```
 
 The first commit can take a minute or more, because the sink waits for its control consumer to join a group. After that, `curl $api/demo/tables/kc` shows a snapshot whose summary has `"total-records": "5"`.
@@ -66,10 +82,14 @@ The table's data and metadata files are in SeaweedFS, whose browser at `http://1
 
 ## Flink SQL
 
+docs/snippets/iceberg-ingestion/commands.sh:flink-client
+
 ```bash
 odctl up flink-lite
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
+
+docs/snippets/iceberg-ingestion/steps.sql:flink
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -84,15 +104,6 @@ SELECT COUNT(*) FROM ice.demo_flink.t;
 
 ## Spark SQL
 
-Spark's default catalog is `iceberg`, already pointed at the REST catalog.
-
-```bash
-odctl up spark-lite
-docker exec spark-master /opt/spark/bin/spark-sql -e "
-  CREATE NAMESPACE IF NOT EXISTS iceberg.demo;
-  CREATE OR REPLACE TABLE iceberg.demo.t (id BIGINT) USING iceberg;
-  INSERT INTO iceberg.demo.t VALUES (1),(2),(3);
-  SELECT count(*) FROM iceberg.demo.t;"
-```
+Spark's default catalog is `iceberg`, already pointed at the REST catalog through `spark/spark-defaults.conf` in the workspace, so `spark-sql` needs no `CREATE CATALOG`. [Spark](https://jaehyeon.me/odctl/latest/guides/spark/#run-sql-against-iceberg) creates and queries a table.
 
 Every engine sees the same tables, so a table written by one can be read by the others, and by Trino through its `iceberg` catalog.
