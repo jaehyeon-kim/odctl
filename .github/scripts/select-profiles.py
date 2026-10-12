@@ -66,6 +66,31 @@ COMPOSE_PREFIX = "src/odctl/resources/compose-"
 
 REGISTRY = Path("src/odctl/resources/registry.yml")
 
+# smoke.sh runs the guide commands in docs/snippets/<guide>/, so a change there
+# needs the groups whose assertions run that guide. A folder missing from this
+# map runs everything, and a test fails until it is added.
+SNIPPET_PREFIX = "docs/snippets/"
+SNIPPET_GROUPS = {
+    "kafka": ["kafka-lite kafka-full"],
+    "kafka-connect": ["kafka-lite kafka-full"],
+    "iceberg-ingestion": ["kafka-lite kafka-full", "flink-lite flink-full"],
+    "flink-sql": ["flink-lite flink-full"],
+    "fluss": ["fluss"],
+    "spark": ["spark-lite spark-full"],
+    "clickhouse": ["ch-lite ch-full"],
+    "trino-metabase": ["trino", "metabase"],
+    "hybrid-search": ["postgres"],
+    "valkey": ["valkey"],
+    "airflow-dags": ["airflow"],
+    "temporal-workers": ["temporal"],
+    "mlflow": ["mlflow"],
+    "feast-iceberg": ["feast"],
+    "evidently-reports": ["evidently"],
+    "lineage": ["lineage"],
+    "openmetadata": ["metadata"],
+    "telemetry": ["telemetry"],
+}
+
 
 def profile_to_file(registry_path: Path = REGISTRY) -> dict:
     """Map each profile to the compose file the registry says provides it."""
@@ -94,15 +119,21 @@ def select(changed: list, registry_path: Path = REGISTRY) -> list:
     if broad:
         return list(GROUPS)
 
+    snippet_groups = set()
+    for c in changed:
+        if c.startswith(SNIPPET_PREFIX):
+            guide = c[len(SNIPPET_PREFIX) :].split("/")[0]
+            if guide not in SNIPPET_GROUPS:
+                return list(GROUPS)
+            snippet_groups.update(SNIPPET_GROUPS[guide])
+
     mapping = profile_to_file(registry_path)
     touched_files = {Path(c).name for c in changed if is_compose(c)}
-    if not touched_files:
-        return []
 
     selected = []
     for group in GROUPS:
         files = {mapping.get(p) for p in group.split()}
-        if files & touched_files:
+        if files & touched_files or group in snippet_groups:
             selected.append(group)
     return selected
 

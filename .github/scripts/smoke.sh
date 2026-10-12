@@ -52,6 +52,26 @@ http_reachable() {
 
 ch() { docker exec "$1" clickhouse-client --password password -q "$2" 2>&1; }
 
+# Guide commands live in docs/snippets/<guide>/, one section per step, and each
+# guide page shows a copy of its sections, which tests/test_docs.py compares.
+# Running the same sections here proves the commands on the page work.
+SNIPPETS="$(cd "$(dirname "$0")/../.." && pwd)/docs/snippets"
+
+# Print one section of a snippet file: snippet kafka/commands.sh create-topic
+snippet() {
+  awk -v s="$2" 'index($0, "--8<-- [start:" s "]") {on = 1; next}
+    index($0, "--8<-- [end:" s "]") {on = 0} on' "$SNIPPETS/$1"
+}
+
+# Run a bash section from the current directory, where the reader's .odctl
+# workspace is, so an `odctl up` in a step reads the workspace's .env.
+run_snippet() {
+  local file="$1" section="$2" code
+  code=$(snippet "$file" "$section")
+  [ -n "$code" ] || fail "no section $section in docs/snippets/$file"
+  bash -o pipefail -c "$code"
+}
+
 # Metrics: nothing else here reads a metrics endpoint, so a change that breaks
 # one goes unseen. In 0.8.0 the JMX agent in KAFKA_OPTS broke every Kafka CLI
 # run, and only an unrelated topic check caught it. So each profile reads its
@@ -97,6 +117,20 @@ kafka_topic() {
   docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 "$@"
 }
 
+# kafka-lite runs the guide's commands. kafka-full keeps smoke_kafka below,
+# because its broker container is kafka-1, not the kafka the guide names.
+guide_kafka() {
+  retry 30 5 docker exec kafka /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server broker-1:19092 --list || fail "broker never became reachable"
+  run_snippet kafka/commands.sh create-topic >/dev/null 2>&1 || fail "could not create the topic"
+  # The consumer reads through a group on purpose. Assign mode bypasses the
+  # coordinator and would pass even when __consumer_offsets cannot be created.
+  local got
+  got=$(run_snippet kafka/commands.sh produce-consume 2>/dev/null | grep -c '"n"')
+  [ "$got" -eq 5 ] || fail "group-mode consume returned $got of 5 messages"
+  pass "produced and consumed 5 messages through a consumer group"
+}
+
 smoke_kafka() {
   local container="$1"
   retry 30 5 docker exec "$container" /opt/kafka/bin/kafka-topics.sh \
@@ -121,7 +155,7 @@ smoke_kafka() {
 connect_plugins() {
   retry 40 5 http_ok "http://127.0.0.1:8083/connector-plugins" || fail "Connect REST never answered"
   local plugins
-  plugins=$(curl -fsS "http://127.0.0.1:8083/connector-plugins" 2>/dev/null)
+  plugins=$(run_snippet kafka-connect/commands.sh plugins 2>/dev/null)
   for cls in org.apache.iceberg.connect.IcebergSinkConnector \
     io.debezium.connector.postgresql.PostgresConnector \
     com.clickhouse.kafka.connect.ClickHouseSinkConnector; do
@@ -135,50 +169,19 @@ connect_plugins() {
 smoke_iceberg_sink() {
   odctl up catalog >/dev/null 2>&1 || fail "could not start the catalog for the Iceberg sink"
   retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
-  local api="http://127.0.0.1:8181/v1/namespaces"
-  curl -fsS -X POST -H 'Content-Type: application/json' -d '{"namespace":["smoke"]}' "$api" >/dev/null 2>&1
-  curl -fsS -X DELETE "$api/smoke/tables/kc?purgeRequested=true" >/dev/null 2>&1 || true
-  curl -fsS -X POST -H 'Content-Type: application/json' \
-    -d '{"name":"kc","schema":{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","required":false,"type":"long"},{"id":2,"name":"name","required":false,"type":"string"}]}}' \
-    "$api/smoke/tables" >/dev/null 2>&1 || fail "could not create the sink's target table"
-
-  kafka_topic --create --if-not-exists --topic smoke-iceberg --partitions 1 --replication-factor 1 >/dev/null 2>&1
-  kafka_topic --create --if-not-exists --topic control-iceberg --partitions 1 --replication-factor 1 >/dev/null 2>&1
-  for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -i kafka \
-    /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic smoke-iceberg >/dev/null 2>&1 \
-    || fail "produce to smoke-iceberg failed"
-
-  curl -fsS -X DELETE "http://127.0.0.1:8083/connectors/smoke-iceberg" >/dev/null 2>&1 || true
-  curl -fsS -X POST -H 'Content-Type: application/json' "http://127.0.0.1:8083/connectors" -d '{
-    "name": "smoke-iceberg",
-    "config": {
-      "connector.class": "org.apache.iceberg.connect.IcebergSinkConnector",
-      "tasks.max": "1",
-      "topics": "smoke-iceberg",
-      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-      "value.converter.schemas.enable": "false",
-      "key.converter": "org.apache.kafka.connect.storage.StringConverter",
-      "iceberg.tables": "smoke.kc",
-      "iceberg.control.commit.interval-ms": "10000",
-      "iceberg.kafka.session.timeout.ms": "300000",
-      "iceberg.kafka.heartbeat.interval.ms": "3000",
-      "iceberg.kafka.auto.offset.reset": "earliest",
-      "consumer.override.auto.offset.reset": "earliest",
-      "iceberg.catalog.type": "rest",
-      "iceberg.catalog.uri": "http://catalog:8181",
-      "iceberg.catalog.io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
-      "iceberg.catalog.client.region": "us-east-1",
-      "iceberg.catalog.s3.endpoint": "http://seaweed:8333",
-      "iceberg.catalog.s3.path-style-access": "true",
-      "iceberg.catalog.s3.access-key-id": "user",
-      "iceberg.catalog.s3.secret-access-key": "password"
-    }}' >/dev/null 2>&1 || fail "Connect rejected the Iceberg sink configuration"
+  run_snippet iceberg-ingestion/commands.sh create-table >/dev/null 2>&1 \
+    || fail "could not create the sink's target table"
+  run_snippet iceberg-ingestion/commands.sh topics-produce >/dev/null 2>&1 \
+    || fail "could not create the topics or produce to demo-iceberg"
+  # From the snippet folder, where the guide's @demo-iceberg.json is.
+  (cd "$SNIPPETS/kafka-connect" && run_snippet kafka-connect/commands.sh register) >/dev/null 2>&1 \
+    || fail "Connect rejected the Iceberg sink configuration"
 
   # The first commit waits for the control consumer to join its group, which
   # takes a minute or more on a fresh worker.
-  local records=""
+  local api="http://127.0.0.1:8181/v1/namespaces" records=""
   for _ in $(seq 1 60); do
-    records=$(curl -fsS "$api/smoke/tables/kc" 2>/dev/null | python3 -c '
+    records=$(curl -fsS "$api/demo/tables/kc" 2>/dev/null | python3 -c '
 import json, sys
 m = json.load(sys.stdin)["metadata"]
 cur = m.get("current-snapshot-id")
@@ -188,13 +191,16 @@ print(snap[0]["summary"].get("total-records", "") if snap else "")' 2>/dev/null)
     sleep 5
   done
   if [ "$records" != "5" ]; then
-    curl -fsS "http://127.0.0.1:8083/connectors/smoke-iceberg/status" 2>/dev/null; echo
-    docker logs --tail 40 connect 2>&1
+    run_snippet kafka-connect/commands.sh logs 2>&1
     fail "the Iceberg sink committed ${records:-no} records, expected 5"
   fi
-  curl -fsS -X DELETE "http://127.0.0.1:8083/connectors/smoke-iceberg" >/dev/null 2>&1 || true
-  curl -fsS -X DELETE "$api/smoke/tables/kc?purgeRequested=true" >/dev/null 2>&1 || true
-  pass "the Iceberg sink committed 5 records to an Iceberg table"
+  run_snippet kafka-connect/commands.sh logs >/dev/null 2>&1 || fail "could not read the Connect log"
+  local status
+  status=$(run_snippet kafka-connect/commands.sh status-remove 2>/dev/null)
+  grep -q '"state":"RUNNING"' <<<"$status" || { echo "$status"; fail "the connector status was not RUNNING"; }
+  curl -fsS "http://127.0.0.1:8083/connectors/demo-iceberg" >/dev/null 2>&1 \
+    && fail "the connector is still registered after the delete"
+  pass "the Iceberg sink committed 5 records to an Iceberg table, and was checked and removed"
 }
 
 smoke_flink() {
@@ -212,23 +218,12 @@ SQL
     || fail "JVM module flags missing from the TaskManager command line"
   pass "Iceberg catalog registered and JVM module flags present"
 
-  # Registering the catalog loads the runtime jar but writes nothing. A batch
-  # insert and read proves the runtime, the Hadoop classes and S3FileIO work
-  # together on this Flink minor.
-  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
-SET 'execution.runtime-mode' = 'batch';
-SET 'table.dml-sync' = 'true';
-SET 'sql-client.execution.result-mode' = 'tableau';
-CREATE CATALOG ice WITH ('type'='iceberg','catalog-type'='rest','uri'='http://catalog:8181','warehouse'='s3://warehouse','s3.endpoint'='http://seaweed:8333','s3.path-style-access'='true','s3.access-key-id'='user','s3.secret-access-key'='password');
-CREATE DATABASE IF NOT EXISTS ice.smoke_flink;
-DROP TABLE IF EXISTS ice.smoke_flink.t;
-CREATE TABLE ice.smoke_flink.t (id BIGINT, name STRING);
-INSERT INTO ice.smoke_flink.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
-SELECT 'rows=' || CAST(COUNT(*) AS STRING) AS c FROM ice.smoke_flink.t;
-DROP TABLE ice.smoke_flink.t;
-SQL
-)
-  grep -q "rows=3" <<<"$out" || { echo "$out" | tail -30; fail "Flink could not write and read an Iceberg table"; }
+  # Registering the catalog loads the runtime jar but writes nothing. The Ingest
+  # into Iceberg guide's batch insert and read proves the runtime, the Hadoop
+  # classes and S3FileIO work together on this Flink minor.
+  out=$(snippet iceberg-ingestion/steps.sql flink \
+    | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  grep -qE "^\| +3 \|$" <<<"$out" || { echo "$out" | tail -30; fail "Flink could not write and read an Iceberg table"; }
   pass "Flink wrote 3 rows to an Iceberg table and read them back"
 }
 
@@ -239,56 +234,41 @@ SQL
 smoke_flink_kafka_jdbc() {
   odctl up kafka-lite >/dev/null 2>&1 || fail "could not start kafka-lite for the Flink Kafka and JDBC check"
   retry 30 5 kafka_topic --list >/dev/null 2>&1 || fail "broker never became reachable"
-  kafka_topic --create --if-not-exists --topic smoke-flink-orders --partitions 1 --replication-factor 1 >/dev/null 2>&1
   # Right after it starts, Karapace answers its health check but times out on a
   # schema write until its producer reaches the broker. Wait for a write.
   retry 24 5 curl -fsS --max-time 10 -X POST -H 'Content-Type: application/vnd.schemaregistry.v1+json' \
     -d '{"schema": "{\"type\":\"string\"}"}' http://127.0.0.1:8081/subjects/smoke-ready/versions \
     >/dev/null 2>&1 || fail "Karapace never accepted a schema"
-  docker exec postgres psql -U user -d odctl -q -v ON_ERROR_STOP=1 -c "
-    DROP TABLE IF EXISTS smoke_flink_stats;
-    CREATE TABLE smoke_flink_stats (supplier TEXT PRIMARY KEY, orders BIGINT, total DOUBLE PRECISION);
-  " >/dev/null 2>&1 || fail "could not create the JDBC target table"
+  run_snippet flink-sql/commands.sh create-topic-table >/dev/null 2>&1 \
+    || fail "could not create the topic or the JDBC target table"
   local out
-  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
-SET 'execution.runtime-mode' = 'batch';
-SET 'table.dml-sync' = 'true';
-CREATE TABLE orders (supplier STRING, price DOUBLE) WITH ('connector'='kafka','topic'='smoke-flink-orders','properties.bootstrap.servers'='broker-1:19092','scan.startup.mode'='earliest-offset','scan.bounded.mode'='latest-offset','format'='avro-confluent','avro-confluent.url'='http://karapace:8081');
-INSERT INTO orders VALUES ('a', 10.0), ('a', 5.0), ('b', 7.5);
-CREATE TABLE stats (supplier STRING, orders BIGINT, total DOUBLE, PRIMARY KEY (supplier) NOT ENFORCED) WITH ('connector'='jdbc','url'='jdbc:postgresql://postgres:5432/odctl','table-name'='smoke_flink_stats','username'='user','password'='password');
-INSERT INTO stats SELECT supplier, COUNT(*), SUM(price) FROM orders GROUP BY supplier;
-SQL
-)
+  out=$(snippet flink-sql/steps.sql kafka-to-postgres \
+    | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  run_snippet flink-sql/commands.sh check >/dev/null 2>&1 || fail "the guide's check query failed"
   local rows
   rows=$(docker exec postgres psql -U user -d odctl -tAc \
-    "SELECT string_agg(supplier || '=' || orders || '/' || total, ',' ORDER BY supplier) FROM smoke_flink_stats" 2>/dev/null)
-  docker exec postgres psql -U user -d odctl -q -c "DROP TABLE IF EXISTS smoke_flink_stats" >/dev/null 2>&1
+    "SELECT string_agg(supplier || '=' || orders || '/' || total, ',' ORDER BY supplier) FROM supplier_stats" 2>/dev/null)
   [ "$rows" = "a=2/15,b=1/7.5" ] || { echo "$out" | grep -iE "error|exception" | tail -10; fail "Kafka Avro to JDBC through Flink SQL gave '$rows', expected a=2/15,b=1/7.5"; }
   pass "Flink read Avro from Kafka through the schema registry and wrote an aggregate to PostgreSQL over JDBC"
 }
 
 smoke_spark() {
   local out
-  out=$(docker exec spark-master /opt/spark/bin/spark-sql -e "
-    CREATE NAMESPACE IF NOT EXISTS iceberg.smoke;
-    CREATE OR REPLACE TABLE iceberg.smoke.t (id BIGINT) USING iceberg;
-    INSERT INTO iceberg.smoke.t VALUES (1),(2),(3);
-    SELECT count(*) FROM iceberg.smoke.t;" 2>&1)
+  out=$(run_snippet spark/commands.sh run-sql 2>&1)
   grep -qE "^3$" <<<"$out" || { echo "$out" | tail -20; fail "spark-sql could not round-trip an Iceberg table"; }
-  docker exec spark-master sh -c 'ls /tmp/spark-events | head -1' >/dev/null 2>&1 \
-    || fail "no event log written, so the event log directory is not writable"
+  out=$(run_snippet spark/commands.sh event-logs 2>/dev/null)
+  [ -n "$out" ] || fail "no event log written, so the event log directory is not writable"
   pass "spark-sql wrote and read an Iceberg table, event logging works"
 }
 
 smoke_ch_lite() {
   retry 30 5 docker exec ch-11 clickhouse-client --password password -q "SELECT 1" \
     || fail "ch-11 never answered"
+  local out
+  out=$(run_snippet clickhouse/commands.sh merge-tree 2>&1)
   # Databases come from /docker-entrypoint-initdb.d on every fresh server.
-  ch ch-11 "SHOW DATABASES" | grep -q feature_store || fail "feature_store database missing"
-  ch ch-11 "DROP TABLE IF EXISTS default.smoke" >/dev/null
-  ch ch-11 "CREATE TABLE default.smoke (id UInt32) ENGINE=MergeTree ORDER BY id" >/dev/null
-  ch ch-11 "INSERT INTO default.smoke SELECT number FROM numbers(10)" >/dev/null
-  [ "$(ch ch-11 "SELECT count() FROM default.smoke")" = "10" ] || fail "MergeTree round trip failed"
+  grep -qx feature_store <<<"$out" || fail "feature_store database missing"
+  [ "$(tail -1 <<<"$out")" = "10" ] || { echo "$out"; fail "MergeTree round trip failed"; }
   pass "databases initialised and MergeTree round trip works"
   assert_metrics http://ch-11:9363/metrics http://ch-12:9363/metrics
 }
@@ -298,10 +278,10 @@ smoke_ch_full() {
     || fail "ch-21 never answered"
   # Exercises keeper and the dual-stack listeners: replicated DDL fails with
   # "Connection refused" when keeper listens on IPv4 only.
-  ch ch-11 "DROP TABLE IF EXISTS default.repl ON CLUSTER '{cluster}' SYNC" >/dev/null 2>&1
-  ch ch-11 "CREATE TABLE default.repl ON CLUSTER '{cluster}' (id UInt32) ENGINE=ReplicatedMergeTree ORDER BY id" >/dev/null \
-    || fail "replicated DDL failed, check keeper reachability"
-  ch ch-11 "INSERT INTO default.repl SELECT number FROM numbers(50)" >/dev/null
+  local out
+  out=$(run_snippet clickhouse/commands.sh replicated 2>&1) \
+    || { echo "$out" | tail -20; fail "replicated DDL failed, check keeper reachability"; }
+  # The guide reads ch-12 at once; replication can take a moment, so wait here.
   retry 12 5 bash -c '[ "$(docker exec ch-12 clickhouse-client --password password -q "SELECT count() FROM default.repl" 2>/dev/null)" = "50" ]' \
     || fail "rows never replicated to the sibling replica"
   [ "$(ch ch-21 "SELECT count() FROM default.repl")" = "0" ] || fail "shard 2 unexpectedly holds shard 1 data"
@@ -315,7 +295,7 @@ smoke_ch_full() {
 # is absent, which is why this can be required in a trino-only profile group.
 catalogs_loaded() {
   local cat
-  cat=$(docker exec trino trino --execute "SHOW CATALOGS" 2>/dev/null | tr -d '"')
+  cat=$(run_snippet trino-metabase/commands.sh catalogs 2>/dev/null | tr -d '"')
   for expected in iceberg kafka clickhouse postgres; do
     grep -q "^${expected}$" <<<"$cat" || return 1
   done
@@ -324,10 +304,10 @@ catalogs_loaded() {
 smoke_trino() {
   retry 40 5 http_ok "http://127.0.0.1:8080/v1/info" || fail "Trino never answered"
   retry 24 5 catalogs_loaded || {
-    docker exec trino trino --execute "SHOW CATALOGS" 2>&1 | tail -10
+    run_snippet trino-metabase/commands.sh catalogs 2>&1 | tail -10
     fail "not every catalog loaded within two minutes"
   }
-  docker exec trino trino --execute "SELECT 1" >/dev/null 2>&1 || fail "query execution failed"
+  [ "$(run_snippet trino-metabase/commands.sh query 2>/dev/null | tr -d '"')" = "1" ] || fail "query execution failed"
   pass "all catalogs loaded and a query ran"
   # As Prometheus logs in: user prometheus with no password, which rules.json
   # allows to read system information.
@@ -344,36 +324,18 @@ smoke_infra() {
       pass "accepting connections and running queries"
       # odctl's image adds pgvector, pg_textsearch and PostGIS, and
       # 01-init-databases.sh creates them in a `vector` database. SELECT 1 on
-      # `odctl` proves none of that, so retrieval work would fail at first use
-      # rather than here.
-      docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -q -c "
-        CREATE TABLE IF NOT EXISTS odctl_smoke (id bigserial primary key, embedding vector(3));
-        TRUNCATE odctl_smoke RESTART IDENTITY;
-        INSERT INTO odctl_smoke (embedding) VALUES ('[1,0,0]'), ('[0,1,0]'), ('[0.9,0.1,0]');
-        CREATE INDEX IF NOT EXISTS odctl_smoke_hnsw ON odctl_smoke USING hnsw (embedding vector_l2_ops);
-      " >/dev/null 2>&1 || fail "pgvector table, insert or HNSW index failed in the vector database"
+      # `odctl` proves none of that, so run the hybrid search guide's SQL there.
       local nearest
-      nearest=$(docker exec postgres psql -U user -d vector -tAc \
-        "SELECT id FROM odctl_smoke ORDER BY embedding <-> '[1,0,0]' LIMIT 1" 2>/dev/null | tr -d '[:space:]')
-      docker exec postgres psql -U user -d vector -q -c "DROP TABLE IF EXISTS odctl_smoke" >/dev/null 2>&1
+      nearest=$(snippet hybrid-search/steps.sql vector \
+        | docker exec -i postgres psql -U user -d vector -v ON_ERROR_STOP=1 -tAq 2>/dev/null | tr -d '[:space:]')
       [ "$nearest" = "1" ] || fail "pgvector similarity returned row '$nearest', expected 1"
       pass "pgvector: vector column, HNSW index and similarity ordering all work"
       # pg_textsearch only works when preloaded, so a BM25 index proves the
-      # shared_preload_libraries setting as well as the extension.
+      # shared_preload_libraries setting as well as the extension. Its index
+      # build reports NOTICE lines on stderr, which are left out.
       local bm25
-      # pg_textsearch reports its index build as NOTICE lines, so keep only warnings.
-      bm25=$(docker exec postgres psql -U user -d vector -v ON_ERROR_STOP=1 -tAq -c "
-        SET client_min_messages = warning;
-        DROP TABLE IF EXISTS odctl_smoke_docs;
-        CREATE TABLE odctl_smoke_docs (id int primary key, content text);
-        INSERT INTO odctl_smoke_docs VALUES
-          (1, 'PostgreSQL is a powerful database system'),
-          (2, 'BM25 is an effective ranking function'),
-          (3, 'Full text search with custom scoring');
-        CREATE INDEX odctl_smoke_docs_bm25 ON odctl_smoke_docs USING bm25(content) WITH (text_config='english');
-        SELECT id FROM odctl_smoke_docs ORDER BY content <@> 'ranking function' LIMIT 1;
-        DROP TABLE odctl_smoke_docs;
-      " 2>&1 | tr -d '[:space:]')
+      bm25=$(snippet hybrid-search/steps.sql bm25 \
+        | docker exec -i postgres psql -U user -d vector -v ON_ERROR_STOP=1 -tAq 2>/dev/null | tr -d '[:space:]')
       [ "$bm25" = "2" ] || fail "pg_textsearch BM25 query returned '$bm25', expected 2"
       pass "pg_textsearch: BM25 index and ranking work"
       local metres
@@ -425,18 +387,13 @@ smoke_infra() {
       pass "table created through the catalog and its metadata read back"
       assert_metrics http://catalog:9404/metrics ;;
     valkey)
-      local vk="redis://user:password@localhost:6379"
-      retry 30 5 docker exec valkey valkey-cli -u "$vk" ping \
+      retry 30 5 docker exec valkey valkey-cli --no-auth-warning -u "redis://user:password@localhost:6379" ping \
         || fail "valkey never answered PING"
-      # product-recommender writes LinUCB models as a multi-key write and reads
-      # them back with a batch MGET, so assert that round trip rather than a ping.
-      docker exec valkey valkey-cli -u "$vk" \
-        mset 'linucb:smoke-1' '{"a":1}' 'linucb:smoke-2' '{"a":2}' >/dev/null 2>&1 \
-        || fail "multi-key MSET failed"
+      # product-recommender writes models as a multi-key write and reads them
+      # back with a batch MGET, as the guide does, so assert that round trip.
       local got
-      got=$(docker exec valkey valkey-cli -u "$vk" mget 'linucb:smoke-1' 'linucb:smoke-2' 2>/dev/null | grep -c '"a"')
+      got=$(run_snippet valkey/commands.sh round-trip 2>/dev/null | grep -c '"a"')
       [ "$got" -eq 2 ] || fail "batch MGET returned $got of 2 values, expected 2"
-      docker exec valkey valkey-cli -u "$vk" del 'linucb:smoke-1' 'linucb:smoke-2' >/dev/null 2>&1
       pass "authenticated, multi-key write and batch MGET round-tripped"
       # Read by the telemetry collector's redis receiver.
       assert_pushed_metrics 'redis_.+' Valkey ;;
@@ -491,6 +448,8 @@ for db in (d.get("data") if isinstance(d, dict) else d) or []:
 smoke_metabase() {
   local sid
   retry 60 5 http_ok "http://127.0.0.1:3000/api/health" || fail "no HTTP response from :3000"
+  run_snippet trino-metabase/commands.sh metabase-health 2>/dev/null | grep -q '"status":"ok"' \
+    || fail "Metabase health did not report ok"
   assert_metrics http://metabase:9191/metrics
   sid=$(retry_out 12 5 mb_session) || fail "could not obtain a Metabase session"
 
@@ -525,72 +484,55 @@ smoke_metabase() {
 # odctl network, so a run that logs params but no artifact is the failure this
 # asserts against.
 smoke_mlflow() {
-  local run_id="$$"
   retry 60 5 http_ok "http://127.0.0.1:5004/health" || fail "no HTTP response from :5004"
-  docker exec -i -e SMOKE_RUN_ID="$run_id" -e GIT_PYTHON_REFRESH=quiet -e MLFLOW_LOGGING_LEVEL=ERROR mlflow python - <<'PYEOF' || fail "could not log a run with a proxied artifact"
-import mlflow, os, pathlib, sys
-mlflow.set_tracking_uri("http://localhost:5000")
-mlflow.set_experiment(f"odctl-smoke-{os.environ['SMOKE_RUN_ID']}")
-p = pathlib.Path("/tmp/smoke.txt")
-p.write_text("odctl smoke")
-with mlflow.start_run() as run:
-    mlflow.log_param("k", "v")
-    mlflow.log_metric("m", 1.0)
-    mlflow.log_artifact(str(p))
-    uri = mlflow.get_run(run.info.run_id).info.artifact_uri
-# Proxied artifacts get an mlflow-artifacts:/ URI. An s3:// URI means the
-# server handed the client a location only reachable inside the network.
-if not uri.startswith("mlflow-artifacts:"):
-    sys.exit(f"artifact_uri is {uri}, expected mlflow-artifacts:/")
-names = [f.path for f in mlflow.MlflowClient().list_artifacts(run.info.run_id)]
-if "smoke.txt" not in names:
-    sys.exit(f"artifact not listed back: {names}")
-PYEOF
+  local out
+  out=$(mlflow_snippet log-run 2>/dev/null) || fail "could not log a run with a proxied artifact"
+  # Proxied artifacts get an mlflow-artifacts:/ URI. An s3:// URI means the
+  # server handed the client a location only reachable inside the network.
+  grep -q "^mlflow-artifacts:" <<<"$out" || fail "artifact URI is not mlflow-artifacts:/: $out"
+  grep -q "notes.txt" <<<"$out" || fail "artifact not listed back: $out"
   pass "logged a run with a proxied artifact and read it back"
   assert_metrics http://mlflow:5000/metrics
-  smoke_model_server "$run_id"
+  smoke_model_server
+}
+
+# The guide runs its Python on the host, with the client versions the server
+# image pins, so read them from the Dockerfile the image is built from.
+mlflow_snippet() {
+  local dockerfile="$SNIPPETS/../../src/odctl/resources/docker/mlflow/Dockerfile" mlflow xgboost
+  mlflow=$(grep -oE 'mlflow/mlflow:v[0-9.]+' "$dockerfile" | head -1 | cut -dv -f2)
+  xgboost=$(grep -oE "xgboost~=[0-9.]+" "$dockerfile" | head -1 | cut -d= -f2)
+  (cd "$(mktemp -d)" && snippet mlflow/steps.py "$1" \
+    | GIT_PYTHON_REFRESH=quiet uv run --no-project --quiet --python 3.12 \
+      --with "mlflow==$mlflow" --with "xgboost~=$xgboost" python -)
 }
 
 # mlflow-serve starts with the mlflow profile and waits idle while MODEL_URI is
-# empty. A model has to exist before it can serve one, so this registers a
-# model, sets MODEL_URI and runs `odctl up mlflow` again to recreate it.
+# empty. A model has to exist before it can serve one, so this registers the
+# guide's model, sets MODEL_URI as the guide does and runs its serve step.
 smoke_model_server() {
-  local run_id="$1" name="odctl-smoke-$1"
   [ "$(docker inspect -f '{{.State.Health.Status}}' mlflow-serve 2>/dev/null)" = healthy ] \
     || fail "mlflow-serve is not waiting healthy with MODEL_URI empty"
   pass "mlflow-serve waiting idle with MODEL_URI empty"
-  docker exec -i -e SMOKE_MODEL_NAME="$name" -e GIT_PYTHON_REFRESH=quiet -e MLFLOW_LOGGING_LEVEL=ERROR \
-    mlflow python - <<'PYEOF' || fail "could not register a model to serve"
-import mlflow, numpy as np, os, xgboost as xgb
-from mlflow import MlflowClient
-mlflow.set_tracking_uri("http://localhost:5000")
-name = os.environ["SMOKE_MODEL_NAME"]
-mlflow.set_experiment(name)
-X, y = np.array([[0.0], [1.0], [2.0], [3.0]]), np.array([0, 0, 1, 1])
-with mlflow.start_run():
-    model = xgb.XGBClassifier(n_estimators=5, max_depth=2).fit(X, y)
-    mlflow.xgboost.log_model(model, name="model", registered_model_name=name)
-c = MlflowClient()
-v = max(int(mv.version) for mv in c.search_model_versions(f"name='{name}'"))
-c.set_registered_model_alias(name, "champion", v)
-PYEOF
+  mlflow_snippet register-model >/dev/null 2>&1 || fail "could not register a model to serve"
 
   [ -f .odctl/.env ] || fail "no .odctl/.env to set MODEL_URI in"
   # A fresh line rather than an edit in place, so this works whether or not the
   # generated template still carries a MODEL_URI key.
   sed -i'' -e '/^MODEL_URI=/d' .odctl/.env
-  echo "MODEL_URI=\"models:/$name@champion\"" >> .odctl/.env
-
-  odctl up mlflow >/dev/null 2>&1 || fail "mlflow-serve did not start for models:/$name@champion"
-  retry 30 5 http_ok "http://127.0.0.1:5003/ping" || fail "no HTTP response from :5003"
+  cat "$SNIPPETS/mlflow/model-uri.env" >> .odctl/.env
 
   # Assert on the response body. The endpoint answers 200 with an error payload
-  # when scoring fails, so a status code alone proves nothing was served.
+  # when scoring fails, so a status code alone proves nothing was served. The
+  # model can still be loading when `odctl up` returns, so wait and run again.
   local got
-  got=$(curl -fsS --max-time 20 -X POST http://127.0.0.1:5003/invocations \
-    -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}' 2>/dev/null)
+  got=$(run_snippet mlflow/commands.sh serve 2>/dev/null)
+  if [[ "$got" != *'"predictions"'* ]]; then
+    retry 30 5 http_ok "http://127.0.0.1:5003/ping" || fail "no HTTP response from :5003"
+    got=$(run_snippet mlflow/commands.sh serve 2>/dev/null)
+  fi
   case "$got" in
-    *'"predictions"'*) pass "served models:/$name@champion and scored: $got" ;;
+    *'"predictions"'*) pass "served models:/demo-model@champion and scored: $(tail -1 <<<"$got")" ;;
     *) fail "/invocations returned no predictions: ${got:-<empty>}" ;;
   esac
 }
@@ -624,51 +566,29 @@ if bad:
     | grep -q access_token || fail "login as user/password was refused"
   pass "login as user/password works"
 
-  local dag_id="odctl_smoke_$$"
   # Written to s3://airflow only. The S3 DAG bundle reads it from there, so this
   # tests the real path rather than a file placed in the container.
-  docker exec -i airflow python - "$dag_id" >/dev/null 2>&1 <<'PYEOF' \
+  run_snippet airflow-dags/commands.sh upload >/dev/null 2>&1 \
     || fail "could not upload the DAG to s3://airflow/dags"
-import sys, boto3
-dag_id = sys.argv[1]
-body = f"""
-from airflow.sdk import DAG
-from airflow.providers.standard.operators.bash import BashOperator
-import pendulum
-
-with DAG(
-    dag_id="{dag_id}",
-    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
-    schedule=None,
-    catchup=False,
-):
-    BashOperator(task_id="say_hello", bash_command="echo odctl-smoke-ran")
-"""
-boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(
-    Bucket="airflow", Key=f"dags/{dag_id}.py", Body=body.encode())
-PYEOF
 
   # The bundle refreshes every 30 seconds, then the dag-processor parses it.
   retry 30 10 bash -c \
-    "docker exec airflow airflow dags list 2>/dev/null | grep -q $dag_id" \
+    "docker exec airflow airflow dags list 2>/dev/null | grep -q hello" \
     || fail "the S3 DAG bundle never delivered the DAG, or it was never parsed"
   pass "the S3 DAG bundle delivered the DAG and it was parsed"
 
-  docker exec airflow airflow dags unpause "$dag_id" >/dev/null 2>&1
-  docker exec airflow airflow dags trigger "$dag_id" >/dev/null 2>&1 \
-    || fail "could not trigger the DAG"
+  run_snippet airflow-dags/commands.sh run >/dev/null 2>&1 \
+    || fail "the guide's list, unpause, trigger and list-runs commands failed"
 
   local state=""
   for _ in $(seq 1 30); do
-    state=$(docker exec airflow airflow dags list-runs "$dag_id" -o plain 2>/dev/null \
-      | grep -E "^$dag_id" | head -1 | tr -s ' ' | cut -d' ' -f3)
+    state=$(docker exec airflow airflow dags list-runs hello -o plain 2>/dev/null \
+      | grep -E "^hello" | head -1 | tr -s ' ' | cut -d' ' -f3)
     case "$state" in success|failed) break ;; esac
     sleep 10
   done
   [ "$state" = "success" ] || fail "DAG run finished in state ${state:-none}, not success"
   pass "DAG run reached success, so a task really executed"
-
-  docker exec airflow python -c "import boto3; boto3.client('s3', endpoint_url='http://seaweed:8333').delete_object(Bucket='airflow', Key='dags/$dag_id.py')" >/dev/null 2>&1 || true
 
   # Airflow pushes OTLP to the telemetry collector rather than being scraped.
   assert_pushed_metrics 'airflow_.+' Airflow
@@ -769,15 +689,12 @@ sys.exit(0 if r and r[0][\"value\"][1] == \"42\" else 1)
 "' || fail "the OTLP metric never became queryable"
   pass "OTLP metrics receiver accepted a metric and it queried back"
 
-  # The same encoding through the collector's OTLP HTTP receiver, which forwards
-  # to Prometheus. This is the path an OpenTelemetry SDK uses by default.
-  sed 's/odctl_smoke_total/odctl_smoke_collector_total/' /tmp/odctl-otlp.json > /tmp/odctl-otlp-collector.json
-  curl -fsS --max-time 10 -X POST -H "Content-Type: application/json" \
-    --data-binary @/tmp/odctl-otlp-collector.json \
-    "http://127.0.0.1:4318/v1/metrics" >/dev/null \
+  # The guide's metric, through the collector's OTLP HTTP receiver, which
+  # forwards to Prometheus. This is the path an OpenTelemetry SDK uses.
+  run_snippet telemetry/commands.sh send-metric >/dev/null 2>&1 \
     || fail "the OTLP collector rejected a metric on :4318"
   retry 12 5 bash -c '
-    curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/query?query=odctl_smoke_collector_total" 2>/dev/null \
+    curl -fsS --max-time 10 "http://127.0.0.1:19090/api/v1/query?query=demo_total" 2>/dev/null \
       | python3 -c "
 import json, sys
 r = json.load(sys.stdin)[\"data\"][\"result\"]
@@ -816,32 +733,20 @@ sys.exit(0 if sum(d.get(\"folderTitle\") == \"odctl\" for d in json.load(sys.std
 # OpenLineage event and read the dataset back out.
 smoke_lineage() {
   retry 60 5 http_ok "http://127.0.0.1:5002/api/v1/namespaces" || fail "no HTTP response from :5002"
-
-  local ns="odctl-smoke" run_id="a1b2c3d4-0000-4000-8000-00000000$$"
-  local now
-  now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
-
-  for event in START COMPLETE; do
-    curl -fsS -X POST "http://127.0.0.1:5002/api/v1/lineage" \
-      -H 'Content-Type: application/json' \
-      -d "{\"eventType\":\"$event\",\"eventTime\":\"$now\",
-           \"producer\":\"odctl-smoke\",
-           \"run\":{\"runId\":\"$run_id\"},
-           \"job\":{\"namespace\":\"$ns\",\"name\":\"smoke-job\"},
-           \"outputs\":[{\"namespace\":\"$ns\",\"name\":\"smoke-dataset\"}]}" \
-      >/dev/null 2>&1 || fail "Marquez rejected the $event OpenLineage event"
-  done
+  run_snippet lineage/commands.sh send >/dev/null 2>&1 || fail "could not post the OpenLineage events"
   pass "posted START and COMPLETE OpenLineage events"
 
-  # Marquez writes the job, run and dataset from those events. Reading the
-  # dataset back proves it persisted them rather than accepting and dropping.
-  retry 12 5 bash -c \
-    "curl -fsS 'http://127.0.0.1:5002/api/v1/namespaces/$ns/datasets/smoke-dataset' | grep -q smoke-dataset" \
-    || fail "the dataset never appeared, so Marquez did not persist the lineage"
-  curl -fsS "http://127.0.0.1:5002/api/v1/namespaces/$ns/jobs/smoke-job" 2>/dev/null \
-    | grep -q smoke-job || fail "the job did not read back"
+  # Marquez writes the job, run and dataset from those events. Reading them
+  # back proves it persisted them rather than accepting and dropping.
+  retry 12 5 lineage_read_back || fail "the job or the dataset never read back from Marquez"
   pass "dataset and job both read back from Marquez"
   assert_metrics http://marquez-api:5000/metrics
+}
+
+lineage_read_back() {
+  local out
+  out=$(run_snippet lineage/commands.sh read 2>/dev/null)
+  grep -q '"name":"demo-job"' <<<"$out" && grep -q '"name":"demo-dataset"' <<<"$out"
 }
 
 # Fluss: both containers ran while the cluster did nothing at all. The
@@ -876,28 +781,19 @@ smoke_fluss() {
     "docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active 2>/dev/null | grep -q fluss-coordinator:9123" \
     || fail "no active coordinator registered in ZooKeeper"
   pass "coordinator registered itself as the active leader"
+  local out
+  out=$(run_snippet fluss/commands.sh registrations 2>/dev/null)
+  grep -q '\[0' <<<"$out" && grep -q fluss-coordinator:9123 <<<"$out" \
+    || { echo "$out"; fail "the guide's ZooKeeper commands did not show the registrations"; }
   assert_metrics http://fluss-coordinator:9249/metrics http://fluss-tablet-1:9249/metrics
 
   # The Flink client jar comes from the deps image and must match the server
-  # version, so write and read a table through it.
+  # version, so write and read a table through it, with the guide's SQL.
   odctl up flink-lite >/dev/null 2>&1 || fail "could not start flink-lite for the Fluss client check"
   retry 40 5 http_ok "http://127.0.0.1:8082/config" || fail "JobManager REST never answered"
-  local out
-  out=$(docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1 <<'SQL'
-SET 'execution.runtime-mode' = 'batch';
-SET 'table.dml-sync' = 'true';
-SET 'sql-client.execution.result-mode' = 'tableau';
-CREATE CATALOG fluss_catalog WITH ('type' = 'fluss', 'bootstrap.servers' = 'fluss-coordinator:9123');
-CREATE DATABASE IF NOT EXISTS fluss_catalog.smoke;
-DROP TABLE IF EXISTS fluss_catalog.smoke.t;
-CREATE TABLE fluss_catalog.smoke.t (id BIGINT, name STRING, PRIMARY KEY (id) NOT ENFORCED);
-INSERT INTO fluss_catalog.smoke.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
-SELECT 'id=' || CAST(id AS STRING) AS c FROM fluss_catalog.smoke.t LIMIT 10;
-DROP TABLE fluss_catalog.smoke.t;
-SQL
-)
+  out=$(snippet fluss/steps.sql table | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
   local got
-  got=$(grep -c "id=[123]" <<<"$out")
+  got=$(grep -cE '^\| +[123] \| +[abc] +\|$' <<<"$out")
   [ "$got" -eq 3 ] || { echo "$out" | tail -30; fail "Flink read $got of 3 rows from a Fluss table"; }
   pass "Flink wrote 3 rows to a Fluss table and read them back"
 }
@@ -921,10 +817,7 @@ smoke_metadata() {
   # The principal domain odctl sets is open-data.local, not the upstream
   # default. A wrong domain fails with a misleading invalid password error.
   local token
-  token=$(curl -fsS --max-time 20 -H 'Content-Type: application/json' \
-    -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \
-    "http://127.0.0.1:8585/api/v1/users/login" 2>/dev/null \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])' 2>/dev/null)
+  token=$(om_step login 'echo "$TOKEN"' 2>/dev/null | tail -1)
   [ -n "$token" ] || fail "admin@open-data.local could not log in"
   pass "admin logged in and received a JWT"
   local auth="Authorization: Bearer $token"
@@ -937,43 +830,35 @@ smoke_metadata() {
     || fail "the server cannot reach the ingestion container, so no pipeline can deploy"
   pass "ingestion Airflow healthy and reachable from the server"
 
-  # A real ingestion. Postgres is already running, so it is its own source.
-  curl -fsS --max-time 60 -X DELETE -H "$auth" \
-    "http://127.0.0.1:8585/api/v1/services/databaseServices/name/odctl_smoke?hardDelete=true&recursive=true" \
-    >/dev/null 2>&1 || true
+  # A real ingestion, with the guide's steps. Postgres is already running, so it
+  # is its own source.
   local svc
-  svc=$(curl -fsS --max-time 30 -X PUT -H "$auth" -H 'Content-Type: application/json' \
-    -d '{"name":"odctl_smoke","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}' \
-    "http://127.0.0.1:8585/api/v1/services/databaseServices" 2>/dev/null \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)
+  svc=$(TOKEN="$token" om_step service 'echo "$SVC"' 2>/dev/null | tail -1)
   [ -n "$svc" ] || fail "could not create a database service"
 
-  local pipe
-  pipe=$(curl -fsS --max-time 30 -X POST -H "$auth" -H 'Content-Type: application/json' \
-    -d "{\"name\":\"odctl_smoke_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"$svc\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}" \
-    "http://127.0.0.1:8585/api/v1/services/ingestionPipelines" 2>/dev/null \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)
+  local out pipe
+  out=$(TOKEN="$token" SVC="$svc" om_step pipeline 'echo; echo "$PIPE"' 2>/dev/null)
+  pipe=$(tail -1 <<<"$out")
   [ -n "$pipe" ] || fail "could not create an ingestion pipeline"
-
-  curl -fsS --max-time 90 -X POST -H "$auth" \
-    "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$pipe" 2>/dev/null \
-    | grep -q 'has been created' || fail "the pipeline did not deploy a DAG into Airflow"
+  grep -q 'has been created' <<<"$out" || { echo "$out"; fail "the pipeline did not deploy a DAG into Airflow"; }
   pass "ingestion pipeline deployed a DAG"
 
-  # Airflow's dag_processor has to parse the new file before it can be triggered.
-  local triggered=no
-  for _ in $(seq 1 24); do
-    if curl -fsS --max-time 90 -X POST -H "$auth" \
-        "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$pipe" 2>/dev/null \
-        | grep -q 'has been triggered'; then triggered=yes; break; fi
-    sleep 5
-  done
-  [ "$triggered" = "yes" ] || fail "the pipeline never triggered"
+  # Airflow's dag_processor has to parse the new file before it can be
+  # triggered, so the guide's trigger can come too early. Trigger again here.
+  if ! grep -q 'has been triggered' <<<"$out"; then
+    local triggered=no
+    for _ in $(seq 1 24); do
+      if curl -fsS --max-time 90 -X POST -H "$auth" \
+          "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$pipe" 2>/dev/null \
+          | grep -q 'has been triggered'; then triggered=yes; break; fi
+      sleep 5
+    done
+    [ "$triggered" = "yes" ] || fail "the pipeline never triggered"
+  fi
 
   local state=""
   for _ in $(seq 1 30); do
-    state=$(curl -fsS --max-time 15 -H "$auth" \
-      "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/odctl_smoke.odctl_smoke_metadata?fields=pipelineStatuses" 2>/dev/null \
+    state=$(TOKEN="$token" om_step status 2>/dev/null \
       | python3 -c 'import json,sys; s=json.load(sys.stdin).get("pipelineStatuses") or []; print(s[0]["pipelineState"] if s else "")' 2>/dev/null)
     case "$state" in success|failed|partialSuccess) break ;; esac
     sleep 10
@@ -982,9 +867,9 @@ smoke_metadata() {
   pass "ingestion run reached success"
 
   # Elasticsearch moved to 9.3.0 with this upgrade, so assert the catalogue is
-  # searchable rather than merely populated.
-  curl -fsS --max-time 60 -X POST -H "$auth" \
-    "http://127.0.0.1:8585/api/v1/apps/trigger/SearchIndexingApplication" >/dev/null 2>&1
+  # searchable rather than merely populated. The guide's step starts indexing
+  # and searches once; the index fills over the next minutes.
+  TOKEN="$token" om_step search >/dev/null 2>&1 || fail "the guide's search step failed"
   local hits=0
   for _ in $(seq 1 60); do
     hits=$(curl -fsS --max-time 20 -H "$auth" \
@@ -1010,9 +895,20 @@ smoke_metadata() {
   done
   pass "Context Center pages and memories both answer"
 
-  curl -fsS --max-time 60 -X DELETE -H "$auth" \
-    "http://127.0.0.1:8585/api/v1/services/databaseServices/name/odctl_smoke?hardDelete=true&recursive=true" \
-    >/dev/null 2>&1 || true
+  TOKEN="$token" om_step remove >/dev/null 2>&1 || fail "the guide's remove step failed"
+  pass "the guide's remove step deleted the service and its pipeline"
+}
+
+# The OpenMetadata guide's steps share shell variables: login sets TOKEN, the
+# service step sets SVC from AUTH, and so on. Run one section with the
+# variables earlier steps set, passed in the environment, then any extra
+# commands, such as echoing the variable the section set.
+om_step() {
+  local code
+  code=$(snippet openmetadata/commands.sh "$1")
+  bash -o pipefail -c 'AUTH="Authorization: Bearer ${TOKEN:-}"
+'"$code"'
+'"${2:-}"
 }
 
 # Feast keeps no feature values of its own, so liveness proves nothing here.
@@ -1036,70 +932,11 @@ smoke_feast() {
     "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
     || fail "could not install the feast client"
 
-  # warehouse="" is required. Feast's REST client puts warehouse into the URL
-  # path as a prefix for Polaris and Nessie style catalogs, and
-  # Iceberg's REST fixture server serves the spec with no prefix, so a real
-  # warehouse gives HTTP 400 "Ambiguous URI empty segment".
-  # A fresh project per run. `feast teardown` leaves rows in
-  # feature_view_version_history, so applying the same feature view into the
-  # same project twice hits the primary key on
-  # (feature_view_name, project_id, version_number) and the second run fails.
-  local proj="odctl_smoke_$(date -u +%Y%m%d%H%M%S)"
-
-  cat > "$work/feature_repo/feature_store.yaml" <<YAML
-project: ${proj}
-provider: local
-registry:
-  registry_type: sql
-  path: postgresql+psycopg://user:password@localhost:5432/feast
-offline_store:
-  type: duckdb
-online_store:
-  type: redis
-  connection_string: "localhost:6379,username=user,password=password"
-entity_key_serialization_version: 3
-YAML
-
-  cat > "$work/feature_repo/definitions.py" <<'PYDEF'
-from datetime import timedelta
-from feast import Entity, FeatureView, Field
-from feast.types import Float32
-from feast.infra.data_sources.contrib.iceberg_catalog.iceberg_source import IcebergSource
-
-driver = Entity(name="driver", join_keys=["driver_id"])
-src = IcebergSource(
-    warehouse="", namespace="smoke", table="driver_stats",
-    catalog_type="rest", catalog_name="odctl",
-    endpoint="http://localhost:8181",
-    timestamp_field="event_timestamp",
-)
-fv = FeatureView(
-    name="driver_stats", entities=[driver], ttl=timedelta(days=365),
-    schema=[Field(name="conv_rate", dtype=Float32)], source=src, online=True,
-)
-PYDEF
-
-  cat > "$work/build.py" <<'PYBUILD'
-import datetime, pyarrow as pa
-from pyiceberg.catalog import load_catalog
-cat = load_catalog("odctl")
-cat.create_namespace_if_not_exists("smoke")
-schema = pa.schema([
-    pa.field("driver_id", pa.int64(), nullable=False),
-    pa.field("event_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
-    pa.field("conv_rate", pa.float32(), nullable=False),
-])
-try: cat.drop_table("smoke.driver_stats")
-except Exception: pass
-t = cat.create_table("smoke.driver_stats", schema=schema)
-now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
-t.append(pa.Table.from_pydict({
-    "driver_id": [1001, 1002],
-    "event_timestamp": [now - datetime.timedelta(hours=1)] * 2,
-    "conv_rate": [0.5, 0.75],
-}, schema=schema))
-print(t.scan().to_arrow().num_rows)
-PYBUILD
+  # The guide's repository, with warehouse="" in its source. Feast's REST client
+  # puts warehouse into the URL path as a prefix for Polaris and Nessie style
+  # catalogs, and Iceberg's REST fixture server serves the spec with no prefix,
+  # so a real warehouse gives HTTP 400 "Ambiguous URI empty segment".
+  cp "$SNIPPETS/feast-iceberg/feature_repo/"* "$work/feature_repo/"
 
   cat > "$work/check.py" <<'PYCHECK'
 import datetime, sys, pandas as pd
@@ -1129,14 +966,9 @@ if got != [0.5, 0.75]:
 print("online ok")
 PYONLINE
 
-  export PYICEBERG_CATALOG__ODCTL__TYPE=rest
-  export PYICEBERG_CATALOG__ODCTL__URI=http://localhost:8181
-  export PYICEBERG_CATALOG__ODCTL__WAREHOUSE=s3://warehouse/
-  export PYICEBERG_CATALOG__ODCTL__S3__ENDPOINT=http://localhost:8333
-  export PYICEBERG_CATALOG__ODCTL__S3__ACCESS_KEY_ID=user
-  export PYICEBERG_CATALOG__ODCTL__S3__SECRET_ACCESS_KEY=password
-  export PYICEBERG_CATALOG__ODCTL__S3__PATH_STYLE_ACCESS=true
-  export PYICEBERG_CATALOG__ODCTL__S3__REGION=us-east-1
+  # The guide's catalog settings, exported as the guide does.
+  eval "$(snippet feast-iceberg/commands.sh catalog-env)"
+  snippet feast-iceberg/steps.py create-table > "$work/build.py"
 
   local py="$work/.venv/bin/python"
   local feast_bin="$work/.venv/bin/feast"
@@ -1156,21 +988,20 @@ PYONLINE
   run_step "could not create the Iceberg table through the catalog" "$py" build.py
   pass "Iceberg table created through the REST catalog on SeaweedFS"
 
-  run_step "feast apply failed" "$feast_bin" -c feature_repo apply
-  pass "feast apply registered the feature view against the catalog"
+  run_step "feast apply or materialize failed" \
+    env PATH="$work/.venv/bin:$PATH" bash -o pipefail -c "$(snippet feast-iceberg/commands.sh apply-materialize)"
+  pass "feast apply registered the feature view, and materialize wrote to valkey"
 
   run_step "the point-in-time join returned the wrong values" "$py" check.py
   pass "get_historical_features read Iceberg through DuckDB"
 
-  run_step "feast materialize into valkey failed" \
-    "$feast_bin" -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
   run_step "the online read from valkey returned the wrong values" "$py" online.py
-  pass "materialize wrote to valkey and get_online_features read it back"
+  pass "get_online_features read the materialised values from valkey"
 
   (cd "$work" && "$feast_bin" -c feature_repo teardown) >/dev/null 2>&1 || true
   curl -fsS --max-time 10 -X DELETE \
-    "http://127.0.0.1:8181/v1/namespaces/smoke/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
-  curl -fsS --max-time 10 -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke" >/dev/null 2>&1 || true
+    "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
+  curl -fsS --max-time 10 -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo" >/dev/null 2>&1 || true
   rm -rf "$work"
 }
 
@@ -1189,6 +1020,31 @@ smoke_temporal() {
   uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the temporal client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q "temporalio==1.34.0" >/dev/null 2>&1 \
     || fail "could not install the temporalio SDK"
+
+  # The guide's worker script as written, then the same script with its Approval
+  # workflow added and the body of main replaced by its approval step, as the
+  # guide tells the reader to do.
+  snippet temporal-workers/steps.py worker > "$work/greet.py"
+  snippet temporal-workers/steps.py approval-workflow > "$work/approval.part"
+  snippet temporal-workers/steps.py approval-run > "$work/run.part"
+  python3 - "$work" <<'PYEOF' || fail "could not combine the guide's approval steps"
+import pathlib, sys, textwrap
+work = pathlib.Path(sys.argv[1])
+script = (work / "greet.py").read_text()
+head, tail = script.split("async def main() -> None:\n")
+body, rest = tail.split("\n\n", 1)
+connect = body.splitlines()[0]
+run = textwrap.indent((work / "run.part").read_text().rstrip(), "    ")
+approval = (work / "approval.part").read_text()
+(work / "approval.py").write_text(
+    f"{head}{approval}\n\nasync def main() -> None:\n{connect}\n{run}\n\n{rest}")
+PYEOF
+  local got
+  got=$(cd "$work" && "$work/.venv/bin/python" greet.py 2>&1 | tail -1)
+  [ "$got" = "hello odctl" ] || fail "the guide's worker printed '$got', expected hello odctl"
+  got=$(cd "$work" && "$work/.venv/bin/python" approval.py 2>&1 | tail -1)
+  [ "$got" = "approved by alice" ] || fail "the guide's approval step printed '$got', expected approved by alice"
+  pass "the guide's worker retried its activity, and its approval workflow completed on a signal"
 
   cat > "$work/workflows.py" <<'PYEOF'
 import asyncio, os, sys
@@ -1314,38 +1170,35 @@ smoke_evidently() {
   retry 60 5 http_ok "http://127.0.0.1:8089/api/v2/projects" || fail "no HTTP response from :8089"
   pass "evidently answering and its database reachable"
 
-  docker exec -i -e SMOKE_RUN_ID="$$" evidently python - <<'PYEOF' || fail "report or dataset round trip failed"
-import os, sys
-import numpy as np, pandas as pd, requests
-from evidently import DataDefinition, Dataset, Report
-from evidently.presets import DataDriftPreset
-from evidently.ui.workspace import RemoteWorkspace
-url = "http://127.0.0.1:8000"
-ws = RemoteWorkspace(url)
-project = ws.create_project(f"odctl-smoke-{os.environ['SMOKE_RUN_ID']}")
+  # The guide's two steps run on the host in one process, as a reader runs them,
+  # with the client version the compose file pins. The checks after them read
+  # back what the steps stored.
+  local version
+  version=$(grep -oE 'evidently/evidently-service:[0-9.]+' \
+    "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2)
+  {
+    snippet evidently-reports/steps.py report
+    snippet evidently-reports/steps.py dataset
+    cat <<'PYEOF'
+import sys, requests
+url = "http://127.0.0.1:8089"
 # Column x moves by three standard deviations and y does not, so exactly one
 # column should drift.
-rng = np.random.default_rng(7)
-reference = pd.DataFrame({"x": rng.normal(0, 1, 500), "y": rng.normal(0, 1, 500)})
-current = pd.DataFrame({"x": rng.normal(3, 1, 500), "y": rng.normal(0, 1, 500)})
-snapshot = Report([DataDriftPreset()]).run(current_data=current, reference_data=reference)
-run = ws.add_run(project.id, snapshot)
 listed = requests.get(f"{url}/api/projects/{project.id}/snapshots", timeout=30).json()
-if str(run.id) not in [s["id"] for s in listed]:
-    sys.exit(f"report {run.id} not listed back: {listed}")
-stored = requests.get(f"{url}/api/projects/{project.id}/{run.id}/download",
+if len(listed) != 1:
+    sys.exit(f"expected one report listed back, got {listed}")
+stored = requests.get(f"{url}/api/projects/{project.id}/{listed[0]['id']}/download",
                       params={"report_format": "json"}, timeout=30).json()
 drift = next(m for m in stored["metrics"] if m["metric_name"].startswith("DriftedColumnsCount"))
 if drift["value"]["count"] != 1:
     sys.exit(f"stored report has {drift['value']} drifted columns, expected 1")
-print("report read back:", drift["metric_name"], drift["value"])
-data = pd.DataFrame({"id": [1, 2, 3], "score": [0.1, 0.5, 0.9]})
-dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definition=DataDefinition()), "odctl-smoke")
 back = ws.load_dataset(dataset_id).as_dataframe()
 pd.testing.assert_frame_equal(back[list(data.columns)].reset_index(drop=True), data, check_dtype=False)
-print("dataset read back")
 ws.delete_project(project.id)
 PYEOF
+  } | (cd "$(mktemp -d)" && uv run --no-project --quiet --python 3.12 \
+      --with "evidently==$version" --with requests python -) \
+    || fail "report or dataset round trip failed"
   pass "pushed a drift report and read it back, and a dataset round-tripped"
 }
 
@@ -1365,7 +1218,7 @@ SPARK_MASTER=http://spark-master:8080/metrics/master/prometheus/
 
 case "$PROFILE" in
   kafka-lite)
-    smoke_kafka kafka; connect_plugins
+    guide_kafka; connect_plugins
     assert_metrics http://kafka:9404/metrics "${KAFKA_SIDE[@]}"
     smoke_iceberg_sink ;;
   kafka-full)
