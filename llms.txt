@@ -28,9 +28,9 @@
 
 ## Guides
 
-- [Produce and consume with Kafka](https://jaehyeon.me/odctl/latest/guides/kafka/index.md)
+- [Kafka](https://jaehyeon.me/odctl/latest/guides/kafka/index.md)
 - [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md)
-- [Flink SQL: Kafka to PostgreSQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md)
+- [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md)
 - [Fluss](https://jaehyeon.me/odctl/latest/guides/fluss/index.md)
 - [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md)
 - [Spark](https://jaehyeon.me/odctl/latest/guides/spark/index.md)
@@ -38,10 +38,10 @@
 - [Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md)
 - [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md)
 - [Temporal workers](https://jaehyeon.me/odctl/latest/guides/temporal-workers/index.md)
-- [MLflow tracking and model serving](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)
+- [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)
 - [Feast with Iceberg](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/index.md)
 - [Evidently reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)
-- [Hybrid search in PostgreSQL](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
+- [Hybrid search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
 - [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)
 - [OpenLineage and Marquez](https://jaehyeon.me/odctl/latest/guides/lineage/index.md)
 - [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)
