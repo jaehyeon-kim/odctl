@@ -1,6 +1,6 @@
 # Trino and Metabase
 
-The `trino` profile runs Trino, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The `metabase` profile runs Metabase, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start `postgres`. The commands below come from the end-to-end tests, with the names changed.
+The `trino` profile runs Trino, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The `metabase` profile runs Metabase, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start `postgres`. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up trino metabase
@@ -13,7 +13,7 @@ odctl up trino metabase
 
 ## Trino catalogs
 
-```bash
+```bash title="docs/snippets/trino-metabase/commands.sh:catalogs"
 docker exec trino trino --execute "SHOW CATALOGS"
 ```
 
@@ -29,7 +29,7 @@ Every catalog loads when Trino starts, even when its service is not running. A q
 
 Run a query:
 
-```bash
+```bash title="docs/snippets/trino-metabase/commands.sh:query"
 docker exec trino trino --execute "SELECT 1"
 ```
 
@@ -53,7 +53,7 @@ Metabase runs inside the `odctl` network, so it reaches each database by contain
 
 Metabase takes a while to start. It is ready when this request succeeds:
 
-```bash
+```bash title="docs/snippets/trino-metabase/commands.sh:metabase-health"
 curl http://127.0.0.1:3000/api/health
 ```
 
@@ -63,4 +63,4 @@ A SQL question on the PostgreSQL connection, shown as a bar chart:
 
 ## From another container
 
-Inside the `odctl` network, Trino is at `http://trino:8080` and Metabase at `http://metabase:3000`.
+Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), Trino is at `http://trino:8080` and Metabase at `http://metabase:3000`.

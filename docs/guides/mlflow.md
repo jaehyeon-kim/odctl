@@ -1,6 +1,8 @@
 # MLflow tracking and model serving
 
-The `mlflow` profile runs two containers. `mlflow` is the tracking server and model registry, with runs on PostgreSQL and artifacts on SeaweedFS under `s3://mlflow`. `mlflow-serve` scores a registered model over HTTP. The commands below come from the end-to-end tests, with the names changed.
+The `mlflow` profile runs two containers. `mlflow` is the tracking server and model registry, with runs on PostgreSQL and artifacts on SeaweedFS under `s3://mlflow`. `mlflow-serve` scores a registered model over HTTP. The end-to-end tests run the commands below on every release.
+
+![Your code logs runs and models to the mlflow server, which keeps them in PostgreSQL and SeaweedFS; mlflow-serve loads a model from it and answers /invocations](../images/path-mlflow.png)
 
 ```bash
 odctl up mlflow
@@ -17,7 +19,7 @@ The server runs MLflow 3.16.1, so install the same client version on the host.
 
 ## Log a run with an artifact
 
-```python
+```python title="docs/snippets/mlflow/steps.py:log-run"
 import pathlib
 import mlflow
 
@@ -43,7 +45,7 @@ The runs are listed under the experiment in the Model training view:
 
 ## Register a model
 
-```python
+```python title="docs/snippets/mlflow/steps.py:register-model"
 import mlflow, numpy as np, xgboost as xgb
 from mlflow import MlflowClient
 
@@ -70,13 +72,13 @@ The registry lists each version, with the `champion` alias on the latest:
 
 `mlflow-serve` starts with the profile and waits idle while `MODEL_URI` is empty. `MODEL_URI` is set in `.odctl/.env`, which `odctl init` writes. Change its line there to:
 
-```bash
+```bash title="docs/snippets/mlflow/model-uri.env"
 MODEL_URI="models:/demo-model@champion"
 ```
 
 Then run `odctl up mlflow` again, so the container starts with the new value, and score two rows:
 
-```bash
+```bash title="docs/snippets/mlflow/commands.sh:serve"
 odctl up mlflow
 curl -X POST http://127.0.0.1:5003/invocations \
   -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}'

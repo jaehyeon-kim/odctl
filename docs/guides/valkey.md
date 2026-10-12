@@ -1,6 +1,6 @@
 # Valkey
 
-The `valkey` profile runs the Valkey Bundle image as one container named `valkey`. The registry describes it as a cache and data store with JSON, Bloom and vector search capabilities. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+The `valkey` profile runs the Valkey Bundle image as one container named `valkey`. The registry describes it as a cache and data store with JSON, Bloom and vector search capabilities. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up valkey
@@ -21,7 +21,7 @@ The unauthenticated `default` user is turned off, so every client logs in as `us
 
 `valkey-cli` is in the container. Log in with a URL that carries the user and password:
 
-```bash
+```bash title="docs/snippets/valkey/commands.sh:round-trip"
 vk=redis://user:password@localhost:6379
 docker exec valkey valkey-cli --no-auth-warning -u "$vk" ping
 docker exec valkey valkey-cli --no-auth-warning -u "$vk" mset 'model:1' '{"a":1}' 'model:2' '{"a":2}'
@@ -39,4 +39,4 @@ Valkey writes an append-only file and saves a snapshot every 60 seconds when at 
 
 ## From another container
 
-Inside the `odctl` network, connect to `valkey:6379` with the same user and password, for example `redis://user:password@valkey:6379` for a Redis client. Feast's online store uses this address, as [Feast with Iceberg](feast-iceberg.md) shows.
+Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), connect to `valkey:6379` with the same user and password, for example `redis://user:password@valkey:6379` for a Redis client. Feast's online store uses this address, as [Feast with Iceberg](feast-iceberg.md) shows.

@@ -1,8 +1,10 @@
 # Feast with Iceberg
 
-The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The steps below come from the end-to-end tests.
+The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
 
-```bash
+![The feast CLI writes definitions to the registry in PostgreSQL, reads offline values from Iceberg and materialises them into Valkey; the Feast UI and feature server load the repository from SeaweedFS and the feature server reads Valkey](../images/path-feast.png)
+
+```bash title="docs/snippets/feast-iceberg/commands.sh:install"
 odctl up feast
 pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
 ```
@@ -11,7 +13,7 @@ pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
 
 PyIceberg, which Feast uses to read Iceberg, takes its catalog settings from the environment:
 
-```bash
+```bash title="docs/snippets/feast-iceberg/commands.sh:catalog-env"
 export PYICEBERG_CATALOG__ODCTL__TYPE=rest
 export PYICEBERG_CATALOG__ODCTL__URI=http://127.0.0.1:8181
 export PYICEBERG_CATALOG__ODCTL__WAREHOUSE=s3://warehouse/
@@ -24,7 +26,7 @@ export PYICEBERG_CATALOG__ODCTL__S3__REGION=us-east-1
 
 ## Create an Iceberg table
 
-```python
+```python title="docs/snippets/feast-iceberg/steps.py:create-table"
 import datetime, pyarrow as pa
 from pyiceberg.catalog import load_catalog
 
@@ -48,7 +50,7 @@ t.append(pa.Table.from_pydict({
 
 `feature_repo/feature_store.yaml`:
 
-```yaml
+```yaml title="docs/snippets/feast-iceberg/feature_repo/feature_store.yaml"
 project: demo
 provider: local
 registry:
@@ -64,7 +66,7 @@ entity_key_serialization_version: 3
 
 `feature_repo/definitions.py`:
 
-```python
+```python title="docs/snippets/feast-iceberg/feature_repo/definitions.py"
 from datetime import timedelta
 from feast import Entity, FeatureView, Field
 from feast.types import Float32
@@ -87,7 +89,7 @@ Pass `warehouse=""` and `catalog_name="odctl"`. Feast's REST client puts the war
 
 ## Register and materialise
 
-```bash
+```bash title="docs/snippets/feast-iceberg/commands.sh:apply-materialize"
 feast -c feature_repo apply
 feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
 ```

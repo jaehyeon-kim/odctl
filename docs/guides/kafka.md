@@ -1,6 +1,6 @@
 # Produce and consume with Kafka
 
-The `kafka-lite` profile runs one Kafka broker in KRaft mode, the Karapace schema registry, Kafka Connect and Kafka UI. `kafka-full` runs three brokers with the same services beside them. The commands below come from the end-to-end tests, with the names changed.
+The `kafka-lite` profile runs one Kafka broker in KRaft mode, the Karapace schema registry, Kafka Connect and Kafka UI. `kafka-full` runs three brokers with the same services beside them. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up kafka-lite
@@ -20,14 +20,14 @@ Port 29092 is a listener for minikube. It advertises `host.minikube.internal`, w
 
 The Kafka command-line tools are in the broker container, which is `kafka` in `kafka-lite` and `kafka-1` in `kafka-full`:
 
-```bash
+```bash title="docs/snippets/kafka/commands.sh:create-topic"
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --topic demo --partitions 1 --replication-factor 1
 ```
 
 ## Produce and consume
 
-```bash
+```bash title="docs/snippets/kafka/commands.sh:produce-consume"
 for i in 1 2 3 4 5; do echo "{\"n\":$i}"; done | docker exec -i kafka \
   /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic demo
 
@@ -41,12 +41,6 @@ Kafka UI at `http://127.0.0.1:8086` shows the topics, their messages and the sch
 
 ![Kafka UI listing the topics of odctl-cluster](../images/kafka-ui.png){ .screenshot }
 
-## Kafka Connect plugins
+## Kafka Connect
 
-Connect loads its plugins from the shared volume that the `deps` profile fills. List what it has loaded:
-
-```bash
-curl -s http://127.0.0.1:8083/connector-plugins
-```
-
-The list includes `org.apache.iceberg.connect.IcebergSinkConnector`, `io.debezium.connector.postgresql.PostgresConnector` and `com.clickhouse.kafka.connect.ClickHouseSinkConnector`, which the tests check on every release. [Ingest into Iceberg](iceberg-ingestion.md) registers the Iceberg sink.
+Both Kafka profiles run a Kafka Connect worker beside the brokers. [Kafka Connect](kafka-connect.md) lists the plugins it loads and shows how to register a connector.
