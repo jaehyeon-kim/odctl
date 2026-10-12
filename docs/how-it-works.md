@@ -4,7 +4,7 @@
 
 Take `odctl up flink-lite` as an example. Flink keeps its tables in Iceberg, so it needs the Iceberg REST catalog. The catalog keeps its metadata in PostgreSQL and its files in SeaweedFS. All of them need the shared jars in `deps`.
 
-![odctl up flink-lite starts deps, then postgres and storage, then catalog, then flink-lite](images/odctl-up.png)
+![odctl up flink-lite, step by step: deps, then postgres and storage, then catalog, then flink-lite](images/odctl-up.gif)
 
 odctl reads these links from `registry.yml` and starts the profiles from left to right:
 
@@ -15,7 +15,28 @@ odctl reads these links from `registry.yml` and starts the profiles from left to
 
 `odctl up flink-lite --dry-run` prints this plan without starting anything. Each [profile page](profiles/index.md) lists what its profile also starts.
 
-`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles.
+### Dependencies and the start order
+
+Each profile lists the profiles it needs under `depends_on` in `registry.yml`. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: `deps` first, `postgres` and `storage` next, `catalog` after them, and every other profile last, in alphabetical order.
+
+The profiles are then grouped by compose file, in that order, and each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
+
+### Before anything starts
+
+![odctl up checks that Docker runs, the profiles exist and the images are published before it starts a container](images/odctl-up-checks.png)
+
+`odctl up` checks four things before it starts a container:
+
+1. **Docker is reachable.** If not, it stops.
+2. **Every profile you name is in `registry.yml`.** An unknown name stops it, with the name in the error.
+3. **Every service can be started.** A service that declares a profile owned by another compose file would never start, so odctl warns about it and carries on.
+4. **odctl's own images exist for the tag.** It resolves `TAG` as compose does and asks the registry for each odctl image that is not already on your machine. If the registry says one is missing, odctl stops and names the tag, rather than leaving Docker to fail on one service. If the registry cannot be reached, it starts anyway, so a machine with no network can run images it pulled before.
+
+### Which containers a command touches
+
+`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name, not on their dependencies. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project name starts with `odctl-`, and the service belongs to one of the named profiles.
+
+There is one exception. When a profile depends on another profile in the same compose file, both are included, because compose refuses a command on a service whose dependency is left out. `odctl down --volumes` removes the shared `deps` volume and the `odctl` network only when no other profile has a container left.
 
 ## How you reach a service
 

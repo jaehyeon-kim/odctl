@@ -58,3 +58,7 @@ odctl down --all
 ```
 
 `odctl down` removes the containers, and the data inside them goes with them. See [How it works](how-it-works.md).
+
+## Use it with an AI assistant
+
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/main/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.

@@ -67,9 +67,9 @@ nav:
   - Profiles: profiles/
   - Guides:
       - Streaming:
-          - Produce and consume with Kafka: guides/kafka.md
+          - Kafka: guides/kafka.md
           - Kafka Connect: guides/kafka-connect.md
-          - "Flink SQL: Kafka to PostgreSQL": guides/flink-sql.md
+          - Flink SQL: guides/flink-sql.md
           - Fluss: guides/fluss.md
       - Lakehouse and batch:
           - Ingest into Iceberg: guides/iceberg-ingestion.md
@@ -81,12 +81,12 @@ nav:
           - Airflow DAGs from S3: guides/airflow-dags.md
           - Temporal workers: guides/temporal-workers.md
       - ML and AI:
-          - MLflow tracking and model serving: guides/mlflow.md
+          - MLflow: guides/mlflow.md
           - Feast with Iceberg: guides/feast-iceberg.md
           - Evidently reports: guides/evidently-reports.md
-          - Hybrid search in PostgreSQL: guides/hybrid-search.md
+          - Hybrid search: guides/hybrid-search.md
           - Valkey: guides/valkey.md
-      - Governance and operations:
+      - Metadata and operations:
           - OpenLineage and Marquez: guides/lineage.md
           - OpenMetadata: guides/openmetadata.md
           - Telemetry: guides/telemetry.md

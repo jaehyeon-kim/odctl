@@ -6,6 +6,8 @@ The `telemetry` profile runs the grafana/otel-lgtm image: an OpenTelemetry Colle
 odctl up telemetry kafka-lite flink-lite
 ```
 
+![Prometheus scrapes the services; Airflow and your app send OTLP to the collector, which reads PostgreSQL and Valkey and passes metrics to Prometheus and traces and logs to Tempo and Loki; Grafana reads all three](../images/path-telemetry.png)
+
 | Endpoint | Address |
 | --- | --- |
 | Grafana (user `user`, password `password`) | `http://127.0.0.1:3004` |
@@ -28,7 +30,7 @@ For example, the PostgreSQL dashboard:
 
 Point an OpenTelemetry SDK at `http://127.0.0.1:4318`, its default HTTP port. The end-to-end tests post one metric with curl, which shows the path:
 
-```bash
+```bash title="docs/snippets/telemetry/commands.sh:send-metric"
 ts=$(python3 -c "import time;print(int(time.time()*1e9))")
 cat > /tmp/otlp.json <<JSON
 {"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"demo"}}]},

@@ -1,6 +1,8 @@
 # Airflow DAGs from S3
 
-The `airflow` profile runs `airflow standalone` in one container against odctl's PostgreSQL. It reads DAG files from `s3://airflow/dags` on SeaweedFS, so you deploy a DAG by uploading it. No volume or sync container is involved. The steps below come from the end-to-end tests.
+The `airflow` profile runs `airflow standalone` in one container against odctl's PostgreSQL. It reads DAG files from `s3://airflow/dags` on SeaweedFS, so you deploy a DAG by uploading it. No volume or sync container is involved. The end-to-end tests run the steps below on every release.
+
+![You upload DAG files to SeaweedFS; Airflow reads them every 15 seconds, keeps its metadata in PostgreSQL and logs runs to MLflow](../images/path-airflow.png)
 
 ```bash
 odctl up airflow
@@ -12,7 +14,7 @@ The web UI is at `http://127.0.0.1:8085`, with user `user` and password `passwor
 
 Any S3 client pointed at `http://127.0.0.1:8333` with key `user` and secret `password` can upload. This uses boto3 inside the Airflow container:
 
-```bash
+```bash title="docs/snippets/airflow-dags/commands.sh:upload"
 docker exec -i airflow python - <<'PY'
 import boto3
 body = '''
@@ -39,7 +41,7 @@ Airflow checks the bucket every 15 seconds and then parses the new file.
 
 New DAGs start paused. Wait until the DAG is listed, then unpause and trigger it:
 
-```bash
+```bash title="docs/snippets/airflow-dags/commands.sh:run"
 docker exec airflow airflow dags list | grep hello
 docker exec airflow airflow dags unpause hello
 docker exec airflow airflow dags trigger hello

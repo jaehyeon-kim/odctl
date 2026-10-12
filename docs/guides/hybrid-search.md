@@ -1,15 +1,15 @@
 # Hybrid search in PostgreSQL
 
-odctl's PostgreSQL image adds pgvector for vector search and pg_textsearch for BM25 keyword ranking. Both extensions are created in the `vector` database. Hybrid search runs both queries and combines their rankings, which your application or a final SQL query does. The SQL below comes from the end-to-end tests.
+odctl's PostgreSQL image adds pgvector for vector search and pg_textsearch for BM25 keyword ranking. Both extensions are created in the `vector` database. Hybrid search runs both queries and combines their rankings, which your application or a final SQL query does. The end-to-end tests run the SQL below on every release.
 
-```bash
+```bash title="docs/snippets/hybrid-search/commands.sh:psql"
 odctl up postgres
 docker exec -it postgres psql -U user -d vector
 ```
 
 ## Vector similarity with pgvector
 
-```sql
+```sql title="docs/snippets/hybrid-search/steps.sql:vector"
 CREATE TABLE items (id bigserial primary key, embedding vector(3));
 INSERT INTO items (embedding) VALUES ('[1,0,0]'), ('[0,1,0]'), ('[0.9,0.1,0]');
 CREATE INDEX items_hnsw ON items USING hnsw (embedding vector_l2_ops);
@@ -21,7 +21,7 @@ SELECT id FROM items ORDER BY embedding <-> '[1,0,0]' LIMIT 1;
 
 ## Keyword ranking with pg_textsearch
 
-```sql
+```sql title="docs/snippets/hybrid-search/steps.sql:bm25"
 CREATE TABLE docs (id int primary key, content text);
 INSERT INTO docs VALUES
   (1, 'PostgreSQL is a powerful database system'),

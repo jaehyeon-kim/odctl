@@ -1,6 +1,6 @@
 # Spark
 
-The `spark-lite` profile runs a Spark master, one worker and the Spark History Server. `spark-full` runs three workers. Spark's default catalog is `iceberg`, already pointed at the Iceberg REST catalog, so `spark-sql` reads and writes Iceberg tables with no extra settings. The commands below come from the end-to-end tests, which run them on every release, with the names changed.
+The `spark-lite` profile runs a Spark master, one worker and the Spark History Server. `spark-full` runs three workers. Spark's default catalog is `iceberg`, already pointed at the Iceberg REST catalog, so `spark-sql` reads and writes Iceberg tables with no extra settings. The end-to-end tests run the commands below on every release.
 
 ```bash
 odctl up spark-lite
@@ -16,7 +16,7 @@ odctl up spark-lite
 
 ## Run SQL against Iceberg
 
-```bash
+```bash title="docs/snippets/spark/commands.sh:run-sql"
 docker exec spark-master /opt/spark/bin/spark-sql -e "
   CREATE NAMESPACE IF NOT EXISTS iceberg.demo;
   CREATE OR REPLACE TABLE iceberg.demo.t (id BIGINT) USING iceberg;
@@ -30,7 +30,7 @@ The query prints `3`. The table is in the same catalog that Flink, Kafka Connect
 
 Every Spark application writes an event log to `/tmp/spark-events`, which all Spark containers share. List the logs:
 
-```bash
+```bash title="docs/snippets/spark/commands.sh:event-logs"
 docker exec spark-master ls /tmp/spark-events
 ```
 
@@ -46,4 +46,4 @@ The History Server lists the `spark-sql` run:
 
 ## From another container
 
-Inside the `odctl` network, submit applications to `spark://spark-master:7077`. Spark's settings, including the `iceberg` catalog and S3 access to SeaweedFS, are in `spark/spark-defaults.conf` in the workspace.
+Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), submit applications to `spark://spark-master:7077`. Spark's settings, including the `iceberg` catalog and S3 access to SeaweedFS, are in `spark/spark-defaults.conf` in the workspace.

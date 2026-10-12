@@ -12,9 +12,14 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13
     hooks:
+      # Guide snippets are steps of a page, not modules, and keep the layout the
+      # page shows: a later step uses names an earlier one defines, and the
+      # docs test checks each page against its file.
       - id: ruff-check
         args: [--fix]
+        exclude: ^docs/snippets/
       - id: ruff-format
+        exclude: ^docs/snippets/
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
@@ -24,3 +29,4 @@ repos:
           - pydantic
           - types-PyYAML
         args: [--ignore-missing-imports]
+        exclude: ^docs/snippets/

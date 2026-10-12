@@ -1,6 +1,7 @@
 """The generated documentation pages cover every profile and every command."""
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -196,3 +197,134 @@ def test_client_versions_in_guides_match_the_stack():
     text = (guides / "mlflow.md").read_text()
     assert set(re.findall(r"MLflow (\d[\d.]*)", text)) == {mlflow}
     assert set(re.findall(r"XGBoost (\d[\d.]*)", text)) == {xgboost}
+
+
+# Area names in TECH_GROUPS also name a page, its URL and a home table row, so a
+# long one stays and wraps in the sidebar.
+_LONG_TITLES = {"Stream and batch processing"}
+
+
+def _nav_titles(items):
+    for item in items:
+        if isinstance(item, dict):
+            for title, value in item.items():
+                yield title
+                if isinstance(value, list):
+                    yield from _nav_titles(value)
+
+
+def test_sidebar_titles_are_short():
+    import yaml
+
+    config = yaml.safe_load(
+        (REPO / "mkdocs.yml").read_text().replace("!!python/name:", "")
+    )
+    long = [
+        t for t in _nav_titles(config["nav"]) if len(t) > 24 and t not in _LONG_TITLES
+    ]
+    assert not long, f"sidebar titles over 24 characters: {long}"
+
+
+def test_no_heading_starts_with_a_number():
+    numbered = []
+    for page in (REPO / "docs").rglob("*.md"):
+        in_code = False
+        for line in page.read_text().splitlines():
+            if line.startswith("```"):
+                in_code = not in_code
+            elif not in_code and re.match(r"#+ +\d", line):
+                numbered.append(f"{page.relative_to(REPO)}: {line}")
+    assert not numbered, numbered
+
+
+def test_every_diagram_is_exported_and_every_image_is_used():
+    images = REPO / "docs" / "images"
+    for source in images.glob("*.drawio"):
+        if source.name.startswith("_"):
+            continue
+        assert (
+            source.with_suffix(".png").exists() or source.with_suffix(".gif").exists()
+        ), f"{source.name} has no exported image; run scripts/diagrams.py"
+    text = "\n".join(p.read_text() for p in (REPO / "docs").rglob("*.md"))
+    unused = [
+        p.name
+        for p in images.iterdir()
+        if p.suffix in {".png", ".gif"} and f"images/{p.name}" not in text
+    ]
+    assert not unused, f"images no page uses: {unused}"
+
+
+def test_skill_is_generated_from_the_registry(gen_pages):
+    committed = (REPO / "skills" / "odctl" / "SKILL.md").read_text()
+    assert committed == gen_pages.skill(INTERNAL_RESOURCES_DIR), (
+        "skills/odctl/SKILL.md is out of date; run uv run python scripts/gen_pages.py"
+    )
+    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+    for stack in registry.stacks.values():
+        for profile in stack.profiles:
+            assert f"\n### {profile}\n" in committed, (
+                f"{profile} missing from the skill"
+            )
+
+
+_FENCE = re.compile(r"^```(\w+)([^\n]*)\n(.*?)^```", re.S | re.M)
+_TITLE = re.compile(r'title="([^"]+)"')
+
+
+def _section(path: Path, name: str) -> str:
+    lines: list[str] = []
+    inside = False
+    for line in path.read_text().splitlines():
+        if f"--8<-- [start:{name}]" in line:
+            inside = True
+        elif f"--8<-- [end:{name}]" in line:
+            return "\n".join(lines)
+        elif inside:
+            lines.append(line)
+    raise AssertionError(f"no section {name} in {path.relative_to(REPO)}")
+
+
+def test_guide_code_blocks_are_copies_of_snippet_files():
+    """Each guide block is a copy of a snippet file, or a section of one, that
+    the e2e test runs. Blocks that only start profiles with odctl are exempt,
+    because the e2e test starts each profile itself."""
+    for page in sorted((REPO / "docs" / "guides").glob("*.md")):
+        for lang, info, body in _FENCE.findall(page.read_text()):
+            if lang == "text":
+                continue
+            code = [line for line in body.splitlines() if line.strip()]
+            title = _TITLE.search(info)
+            if title is None:
+                assert lang == "bash" and all(c.startswith("odctl ") for c in code), (
+                    f"{page.name}: a {lang} block has no title naming its snippet file"
+                )
+                continue
+            ref = title.group(1)
+            path_text, _, name = ref.partition(":")
+            path = REPO / path_text
+            assert path_text.startswith("docs/snippets/") and path.exists(), (
+                f"{page.name}: {ref} is not a snippet file"
+            )
+            expected = _section(path, name) if name else path.read_text()
+            assert body.rstrip("\n") == expected.rstrip("\n"), (
+                f"{page.name}: the block titled {ref} differs from its file"
+            )
+
+
+def test_snippet_changes_select_the_groups_that_run_them():
+    selector = _load(
+        "select_profiles", REPO / ".github" / "scripts" / "select-profiles.py"
+    )
+    registry = INTERNAL_RESOURCES_DIR / "registry.yml"
+    folders = {p.name for p in (REPO / "docs" / "snippets").iterdir() if p.is_dir()}
+    assert folders == set(selector.SNIPPET_GROUPS), (
+        "add each docs/snippets folder to SNIPPET_GROUPS in select-profiles.py"
+    )
+    for groups in selector.SNIPPET_GROUPS.values():
+        assert set(groups) <= set(selector.GROUPS)
+    assert selector.select(["docs/snippets/kafka/commands.sh"], registry) == [
+        "kafka-lite kafka-full"
+    ]
+    assert selector.select(["docs/snippets/unknown/x.sh"], registry) == list(
+        selector.GROUPS
+    )
