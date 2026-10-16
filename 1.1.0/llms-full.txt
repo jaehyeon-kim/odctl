@@ -1,0 +1,2693 @@
+# Open Data Stack (odctl)
+
+> One CLI for a local open data stack.
+
+# Home
+
+# Open Data Stack (odctl)
+
+odctl is a command-line tool that runs an open data stack on your machine with Docker Compose. You name the profiles you want, such as `kafka-lite` or `airflow`, and odctl starts them together with the services they depend on.
+
+## Why not plain Docker Compose?
+
+odctl is Docker Compose: it runs Compose files and selects services with Compose profiles. For one small project with two or three services, a Compose file of your own is enough. odctl helps when there are more.
+
+- **One set of files for every project.** Projects need different tools. One uses MLflow, Feast and Airflow, and another does not need Airflow. Copied compose files drift apart, for example when an image is upgraded in one copy only. odctl keeps the files in one place. Each release fixes the image versions and runs an end-to-end test for every profile, so a project pins an odctl version instead of keeping its own files.
+- **The services are already connected.** PostgreSQL creates the databases for MLflow, Feast and the others when it first starts. MLflow keeps its artifacts in S3 storage. Feast's config points to its registry in PostgreSQL, to Iceberg for offline features and to Valkey for online features. The Airflow image has the MLflow and Feast clients installed. Kafka Connect, Flink and Spark take connector jars with matching versions from one shared image.
+- **Commands show what is running.** `odctl explain` shows a profile's services, ports and dependencies. `odctl up --dry-run` shows what would start, in order. `odctl ps` lists the running containers with their health and ports. The [CLI reference](https://jaehyeon.me/odctl/latest/cli/index.md) lists every command.
+
+## What it runs
+
+| Area                                                                                                          | Technologies                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [Messaging](https://jaehyeon.me/odctl/latest/profiles/messaging/index.md)                                     | Kafka (KRaft), Karapace schema registry, Kafka Connect, Kafka UI (kafbat)                                                 |
+| [Stream and batch processing](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/index.md) | Apache Flink, Apache Spark                                                                                                |
+| [Analytics](https://jaehyeon.me/odctl/latest/profiles/analytics/index.md)                                     | ClickHouse, Trino, Metabase                                                                                               |
+| [Orchestration](https://jaehyeon.me/odctl/latest/profiles/orchestration/index.md)                             | Apache Airflow, Temporal                                                                                                  |
+| [MLOps](https://jaehyeon.me/odctl/latest/profiles/mlops/index.md)                                             | MLflow, Feast, Evidently                                                                                                  |
+| [Metadata and lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)               | OpenMetadata, Marquez                                                                                                     |
+| [Observability](https://jaehyeon.me/odctl/latest/profiles/observability/index.md)                             | grafana/otel-lgtm (OpenTelemetry Collector, Prometheus, Tempo, Loki, Grafana)                                             |
+| [Storage and catalog](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/index.md)                 | PostgreSQL 18 with pgvector, pg_textsearch and PostGIS, SeaweedFS (S3), Iceberg REST catalog, Valkey Bundle, Apache Fluss |
+
+Kafka Connect comes with a set of connectors, such as the Iceberg sink and the Debezium PostgreSQL source. [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md) lists them all.
+
+## Where to go next
+
+- [Getting started](https://jaehyeon.me/odctl/latest/getting-started/index.md) installs odctl and starts a first profile.
+- [Profiles](https://jaehyeon.me/odctl/latest/profiles/index.md) lists every profile with its ports, images and memory limits.
+- [Guides](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) show how to use the services together.
+
+## Projects that use odctl
+
+- [benchtop](https://github.com/jaehyeon-kim/benchtop): data engineering and machine learning projects, each run from a cold clone on odctl.
+- [desflow](https://github.com/jaehyeon-kim/desflow) ([docs](https://jaehyeon.me/desflow/)): a SimPy library for simulations that stream to Kafka, PostgreSQL, Redis and Iceberg.
+- [agentic-analytics-system](https://github.com/jaehyeon-kim/agentic-analytics-system): conversational analytics over an Iceberg lakehouse.
+
+Blog posts about odctl and these projects are tagged [odctl](https://jaehyeon.me/tags/odctl/) on jaehyeon.me.
+# Getting started
+
+# Getting started
+
+The recording shows the steps on this page: install odctl, preview a profile, start it, list the containers and stop them.
+
+## Requirements
+
+- Docker Engine or Docker Desktop, running. Give Docker 8 to 16 GB of memory.
+- Python 3.10 or later.
+
+## Install
+
+odctl is a command-line tool, so install it into its own environment with uv or pipx.
+
+```bash
+uv tool install odctl
+# or
+pipx install odctl
+```
+
+`pip install odctl` also works.
+
+## Create a workspace
+
+```bash
+odctl init
+```
+
+This copies the compose files and their settings into `.odctl` in the current directory, and writes `.odctl/.env` with `TAG` set to the CLI version. odctl reads from `.odctl` whenever it exists, so you can edit any file there. [Workspace](https://jaehyeon.me/odctl/latest/how-it-works/#workspace) explains what changes with and without it, and how to customise it.
+
+## Start a profile
+
+List the profiles, then see what one of them starts:
+
+```bash
+odctl list
+odctl up kafka-lite --dry-run
+```
+
+The dry run prints which compose files and profiles it would start:
+
+Start it:
+
+```bash
+odctl up kafka-lite
+```
+
+odctl starts the profiles `kafka-lite` depends on first, then Kafka. It waits until the services are running, and healthy where they define a health check. `odctl explain kafka-lite` prints its addresses, and the [Messaging page](https://jaehyeon.me/odctl/latest/profiles/messaging/#kafka-lite) lists the same.
+
+Check what is running, and stop everything when you are done:
+
+```bash
+odctl ps --all
+odctl down --all
+```
+
+`odctl down` removes the containers, and the data inside them goes with them. See [How it works](https://jaehyeon.me/odctl/latest/how-it-works/index.md).
+
+## Use it with an AI assistant
+
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/main/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.
+# How it works
+
+# How it works
+
+## What `odctl up` does
+
+Take `odctl up flink-lite` as an example. Flink keeps its tables in Iceberg, so it needs the Iceberg REST catalog. The catalog keeps its metadata in PostgreSQL and its files in SeaweedFS. All of them need the shared jars in `deps`.
+
+odctl reads these links from `registry.yml` and starts the profiles from left to right:
+
+1. `deps` copies connectors and jars into a shared Docker volume, creates the `odctl` network, and exits.
+1. `postgres` and `storage` start, and odctl waits until they are healthy.
+1. `catalog` starts once both are healthy.
+1. `flink-lite` starts last.
+
+`odctl up flink-lite --dry-run` prints this plan without starting anything. Each [profile page](https://jaehyeon.me/odctl/latest/profiles/index.md) lists what its profile also starts.
+
+### Dependencies and the start order
+
+Each profile lists the profiles it needs under `depends_on` in `registry.yml`. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: `deps` first, `postgres` and `storage` next, `catalog` after them, and every other profile last, in alphabetical order.
+
+The profiles are then grouped by compose file, in that order, and each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
+
+### Before anything starts
+
+`odctl up` checks four things before it starts a container:
+
+1. **Docker is reachable.** If not, it stops.
+1. **Every profile you name is in `registry.yml`.** An unknown name stops it, with the name in the error.
+1. **Every service can be started.** A service that declares a profile owned by another compose file would never start, so odctl warns about it and carries on.
+1. **odctl's own images exist for the tag.** It resolves `TAG` as compose does and asks the registry for each odctl image that is not already on your machine. If the registry says one is missing, odctl stops and names the tag, rather than leaving Docker to fail on one service. If the registry cannot be reached, it starts anyway, so a machine with no network can run images it pulled before.
+
+### Which containers a command touches
+
+`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name, not on their dependencies. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project name starts with `odctl-`, and the service belongs to one of the named profiles.
+
+There is one exception. When a profile depends on another profile in the same compose file, both are included, because compose refuses a command on a service whose dependency is left out. `odctl down --volumes` removes the shared `deps` volume and the `odctl` network only when no other profile has a container left.
+
+## How you reach a service
+
+Every service publishes its ports on the host at `127.0.0.1` only, so a browser or client on your machine uses `http://127.0.0.1:<port>`, and other machines on your network cannot reach them. This works the same on macOS, Linux and WSL2: Docker Desktop forwards the port to the host's `127.0.0.1`, and WSL2 forwards it to Windows' `localhost`. To open a port to your network, remove `127.0.0.1:` from its line in `.odctl/compose-*.yml` and run `odctl recreate <profile>`. Each profile page lists the ports.
+
+Inside Docker, services reach each other by name on the `odctl` network, for example `http://catalog:8181` or `broker-1:19092` for Kafka. A container of your own reaches them the same way when it joins that network:
+
+```bash
+docker run --rm --network odctl curlimages/curl http://catalog:8181/v1/config
+```
+
+## Where data lives
+
+Services keep their data inside their containers.
+
+| Command                | Containers                                   | Your data |
+| ---------------------- | -------------------------------------------- | --------- |
+| `odctl restart`        | kept                                         | kept      |
+| `odctl recreate`       | replaced                                     | lost      |
+| `odctl down`           | removed                                      | lost      |
+| `odctl down --volumes` | removed, with the `odctl-shared-deps` volume | lost      |
+
+So a database, a bucket, a topic or an Iceberg table lasts until the profile is stopped. This keeps every `odctl up` a clean start. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
+
+## Which images run
+
+Most services run their project's official image, pinned to an exact version. odctl builds five images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`:
+
+| Image      | Contents                                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `deps`     | Connectors, jars and the Prometheus JMX agent, including the Iceberg REST catalog and the Kafka Connect Iceberg sink |
+| `postgres` | PostgreSQL 18 with pgvector, pg_textsearch and PostGIS                                                               |
+| `airflow`  | Airflow with the MLflow and Feast clients and the model runtimes                                                     |
+| `mlflow`   | The MLflow server and model server with the model runtimes                                                           |
+| `spark`    | Spark with the Python clients jobs use                                                                               |
+
+These five are tagged with the CLI version through `TAG`. [Workspace](#workspace) explains how `TAG` is set with and without `odctl init`.
+
+## Workspace
+
+odctl runs from one of two places: the files bundled with the CLI, or a workspace that `odctl init` copies them into.
+
+### With and without `odctl init`
+
+|                                 | Without a workspace                                               | With a workspace                                                                     |
+| ------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Files odctl reads               | the compose files and `registry.yml` inside the installed package | the copies in `.odctl` in the current directory                                      |
+| Image tag of odctl's own images | the CLI version                                                   | the CLI version, written to `.odctl/.env` as `TAG`                                   |
+| Your changes                    | none; the package is replaced on every upgrade                    | any file in `.odctl`                                                                 |
+| After a CLI upgrade             | new files and images at once                                      | the old files and images, with a warning on every command until `odctl init --force` |
+
+A `TAG` set in the shell overrides both.
+
+odctl looks for `.odctl` in the current directory. `--workspace PATH` points it at another directory, so one workspace can serve several projects.
+
+### Customise it
+
+`odctl init` copies everything odctl runs into `.odctl`. It copies only files that are missing, so running it again keeps your edits.
+
+| File                    | What to change                                                                                                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compose-*.yml`         | Host ports, memory limits and environment variables of each service                                                                                                    |
+| `registry.yml`          | The profiles, their compose files and their dependencies                                                                                                               |
+| `.env`                  | `TAG`, extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`) and the MLflow services (`_MLOPS_PIP_DEPS`), and the model the MLflow model server serves (`MODEL_URI`) |
+| `grafana/dashboards/`   | The Grafana dashboard for each service                                                                                                                                 |
+| `trino/rules.json`      | Trino's file-based access control                                                                                                                                      |
+| `evidently/config.yaml` | The Evidently server's settings                                                                                                                                        |
+
+### Apply a change
+
+A restart keeps the container, so it does not apply an edited compose file or `.env`. Run `odctl recreate <profile>` to replace the profile's containers from their current definition, and add `--pull` to fetch images again. Recreating discards the data in those containers. `odctl restart <profile>` is enough for files a service reads when it starts, such as `trino/rules.json` and the Grafana dashboards.
+
+### Examples
+
+Each example edits the workspace, then applies the change. `sed -i.bak` works with both GNU and macOS `sed`, and keeps the original as a `.bak` file.
+
+Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it:
+
+```bash
+sed -i.bak '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' .odctl/compose-infra.yml
+odctl recreate storage
+docker inspect seaweed --format '{{.HostConfig.Memory}}'   # 2147483648
+```
+
+Publish Trino on port 8180 instead of 8080, when another program already uses 8080:
+
+```bash
+sed -i.bak 's/"127.0.0.1:8080:8080" # Trino/"127.0.0.1:8180:8080" # Trino/' .odctl/compose-analytics.yml
+odctl up trino
+docker port trino   # 8080/tcp -> 127.0.0.1:8180
+```
+
+Install extra Python packages in the Airflow container, for DAGs that import them:
+
+```bash
+sed -i.bak 's/^_AIRFLOW_PIP_DEPS=.*/_AIRFLOW_PIP_DEPS="dateparser==1.4.3"/' .odctl/.env
+odctl up airflow
+docker exec airflow python -c "import dateparser"
+```
+
+The packages install when the container starts, so the first start after the change takes longer. `_MLOPS_PIP_DEPS` does the same for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `MODEL_URI` in the same file sets the model `mlflow-serve` serves, as [MLflow tracking and model serving](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) shows.
+
+### Trino access rules
+
+The shipped `trino/rules.json` grants every identity full table privileges and denies `analyst` schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.
+
+### Start again
+
+`odctl init --force` deletes `.odctl` and copies the bundled files again, with `TAG` set to the current CLI version. Your edits are lost, so it asks for confirmation first.
+# Profiles
+
+# Profiles
+
+A profile is what `odctl up` starts. These pages are generated from `registry.yml` and the compose files when the site is built.
+
+## [Messaging](https://jaehyeon.me/odctl/latest/profiles/messaging/index.md)
+
+| Profile                                                                         | Technology | Description                                                                               |
+| ------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| [`kafka-lite`](https://jaehyeon.me/odctl/latest/profiles/messaging/#kafka-lite) | Kafka      | Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers. |
+| [`kafka-full`](https://jaehyeon.me/odctl/latest/profiles/messaging/#kafka-full) | Kafka      | Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers. |
+
+## [Stream and batch processing](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/index.md)
+
+| Profile                                                                                           | Technology   | Description                                                                                      |
+| ------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| [`flink-lite`](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/#flink-lite) | Apache Flink | Stateful, real-time stream processing engine. Lite uses 1 TaskManager; Full uses 3 TaskManagers. |
+| [`flink-full`](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/#flink-full) | Apache Flink | Stateful, real-time stream processing engine. Lite uses 1 TaskManager; Full uses 3 TaskManagers. |
+| [`spark-lite`](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/#spark-lite) | Apache Spark | Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers.      |
+| [`spark-full`](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/#spark-full) | Apache Spark | Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers.      |
+
+## [Analytics](https://jaehyeon.me/odctl/latest/profiles/analytics/index.md)
+
+| Profile                                                                     | Technology | Description                                                                                       |
+| --------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| [`ch-lite`](https://jaehyeon.me/odctl/latest/profiles/analytics/#ch-lite)   | ClickHouse | Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase). |
+| [`ch-full`](https://jaehyeon.me/odctl/latest/profiles/analytics/#ch-full)   | ClickHouse | Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase). |
+| [`trino`](https://jaehyeon.me/odctl/latest/profiles/analytics/#trino)       | Trino      | Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase). |
+| [`metabase`](https://jaehyeon.me/odctl/latest/profiles/analytics/#metabase) | Metabase   | Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and BI dashboards (Metabase). |
+
+## [Orchestration](https://jaehyeon.me/odctl/latest/profiles/orchestration/index.md)
+
+| Profile                                                                         | Technology     | Description                                                                                                 |
+| ------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| [`airflow`](https://jaehyeon.me/odctl/latest/profiles/orchestration/#airflow)   | Apache Airflow | Workflow orchestration and pipeline scheduling (Airflow), and durable workflows written in code (Temporal). |
+| [`temporal`](https://jaehyeon.me/odctl/latest/profiles/orchestration/#temporal) | Temporal       | Workflow orchestration and pipeline scheduling (Airflow), and durable workflows written in code (Temporal). |
+
+## [MLOps](https://jaehyeon.me/odctl/latest/profiles/mlops/index.md)
+
+| Profile                                                                   | Technology | Description                                                                                                               |
+| ------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [`mlflow`](https://jaehyeon.me/odctl/latest/profiles/mlops/#mlflow)       | MLflow     | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). |
+| [`feast`](https://jaehyeon.me/odctl/latest/profiles/mlops/#feast)         | Feast      | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). |
+| [`evidently`](https://jaehyeon.me/odctl/latest/profiles/mlops/#evidently) | Evidently  | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). |
+
+## [Metadata and lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)
+
+| Profile                                                                                | Technology   | Description                                       |
+| -------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------- |
+| [`metadata`](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/#metadata) | OpenMetadata | Data catalog, discovery, and governance platform. |
+| [`lineage`](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/#lineage)   | Marquez      | System telemetry, monitoring, and data lineage.   |
+
+## [Observability](https://jaehyeon.me/odctl/latest/profiles/observability/index.md)
+
+| Profile                                                                           | Technology                    | Description                                     |
+| --------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------- |
+| [`telemetry`](https://jaehyeon.me/odctl/latest/profiles/observability/#telemetry) | Telemetry (grafana/otel-lgtm) | System telemetry, monitoring, and data lineage. |
+
+## [Storage and catalog](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/index.md)
+
+| Profile                                                                               | Technology           | Description                                                                                                                              |
+| ------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| [`postgres`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#postgres) | PostgreSQL           | PostgreSQL metadata backend.                                                                                                             |
+| [`storage`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#storage)   | SeaweedFS            | SeaweedFS S3-compatible object storage.                                                                                                  |
+| [`catalog`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#catalog)   | Iceberg REST catalog | Iceberg REST Catalog.                                                                                                                    |
+| [`valkey`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#valkey)     | Valkey               | Stream storage (Fluss) and multi-model data store (Valkey Bundle). Valkey includes advanced JSON, Bloom, and Vector Search capabilities. |
+| [`fluss`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#fluss)       | Apache Fluss         | Stream storage (Fluss) and multi-model data store (Valkey Bundle). Valkey includes advanced JSON, Bloom, and Vector Search capabilities. |
+| [`deps`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#deps)         | Shared dependencies  | Shared dependencies, JARs, connectors, and Docker network                                                                                |
+
+# Analytics
+
+## ClickHouse
+
+Profiles: `ch-lite`, `ch-full`. Stack `analytics`, defined in `compose-analytics.yml`.
+
+### ch-lite
+
+Depends on: `deps`. `odctl up ch-lite` also starts: `deps`.
+
+```text
+• ClickHouse HTTP (Shard 1 / Replica 1 & 2):
+  * External (host): http://127.0.0.1:8123, http://127.0.0.1:8124
+  * Internal (Docker): http://ch-11:8123, http://ch-12:8123
+```
+
+| Service          | Image                                       | Host:container ports     | Memory limit |
+| ---------------- | ------------------------------------------- | ------------------------ | ------------ |
+| `ch-keeper`      | `clickhouse/clickhouse-keeper:25.12-alpine` | `9181:9181`              | `512m`       |
+| `ch-shard2-stub` | `alpine:3.24`                               | none                     | `64m`        |
+| `ch-11`          | `clickhouse/clickhouse-server:25.12-alpine` | `8123:8123`, `9000:9000` | `4g`         |
+| `ch-12`          | `clickhouse/clickhouse-server:25.12-alpine` | `8124:8123`, `9001:9000` | `4g`         |
+
+### ch-full
+
+Depends on: `deps`. `odctl up ch-full` also starts: `deps`.
+
+```text
+• ClickHouse HTTP (Shards 1 & 2 / Replicas 1 & 2):
+  * External (host): http://127.0.0.1:8123, http://127.0.0.1:8124, http://127.0.0.1:8125, http://127.0.0.1:8126
+  * Internal (Docker): http://ch-11:8123, http://ch-12:8123, http://ch-21:8123, http://ch-22:8123
+```
+
+| Service      | Image                                       | Host:container ports     | Memory limit |
+| ------------ | ------------------------------------------- | ------------------------ | ------------ |
+| `ch-keeper`  | `clickhouse/clickhouse-keeper:25.12-alpine` | `9181:9181`              | `512m`       |
+| `ch-11-full` | `clickhouse/clickhouse-server:25.12-alpine` | `8123:8123`, `9000:9000` | `4g`         |
+| `ch-12-full` | `clickhouse/clickhouse-server:25.12-alpine` | `8124:8123`, `9001:9000` | `4g`         |
+| `ch-21`      | `clickhouse/clickhouse-server:25.12-alpine` | `8125:8123`, `9002:9000` | `4g`         |
+| `ch-22`      | `clickhouse/clickhouse-server:25.12-alpine` | `8126:8123`, `9003:9000` | `4g`         |
+
+## Trino
+
+Profiles: `trino`. Stack `analytics`, defined in `compose-analytics.yml`.
+
+### trino
+
+Depends on: `postgres`. `odctl up trino` also starts: `deps`, `postgres`.
+
+```text
+• Trino UI & JDBC connection (no password: no authenticator is
+  configured, so any username is accepted):
+  * External (host): http://127.0.0.1:8080
+  * Internal (Docker): http://trino:8080
+• Identities: `docker exec -it trino trino` connects as `trino`, the
+  CLI default. Pass `--user user` for the stack-wide convention, or
+  `--user analyst`, which trino/rules.json denies schema ownership
+  while leaving every table privilege in place.
+• Catalogs: postgres works with the trino profile alone. iceberg,
+  kafka, clickhouse and valkey load without their backing services,
+  so they appear in SHOW CATALOGS and then fail at query time unless
+  catalog, storage, kafka-lite, ch-lite or valkey is also up.
+```
+
+| Service | Image               | Host:container ports | Memory limit |
+| ------- | ------------------- | -------------------- | ------------ |
+| `trino` | `trinodb/trino:483` | `8080:8080`          | `4g`         |
+
+## Metabase
+
+Profiles: `metabase`. Stack `analytics`, defined in `compose-analytics.yml`.
+
+### metabase
+
+Depends on: `postgres`. `odctl up metabase` also starts: `deps`, `postgres`.
+
+```text
+• Metabase Dashboard Engine:
+  * External (host): http://127.0.0.1:3000
+  * Internal (Docker): http://metabase:3000
+```
+
+| Service    | Image                          | Host:container ports | Memory limit |
+| ---------- | ------------------------------ | -------------------- | ------------ |
+| `metabase` | `metabase/metabase:v0.63.19.3` | `3000:3000`          | `1500m`      |
+
+# Messaging
+
+## Kafka
+
+Profiles: `kafka-lite`, `kafka-full`. Stack `kafka`, defined in `compose-kafka.yml`.
+
+### kafka-lite
+
+Depends on: `deps`. `odctl up kafka-lite` also starts: `deps`.
+
+```text
+• Kafka UI:
+  - External (host): http://127.0.0.1:8086
+  - Internal (Docker): http://kafka-ui:8080
+• Schema Registry & Connect:
+  - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083
+• Bootstrap Servers (1-Node Lite):
+  - External (host): 127.0.0.1:9092
+  - Internal (Docker): broker-1:19092
+```
+
+| Service    | Image                               | Host:container ports | Memory limit |
+| ---------- | ----------------------------------- | -------------------- | ------------ |
+| `kafka`    | `apache/kafka:4.3.1`                | `9092:9092`          | `1500m`      |
+| `connect`  | `apache/kafka:4.3.1`                | `8083:8083`          | `2g`         |
+| `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
+| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
+
+### kafka-full
+
+Depends on: `deps`. `odctl up kafka-full` also starts: `deps`.
+
+```text
+• Kafka UI:
+  - External (host): http://127.0.0.1:8086
+  - Internal (Docker): http://kafka-ui:8080
+• Schema Registry & Connect:
+  - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083
+• Bootstrap Servers (3-Node Cluster):
+  - External (host): 127.0.0.1:9092, 127.0.0.1:9093, 127.0.0.1:9094
+  - Internal (Docker): broker-1:19092, broker-2:19093, broker-3:19094
+```
+
+| Service    | Image                               | Host:container ports | Memory limit |
+| ---------- | ----------------------------------- | -------------------- | ------------ |
+| `kafka-1`  | `apache/kafka:4.3.1`                | `9092:9092`          | `1500m`      |
+| `kafka-2`  | `apache/kafka:4.3.1`                | `9093:9093`          | `1500m`      |
+| `kafka-3`  | `apache/kafka:4.3.1`                | `9094:9094`          | `1500m`      |
+| `connect`  | `apache/kafka:4.3.1`                | `8083:8083`          | `2g`         |
+| `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
+| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
+
+# Metadata and lineage
+
+## OpenMetadata
+
+Profiles: `metadata`. Stack `metadata`, defined in `compose-metadata.yml`.
+
+### metadata
+
+Depends on: `postgres`. `odctl up metadata` also starts: `deps`, `postgres`.
+
+```text
+• OpenMetadata UI & REST API:
+  - External (host): http://127.0.0.1:8585
+  - Internal (Docker): http://openmetadata-server:8585
+• Ingestion Pipeline UI:
+  - External (host): http://127.0.0.1:8087
+  - Internal (Docker): http://openmetadata-ingestion:8080
+• Default Admin: admin@open-data.local / admin
+```
+
+| Service                  | Image                                                 | Host:container ports     | Memory limit |
+| ------------------------ | ----------------------------------------------------- | ------------------------ | ------------ |
+| `openmetadata-es`        | `docker.elastic.co/elasticsearch/elasticsearch:9.3.0` | `9200:9200`, `9300:9300` | `2g`         |
+| `openmetadata-migrate`   | `docker.getcollate.io/openmetadata/server:2.0.1`      | none                     | `1g`         |
+| `openmetadata-server`    | `docker.getcollate.io/openmetadata/server:2.0.1`      | `8585:8585`, `8586:8586` | `2g`         |
+| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.1`   | `8087:8080`              | `1500m`      |
+
+## Marquez
+
+Profiles: `lineage`. Stack `obsv`, defined in `compose-obsv.yml`.
+
+### lineage
+
+Depends on: `postgres`. `odctl up lineage` also starts: `deps`, `postgres`.
+
+```text
+• Marquez API Metadata Endpoint:
+  * External (host): http://127.0.0.1:5002
+  * Internal (Docker): http://marquez-api:5000
+• Marquez Lineage Graph Web UI:
+  * External (host): http://127.0.0.1:3003
+  * Internal (Docker): http://marquez-web:3000
+```
+
+| Service       | Image                               | Host:container ports     | Memory limit |
+| ------------- | ----------------------------------- | ------------------------ | ------------ |
+| `marquez-api` | `marquezproject/marquez:0.51.1`     | `5002:5000`, `5001:5001` | `1g`         |
+| `marquez-web` | `marquezproject/marquez-web:0.51.1` | `3003:3000`              | `512m`       |
+
+# MLOps
+
+## MLflow
+
+Profiles: `mlflow`. Stack `mlops`, defined in `compose-mlops.yml`.
+
+### mlflow
+
+Depends on: `postgres`, `storage`. `odctl up mlflow` also starts: `deps`, `postgres`, `storage`.
+
+```text
+• MLflow Tracking UI & Artifact Registry Server:
+  * External (host): http://127.0.0.1:5004
+  * Internal (Docker): http://mlflow:5000
+• MLflow Model Scoring Server, idle until MODEL_URI in .env names a model;
+  run `odctl up mlflow` again after setting it:
+  * External (host): http://127.0.0.1:5003/invocations
+  * Internal (Docker): http://mlflow-serve:5003/invocations
+• Liveness: http://127.0.0.1:5003/ping and http://127.0.0.1:5003/health
+```
+
+| Service        | Image                                             | Host:container ports | Memory limit |
+| -------------- | ------------------------------------------------- | -------------------- | ------------ |
+| `mlflow`       | `ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>` | `5004:5000`          | `2500m`      |
+| `mlflow-serve` | `ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>` | `5003:5003`          | `1500m`      |
+
+## Feast
+
+Profiles: `feast`. Stack `mlops`, defined in `compose-mlops.yml`.
+
+### feast
+
+Depends on: `catalog`, `valkey`. `odctl up feast` also starts: `catalog`, `deps`, `postgres`, `storage`, `valkey`.
+
+```text
+• Feast UI (registry browser, not data):
+  * External (host): http://127.0.0.1:8890
+  * Internal (Docker): http://feast-ui:8888
+• Upload your feature repository to s3://feast/repo. The services check
+  it every 15 seconds and restart Feast when it changes. Run
+  `feast apply` from your own environment. odctl ships no definitions.
+• Your environment needs: feast[duckdb,iceberg,redis,postgres]
+• On an IcebergSource against catalog, pass warehouse="" and
+  catalog_name="odctl". The REST client puts warehouse in the URL path,
+  and Iceberg's REST fixture server serves the spec with no prefix.
+• Online feature server for get_online_features:
+  * External (host): http://127.0.0.1:6566
+  * Internal (Docker): http://feast-serve:6566
+• Liveness: http://127.0.0.1:6566/health
+```
+
+| Service       | Image                                    | Host:container ports | Memory limit |
+| ------------- | ---------------------------------------- | -------------------- | ------------ |
+| `feast-ui`    | `quay.io/feastdev/feature-server:0.66.0` | `8890:8888`          | `1g`         |
+| `feast-serve` | `quay.io/feastdev/feature-server:0.66.0` | `6566:6566`          | `1g`         |
+
+## Evidently
+
+Profiles: `evidently`. Stack `mlops`, defined in `compose-mlops.yml`.
+
+### evidently
+
+Depends on: `postgres`. `odctl up evidently` also starts: `deps`, `postgres`.
+
+```text
+• Evidently UI & API (no login, and writes are open):
+  * External (host): http://127.0.0.1:8089
+  * Internal (Docker): http://evidently:8000
+• Push reports with RemoteWorkspace("http://127.0.0.1:8089") from the
+  host, or RemoteWorkspace("http://evidently:8000") from a container.
+  Reports are computed by the client, so it needs evidently==0.7.23.
+  In Airflow, set _AIRFLOW_PIP_DEPS="evidently==0.7.23" in .env.
+• Projects, reports, dashboards and datasets: the evidently database
+  on Postgres.
+• Settings: evidently/config.yaml in the workspace.
+```
+
+| Service     | Image                                | Host:container ports | Memory limit |
+| ----------- | ------------------------------------ | -------------------- | ------------ |
+| `evidently` | `evidently/evidently-service:0.7.23` | `8089:8000`          | `1g`         |
+
+# Observability
+
+## Telemetry (grafana/otel-lgtm)
+
+Profiles: `telemetry`. Stack `obsv`, defined in `compose-obsv.yml`.
+
+### telemetry
+
+Depends on: `deps`. `odctl up telemetry` also starts: `deps`.
+
+```text
+• Prometheus Time Series Engine (also takes OTLP at /api/v1/otlp/v1/metrics):
+  * External (host): http://127.0.0.1:19090
+  * Internal (Docker): http://prometheus:9090
+• Grafana Dashboards (Credentials: user / password):
+  * External (host): http://127.0.0.1:3004
+  * Internal (Docker): http://grafana:3000
+  * A dashboard per service in the odctl folder, which fills in once
+    that service's profile is up.
+• OTLP Receiver (metrics, traces and logs):
+  * External (host): 127.0.0.1:4317 (gRPC), http://127.0.0.1:4318 (HTTP)
+  * Internal (Docker): otel-lgtm:4317 (gRPC), http://otel-lgtm:4318 (HTTP)
+```
+
+| Service     | Image                      | Host:container ports                                | Memory limit |
+| ----------- | -------------------------- | --------------------------------------------------- | ------------ |
+| `otel-lgtm` | `grafana/otel-lgtm:0.35.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g`         |
+
+# Orchestration
+
+## Apache Airflow
+
+Profiles: `airflow`. Stack `orch`, defined in `compose-orch.yml`.
+
+### airflow
+
+Depends on: `postgres`, `storage`. `odctl up airflow` also starts: `deps`, `postgres`, `storage`.
+
+```text
+• Airflow Web UI (Credentials: user / password):
+  * External (host): http://127.0.0.1:8085
+  * Internal (Docker): http://airflow:8080
+• DAGs: read from s3://airflow/dags every 15 seconds.
+• Plugins: copied from s3://airflow/plugins at start. Airflow loads
+  plugins only once, so run `odctl restart airflow` after changing one.
+```
+
+| Service   | Image                                              | Host:container ports | Memory limit |
+| --------- | -------------------------------------------------- | -------------------- | ------------ |
+| `airflow` | `ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>` | `8085:8080`          | `3g`         |
+
+## Temporal
+
+Profiles: `temporal`. Stack `orch`, defined in `compose-orch.yml`.
+
+### temporal
+
+Depends on: `deps`. `odctl up temporal` also starts: `deps`.
+
+```text
+• Temporal Web UI:
+  * External (host): http://127.0.0.1:8233
+  * Internal (Docker): http://temporal:8233
+• gRPC endpoint for SDK clients and workers (namespace "default"):
+  * External (host): 127.0.0.1:7233
+  * Internal (Docker): temporal:7233
+• Your environment needs: temporalio. odctl runs only the server, so
+  your own process runs the worker that executes workflows and
+  activities.
+• Development server: the server, the UI and a SQLite database in one
+  process. History survives `odctl restart` and is lost on
+  `odctl down`, like every odctl service's data.
+• Prometheus metrics: http://temporal:9090/metrics, inside the network.
+```
+
+| Service    | Image                       | Host:container ports     | Memory limit |
+| ---------- | --------------------------- | ------------------------ | ------------ |
+| `temporal` | `temporalio/temporal:1.9.1` | `7233:7233`, `8233:8233` | `1g`         |
+
+# Storage and catalog
+
+## PostgreSQL
+
+Profiles: `postgres`. Stack `postgres`, defined in `compose-infra.yml`.
+
+### postgres
+
+Depends on: `deps`. `odctl up postgres` also starts: `deps`.
+
+```text
+• Postgres JDBC:
+  - External (host): jdbc:postgresql://127.0.0.1:5432/odctl
+  - Internal (Docker): jdbc:postgresql://postgres:5432/odctl
+  - Credentials: user / password
+• Extensions, created in the `vector` database:
+  - vector (pgvector): vector columns and HNSW or IVFFlat indexes
+  - pg_textsearch: BM25 keyword ranking, for hybrid search with pgvector
+  - postgis: geometry and geography types and spatial queries
+  Run CREATE EXTENSION in another database to use them there.
+```
+
+| Service    | Image                                               | Host:container ports | Memory limit |
+| ---------- | --------------------------------------------------- | -------------------- | ------------ |
+| `postgres` | `ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>` | `5432:5432`          | `1g`         |
+
+## SeaweedFS
+
+Profiles: `storage`. Stack `storage`, defined in `compose-infra.yml`.
+
+### storage
+
+Depends on: `deps`. `odctl up storage` also starts: `deps`.
+
+```text
+• S3 Browser UI:
+  - External (host): http://127.0.0.1:8889
+  - Internal (Docker): http://seaweed:8888
+• S3 API Endpoint:
+  - External (host): http://127.0.0.1:8333
+  - Internal (Docker): http://seaweed:8333
+  - Default AWS Keys: user / password
+```
+
+| Service        | Image                      | Host:container ports                  | Memory limit |
+| -------------- | -------------------------- | ------------------------------------- | ------------ |
+| `seaweed`      | `chrislusf/seaweedfs:4.48` | `8333:8333`, `8889:8888`, `9333:9333` | `512m`       |
+| `seaweed-init` | `chrislusf/seaweedfs:4.48` | none                                  | not set      |
+
+## Iceberg REST catalog
+
+Profiles: `catalog`. Stack `catalog`, defined in `compose-infra.yml`.
+
+### catalog
+
+Depends on: `postgres`, `storage`. `odctl up catalog` also starts: `deps`, `postgres`, `storage`.
+
+```text
+• REST API Endpoint:
+  - External (host): http://127.0.0.1:8181
+  - Internal (Docker): http://catalog:8181
+```
+
+| Service   | Image                               | Host:container ports | Memory limit |
+| --------- | ----------------------------------- | -------------------- | ------------ |
+| `catalog` | `azul/zulu-openjdk:17-jre-headless` | `8181:8181`          | `512m`       |
+
+## Valkey
+
+Profiles: `valkey`. Stack `store`, defined in `compose-store.yml`.
+
+### valkey
+
+Depends on: `deps`. `odctl up valkey` also starts: `deps`.
+
+```text
+• Valkey (Multi-Model Data Store: Cache, JSON, Vector Search):
+  * External (host): 127.0.0.1:6379
+  * Internal (Docker): valkey:6379
+  * Authentication: username 'user', password 'password'
+```
+
+| Service  | Image                               | Host:container ports | Memory limit |
+| -------- | ----------------------------------- | -------------------- | ------------ |
+| `valkey` | `valkey/valkey-bundle:9.1.3-alpine` | `6379:6379`          | `512m`       |
+
+## Apache Fluss
+
+Profiles: `fluss`. Stack `store`, defined in `compose-store.yml`.
+
+### fluss
+
+Depends on: `deps`. `odctl up fluss` also starts: `deps`.
+
+```text
+• Fluss Coordinator API:
+  * External (host): 127.0.0.1:9123
+  * Internal (Docker): fluss-coordinator:9123
+• The servers advertise their container names, which resolve only
+  inside the odctl network, so run Fluss clients in a container, such
+  as Flink.
+```
+
+| Service             | Image                | Host:container ports | Memory limit |
+| ------------------- | -------------------- | -------------------- | ------------ |
+| `fluss-zookeeper`   | `zookeeper:3.9.6`    | none                 | `512m`       |
+| `fluss-coordinator` | `apache/fluss:1.0.0` | `9123:9123`          | `1g`         |
+| `fluss-tablet-1`    | `apache/fluss:1.0.0` | `9124:9123`          | `2g`         |
+
+## Shared dependencies
+
+Profiles: `deps`. Stack `deps`, defined in `compose-deps.yml`.
+
+### deps
+
+Depends on: nothing. `odctl up deps` also starts: nothing else.
+
+```text
+• Runs automatically on 'odctl up'.
+• No persistent UI or ports exposed.
+```
+
+| Service     | Image                                           | Host:container ports | Memory limit |
+| ----------- | ----------------------------------------------- | -------------------- | ------------ |
+| `init-deps` | `ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>` | none                 | not set      |
+
+# Stream and batch processing
+
+## Apache Flink
+
+Profiles: `flink-lite`, `flink-full`. Stack `flink`, defined in `compose-flink.yml`.
+
+### flink-lite
+
+Depends on: `catalog`. `odctl up flink-lite` also starts: `catalog`, `deps`, `postgres`, `storage`.
+
+```text
+• Flink JobManager UI (1 TaskManager):
+  - External (host): http://127.0.0.1:8082
+  - Internal (Docker): http://jobmanager:8081
+• SQL Gateway REST:
+  - External (host): http://127.0.0.1:8084
+  - Internal (Docker): http://flink-sql-gateway:8083
+```
+
+| Service         | Image              | Host:container ports | Memory limit |
+| --------------- | ------------------ | -------------------- | ------------ |
+| `jobmanager`    | `flink:2.2-java17` | `8082:8081`          | `1500m`      |
+| `taskmanager-a` | `flink:2.2-java17` | none                 | `3500m`      |
+| `sql-gateway`   | `flink:2.2-java17` | `8084:8083`          | `1g`         |
+
+### flink-full
+
+Depends on: `catalog`. `odctl up flink-full` also starts: `catalog`, `deps`, `postgres`, `storage`.
+
+```text
+• Flink JobManager UI (3 TaskManagers):
+  - External (host): http://127.0.0.1:8082
+  - Internal (Docker): http://jobmanager:8081
+• SQL Gateway REST:
+  - External (host): http://127.0.0.1:8084
+  - Internal (Docker): http://flink-sql-gateway:8083
+```
+
+| Service         | Image              | Host:container ports | Memory limit |
+| --------------- | ------------------ | -------------------- | ------------ |
+| `jobmanager`    | `flink:2.2-java17` | `8082:8081`          | `1500m`      |
+| `taskmanager-a` | `flink:2.2-java17` | none                 | `3500m`      |
+| `taskmanager-b` | `flink:2.2-java17` | none                 | `3500m`      |
+| `taskmanager-c` | `flink:2.2-java17` | none                 | `3500m`      |
+| `sql-gateway`   | `flink:2.2-java17` | `8084:8083`          | `1g`         |
+
+## Apache Spark
+
+Profiles: `spark-lite`, `spark-full`. Stack `spark`, defined in `compose-spark.yml`.
+
+### spark-lite
+
+Depends on: `catalog`. `odctl up spark-lite` also starts: `catalog`, `deps`, `postgres`, `storage`.
+
+```text
+• Spark Master UI (1 Worker):
+  - External (host): http://127.0.0.1:9080
+  - Internal (Docker): http://spark-master:8080
+• Master RPC:
+  - External (host): spark://127.0.0.1:7077
+  - Internal (Docker): spark://spark-master:7077
+• Spark History Server:
+  - External (host): http://127.0.0.1:18080
+  - Internal (Docker): http://spark-history:18080
+```
+
+| Service          | Image                                            | Host:container ports     | Memory limit |
+| ---------------- | ------------------------------------------------ | ------------------------ | ------------ |
+| `spark-master`   | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9080:8080`, `7077:7077` | `1g`         |
+| `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9081:8081`              | `2g`         |
+| `spark-history`  | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `18080:18080`            | `1g`         |
+
+### spark-full
+
+Depends on: `catalog`. `odctl up spark-full` also starts: `catalog`, `deps`, `postgres`, `storage`.
+
+```text
+• Spark Master UI (3 Workers):
+  - External (host): http://127.0.0.1:9080
+  - Internal (Docker): http://spark-master:8080
+• Master RPC:
+  - External (host): spark://127.0.0.1:7077
+  - Internal (Docker): spark://spark-master:7077
+• Spark History Server:
+  - External (host): http://127.0.0.1:18080
+  - Internal (Docker): http://spark-history:18080
+```
+
+| Service          | Image                                            | Host:container ports     | Memory limit |
+| ---------------- | ------------------------------------------------ | ------------------------ | ------------ |
+| `spark-master`   | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9080:8080`, `7077:7077` | `1g`         |
+| `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9081:8081`              | `2g`         |
+| `spark-worker-2` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9082:8081`              | `2g`         |
+| `spark-worker-3` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9083:8081`              | `2g`         |
+| `spark-history`  | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `18080:18080`            | `1g`         |
+# Guides
+
+# Produce and consume with Kafka
+
+The `kafka-lite` profile runs one Kafka broker in KRaft mode, the Karapace schema registry, Kafka Connect and Kafka UI. `kafka-full` runs three brokers with the same services beside them. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up kafka-lite
+```
+
+| Endpoint                                     | Address                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| Bootstrap servers from the host              | `127.0.0.1:9092` (`kafka-full` adds `127.0.0.1:9093` and `127.0.0.1:9094`) |
+| Bootstrap servers inside the `odctl` network | `broker-1:19092`                                                           |
+| Kafka UI                                     | `http://127.0.0.1:8086`                                                    |
+| Schema registry (Karapace)                   | `http://127.0.0.1:8081`                                                    |
+| Kafka Connect REST API                       | `http://127.0.0.1:8083`                                                    |
+
+## Create a topic
+
+The Kafka command-line tools are in the broker container, which is `kafka` in `kafka-lite` and `kafka-1` in `kafka-full`:
+
+docs/snippets/kafka/commands.sh:create-topic
+
+```bash
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+  --create --topic demo --partitions 1 --replication-factor 1
+```
+
+## Produce and consume
+
+docs/snippets/kafka/commands.sh:produce-consume
+
+```bash
+for i in 1 2 3 4 5; do echo "{\"n\":$i}"; done | docker exec -i kafka \
+  /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic demo
+
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server broker-1:19092 \
+  --topic demo --from-beginning --max-messages 5 --timeout-ms 60000
+```
+
+The consumer reads through a consumer group, so its offsets are stored in the broker's `__consumer_offsets` topic.
+
+Kafka UI at `http://127.0.0.1:8086` shows the topics, their messages, the consumer groups and the schemas in Karapace.
+
+## Kafka Connect
+
+Both Kafka profiles run a Kafka Connect worker beside the brokers. [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md) lists the plugins it loads and shows how to register a connector.
+
+# Kafka Connect
+
+Both Kafka profiles run one Kafka Connect worker, `connect`, beside the brokers. It loads its plugins from the shared volume that the `deps` profile fills, and you manage connectors through its REST API. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up kafka-lite
+```
+
+| Setting                             | Value                                  |
+| ----------------------------------- | -------------------------------------- |
+| REST API from the host              | `http://127.0.0.1:8083`                |
+| REST API inside the `odctl` network | `http://connect:8083`                  |
+| Plugin folder                       | `/mnt/shared-deps/connect`             |
+| Default converters                  | JSON with schemas, for keys and values |
+| Offset flush interval               | 10 seconds                             |
+
+## Plugins
+
+The `deps` image puts these connectors in the plugin folder: the Apache Iceberg sink, the Debezium PostgreSQL source, the ClickHouse sink, the Aiven JDBC connector, the Aiven S3 sink, the Redis connector and the MSK data generator. List the classes Connect has loaded:
+
+docs/snippets/kafka-connect/commands.sh:plugins
+
+```bash
+curl -s http://127.0.0.1:8083/connector-plugins
+```
+
+The tests check that the list includes `org.apache.iceberg.connect.IcebergSinkConnector`, `io.debezium.connector.postgresql.PostgresConnector` and `com.clickhouse.kafka.connect.ClickHouseSinkConnector`. A plugin missing from the volume does not stop Connect from starting. It only leaves the class out of this list.
+
+## Register a connector
+
+A connector is a name and a `config` object, posted to `/connectors`. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) has a complete Iceberg sink configuration. Save it as `demo-iceberg.json` and post it:
+
+docs/snippets/kafka-connect/commands.sh:register
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  http://127.0.0.1:8083/connectors -d @demo-iceberg.json
+```
+
+The worker's default converters expect JSON with a schema envelope. A connector that reads plain JSON sets `"value.converter.schemas.enable": "false"` in its own config, as the Iceberg example does.
+
+## Check and remove it
+
+docs/snippets/kafka-connect/commands.sh:status-remove
+
+```bash
+curl -s http://127.0.0.1:8083/connectors/demo-iceberg/status
+curl -X DELETE http://127.0.0.1:8083/connectors/demo-iceberg
+```
+
+The status shows the connector and each task as `RUNNING` or `FAILED`, with the error for a failed task. The worker's log has the rest:
+
+docs/snippets/kafka-connect/commands.sh:logs
+
+```bash
+docker logs --tail 40 connect
+```
+
+Kafka UI lists the connector under Kafka Connect, Connectors:
+
+## PostgreSQL for Debezium
+
+The `postgres` profile runs PostgreSQL with `wal_level=logical`. Its init script creates the `cdc` schema and the `cdc_pub` publication for every table in that schema, so a Debezium source can read changes to tables you create in `cdc`. Start both profiles to use it:
+
+```bash
+odctl up postgres kafka-lite
+```
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), the REST API is `http://connect:8083`, and connectors reach the brokers at `broker-1:19092`, the catalog at `http://catalog:8181` and SeaweedFS at `http://seaweed:8333`.
+
+# Flink SQL: Kafka to PostgreSQL
+
+The `flink-lite` profile runs a Flink JobManager, one TaskManager and the SQL Gateway. `flink-full` runs three TaskManagers. Flink's connector jars for Kafka, Avro with the schema registry, JDBC and Iceberg come from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
+
+This guide reads Avro records from Kafka through the Karapace schema registry and writes an aggregate to PostgreSQL over JDBC. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) shows Flink writing an Iceberg table.
+
+```bash
+odctl up flink-lite kafka-lite
+```
+
+`flink-lite` starts PostgreSQL itself, because it depends on the Iceberg catalog, which keeps its metadata there.
+
+| Endpoint                                  | Address                         |
+| ----------------------------------------- | ------------------------------- |
+| Flink UI and REST API from the host       | `http://127.0.0.1:8082`         |
+| SQL Gateway REST API from the host        | `http://127.0.0.1:8084`         |
+| Flink REST API inside the `odctl` network | `http://jobmanager:8081`        |
+| SQL Gateway inside the `odctl` network    | `http://flink-sql-gateway:8083` |
+
+## Create the topic and the target table
+
+docs/snippets/flink-sql/commands.sh:create-topic-table
+
+```bash
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+  --create --if-not-exists --topic orders --partitions 1 --replication-factor 1
+
+docker exec postgres psql -U user -d odctl -c "
+  CREATE TABLE supplier_stats (supplier TEXT PRIMARY KEY, orders BIGINT, total DOUBLE PRECISION);"
+```
+
+## Run the SQL
+
+Open the SQL client in the JobManager container:
+
+docs/snippets/flink-sql/commands.sh:sql-client
+
+```bash
+docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
+```
+
+docs/snippets/flink-sql/steps.sql:kafka-to-postgres
+
+```sql
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+CREATE TABLE orders (supplier STRING, price DOUBLE) WITH ('connector'='kafka','topic'='orders','properties.bootstrap.servers'='broker-1:19092','scan.startup.mode'='earliest-offset','scan.bounded.mode'='latest-offset','format'='avro-confluent','avro-confluent.url'='http://karapace:8081');
+INSERT INTO orders VALUES ('a', 10.0), ('a', 5.0), ('b', 7.5);
+CREATE TABLE stats (supplier STRING, orders BIGINT, total DOUBLE, PRIMARY KEY (supplier) NOT ENFORCED) WITH ('connector'='jdbc','url'='jdbc:postgresql://postgres:5432/odctl','table-name'='supplier_stats','username'='user','password'='password');
+INSERT INTO stats SELECT supplier, COUNT(*), SUM(price) FROM orders GROUP BY supplier;
+```
+
+The first `INSERT` writes three Avro records to Kafka and registers their schema in Karapace. The second reads them back, groups them by supplier and writes the result to PostgreSQL. `scan.bounded.mode` set to `latest-offset` makes the Kafka source stop at the end of the topic, so the batch job finishes. Leave it out and set `execution.runtime-mode` to `streaming` for a job that keeps running.
+
+Right after Kafka starts, Karapace can answer its health check and still time out on a schema write for a short while. If the first `INSERT` fails on the schema registry, run it again.
+
+## Check the result
+
+docs/snippets/flink-sql/commands.sh:check
+
+```bash
+docker exec postgres psql -U user -d odctl -c "SELECT * FROM supplier_stats ORDER BY supplier"
+```
+
+Supplier `a` has 2 orders totalling 15, and supplier `b` has 1 order totalling 7.5. The Flink UI at `http://127.0.0.1:8082` shows the jobs the SQL client submitted.
+
+The two `INSERT` statements run as two batch jobs, listed under Completed Jobs.
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), Flink's REST API is `http://jobmanager:8081` and the SQL Gateway is `http://flink-sql-gateway:8083`. In Flink SQL, Kafka is `broker-1:19092`, Karapace is `http://karapace:8081` and PostgreSQL is `jdbc:postgresql://postgres:5432/odctl`.
+
+# Fluss
+
+The `fluss` profile runs Apache Fluss: a coordinator server, one tablet server and the ZooKeeper they register in. Flink reads and writes Fluss tables through the Fluss catalog, whose client jar comes from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up fluss flink-lite
+```
+
+| Endpoint                                 | Address                  |
+| ---------------------------------------- | ------------------------ |
+| Coordinator inside the `odctl` network   | `fluss-coordinator:9123` |
+| Tablet server inside the `odctl` network | `fluss-tablet-1:9123`    |
+
+The coordinator is also published on `127.0.0.1:9123` and the tablet server on `127.0.0.1:9124`. Both advertise their container names, which resolve only inside the `odctl` network, so run Fluss clients in a container, such as Flink.
+
+## Check the cluster formed
+
+The servers register in ZooKeeper once they are up. List the tablet servers and read the active coordinator:
+
+docs/snippets/fluss/commands.sh:registrations
+
+```bash
+docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids
+docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active
+```
+
+The first prints `[0]`, the id of the one tablet server. The second names `fluss-coordinator:9123`.
+
+## Write and read a table with Flink SQL
+
+docs/snippets/fluss/commands.sh:sql-client
+
+```bash
+docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
+```
+
+docs/snippets/fluss/steps.sql:table
+
+```sql
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+SET 'sql-client.execution.result-mode' = 'tableau';
+CREATE CATALOG fluss_catalog WITH ('type' = 'fluss', 'bootstrap.servers' = 'fluss-coordinator:9123');
+CREATE DATABASE IF NOT EXISTS fluss_catalog.demo;
+CREATE TABLE fluss_catalog.demo.t (id BIGINT, name STRING, PRIMARY KEY (id) NOT ENFORCED);
+INSERT INTO fluss_catalog.demo.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT * FROM fluss_catalog.demo.t LIMIT 10;
+```
+
+The `SELECT` returns the three rows.
+
+Fluss keeps its data inside its containers, so `odctl down` removes it.
+
+The Flink UI lists the two jobs:
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), set a Fluss client's bootstrap servers to `fluss-coordinator:9123`.
+
+# Ingest into Iceberg
+
+Kafka Connect, Flink and Spark all write Iceberg tables through the same REST catalog, `http://catalog:8181`, with the files on SeaweedFS under `s3://warehouse`. The end-to-end tests run the commands below on every release.
+
+## Kafka Connect sink
+
+`kafka-lite` does not start the catalog, so start both:
+
+```bash
+odctl up kafka-lite catalog
+```
+
+Create a namespace and a table through the catalog's REST API:
+
+docs/snippets/iceberg-ingestion/commands.sh:create-table
+
+```bash
+api=http://127.0.0.1:8181/v1/namespaces
+curl -X POST -H 'Content-Type: application/json' -d '{"namespace":["demo"]}' "$api"
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"name":"kc","schema":{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","required":false,"type":"long"},{"id":2,"name":"name","required":false,"type":"string"}]}}' \
+  "$api/demo/tables"
+```
+
+Create the topic and the sink's control topic, then write some JSON records:
+
+docs/snippets/iceberg-ingestion/commands.sh:topics-produce
+
+```bash
+for topic in demo-iceberg control-iceberg; do
+  docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+    --create --if-not-exists --topic "$topic" --partitions 1 --replication-factor 1
+done
+for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -i kafka \
+  /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic demo-iceberg
+```
+
+Save the sink's configuration as `demo-iceberg.json`:
+
+docs/snippets/kafka-connect/demo-iceberg.json
+
+```json
+{
+  "name": "demo-iceberg",
+  "config": {
+    "connector.class": "org.apache.iceberg.connect.IcebergSinkConnector",
+    "tasks.max": "1",
+    "topics": "demo-iceberg",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "iceberg.tables": "demo.kc",
+    "iceberg.control.commit.interval-ms": "10000",
+    "iceberg.kafka.session.timeout.ms": "300000",
+    "iceberg.kafka.heartbeat.interval.ms": "3000",
+    "iceberg.kafka.auto.offset.reset": "earliest",
+    "consumer.override.auto.offset.reset": "earliest",
+    "iceberg.catalog.type": "rest",
+    "iceberg.catalog.uri": "http://catalog:8181",
+    "iceberg.catalog.io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+    "iceberg.catalog.client.region": "us-east-1",
+    "iceberg.catalog.s3.endpoint": "http://seaweed:8333",
+    "iceberg.catalog.s3.path-style-access": "true",
+    "iceberg.catalog.s3.access-key-id": "user",
+    "iceberg.catalog.s3.secret-access-key": "password"
+  }
+}
+```
+
+Register it with Kafka Connect:
+
+docs/snippets/kafka-connect/commands.sh:register
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  http://127.0.0.1:8083/connectors -d @demo-iceberg.json
+```
+
+The first commit can take a minute or more, because the sink waits for its control consumer to join a group. After that, `curl $api/demo/tables/kc` shows a snapshot whose summary has `"total-records": "5"`.
+
+The table's data and metadata files are in SeaweedFS, whose browser at `http://127.0.0.1:8889` lists the buckets, including `warehouse`.
+
+## Flink SQL
+
+docs/snippets/iceberg-ingestion/commands.sh:flink-client
+
+```bash
+odctl up flink-lite
+docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
+```
+
+docs/snippets/iceberg-ingestion/steps.sql:flink
+
+```sql
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+SET 'sql-client.execution.result-mode' = 'tableau';
+CREATE CATALOG ice WITH ('type'='iceberg','catalog-type'='rest','uri'='http://catalog:8181','warehouse'='s3://warehouse','s3.endpoint'='http://seaweed:8333','s3.path-style-access'='true','s3.access-key-id'='user','s3.secret-access-key'='password');
+CREATE DATABASE IF NOT EXISTS ice.demo_flink;
+CREATE TABLE ice.demo_flink.t (id BIGINT, name STRING);
+INSERT INTO ice.demo_flink.t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT COUNT(*) FROM ice.demo_flink.t;
+```
+
+## Spark SQL
+
+Spark's default catalog is `iceberg`, already pointed at the REST catalog through `spark/spark-defaults.conf` in the workspace, so `spark-sql` needs no `CREATE CATALOG`. [Spark](https://jaehyeon.me/odctl/latest/guides/spark/#run-sql-against-iceberg) creates and queries a table.
+
+Every engine sees the same tables, so a table written by one can be read by the others, and by Trino through its `iceberg` catalog.
+
+# Spark
+
+The `spark-lite` profile runs a Spark master, one worker and the Spark History Server. `spark-full` runs three workers. Spark's default catalog is `iceberg`, already pointed at the Iceberg REST catalog, so `spark-sql` reads and writes Iceberg tables with no extra settings. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up spark-lite
+```
+
+| Endpoint                                        | Address                      |
+| ----------------------------------------------- | ---------------------------- |
+| Spark master UI from the host                   | `http://127.0.0.1:9080`      |
+| Master URL from the host                        | `spark://127.0.0.1:7077`     |
+| Spark History Server from the host              | `http://127.0.0.1:18080`     |
+| Master URL inside the `odctl` network           | `spark://spark-master:7077`  |
+| Spark History Server inside the `odctl` network | `http://spark-history:18080` |
+
+## Run SQL against Iceberg
+
+docs/snippets/spark/commands.sh:run-sql
+
+```bash
+docker exec spark-master /opt/spark/bin/spark-sql -e "
+  CREATE NAMESPACE IF NOT EXISTS iceberg.demo;
+  CREATE OR REPLACE TABLE iceberg.demo.t (id BIGINT) USING iceberg;
+  INSERT INTO iceberg.demo.t VALUES (1),(2),(3);
+  SELECT count(*) FROM iceberg.demo.t;"
+```
+
+The query prints `3`. The table is in the same catalog that Flink, Kafka Connect and Trino use, so [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) shows the other engines writing to it.
+
+## See finished applications
+
+Every Spark application writes an event log to `/tmp/spark-events`, which all Spark containers share. List the logs:
+
+docs/snippets/spark/commands.sh:event-logs
+
+```bash
+docker exec spark-master ls /tmp/spark-events
+```
+
+The Spark History Server at `http://127.0.0.1:18080` reads the same directory, so the `spark-sql` run above appears there after it ends, with its jobs, stages and SQL plans. The master UI at `http://127.0.0.1:9080` shows the workers and the applications the master has run.
+
+The event logs are on a volume held in memory, so `odctl down` removes them.
+
+The History Server lists the `spark-sql` run:
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), submit applications to `spark://spark-master:7077`. Spark's settings, including the `iceberg` catalog and S3 access to SeaweedFS, are in `spark/spark-defaults.conf` in the workspace.
+
+# ClickHouse
+
+The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up ch-lite
+```
+
+| Endpoint                      | Address                                                                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| HTTP from the host            | `http://127.0.0.1:8123` (`ch-11`) and `http://127.0.0.1:8124` (`ch-12`); `ch-full` adds `8125` (`ch-21`) and `8126` (`ch-22`) |
+| Native protocol from the host | `127.0.0.1:9000` (`ch-11`) and `127.0.0.1:9001` (`ch-12`); `ch-full` adds `9002` (`ch-21`) and `9003` (`ch-22`)               |
+| Users                         | `default` and `user`, both with the password `password`                                                                       |
+
+Every server creates the `feature_store` and `odctl` databases when it starts with no data.
+
+## Create a table and query it
+
+`clickhouse-client` is in each server container:
+
+docs/snippets/clickhouse/commands.sh:merge-tree
+
+```bash
+docker exec ch-11 clickhouse-client --password password -q "SHOW DATABASES"
+
+docker exec ch-11 clickhouse-client --password password -q \
+  "CREATE TABLE default.demo (id UInt32) ENGINE=MergeTree ORDER BY id"
+docker exec ch-11 clickhouse-client --password password -q \
+  "INSERT INTO default.demo SELECT number FROM numbers(10)"
+docker exec ch-11 clickhouse-client --password password -q \
+  "SELECT count() FROM default.demo"
+```
+
+The last command prints `10`.
+
+ClickHouse also serves a query page at `http://127.0.0.1:8123/play`. Enter `default` and `password` in the top right, write a query and press Run.
+
+## Replicate across the cluster
+
+In `ch-full`, `{cluster}` names `odctl_cluster`, which has two shards of two replicas. A table created `ON CLUSTER` with `ReplicatedMergeTree` is created on all four servers, and Keeper keeps the two replicas of each shard in step:
+
+docs/snippets/clickhouse/commands.sh:replicated
+
+```bash
+odctl up ch-full
+
+docker exec ch-11 clickhouse-client --password password -q \
+  "CREATE TABLE default.repl ON CLUSTER '{cluster}' (id UInt32) ENGINE=ReplicatedMergeTree ORDER BY id"
+docker exec ch-11 clickhouse-client --password password -q \
+  "INSERT INTO default.repl SELECT number FROM numbers(50)"
+
+docker exec ch-12 clickhouse-client --password password -q "SELECT count() FROM default.repl"
+docker exec ch-21 clickhouse-client --password password -q "SELECT count() FROM default.repl"
+```
+
+`ch-12`, the other replica of shard 1, returns `50` once replication has caught up. `ch-21` returns `0`, because shard 2 holds only the rows written to it.
+
+In `ch-lite`, `{cluster}` names `odctl_single_shard`, which holds `ch-11` and `ch-12` only, so `ON CLUSTER` statements finish without waiting for the missing shard.
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), connect to `ch-11:8123` over HTTP or `ch-11:9000` with the native protocol, with the same users. Trino's `clickhouse` catalog reads the `feature_store` database on `ch-11`, as [Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md) shows.
+
+# Trino and Metabase
+
+The `trino` profile runs Trino, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The `metabase` profile runs Metabase, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start `postgres`. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up trino metabase
+```
+
+| Endpoint                        | Address                 |
+| ------------------------------- | ----------------------- |
+| Trino UI and JDBC from the host | `http://127.0.0.1:8080` |
+| Metabase from the host          | `http://127.0.0.1:3000` |
+
+## Trino catalogs
+
+docs/snippets/trino-metabase/commands.sh:catalogs
+
+```bash
+docker exec trino trino --execute "SHOW CATALOGS"
+```
+
+| Catalog      | Reads                                                 | Needs                        |
+| ------------ | ----------------------------------------------------- | ---------------------------- |
+| `postgres`   | the `odctl` database                                  | nothing more                 |
+| `iceberg`    | tables in the REST catalog, with files on SeaweedFS   | `catalog`                    |
+| `clickhouse` | the `feature_store` database on `ch-11`               | `ch-lite` or `ch-full`       |
+| `kafka`      | topics, with fields from the Karapace schema registry | `kafka-lite` or `kafka-full` |
+| `valkey`     | keys in Valkey                                        | `valkey`                     |
+
+Every catalog loads when Trino starts, even when its service is not running. A query against such a catalog fails until you start that profile. Catalogs finish loading after Trino's health endpoint starts answering, so `SHOW CATALOGS` can take a minute to list them all.
+
+Run a query:
+
+docs/snippets/trino-metabase/commands.sh:query
+
+```bash
+docker exec trino trino --execute "SELECT 1"
+```
+
+Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Workspace](https://jaehyeon.me/odctl/latest/how-it-works/#workspace) explains the access rules in `trino/rules.json`.
+
+The Trino UI at `http://127.0.0.1:8080` asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.
+
+## Metabase
+
+Open `http://127.0.0.1:3000` and create the first admin account. Then add each database under Admin settings, Databases, with these settings:
+
+| Database type         | Host       | Port   | Other settings                                                  |
+| --------------------- | ---------- | ------ | --------------------------------------------------------------- |
+| PostgreSQL            | `postgres` | `5432` | database `odctl`, user `user`, password `password`              |
+| ClickHouse            | `ch-11`    | `8123` | database `default`, user `default`, password `password`, no SSL |
+| Starburst (for Trino) | `trino`    | `8080` | catalog `postgres`, schema `public`, user `admin`, no SSL       |
+
+Metabase runs inside the `odctl` network, so it reaches each database by container name. Use the Starburst driver for Trino, because it is the Trino driver Metabase ships. It needs a catalog, and any catalog in the table above works.
+
+Metabase takes a while to start. It is ready when this request succeeds:
+
+docs/snippets/trino-metabase/commands.sh:metabase-health
+
+```bash
+curl http://127.0.0.1:3000/api/health
+```
+
+A SQL question on the PostgreSQL connection, shown as a bar chart:
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), Trino is at `http://trino:8080` and Metabase at `http://metabase:3000`.
+
+# Airflow DAGs from S3
+
+The `airflow` profile runs `airflow standalone` in one container against odctl's PostgreSQL. It reads DAG files from `s3://airflow/dags` on SeaweedFS, so you deploy a DAG by uploading it. No volume or sync container is involved. The end-to-end tests run the steps below on every release.
+
+```bash
+odctl up airflow
+```
+
+The web UI is at `http://127.0.0.1:8085`, with user `user` and password `password`.
+
+## Upload a DAG
+
+Any S3 client pointed at `http://127.0.0.1:8333` with key `user` and secret `password` can upload. This uses boto3 inside the Airflow container:
+
+docs/snippets/airflow-dags/commands.sh:upload
+
+```bash
+docker exec -i airflow python - <<'PY'
+import boto3
+body = '''
+from airflow.sdk import DAG
+from airflow.providers.standard.operators.bash import BashOperator
+import pendulum
+
+with DAG(
+    dag_id="hello",
+    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
+    schedule=None,
+    catchup=False,
+):
+    BashOperator(task_id="say_hello", bash_command="echo hello")
+'''
+boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(
+    Bucket="airflow", Key="dags/hello.py", Body=body.encode())
+PY
+```
+
+Airflow checks the bucket every 15 seconds and then parses the new file.
+
+## Run it
+
+New DAGs start paused. Wait until the DAG is listed, then unpause and trigger it:
+
+docs/snippets/airflow-dags/commands.sh:run
+
+```bash
+docker exec airflow airflow dags list | grep hello
+docker exec airflow airflow dags unpause hello
+docker exec airflow airflow dags trigger hello
+docker exec airflow airflow dags list-runs hello
+```
+
+The DAG page shows the run and the `say_hello` task.
+
+## Plugins and packages
+
+Plugins are copied from `s3://airflow/plugins` when the container starts, because Airflow loads plugins only once. Run `odctl restart airflow` after changing one.
+
+To install extra Python packages, set `_AIRFLOW_PIP_DEPS` in `.odctl/.env`, for example `_AIRFLOW_PIP_DEPS="scikit-learn"`, and run `odctl recreate airflow`. Tasks already have the MLflow and Feast clients, and `MLFLOW_TRACKING_URI` points at the `mlflow` profile.
+
+# Temporal workers
+
+The `temporal` profile runs the Temporal development server: the server, the Web UI and a SQLite database in one container. odctl runs only the server. Your own process runs the worker that executes workflows and activities. The end-to-end tests run the code below on every release.
+
+docs/snippets/temporal-workers/commands.sh:install
+
+```bash
+odctl up temporal
+pip install temporalio==1.34.0
+```
+
+The gRPC endpoint is `127.0.0.1:7233` with the namespace `default`, and the Web UI is at `http://127.0.0.1:8233`.
+
+## A worker and a workflow
+
+The activity fails on its first attempt, so the result shows that the retry policy ran it again.
+
+docs/snippets/temporal-workers/steps.py:worker
+
+```python
+import asyncio
+from datetime import timedelta
+from temporalio import activity, workflow
+from temporalio.client import Client
+from temporalio.common import RetryPolicy
+from temporalio.worker import Worker
+
+
+@activity.defn
+async def greet(name: str) -> str:
+    if activity.info().attempt < 2:
+        raise RuntimeError("first attempt fails on purpose")
+    return f"hello {name}"
+
+
+@workflow.defn
+class Greet:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_activity(
+            greet, name,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(initial_interval=timedelta(seconds=1), maximum_attempts=3),
+        )
+
+
+async def main() -> None:
+    client = await Client.connect("127.0.0.1:7233")
+    async with Worker(client, task_queue="demo", workflows=[Greet], activities=[greet]):
+        print(await client.execute_workflow(Greet.run, "odctl", id="greet-1", task_queue="demo"))
+
+
+# The workflow sandbox imports this file again, so run main only as a script.
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Wait for an approval
+
+A workflow can wait for a signal, for example a person approving an agent's action. The workflow below waits until its `approve` signal arrives, and then returns who approved it:
+
+docs/snippets/temporal-workers/steps.py:approval-workflow
+
+```python
+@workflow.defn
+class Approval:
+    def __init__(self) -> None:
+        self.approver = None
+
+    @workflow.signal
+    def approve(self, approver: str) -> None:
+        self.approver = approver
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.approver is not None)
+        return f"approved by {self.approver}"
+```
+
+In `main` above, register it with the worker, start it, then send the signal:
+
+docs/snippets/temporal-workers/steps.py:approval-run
+
+```python
+async with Worker(client, task_queue="demo", workflows=[Greet, Approval], activities=[greet]):
+    handle = await client.start_workflow(Approval.run, id="approval-1", task_queue="demo")
+    await handle.signal(Approval.approve, "alice")
+    print(await handle.result())
+```
+
+Until the signal arrives, the Web UI lists the workflow as running.
+
+The Web UI at `http://127.0.0.1:8233` lists each workflow. Here `approval-2` was started without a signal, so it is still running:
+
+## History
+
+Workflow history is in the database file inside the container. It survives `odctl restart temporal`, and the tests check that a workflow left waiting for its signal resumes and completes afterwards. `odctl down` removes the history, as it removes every odctl service's data.
+
+# MLflow tracking and model serving
+
+The `mlflow` profile runs two containers. `mlflow` is the tracking server and model registry, with runs on PostgreSQL and artifacts on SeaweedFS under `s3://mlflow`. `mlflow-serve` scores a registered model over HTTP. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up mlflow
+```
+
+| Endpoint                                | Address                                |
+| --------------------------------------- | -------------------------------------- |
+| Tracking UI and API from the host       | `http://127.0.0.1:5004`                |
+| Tracking API inside the `odctl` network | `http://mlflow:5000`                   |
+| Model server from the host              | `http://127.0.0.1:5003/invocations`    |
+| Model server inside the `odctl` network | `http://mlflow-serve:5003/invocations` |
+
+The server runs MLflow 3.16.1, so install the same client version on the host.
+
+## Log a run with an artifact
+
+docs/snippets/mlflow/steps.py:log-run
+
+```python
+import pathlib
+import mlflow
+
+mlflow.set_tracking_uri("http://127.0.0.1:5004")
+mlflow.set_experiment("demo")
+
+p = pathlib.Path("notes.txt")
+p.write_text("hello")
+with mlflow.start_run() as run:
+    mlflow.log_param("k", "v")
+    mlflow.log_metric("m", 1.0)
+    mlflow.log_artifact(str(p))
+
+print(mlflow.get_run(run.info.run_id).info.artifact_uri)
+print([f.path for f in mlflow.MlflowClient().list_artifacts(run.info.run_id)])
+```
+
+The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. The run and its artifact appear in the UI.
+
+The runs are listed under the experiment in the Model training view:
+
+## Register a model
+
+docs/snippets/mlflow/steps.py:register-model
+
+```python
+import mlflow, numpy as np, xgboost as xgb
+from mlflow import MlflowClient
+
+mlflow.set_tracking_uri("http://127.0.0.1:5004")
+mlflow.set_experiment("demo-model")
+
+X, y = np.array([[0.0], [1.0], [2.0], [3.0]]), np.array([0, 0, 1, 1])
+with mlflow.start_run():
+    model = xgb.XGBClassifier(n_estimators=5, max_depth=2).fit(X, y)
+    mlflow.xgboost.log_model(model, name="model", registered_model_name="demo-model")
+
+client = MlflowClient()
+version = max(int(mv.version) for mv in client.search_model_versions("name='demo-model'"))
+client.set_registered_model_alias("demo-model", "champion", version)
+```
+
+This needs XGBoost on the host. The model server has XGBoost 3.2, so install the same minor version to log a model it can load.
+
+The registry lists each version, with the `champion` alias on the latest:
+
+## Serve the model
+
+`mlflow-serve` starts with the profile and waits idle while `MODEL_URI` is empty. `MODEL_URI` is set in `.odctl/.env`, which `odctl init` writes. Change its line there to:
+
+docs/snippets/mlflow/model-uri.env
+
+```bash
+MODEL_URI="models:/demo-model@champion"
+```
+
+Then run `odctl up mlflow` again, so the container starts with the new value, and score two rows:
+
+docs/snippets/mlflow/commands.sh:serve
+
+```bash
+odctl up mlflow
+curl -X POST http://127.0.0.1:5003/invocations \
+  -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}'
+```
+
+The response holds a `predictions` list, one per input row. Check the body rather than the status code, because the server answers 200 with an error payload when scoring fails. `http://127.0.0.1:5003/ping` answers once the model is loaded.
+
+## From Airflow or another container
+
+Inside the `odctl` network, set the tracking URI to `http://mlflow:5000` and score at `http://mlflow-serve:5003/invocations`. Extra Python packages for both MLflow containers go in `_MLOPS_PIP_DEPS` in `.odctl/.env`, followed by `odctl recreate mlflow`.
+
+# Feast with Iceberg
+
+The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
+
+docs/snippets/feast-iceberg/commands.sh:install
+
+```bash
+odctl up feast
+pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
+```
+
+## Point the clients at the stack
+
+PyIceberg, which Feast uses to read Iceberg, takes its catalog settings from the environment:
+
+docs/snippets/feast-iceberg/commands.sh:catalog-env
+
+```bash
+export PYICEBERG_CATALOG__ODCTL__TYPE=rest
+export PYICEBERG_CATALOG__ODCTL__URI=http://127.0.0.1:8181
+export PYICEBERG_CATALOG__ODCTL__WAREHOUSE=s3://warehouse/
+export PYICEBERG_CATALOG__ODCTL__S3__ENDPOINT=http://127.0.0.1:8333
+export PYICEBERG_CATALOG__ODCTL__S3__ACCESS_KEY_ID=user
+export PYICEBERG_CATALOG__ODCTL__S3__SECRET_ACCESS_KEY=password
+export PYICEBERG_CATALOG__ODCTL__S3__PATH_STYLE_ACCESS=true
+export PYICEBERG_CATALOG__ODCTL__S3__REGION=us-east-1
+```
+
+## Create an Iceberg table
+
+docs/snippets/feast-iceberg/steps.py:create-table
+
+```python
+import datetime, pyarrow as pa
+from pyiceberg.catalog import load_catalog
+
+cat = load_catalog("odctl")
+cat.create_namespace_if_not_exists("demo")
+schema = pa.schema([
+    pa.field("driver_id", pa.int64(), nullable=False),
+    pa.field("event_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
+    pa.field("conv_rate", pa.float32(), nullable=False),
+])
+t = cat.create_table("demo.driver_stats", schema=schema)
+now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+t.append(pa.Table.from_pydict({
+    "driver_id": [1001, 1002],
+    "event_timestamp": [now - datetime.timedelta(hours=1)] * 2,
+    "conv_rate": [0.5, 0.75],
+}, schema=schema))
+```
+
+## Define the feature repository
+
+`feature_repo/feature_store.yaml`:
+
+docs/snippets/feast-iceberg/feature_repo/feature_store.yaml
+
+```yaml
+project: demo
+provider: local
+registry:
+  registry_type: sql
+  path: postgresql+psycopg://user:password@127.0.0.1:5432/feast
+offline_store:
+  type: duckdb
+online_store:
+  type: redis
+  connection_string: "127.0.0.1:6379,username=user,password=password"
+entity_key_serialization_version: 3
+```
+
+`feature_repo/definitions.py`:
+
+docs/snippets/feast-iceberg/feature_repo/definitions.py
+
+```python
+from datetime import timedelta
+from feast import Entity, FeatureView, Field
+from feast.types import Float32
+from feast.infra.data_sources.contrib.iceberg_catalog.iceberg_source import IcebergSource
+
+driver = Entity(name="driver", join_keys=["driver_id"])
+src = IcebergSource(
+    warehouse="", namespace="demo", table="driver_stats",
+    catalog_type="rest", catalog_name="odctl",
+    endpoint="http://127.0.0.1:8181",
+    timestamp_field="event_timestamp",
+)
+fv = FeatureView(
+    name="driver_stats", entities=[driver], ttl=timedelta(days=365),
+    schema=[Field(name="conv_rate", dtype=Float32)], source=src, online=True,
+)
+```
+
+Pass `warehouse=""` and `catalog_name="odctl"`. Feast's REST client puts the warehouse into the URL path, and the catalog serves its API with no prefix, so a real warehouse value fails with HTTP 400.
+
+## Register and materialise
+
+docs/snippets/feast-iceberg/commands.sh:apply-materialize
+
+```bash
+feast -c feature_repo apply
+feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
+```
+
+`FeatureStore(repo_path="feature_repo").get_historical_features(...)` now takes a point-in-time join from Iceberg through DuckDB, and `get_online_features(...)` reads the materialised values from Valkey.
+
+## Serve from the stack
+
+The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes.
+
+Once the repository is uploaded, the UI lists the project and its feature views:
+
+# Evidently reports
+
+The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The end-to-end tests run the code below on every release.
+
+docs/snippets/evidently-reports/commands.sh:install
+
+```bash
+odctl up evidently
+pip install evidently==0.7.23
+```
+
+The server runs Evidently 0.7.23, so install the same client version. The UI is at `http://127.0.0.1:8089`, with no login.
+
+## Push a data drift report
+
+docs/snippets/evidently-reports/steps.py:report
+
+```python
+import numpy as np, pandas as pd
+from evidently import Report
+from evidently.presets import DataDriftPreset
+from evidently.ui.workspace import RemoteWorkspace
+
+ws = RemoteWorkspace("http://127.0.0.1:8089")
+project = ws.create_project("demo")
+
+rng = np.random.default_rng(7)
+reference = pd.DataFrame({"x": rng.normal(0, 1, 500), "y": rng.normal(0, 1, 500)})
+current = pd.DataFrame({"x": rng.normal(3, 1, 500), "y": rng.normal(0, 1, 500)})
+
+snapshot = Report([DataDriftPreset()]).run(current_data=current, reference_data=reference)
+ws.add_run(project.id, snapshot)
+```
+
+Column `x` moves by three standard deviations and `y` does not, so the report in the UI shows one drifted column.
+
+Open the report under the project's Reports tab:
+
+## Store a dataset
+
+docs/snippets/evidently-reports/steps.py:dataset
+
+```python
+from evidently import DataDefinition, Dataset
+
+data = pd.DataFrame({"id": [1, 2, 3], "score": [0.1, 0.5, 0.9]})
+dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definition=DataDefinition()), "demo")
+ws.load_dataset(dataset_id).as_dataframe()
+```
+
+The dataset is stored in the `evidently` database, with the projects and reports.
+
+## From Airflow or another container
+
+Inside the `odctl` network, connect with `RemoteWorkspace("http://evidently:8000")`. For Airflow tasks, set `_AIRFLOW_PIP_DEPS="evidently==0.7.23"` in `.odctl/.env` and run `odctl recreate airflow`. The server's settings are in `evidently/config.yaml` in the workspace.
+
+# Hybrid search in PostgreSQL
+
+odctl's PostgreSQL image adds pgvector for vector search and pg_textsearch for BM25 keyword ranking. Both extensions are created in the `vector` database. Hybrid search runs both queries and combines their rankings, which your application or a final SQL query does. The end-to-end tests run the SQL below on every release.
+
+docs/snippets/hybrid-search/commands.sh:psql
+
+```bash
+odctl up postgres
+docker exec -it postgres psql -U user -d vector
+```
+
+## Vector similarity with pgvector
+
+docs/snippets/hybrid-search/steps.sql:vector
+
+```sql
+CREATE TABLE items (id bigserial primary key, embedding vector(3));
+INSERT INTO items (embedding) VALUES ('[1,0,0]'), ('[0,1,0]'), ('[0.9,0.1,0]');
+CREATE INDEX items_hnsw ON items USING hnsw (embedding vector_l2_ops);
+
+SELECT id FROM items ORDER BY embedding <-> '[1,0,0]' LIMIT 1;
+```
+
+`<->` is the Euclidean distance, so the nearest row comes first.
+
+## Keyword ranking with pg_textsearch
+
+docs/snippets/hybrid-search/steps.sql:bm25
+
+```sql
+CREATE TABLE docs (id int primary key, content text);
+INSERT INTO docs VALUES
+  (1, 'PostgreSQL is a powerful database system'),
+  (2, 'BM25 is an effective ranking function'),
+  (3, 'Full text search with custom scoring');
+CREATE INDEX docs_bm25 ON docs USING bm25(content) WITH (text_config='english');
+
+SELECT id FROM docs ORDER BY content <@> 'ranking function' LIMIT 1;
+```
+
+Ordering by `content <@> 'query'` puts the best BM25 match first. pg_textsearch works only when PostgreSQL preloads it, and odctl's compose file sets `shared_preload_libraries` to do that.
+
+Each query returns the expected row:
+
+To use the extensions in another database, run `CREATE EXTENSION vector;` or `CREATE EXTENSION pg_textsearch;` there. From the host, connect to `127.0.0.1:5432` as `user` with password `password`.
+
+# Valkey
+
+The `valkey` profile runs the Valkey Bundle image as one container named `valkey`. The registry describes it as a cache and data store with JSON, Bloom and vector search capabilities. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up valkey
+```
+
+| Setting                            | Value                       |
+| ---------------------------------- | --------------------------- |
+| Address from the host              | `127.0.0.1:6379`            |
+| Address inside the `odctl` network | `valkey:6379`               |
+| User                               | `user`, password `password` |
+| Memory limit                       | 512 MB                      |
+
+## Users and permissions
+
+The unauthenticated `default` user is turned off, so every client logs in as `user`. That user has every command, every key pattern and every Pub/Sub channel. Channels are a separate permission in Valkey, and the profile grants them explicitly, so `PUBLISH` and `SUBSCRIBE` work as well as key commands.
+
+## Write and read keys
+
+`valkey-cli` is in the container. Log in with a URL that carries the user and password:
+
+docs/snippets/valkey/commands.sh:round-trip
+
+```bash
+vk=redis://user:password@localhost:6379
+docker exec valkey valkey-cli --no-auth-warning -u "$vk" ping
+docker exec valkey valkey-cli --no-auth-warning -u "$vk" mset 'model:1' '{"a":1}' 'model:2' '{"a":2}'
+docker exec valkey valkey-cli --no-auth-warning -u "$vk" mget 'model:1' 'model:2'
+docker exec valkey valkey-cli --no-auth-warning -u "$vk" del 'model:1' 'model:2'
+```
+
+`--no-auth-warning` stops `valkey-cli` printing a warning about the password on the command line. `ping` answers `PONG`. `mset` writes both keys in one command, and `mget` reads them back in one round trip, which is how product-recommender stores and loads its models.
+
+## Persistence
+
+Valkey writes an append-only file and saves a snapshot every 60 seconds when at least one key has changed. Both files are inside the container, so a restart keeps the data and `odctl down` removes it.
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), connect to `valkey:6379` with the same user and password, for example `redis://user:password@valkey:6379` for a Redis client. Feast's online store uses this address, as [Feast with Iceberg](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/index.md) shows.
+
+# OpenLineage and Marquez
+
+The `lineage` profile runs Marquez: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. Anything that sends OpenLineage events over HTTP can report to it. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up lineage
+```
+
+| Endpoint                               | Address                   |
+| -------------------------------------- | ------------------------- |
+| Marquez API from the host              | `http://127.0.0.1:5002`   |
+| Marquez API inside the `odctl` network | `http://marquez-api:5000` |
+| Lineage graph UI                       | `http://127.0.0.1:3003`   |
+
+## Send OpenLineage events
+
+A run is reported as a `START` event and a `COMPLETE` event with the same run id. The job reads one dataset and writes another:
+
+docs/snippets/lineage/commands.sh:send
+
+```bash
+RUN_ID=a1b2c3d4-0000-4000-8000-000000000001
+NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+
+for event in START COMPLETE; do
+  curl -X POST http://127.0.0.1:5002/api/v1/lineage \
+    -H 'Content-Type: application/json' \
+    -d "{\"eventType\":\"$event\",\"eventTime\":\"$NOW\",
+         \"producer\":\"demo\",
+         \"run\":{\"runId\":\"$RUN_ID\"},
+         \"job\":{\"namespace\":\"demo\",\"name\":\"demo-job\"},
+         \"inputs\":[{\"namespace\":\"demo\",\"name\":\"raw-orders\"}],
+         \"outputs\":[{\"namespace\":\"demo\",\"name\":\"demo-dataset\"}]}"
+done
+```
+
+The run id is a UUID, as OpenLineage requires.
+
+## Read the lineage back
+
+docs/snippets/lineage/commands.sh:read
+
+```bash
+curl http://127.0.0.1:5002/api/v1/namespaces
+curl http://127.0.0.1:5002/api/v1/namespaces/demo/jobs/demo-job
+curl http://127.0.0.1:5002/api/v1/namespaces/demo/datasets/demo-dataset
+```
+
+Marquez writes the job, the run and the dataset from the events, so all three read back. The UI shows them under the `demo` namespace.
+
+The UI draws the job between the datasets it read and wrote:
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), send events to `http://marquez-api:5000/api/v1/lineage`. For an OpenLineage client's HTTP transport, set the URL to `http://marquez-api:5000`, because the transport adds `api/v1/lineage` by default.
+
+# Catalogue a database with OpenMetadata
+
+The `metadata` profile runs OpenMetadata: the server with its UI and REST API, Elasticsearch for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The end-to-end tests run the commands below on every release.
+
+```bash
+odctl up metadata
+```
+
+| Endpoint                                   | Address                           |
+| ------------------------------------------ | --------------------------------- |
+| UI and REST API from the host              | `http://127.0.0.1:8585`           |
+| UI and REST API inside the `odctl` network | `http://openmetadata-server:8585` |
+| Ingestion Airflow from the host            | `http://127.0.0.1:8087`           |
+
+Log in as `admin@open-data.local` with the password `admin`. The domain is `open-data.local`, not the upstream default, and a wrong domain fails with an invalid password error.
+
+## Get a token
+
+The login API takes the password base64-encoded and returns a JWT:
+
+docs/snippets/openmetadata/commands.sh:login
+
+```bash
+TOKEN=$(curl -s -H 'Content-Type: application/json' \
+  -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \
+  http://127.0.0.1:8585/api/v1/users/login \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
+AUTH="Authorization: Bearer $TOKEN"
+```
+
+## Register PostgreSQL as a database service
+
+PostgreSQL is already running, so it serves as the source. The server reaches it by its container name:
+
+docs/snippets/openmetadata/commands.sh:service
+
+```bash
+SVC=$(curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"name":"demo_pg","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}' \
+  http://127.0.0.1:8585/api/v1/services/databaseServices \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+```
+
+## Run a metadata ingestion
+
+Create a pipeline, deploy it as a DAG into the ingestion Airflow, and trigger it:
+
+docs/snippets/openmetadata/commands.sh:pipeline
+
+```bash
+PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"demo_pg_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"$SVC\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}" \
+  http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+```
+
+Airflow has to parse the new DAG file before the trigger works, so repeat the trigger every few seconds until it answers that the pipeline has been triggered. Then read the run's state:
+
+docs/snippets/openmetadata/commands.sh:status
+
+```bash
+curl -s -H "$AUTH" \
+  "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/demo_pg.demo_pg_metadata?fields=pipelineStatuses"
+```
+
+The first entry of `pipelineStatuses` reaches `success` when the tables are catalogued. They then appear in the UI under the `demo_pg` service.
+
+## Search the catalogue
+
+Rebuild the search index, then query it:
+
+docs/snippets/openmetadata/commands.sh:search
+
+```bash
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/apps/trigger/SearchIndexingApplication
+curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_search_index&size=1"
+```
+
+`hits.total.value` counts the searchable tables.
+
+## From another container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), call the API at `http://openmetadata-server:8585`. The server also answers the Model Context Protocol at `http://127.0.0.1:8585/mcp` with the same token.
+
+## Remove the example
+
+docs/snippets/openmetadata/commands.sh:remove
+
+```bash
+curl -s -X DELETE -H "$AUTH" \
+  "http://127.0.0.1:8585/api/v1/services/databaseServices/name/demo_pg?hardDelete=true&recursive=true"
+```
+
+# Telemetry
+
+The `telemetry` profile runs the grafana/otel-lgtm image: an OpenTelemetry Collector, Prometheus, Tempo, Loki and Grafana in one container. Start it next to the profiles you want to watch:
+
+```bash
+odctl up telemetry kafka-lite flink-lite
+```
+
+| Endpoint                                   | Address                                                 |
+| ------------------------------------------ | ------------------------------------------------------- |
+| Grafana (user `user`, password `password`) | `http://127.0.0.1:3004`                                 |
+| Prometheus                                 | `http://127.0.0.1:19090`                                |
+| OTLP through the collector                 | `127.0.0.1:4317` (gRPC), `http://127.0.0.1:4318` (HTTP) |
+
+## Where the metrics come from
+
+Prometheus scrapes the services that publish a metrics endpoint, by container name on the `odctl` network. Airflow pushes its metrics over OTLP to the collector, and the collector reads PostgreSQL and Valkey directly. A service that is not running is simply a target that is down.
+
+## Dashboards
+
+Grafana has a dashboard per service in a folder named `odctl`. A dashboard fills in once its service's profile is up. The dashboards are JSON files in `.odctl/grafana/dashboards/`. Edit a file and run `odctl restart telemetry` to load it. Changes made in the Grafana UI are not kept.
+
+For example, the PostgreSQL dashboard:
+
+## Send your own metrics
+
+Point an OpenTelemetry SDK at `http://127.0.0.1:4318`, its default HTTP port. The end-to-end tests post one metric with curl, which shows the path:
+
+docs/snippets/telemetry/commands.sh:send-metric
+
+```bash
+ts=$(python3 -c "import time;print(int(time.time()*1e9))")
+cat > /tmp/otlp.json <<JSON
+{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"demo"}}]},
+"scopeMetrics":[{"scope":{"name":"demo"},"metrics":[{"name":"demo_total","unit":"1",
+"sum":{"aggregationTemporality":2,"isMonotonic":true,"dataPoints":[
+{"asDouble":42,"timeUnixNano":"${ts}","startTimeUnixNano":"${ts}","attributes":[]}]}}]}]}]}
+JSON
+curl -X POST -H "Content-Type: application/json" --data-binary @/tmp/otlp.json \
+  http://127.0.0.1:4318/v1/metrics
+curl "http://127.0.0.1:19090/api/v1/query?query=demo_total"
+```
+
+Prometheus also accepts OTLP metrics directly at `http://127.0.0.1:19090/api/v1/otlp/v1/metrics`.
+# Labs
+
+# Labs
+
+Work in progress. A series of labs takes one generated dataset of web events and logs for five tenants through Kafka, Flink, ClickHouse, Spark, Trino and the MLOps tools, each lab building on the one before. The code will be in [benchtop](https://github.com/jaehyeon-kim/benchtop), and each lab will be listed here as it is published.
+
+Until then, the [guides](https://jaehyeon.me/odctl/latest/guides/kafka/index.md) show each technology on its own.
+# CLI reference
+
+# CLI reference
+
+This page holds the output of `odctl --help` and of `odctl <command> --help`, captured when the site was built.
+
+## odctl
+
+```text
+Usage: odctl [OPTIONS] COMMAND [ARGS]...
+
+ ODCTL CLI - Orchestrator for the Open Data Stack.
+
+ Manage your local data engineering and MLOps infrastructure effortlessly.
+ Provides commands to inspect, provision, and tear down curated Docker Compose
+ stacks.
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --install-completion          Install completion for the current shell.      │
+│ --show-completion             Show completion for the current shell, to copy │
+│                               it or customize the installation.              │
+│ --help                        Show this message and exit.                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Global Options ─────────────────────────────────────────────────────────────╮
+│ --verbose                    Enable debug-level logging across all commands. │
+│ --workspace  -w      <path>  Path to the ODCTL workspace directory (default: │
+│                              ./.odctl).                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Inspection & Info ──────────────────────────────────────────────────────────╮
+│ list      List all available profiles and their capabilities.                │
+│ explain   Explain the details, services, images, and dependencies of a       │
+│           profile.                                                           │
+│ ps        List Docker containers managed by the Open Data Stack.             │
+│ info      Show the installed odctl version and whether Docker is reachable.  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Workspace ──────────────────────────────────────────────────────────────────╮
+│ init      Initialize a local .odctl workspace for custom configurations.     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Cluster Lifecycle ──────────────────────────────────────────────────────────╮
+│ pull      Pre-fetch Docker images without starting the containers.           │
+│ up        Launch Open Data profiles.                                         │
+│ down      Stop and remove profile containers and networks.                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Management ─────────────────────────────────────────────────────────────────╮
+│ logs      Fetch the logs of containers managed by specific profiles.         │
+│ restart   Restart one or more specific profiles.                             │
+│ recreate  Replace one or more profiles' containers, applying compose file    │
+│           changes.                                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # View all profiles and exposed ports
+
+   $ odctl list -d
+
+
+   # See exactly what the kafka-lite profile provisions
+
+   $ odctl explain kafka-lite
+
+
+   # Launch specific profiles and their dependencies
+
+   $ odctl up flink-lite kafka-lite spark-lite
+
+
+   # Complete teardown and wipe all data
+
+   $ odctl down --all --volumes
+```
+
+## odctl list
+
+```text
+Usage: odctl list [OPTIONS]
+
+ List all available profiles and their capabilities.
+
+ A profile is a specific capability or technology (e.g., `kafka-lite`,
+ `spark-lite`, `airflow`)
+ provided by the Open Data Stack. This command lists them alongside their
+ parent stack.
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --details  -d        Inspect docker-compose files to show exact services and │
+│                      exposed host ports.                                     │
+│ --help               Show this message and exit.                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # View all basic profiles
+
+   $ odctl list
+
+
+   # View profiles, underlying services, and ports
+
+   $ odctl list -d
+```
+
+## odctl explain
+
+```text
+Usage: odctl explain [OPTIONS] {profile}
+
+ Explain the details, services, images, and dependencies of a profile.
+
+ Displays a detailed breakdown of what a profile provisions, its container
+ images,
+ exposed host ports, and any prerequisite profiles it depends on.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│ *    profile      <str>  The target profile to inspect (e.g., 'airflow',     │
+│                          'kafka-lite').                                      │
+│                          [required]                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # See what the Spark profile provisions
+
+   $ odctl explain spark-lite
+```
+
+## odctl init
+
+```text
+Usage: odctl init [OPTIONS]
+
+ Initialize a local .odctl workspace for custom configurations.
+
+ Copies the bundled docker-compose files, configs, and `.env` template into a
+ local `./.odctl/` directory. You can then edit these files directly to
+ customize the stack.
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --force  -f        Wipe out the existing workspace and recreate it from      │
+│                    scratch.                                                  │
+│ --help             Show this message and exit.                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # Initialize a new workspace in ./.odctl/
+
+   $ odctl init
+
+
+   # Recreate workspace, overwriting any local changes
+
+   $ odctl init --force
+```
+
+## odctl pull
+
+```text
+Usage: odctl pull [OPTIONS] [profiles]...
+
+ Pre-fetch Docker images without starting the containers.
+
+ Useful for downloading heavy images (like Spark, Flink, Kafka) ahead of time
+ or ensuring you have the latest versions before launching.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│   profiles      <str>  Specific profiles to pull images for.                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --all   -a        Pull images for ALL available profiles in the registry.    │
+│ --help            Show this message and exit.                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # Pre-fetch images for all profiles
+
+   $ odctl pull --all
+
+
+   # Pre-fetch images just for Flink and Kafka
+
+   $ odctl pull flink-lite kafka-lite
+```
+
+## odctl up
+
+```text
+Usage: odctl up [OPTIONS] {profiles}...
+
+ Launch Open Data profiles.
+
+ Resolves dependencies for the requested profiles and brings up the required
+ Docker Compose stacks in the correct topological order.
+
+ Refuses to start if the images for the resolved TAG are not published,
+ naming the tag rather than leaving Docker to report a missing manifest.
+ Warns about any service whose declared profile belongs to another compose
+ file, since the planner will never start it.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│ *    profiles      <str>  One or more profiles to launch (e.g., 'ch-lite',   │
+│                           'kafka-lite').                                     │
+│                           [required]                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --dry-run          Preview the execution plan without actually starting      │
+│                    anything.                                                 │
+│ --pull             Force pull the latest images from the registry before     │
+│                    starting.                                                 │
+│ --help             Show this message and exit.                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # Launch Clickhouse, Flink, and their dependencies
+
+   $ odctl up ch-lite flink-lite
+
+
+   # Preview what would be launched for Airflow
+
+   $ odctl up airflow --dry-run
+
+
+   # Force pull latest images before launching
+
+   $ odctl up kafka-lite --pull
+```
+
+## odctl down
+
+```text
+Usage: odctl down [OPTIONS] [profiles]...
+
+ Stop and remove profile containers and networks.
+
+ Tears down the requested profiles. Services keep their data inside their
+ containers, so the data is removed with them.
+ Use --volumes to also remove named volumes, such as the shared jar volume.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│   profiles      <str>  Specific profiles to stop.                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --all      -a        Stop ALL running profiles.                              │
+│ --volumes  -v        Also remove named volumes, including the shared jar     │
+│                      volume once no other profile uses it.                   │
+│ --dry-run            Preview the teardown plan without actually stopping     │
+│                      anything.                                               │
+│ --help               Show this message and exit.                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # Stop specific profile(s)
+
+   $ odctl down kafka-lite
+
+
+   # Stop all running profiles
+
+   $ odctl down --all
+
+
+   # Complete teardown and wipe all data
+
+   $ odctl down --all -v
+```
+
+## odctl ps
+
+```text
+Usage: odctl ps [OPTIONS] [profiles]...
+
+ List Docker containers managed by the Open Data Stack.
+
+ Filters out system containers and only shows those belonging to requested
+ profiles.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│   profiles      <str>  Specific profiles to inspect.                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --all   -a        Show all containers managed by ODCTL.                      │
+│ --help            Show this message and exit.                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # Show all running containers managed by ODCTL
+
+   $ odctl ps --all
+
+
+   # Show containers just for specific profiles
+
+   $ odctl ps kafka-lite spark-lite
+```
+
+## odctl info
+
+```text
+Usage: odctl info [OPTIONS]
+
+ Show the installed odctl version and whether Docker is reachable.
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+## odctl logs
+
+```text
+Usage: odctl logs [OPTIONS] {profiles}...
+
+ Fetch the logs of containers managed by specific profiles.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│ *    profiles      <str>  Profiles to fetch logs for. [required]             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --service     -s      <str>  Filter to a specific compose service (Use       │
+│                              'odctl ps' to find names).                      │
+│ --follow      -f             Follow log output in real-time.                 │
+│ --tail        -n      <str>  Number of lines to show from the end of the     │
+│                              logs.                                           │
+│                              [default: all]                                  │
+│ --timestamps  -t             Show timestamps.                                │
+│ --since               <str>  Show logs since timestamp or relative (e.g.     │
+│                              '42m').                                         │
+│ --until               <str>  Show logs before a timestamp or relative.       │
+│ --help                       Show this message and exit.                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples:
+
+   # Tail the last 50 lines of all Flink containers and follow live
+
+   $ odctl logs flink-lite -n 50 -f
+
+
+   # View logs strictly for the JobManager service
+
+   $ odctl logs flink-lite -s jobmanager
+
+
+   # Show logs with timestamps for the last 10 minutes
+
+   $ odctl logs kafka-lite --since 10m -t
+```
+
+## odctl restart
+
+```text
+Usage: odctl restart [OPTIONS] {profiles}...
+
+ Restart one or more specific profiles.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│ *    profiles      <str>  Profiles to restart. [required]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+## odctl recreate
+
+```text
+Usage: odctl recreate [OPTIONS] {profiles}...
+
+ Replace one or more profiles' containers, applying compose file changes.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│ *    profiles      <str>  Profiles to recreate. [required]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --pull          Pull images before recreating.                               │
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+# Troubleshooting
+
+# Troubleshooting
+
+## Containers exit or Docker runs out of memory
+
+Each service has a memory limit, listed on its [profile page](https://jaehyeon.me/odctl/latest/profiles/index.md). The limits of everything you start add up, and Docker needs that much memory available. Give Docker 8 to 16 GB, start fewer profiles at once, or choose a lite profile over a full one. To lower a limit, edit `mem_limit` in the compose file in `.odctl` and run `odctl recreate <profile>`.
+
+## A port is already in use
+
+Every service publishes fixed host ports, listed on its profile page. If another program holds one, `odctl up` fails to start that service. Stop the other program, or change the host side of the port mapping in `.odctl/compose-*.yml` and run `odctl recreate <profile>`. Containers still reach each other on their internal ports, so only clients on your host need the new port.
+
+## Use 127.0.0.1, not localhost
+
+Host addresses in `odctl explain` and on these pages use `127.0.0.1`. With IPv6 enabled in Docker, `localhost` can resolve to a service's IPv6 address, and services that listen on IPv4 only reset the connection. `localhost` works when Docker's IPv6 is off.
+
+## No published image for a TAG
+
+`odctl up` checks the images odctl builds before it starts anything. If the registry says an image for the resolved `TAG` does not exist, it stops with `No published image for TAG=...` and lists the missing images. An image already on your machine passes without a registry call. If the registry cannot be reached, odctl starts anyway and Docker reports what it finds.
+
+The usual causes are a CLI version whose images are not published yet, or a `TAG` in `.odctl/.env` that you changed by hand. Set `TAG` to a published version in `.odctl/.env`, or install a CLI version whose images exist.
+
+## Workspace TAG differs from the CLI version
+
+After you upgrade the CLI, every command except `odctl init` warns that `.odctl/.env` sets an older `TAG`. The workspace keeps the old profiles, images and compose files until you run `odctl init --force`, which also resets your edits.
+
+## A service is up but does not work
+
+`odctl logs <profile>` shows the logs of a profile's containers. Add `-s <service>` for one service, or `-f` to follow them. `odctl ps --all` shows every container odctl manages and its state.
+# About
+
+# Roadmap
+
+The work comes in the order shown, without dates: a release ships when it is ready. The timeline marks the work in progress and what follows it. Each planned item links to its GitHub issue.
+
+## Now and next
+
+Localhost-only services
+
+In 1.1.0: every service is reachable from your machine only, and the docs have this Roadmap and a [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md).
+
+Testing and CI
+
+The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
+
+Memory check, stable interface and JSON output
+
+`odctl up` warns when Docker has less memory than the profiles need. A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)
+
+MCP server
+
+Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. [#141](https://github.com/jaehyeon-kim/odctl/issues/141)
+
+Models on the host
+
+One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
+
+OpenMetadata connectors and Kafka schemas
+
+A Python connector uploaded to S3 is picked up by OpenMetadata, the way the `airflow` profile picks up DAGs, and extra packages can be installed in the ingestion container. Kafka topics whose producers use no schema registry get their fields from JSON Schemas registered in Karapace, with no producer change. [#148](https://github.com/jaehyeon-kim/odctl/issues/148)
+
+## Later
+
+The work after that, in the order it is planned.
+
+- **Labs**
+
+  ______________________________________________________________________
+
+  A series in seven parts that takes one generated dataset of web events and logs through Kafka, Flink, ClickHouse, Spark, Trino and the MLOps tools, each lab listed on the [Labs](https://jaehyeon.me/odctl/latest/labs/index.md) page as it is published.
+
+  [benchtop #1](https://github.com/jaehyeon-kim/benchtop/issues/1)
+
+- **Guides**
+
+  ______________________________________________________________________
+
+  Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.
+
+  [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
+
+- **Lineage and alerts**
+
+  ______________________________________________________________________
+
+  Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run.
+
+  [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
+
+- **Feast**
+
+  ______________________________________________________________________
+
+  An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL.
+
+  [#150](https://github.com/jaehyeon-kim/odctl/issues/150)
+
+- **Streaming**
+
+  ______________________________________________________________________
+
+  Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and a guide to Kafka retention.
+
+  [#151](https://github.com/jaehyeon-kim/odctl/issues/151)
+
+- **Snapshot and restore**
+
+  ______________________________________________________________________
+
+  `odctl snapshot` and `odctl restore` save a profile's data and bring it back, so a lab or an agent can start again from a known state.
+
+  [#142](https://github.com/jaehyeon-kim/odctl/issues/142)
+
+- **Kafka Connect transforms**
+
+  ______________________________________________________________________
+
+  Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.
+
+  [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
+
+- **Langfuse**
+
+  ______________________________________________________________________
+
+  A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse.
+
+  [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
+
+- **desflow server**
+
+  ______________________________________________________________________
+
+  A profile that runs the [desflow](https://jaehyeon.me/desflow/) simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.
+
+  [#144](https://github.com/jaehyeon-kim/odctl/issues/144)
+
+# Changelog
+
+Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.1.0
+
+Every service is now reachable from your machine only, and the docs have a [Roadmap](https://jaehyeon.me/odctl/latest/about/roadmap/index.md) and a [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md).
+
+- Every published port binds to `127.0.0.1`, on macOS, Linux and WSL2, so other machines on your network cannot reach the services. [How you reach a service](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service) says how to open a port when you need to.
+- Kafka no longer publishes ports 29092, 29093 and 29094, which were listeners for a minikube cluster.
+- An odctl skill and `llms.txt` help an AI assistant choose a profile and reach its services. See [Use it with an AI assistant](https://jaehyeon.me/odctl/latest/getting-started/#use-it-with-an-ai-assistant).
+- Eight guides show in a diagram how data moves between their services, and [How it works](https://jaehyeon.me/odctl/latest/how-it-works/index.md) shows what `odctl up` checks and the order it starts services in. The end-to-end tests run every command the guides show.
+- The tables of `odctl ps` and `odctl explain` draw straight right borders on rows with port mappings.
+- `odctl down --help` says what `--volumes` removes.
+
+### Upgrading
+
+- To reach a service from another machine, run `odctl init`, remove `127.0.0.1:` from the service's port line in `.odctl/compose-*.yml`, and run `odctl recreate <profile>`.
+- A Kafka client in minikube cannot use `host.minikube.internal:29092` any more. Add a listener for it to the Kafka service in `.odctl/compose-kafka.yml`.
+- A workspace made by `odctl init` with an earlier release keeps its old compose files, which publish on all interfaces and include port 29092. Run `odctl init --force` to copy the new files; it replaces your edits.
