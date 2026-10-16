@@ -118,7 +118,7 @@ jobs:
           DISABLE_MKDOCS_2_WARNING: "true"
         run: uv run mkdocs build --strict
 
-  # The site is published from main, as dynamic-des does, after the unit tests,
+  # The site is published from main, as desflow does, after the unit tests,
   # lint and the strict build pass. Each version in pyproject.toml gets its own
   # copy, because each CLI version runs images with its own tag.
   docs:
