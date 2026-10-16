@@ -43,7 +43,8 @@ def test_the_last_section_runs_to_the_end():
 def test_relative_links_point_at_the_latest_docs():
     body = release_notes.section("1.1.0", CHANGELOG)
     assert (
-        "](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service)" in body
+        "](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service)"
+        in body
     )
     assert "](https://jaehyeon.me/odctl/latest/)" in body
 
