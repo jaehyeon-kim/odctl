@@ -61,3 +61,16 @@ def test_the_published_changelog_has_the_current_version():
         if line.startswith("version = ")
     )
     assert release_notes.section(version, release_notes.CHANGELOG.read_text())
+
+
+def test_notes_end_with_the_full_changelog_link():
+    tags = ["v1.0.1", "v1.0.2", "v1.1.0", "v0.10.0", "not-a-release"]
+    body = release_notes.notes("1.1.0", CHANGELOG, tags)
+    assert body.endswith(
+        "\n**Full Changelog**: https://github.com/jaehyeon-kim/odctl/compare/v1.0.2...v1.1.0\n"
+    )
+
+
+def test_the_previous_tag_compares_versions_as_numbers():
+    assert release_notes.previous_tag("1.0.0", ["v0.9.0", "v0.10.0"]) == "v0.10.0"
+    assert release_notes.previous_tag("0.1.0", ["v0.1.0"]) is None
