@@ -27,8 +27,8 @@ services:
     profiles: ["spark-lite", "spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
     ports:
-      - "9080:8080"
-      - "7077:7077"
+      - "127.0.0.1:9080:8080"
+      - "127.0.0.1:7077:7077"
     mem_limit: 1g
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
@@ -42,7 +42,7 @@ services:
     profiles: ["spark-lite", "spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "9081:8081"
+      - "127.0.0.1:9081:8081"
     mem_limit: 2g
     depends_on:
       spark-master:
@@ -54,7 +54,7 @@ services:
     profiles: ["spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "9082:8081"
+      - "127.0.0.1:9082:8081"
     mem_limit: 2g
     depends_on:
       spark-master:
@@ -66,7 +66,7 @@ services:
     profiles: ["spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
-      - "9083:8081"
+      - "127.0.0.1:9083:8081"
     mem_limit: 2g
     depends_on:
       spark-master:
@@ -78,7 +78,7 @@ services:
     profiles: ["spark-lite", "spark-full"]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
     ports:
-      - "18080:18080"
+      - "127.0.0.1:18080:18080"
     mem_limit: 1g
 
 networks:

@@ -54,7 +54,8 @@ def _ports(service: dict) -> str:
         if isinstance(port, dict) and "published" in port:
             published.append(f"{port['published']}:{port.get('target', '')}")
         else:
-            published.append(str(port))
+            # Every port binds to 127.0.0.1, which the page says once.
+            published.append(str(port).removeprefix("127.0.0.1:"))
     return ", ".join(f"`{p}`" for p in published) or "none"
 
 
@@ -362,8 +363,8 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
         "",
         "- Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.",
         "- `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.",
-        "- `odctl down <profile>` stops only the profiles named, not their dependencies. Add `--volumes` to delete their data. `odctl down --all --volumes` removes everything.",
-        "- From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.",
+        "- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove named volumes: the shared jar volume `odctl-shared-deps` and Spark's `spark-events-data`. `odctl down --all --volumes` removes everything.",
+        "- Every port is published on `127.0.0.1` only, so other machines cannot reach it. From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.",
         "- Logins are in each profile's notes below. Most services use the user `user` and the password `password`; some have no login.",
         "- `odctl init` copies the compose files, `registry.yml` and `.env` into `.odctl/` in the current directory, so they can be edited. Run `odctl recreate <profile>` after editing a compose file or `.env`.",
         "- `-lite` profiles run one node of a tool; `-full` profiles run a cluster of it. Start one of the pair, not both.",

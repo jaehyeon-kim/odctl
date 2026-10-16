@@ -12,8 +12,8 @@ services:
     networks:
       - odctl
     ports:
-      - "5002:5000" # API
-      - "5001:5001" # Admin
+      - "127.0.0.1:5002:5000" # API
+      - "127.0.0.1:5001:5001" # Admin
     restart: on-failure
     mem_limit: 1g
     environment:
@@ -47,7 +47,7 @@ services:
     networks:
       - odctl
     ports:
-      - "3003:3000"
+      - "127.0.0.1:3003:3000"
     mem_limit: 512m
     environment:
       MARQUEZ_HOST: marquez-api
@@ -76,10 +76,10 @@ services:
           - prometheus
           - grafana
     ports:
-      - "19090:9090" # Prometheus, which also takes OTLP at /api/v1/otlp/v1/metrics
-      - "3004:3000" # Grafana
-      - "4317:4317" # OTLP gRPC, through the collector
-      - "4318:4318" # OTLP HTTP, through the collector
+      - "127.0.0.1:19090:9090" # Prometheus, which also takes OTLP at /api/v1/otlp/v1/metrics
+      - "127.0.0.1:3004:3000" # Grafana
+      - "127.0.0.1:4317:4317" # OTLP gRPC, through the collector
+      - "127.0.0.1:4318:4318" # OTLP HTTP, through the collector
     mem_limit: 2g
     environment:
       # The image enables anonymous Admin by default; odctl keeps a login.

@@ -80,10 +80,6 @@ stacks:
         • Bootstrap Servers (1-Node Lite):
           - External (host): 127.0.0.1:9092
           - Internal (Docker): broker-1:19092
-        • Port 29092 is a minikube listener, not a host endpoint. It is
-          advertised as host.minikube.internal:29092, which does not resolve
-          on a normal host, so a client connects and then fails to produce.
-          Use 127.0.0.1:9092 from the host.
       kafka-full: |
         • Kafka UI:
           - External (host): http://127.0.0.1:8086
@@ -93,10 +89,6 @@ stacks:
         • Bootstrap Servers (3-Node Cluster):
           - External (host): 127.0.0.1:9092, 127.0.0.1:9093, 127.0.0.1:9094
           - Internal (Docker): broker-1:19092, broker-2:19093, broker-3:19094
-        • Ports 29092, 29093 and 29094 are minikube listeners, not host
-          endpoints. They are advertised as host.minikube.internal, which does
-          not resolve on a normal host, so a client connects and then fails to
-          produce. Use 127.0.0.1:9092, 9093 and 9094 from the host.
 
   flink:
     file: "compose-flink.yml"
@@ -165,6 +157,9 @@ stacks:
         • Fluss Coordinator API:
           * External (host): 127.0.0.1:9123
           * Internal (Docker): fluss-coordinator:9123
+        • The servers advertise their container names, which resolve only
+          inside the odctl network, so run Fluss clients in a container, such
+          as Flink.
       valkey: |
         • Valkey (Multi-Model Data Store: Cache, JSON, Vector Search):
           * External (host): 127.0.0.1:6379

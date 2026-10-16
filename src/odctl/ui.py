@@ -157,10 +157,10 @@ def print_explain_panel(
         parts = p.split(":")
         svc_name = parts[0]
 
-        # Parse Host vs Container mapping (e.g., flink-sql-gateway:8084:8083)
+        # Parse Host vs Container mapping (e.g., flink-sql-gateway:127.0.0.1:8084:8083)
         if len(parts) >= 3:
-            host_port = parts[1]
-            container_port = parts[2]
+            host_port = parts[-2]
+            container_port = parts[-1]
         elif len(parts) == 2:
             host_port = parts[1]
             container_port = parts[1]
@@ -168,7 +168,7 @@ def print_explain_panel(
             continue
 
         ports_list.append(
-            f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] ➡️  Container [cyan]{svc_name}:{container_port}[/cyan]"
+            f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] → Container [cyan]{svc_name}:{container_port}[/cyan]"
         )
     ports_str = "\n".join(ports_list) if ports_list else "  None"
 
@@ -197,7 +197,7 @@ def print_explain_panel(
 [bold]Containers (Images):[/bold]
 {services_str}
 
-[bold]Network Mapping (Host ➡️  Docker):[/bold]
+[bold]Network Mapping (Host → Docker):[/bold]
 {ports_str}
 {usage_section}[bold]Note:[/bold]
 [dim]{HOST_ADDRESS_NOTE}[/dim]"""
@@ -389,7 +389,7 @@ def print_ps_table(containers: List[Any], running_profiles: Optional[List[str]] 
                     for b in bindings:
                         host_port = b.get("HostPort")
                         if host_port:
-                            mapping = f"{host_port} ➡️  {c_port}"
+                            mapping = f"{host_port} → {c_port}"
                             if mapping not in ports_list:
                                 ports_list.append(mapping)
 

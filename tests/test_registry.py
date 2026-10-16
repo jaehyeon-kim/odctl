@@ -86,7 +86,7 @@ class TestUsageTextMatchesCompose:
                 continue
             for entry in svc.get("ports") or []:
                 if isinstance(entry, str):
-                    host = entry.split(":")[0].strip('"')
+                    host = entry.split(":")[-2]
                 elif isinstance(entry, dict):
                     host = str(entry.get("published", ""))
                 else:
@@ -134,9 +134,6 @@ class TestUsageTextMatchesCompose:
                         if isinstance(net, dict):
                             names.update(net.get("aliases") or [])
 
-        # Named in the text precisely to say it does not resolve from the host.
-        allowed = {"host.minikube.internal"}
-
         unknown = []
         for stack in registry["stacks"].values():
             usage = stack.get("usage")
@@ -146,7 +143,7 @@ class TestUsageTextMatchesCompose:
                 for host in re.findall(
                     r"(?:https?://)?([a-z][a-z0-9.-]*):\d+", text or ""
                 ):
-                    if host == "127.0.0.1" or host in allowed:
+                    if host == "127.0.0.1":
                         continue
                     if host not in names:
                         unknown.append(f"{profile}: {host}")

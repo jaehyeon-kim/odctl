@@ -11,8 +11,8 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 
 - Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.
 - `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.
-- `odctl down <profile>` stops only the profiles named, not their dependencies. Add `--volumes` to delete their data. `odctl down --all --volumes` removes everything.
-- From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.
+- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove named volumes: the shared jar volume `odctl-shared-deps` and Spark's `spark-events-data`. `odctl down --all --volumes` removes everything.
+- Every port is published on `127.0.0.1` only, so other machines cannot reach it. From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.
 - Logins are in each profile's notes below. Most services use the user `user` and the password `password`; some have no login.
 - `odctl init` copies the compose files, `registry.yml` and `.env` into `.odctl/` in the current directory, so they can be edited. Run `odctl recreate <profile>` after editing a compose file or `.env`.
 - `-lite` profiles run one node of a tool; `-full` profiles run a cluster of it. Start one of the pair, not both.
@@ -28,7 +28,7 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 | `odctl up` | Launch Open Data profiles. |
 | `odctl down` | Stop and remove profile containers and networks. |
 | `odctl ps` | List Docker containers managed by the Open Data Stack. |
-| `odctl info` | Show the installed odctl version, its workspace and the images it uses. |
+| `odctl info` | Show the installed odctl version and whether Docker is reachable. |
 | `odctl logs` | Fetch the logs of containers managed by specific profiles. |
 | `odctl restart` | Restart one or more specific profiles. |
 | `odctl recreate` | Replace one or more profiles' containers, applying compose file changes. |
@@ -48,15 +48,11 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 • Bootstrap Servers (1-Node Lite):
   - External (host): 127.0.0.1:9092
   - Internal (Docker): broker-1:19092
-• Port 29092 is a minikube listener, not a host endpoint. It is
-  advertised as host.minikube.internal:29092, which does not resolve
-  on a normal host, so a client connects and then fails to produce.
-  Use 127.0.0.1:9092 from the host.
 ```
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka` | `apache/kafka:4.3.1` | `9092:9092`, `29092:29092` | `1500m` |
+| `kafka` | `apache/kafka:4.3.1` | `9092:9092` | `1500m` |
 | `connect` | `apache/kafka:4.3.1` | `8083:8083` | `2g` |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
@@ -74,17 +70,13 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 • Bootstrap Servers (3-Node Cluster):
   - External (host): 127.0.0.1:9092, 127.0.0.1:9093, 127.0.0.1:9094
   - Internal (Docker): broker-1:19092, broker-2:19093, broker-3:19094
-• Ports 29092, 29093 and 29094 are minikube listeners, not host
-  endpoints. They are advertised as host.minikube.internal, which does
-  not resolve on a normal host, so a client connects and then fails to
-  produce. Use 127.0.0.1:9092, 9093 and 9094 from the host.
 ```
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka-1` | `apache/kafka:4.3.1` | `9092:9092`, `29092:29092` | `1500m` |
-| `kafka-2` | `apache/kafka:4.3.1` | `9093:9093`, `29093:29093` | `1500m` |
-| `kafka-3` | `apache/kafka:4.3.1` | `9094:9094`, `29094:29094` | `1500m` |
+| `kafka-1` | `apache/kafka:4.3.1` | `9092:9092` | `1500m` |
+| `kafka-2` | `apache/kafka:4.3.1` | `9093:9093` | `1500m` |
+| `kafka-3` | `apache/kafka:4.3.1` | `9094:9094` | `1500m` |
 | `connect` | `apache/kafka:4.3.1` | `8083:8083` | `2g` |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
@@ -506,6 +498,9 @@ Apache Fluss: Stream storage (Fluss) and multi-model data store (Valkey Bundle).
 • Fluss Coordinator API:
   * External (host): 127.0.0.1:9123
   * Internal (Docker): fluss-coordinator:9123
+• The servers advertise their container names, which resolve only
+  inside the odctl network, so run Fluss clients in a container, such
+  as Flink.
 ```
 
 | Service | Image | Host:container ports | Memory limit |

@@ -12,8 +12,8 @@ services:
     networks:
       - odctl
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
     mem_limit: 2g
     environment:
       - discovery.type=single-node
@@ -71,8 +71,8 @@ services:
     networks:
       - odctl
     ports:
-      - "8585:8585"
-      - "8586:8586"
+      - "127.0.0.1:8585:8585"
+      - "127.0.0.1:8586:8586"
     mem_limit: 2g
     environment:
       # bin/openmetadata-server-start.sh reads OPENMETADATA_HEAP_OPTS and
@@ -140,7 +140,7 @@ services:
     networks:
       - odctl
     ports:
-      - "8087:8080"
+      - "127.0.0.1:8087:8080"
     environment:
       AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
       AIRFLOW__CORE__EXECUTOR: LocalExecutor

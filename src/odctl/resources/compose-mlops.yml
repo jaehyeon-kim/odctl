@@ -89,7 +89,7 @@ services:
       - odctl
     ports:
       # Host 5004: macOS binds 5000 to the AirPlay receiver.
-      - "5004:5000"
+      - "127.0.0.1:5004:5000"
     mem_limit: 2500m
     environment:
       <<: *mlops-env
@@ -134,7 +134,7 @@ services:
     networks:
       - odctl
     ports:
-      - "5003:5003"
+      - "127.0.0.1:5003:5003"
     mem_limit: 1500m
     environment:
       <<: *mlops-env
@@ -182,7 +182,7 @@ services:
     networks:
       - odctl
     ports:
-      - "8890:8888"
+      - "127.0.0.1:8890:8888"
     mem_limit: 1g
     environment:
       <<: *feast-env
@@ -209,7 +209,7 @@ services:
     networks:
       - odctl
     ports:
-      - "6566:6566"
+      - "127.0.0.1:6566:6566"
     mem_limit: 1g
     environment:
       <<: *feast-env
@@ -243,7 +243,7 @@ services:
     ports:
       # Host 8089: 8000 is the default for uvicorn, Django and mkdocs serve, so
       # it often clashes with the user's own apps.
-      - "8089:8000"
+      - "127.0.0.1:8089:8000"
     mem_limit: 1g
     environment:
       TZ: ${TZ:-UTC}

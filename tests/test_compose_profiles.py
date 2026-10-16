@@ -377,7 +377,6 @@ class TestConfigHostnamesResolve:
             "localhost",
             "0.0.0.0",
             "127.0.0.1",
-            "host.minikube.internal",
             "host.docker.internal",
         }
 
@@ -402,7 +401,7 @@ class TestConfigHostnamesResolve:
 
         root = self._resources()
         valid = self._valid_hosts()
-        allowed = {"localhost", "0.0.0.0", "127.0.0.1", "host.minikube.internal"}
+        allowed = {"localhost", "0.0.0.0", "127.0.0.1"}
 
         unknown = []
         for path in root.glob("compose-*.yml"):
@@ -437,7 +436,7 @@ class TestConfigHostnamesResolve:
 
         valid = self._valid_hosts()
         # Bind addresses and values that are not a peer at all.
-        allowed = {"0.0.0.0", "::", "localhost", "127.0.0.1", "host.minikube.internal"}
+        allowed = {"0.0.0.0", "::", "localhost", "127.0.0.1"}
         keys = re.compile(r"(_HOST|_HOSTNAME|_ADDR|_ADDRESS|_SERVER|_NODES?)$")
 
         unknown = []
@@ -569,7 +568,7 @@ def _published_ports_by_profile():
         for service in (data.get("services") or {}).values():
             for profile in service.get("profiles") or []:
                 for mapping in service.get("ports") or []:
-                    host = str(mapping).split(":")[0].strip('"')
+                    host = str(mapping).split(":")[-2]
                     if host.isdigit():
                         ports.setdefault(profile, set()).add(host)
     return ports
@@ -608,6 +607,19 @@ def test_no_host_port_is_published_by_two_profiles_that_run_together():
                 clashes.append(f"{profile} and {other} both publish {sorted(shared)}")
 
     assert not clashes, "host port collisions: " + "; ".join(sorted(clashes))
+
+
+def test_every_published_port_binds_to_loopback():
+    """A port published without an address is open to the network, past ufw on Linux."""
+    resources = get_internal_resources_dir()
+    open_ports = []
+    for path in sorted(resources.glob("compose-*.yml")):
+        data = yaml.safe_load(path.read_text()) or {}
+        for name, service in (data.get("services") or {}).items():
+            for mapping in service.get("ports") or []:
+                if not str(mapping).startswith("127.0.0.1:"):
+                    open_ports.append(f"{path.name} {name} {mapping}")
+    assert not open_ports, "ports not bound to 127.0.0.1: " + "; ".join(open_ports)
 
 
 def test_postgres_allows_many_profiles_at_once():

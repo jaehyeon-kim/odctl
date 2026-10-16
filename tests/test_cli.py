@@ -50,3 +50,21 @@ def test_up_command_execution(monkeypatch, mock_registry_data):
     # Verify successful completion and that launch_stack was hit with the right args
     assert result.exit_code == 0
     mock_launch.assert_called_once_with("compose-infra.yml", ["kafka"])
+
+
+def test_bordered_output_has_no_emoji_variation_selector():
+    """U+FE0F makes Rich count a character two cells wide where many terminals draw
+    one, so the right border of a table or panel ends short (#136)."""
+    from pathlib import Path
+
+    import typer.main
+
+    import odctl.ui
+
+    cli = typer.main.get_command(app)
+    texts = [cli.help or ""]
+    for command in cli.commands.values():
+        texts.append(command.help or "")
+        texts.extend(getattr(param, "help", None) or "" for param in command.params)
+    assert "\ufe0f" not in Path(odctl.ui.__file__).read_text(encoding="utf-8")
+    assert "\ufe0f" not in "".join(texts)

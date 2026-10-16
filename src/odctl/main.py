@@ -48,7 +48,7 @@ Provides commands to inspect, provision, and tear down curated Docker Compose st
 [bold underline]Examples:[/bold underline]\n
   [dim]# View all profiles and exposed ports[/dim]\n
   $ [bold cyan]odctl list -d[/bold cyan]\n\n
-  [dim]# See exactly what the airflow profile provisions[/dim]\n
+  [dim]# See exactly what the kafka-lite profile provisions[/dim]\n
   $ [bold cyan]odctl explain kafka-lite[/bold cyan]\n\n
   [dim]# Launch specific profiles and their dependencies[/dim]\n
   $ [bold cyan]odctl up flink-lite kafka-lite spark-lite[/bold cyan]\n\n
@@ -229,7 +229,7 @@ def init(
 [bold underline]Examples:[/bold underline]\n
   [dim]# Pre-fetch images for all profiles[/dim]\n
   $ [bold cyan]odctl pull --all[/bold cyan]\n\n
-  [dim]# Pre-fetch images just for Flink and Spark[/dim]\n
+  [dim]# Pre-fetch images just for Flink and Kafka[/dim]\n
   $ [bold cyan]odctl pull flink-lite kafka-lite[/bold cyan]
 """,
 )
@@ -408,7 +408,7 @@ def down(
         False,
         "--volumes",
         "-v",
-        help="Remove named volumes (⚠️ Destroys database/storage data!).",
+        help="Also remove named volumes, including the shared jar volume once no other profile uses it.",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -419,8 +419,9 @@ def down(
     """
     Stop and remove profile containers and networks.
 
-    Tears down the requested profiles. By default, data volumes are preserved.
-    Use [bold red]--volumes[/bold red] to completely wipe the data.
+    Tears down the requested profiles. Services keep their data inside their
+    containers, so the data is removed with them.
+    Use [bold red]--volumes[/bold red] to also remove named volumes, such as the shared jar volume.
     """
     if not dry_run and not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -564,7 +565,7 @@ def ps(
 
 @app.command(name="info", rich_help_panel="Inspection & Info")
 def info():
-    """Show the installed odctl version, its workspace and the images it uses."""
+    """Show the installed odctl version and whether Docker is reachable."""
     ui.print_package_info()
 
 

@@ -40,9 +40,9 @@ There is one exception. When a profile depends on another profile in the same co
 
 ## How you reach a service
 
-Every service publishes its ports on the host, so a browser or client on your machine uses `http://127.0.0.1:<port>`. Docker publishes them on all of the host's network interfaces, so other machines on your network can reach them too. Each profile page lists the ports.
+Every service publishes its ports on the host at `127.0.0.1` only, so a browser or client on your machine uses `http://127.0.0.1:<port>`, and other machines on your network cannot reach them. This works the same on macOS, Linux and WSL2: Docker Desktop forwards the port to the host's `127.0.0.1`, and WSL2 forwards it to Windows' `localhost`. To open a port to your network, remove `127.0.0.1:` from its line in `.odctl/compose-*.yml` and run `odctl recreate <profile>`. Each profile page lists the ports.
 
-Inside Docker, services reach each other by container name on the `odctl` network, for example `http://catalog:8181` or `broker-1:19092` for Kafka. A container of your own reaches them the same way when it joins that network:
+Inside Docker, services reach each other by name on the `odctl` network, for example `http://catalog:8181` or `broker-1:19092` for Kafka. A container of your own reaches them the same way when it joins that network:
 
 ```bash
 docker run --rm --network odctl curlimages/curl http://catalog:8181/v1/config
@@ -124,9 +124,9 @@ docker inspect seaweed --format '{{.HostConfig.Memory}}'   # 2147483648
 Publish Trino on port 8180 instead of 8080, when another program already uses 8080:
 
 ```bash
-sed -i.bak 's/"8080:8080" # Trino/"8180:8080" # Trino/' .odctl/compose-analytics.yml
+sed -i.bak 's/"127.0.0.1:8080:8080" # Trino/"127.0.0.1:8180:8080" # Trino/' .odctl/compose-analytics.yml
 odctl up trino
-docker port trino   # 8080/tcp -> 0.0.0.0:8180
+docker port trino   # 8080/tcp -> 127.0.0.1:8180
 ```
 
 Install extra Python packages in the Airflow container, for DAGs that import them:

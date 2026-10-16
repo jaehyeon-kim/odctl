@@ -44,7 +44,7 @@ services:
     profiles: ["flink-lite", "flink-full"]
     command: jobmanager
     ports:
-      - "8082:8081"
+      - "127.0.0.1:8082:8081"
     mem_limit: 1500m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/config"]
@@ -94,7 +94,7 @@ services:
       -Drest.address=jobmanager
     mem_limit: 1g
     ports:
-      - "8084:8083"
+      - "127.0.0.1:8084:8083"
     depends_on:
       jobmanager:
         condition: service_healthy

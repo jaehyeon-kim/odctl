@@ -32,7 +32,7 @@ def test_telemetry_is_one_service():
 
 def test_telemetry_publishes_prometheus_grafana_and_otlp():
     ports = _telemetry_services()["otel-lgtm"]["ports"]
-    published = {str(p).split(":")[0] for p in ports}
+    published = {str(p).split(":")[-2] for p in ports}
     assert published == {"19090", "3004", "4317", "4318"}
 
 

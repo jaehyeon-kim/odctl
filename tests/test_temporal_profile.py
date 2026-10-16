@@ -45,7 +45,7 @@ def test_temporal_is_one_development_server():
 
 def test_temporal_publishes_grpc_and_the_ui():
     ports = [str(p) for p in _temporal_services()["temporal"]["ports"]]
-    assert ports == ["7233:7233", "8233:8233"]
+    assert ports == ["127.0.0.1:7233:7233", "127.0.0.1:8233:8233"]
 
 
 def test_temporal_listens_beyond_localhost():
