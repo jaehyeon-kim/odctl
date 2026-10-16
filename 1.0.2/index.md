@@ -34,7 +34,7 @@ Kafka Connect comes with a set of connectors, such as the Iceberg sink and the D
 ## Projects that use odctl
 
 - [benchtop](https://github.com/jaehyeon-kim/benchtop): data engineering and machine learning projects, each run from a cold clone on odctl.
-- [dynamic-des](https://github.com/jaehyeon-kim/dynamic-des): a SimPy library for simulations that stream to Kafka, PostgreSQL, Redis and Iceberg.
+- [desflow](https://github.com/jaehyeon-kim/desflow) ([docs](https://jaehyeon.me/desflow/)): a SimPy library for simulations that stream to Kafka, PostgreSQL, Redis and Iceberg.
 - [agentic-analytics-system](https://github.com/jaehyeon-kim/agentic-analytics-system): conversational analytics over an Iceberg lakehouse.
 
 Blog posts about odctl and these projects are tagged [odctl](https://jaehyeon.me/tags/odctl/) on jaehyeon.me.
