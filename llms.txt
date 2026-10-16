@@ -59,3 +59,8 @@
 
 - [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/index.md)
 
+## About
+
+- [Roadmap](https://jaehyeon.me/odctl/latest/about/roadmap/index.md)
+- [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md)
+
