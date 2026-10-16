@@ -45,8 +45,8 @@ uv run python scripts/diagrams.py [name ...]      # export diagrams; needs draw.
 
 ## Release
 
-1. Bump `version` in `pyproject.toml`, run `uv lock`, and add the release to `docs/about/changelog.md`, with an Upgrading line for any change to ports, profiles, `.env` keys, volumes or workspace files; push to `main`. The docs deploy as that version, aliased `latest`.
-2. Push tag `vX.Y.Z`. The tag pipeline builds and pushes the `X.Y.Z` images, then runs e2e for every profile group (about an hour).
+1. Bump `version` in `pyproject.toml`, run `uv lock`, and add the release to `docs/about/changelog.md`, with an Upgrading line for any change to ports, profiles, `.env` keys, volumes or workspace files. When it reaches `main`, the docs deploy as that version, aliased `latest`.
+2. Push tag `vX.Y.Z` on that commit on `main`. The tag pipeline builds and pushes the `X.Y.Z` images, then runs e2e for every profile group (about an hour).
 3. Publish the GitHub release with that version's Changelog section as its text, so the two never differ: `python scripts/release_notes.py X.Y.Z > /tmp/notes.md`, then `gh release create vX.Y.Z --title vX.Y.Z --notes-file /tmp/notes.md`. `publish.yml` waits for a green tag pipeline and checks that every `X.Y.Z` image is in ghcr, then uploads to PyPI.
 
 ## Git
