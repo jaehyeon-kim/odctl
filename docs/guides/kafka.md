@@ -14,8 +14,6 @@ odctl up kafka-lite
 | Schema registry (Karapace) | `http://127.0.0.1:8081` |
 | Kafka Connect REST API | `http://127.0.0.1:8083` |
 
-Port 29092 is a listener for minikube. It advertises `host.minikube.internal`, which does not resolve on a normal host, so a client connects and then fails to produce. Use `127.0.0.1:9092` from the host.
-
 ## Create a topic
 
 The Kafka command-line tools are in the broker container, which is `kafka` in `kafka-lite` and `kafka-1` in `kafka-full`:
@@ -35,9 +33,9 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server br
   --topic demo --from-beginning --max-messages 5 --timeout-ms 60000
 ```
 
-The consumer reads through a consumer group, so its offsets are stored in the broker's `__consumer_offsets` topic. Kafka UI shows the topic, its messages and the consumer groups.
+The consumer reads through a consumer group, so its offsets are stored in the broker's `__consumer_offsets` topic.
 
-Kafka UI at `http://127.0.0.1:8086` shows the topics, their messages and the schemas in Karapace.
+Kafka UI at `http://127.0.0.1:8086` shows the topics, their messages, the consumer groups and the schemas in Karapace.
 
 ![Kafka UI listing the topics of odctl-cluster](../images/kafka-ui.png){ .screenshot }
 

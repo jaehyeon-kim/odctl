@@ -4,7 +4,7 @@ x-common-environment: &kafka_broker_common_env_vars
   KAFKA_PROCESS_ROLES: "broker,controller"
   KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
   CLUSTER_ID: ${KAFKA_CLUSTER_ID:-42RglGpZQwy9D5VzTVpCWA}
-  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT,LISTENER_MINIKUBE:PLAINTEXT
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
   KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
   KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
   KAFKA_LOG_CLEANUP_POLICY: "delete"
@@ -34,8 +34,7 @@ services:
     volumes: *broker-volumes
     command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "127.0.0.1:9092:9092"
     networks:
       odctl:
         aliases:
@@ -46,8 +45,8 @@ services:
     profiles: ["kafka-lite"]
     environment:
       KAFKA_NODE_ID: 1
-      KAFKA_LISTENERS: CONTROLLER://kafka:19091,LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092,LISTENER_MINIKUBE://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,LISTENER_MINIKUBE://host.minikube.internal:29092
+      KAFKA_LISTENERS: CONTROLLER://kafka:19091,LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:19091"
       KAFKA_NUM_PARTITIONS: "3"
       KAFKA_DEFAULT_REPLICATION_FACTOR: "1"
@@ -71,16 +70,15 @@ services:
     volumes: *broker-volumes
     command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "127.0.0.1:9092:9092"
     networks:
       odctl:
         aliases: ["broker-1"]
     profiles: ["kafka-full"]
     environment:
       KAFKA_NODE_ID: 1
-      KAFKA_LISTENERS: CONTROLLER://kafka-1:19091,LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092,LISTENER_MINIKUBE://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092,LISTENER_MINIKUBE://host.minikube.internal:29092
+      KAFKA_LISTENERS: CONTROLLER://kafka-1:19091,LISTENER_DOCKER_INTERNAL://kafka-1:19092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:19091,2@kafka-2:19091,3@kafka-3:19091"
       KAFKA_NUM_PARTITIONS: "3"
       KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
@@ -93,16 +91,15 @@ services:
     volumes: *broker-volumes
     command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
-      - "9093:9093"
-      - "29093:29093"
+      - "127.0.0.1:9093:9093"
     networks:
       odctl:
         aliases: ["broker-2"]
     profiles: ["kafka-full"]
     environment:
       KAFKA_NODE_ID: 2
-      KAFKA_LISTENERS: CONTROLLER://kafka-2:19091,LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9093,LISTENER_MINIKUBE://0.0.0.0:29093
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093,LISTENER_MINIKUBE://host.minikube.internal:29093
+      KAFKA_LISTENERS: CONTROLLER://kafka-2:19091,LISTENER_DOCKER_INTERNAL://kafka-2:19093,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:19091,2@kafka-2:19091,3@kafka-3:19091"
       KAFKA_NUM_PARTITIONS: "3"
       KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
@@ -115,16 +112,15 @@ services:
     volumes: *broker-volumes
     command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
     ports:
-      - "9094:9094"
-      - "29094:29094"
+      - "127.0.0.1:9094:9094"
     networks:
       odctl:
         aliases: ["broker-3"]
     profiles: ["kafka-full"]
     environment:
       KAFKA_NODE_ID: 3
-      KAFKA_LISTENERS: CONTROLLER://kafka-3:19091,LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9094,LISTENER_MINIKUBE://0.0.0.0:29094
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-3:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094,LISTENER_MINIKUBE://host.minikube.internal:29094
+      KAFKA_LISTENERS: CONTROLLER://kafka-3:19091,LISTENER_DOCKER_INTERNAL://kafka-3:19094,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker-3:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:19091,2@kafka-2:19091,3@kafka-3:19091"
       KAFKA_NUM_PARTITIONS: "3"
       KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
@@ -139,7 +135,7 @@ services:
     container_name: connect
     restart: unless-stopped
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     networks:
       - odctl
     profiles: ["kafka-lite", "kafka-full"]
@@ -197,7 +193,7 @@ services:
       - -m
       - karapace
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     networks:
       - odctl
     profiles: ["kafka-lite", "kafka-full"]
@@ -221,7 +217,7 @@ services:
     container_name: kafka-ui
     restart: always
     ports:
-      - "8086:8080"
+      - "127.0.0.1:8086:8080"
     networks:
       - odctl
     profiles: ["kafka-lite", "kafka-full"]

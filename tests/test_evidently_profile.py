@@ -26,7 +26,7 @@ def test_evidently_runs_the_official_image_on_host_port_8089():
     service = _evidently()
     assert service["image"].startswith("evidently/evidently-service:")
     assert service["profiles"] == ["evidently"]
-    assert service["ports"] == ["8089:8000"]
+    assert service["ports"] == ["127.0.0.1:8089:8000"]
 
 
 def test_evidently_reads_its_settings_from_the_mounted_file():

@@ -36,7 +36,9 @@ def test_airflow_is_one_standalone_service():
 
 
 def test_airflow_publishes_8085():
-    assert [str(p) for p in _airflow_services()["airflow"]["ports"]] == ["8085:8080"]
+    assert [str(p) for p in _airflow_services()["airflow"]["ports"]] == [
+        "127.0.0.1:8085:8080"
+    ]
 
 
 def test_dags_come_from_the_s3_bundle():

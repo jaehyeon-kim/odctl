@@ -86,7 +86,7 @@ services:
     container_name: airflow
     mem_limit: 3g
     ports:
-      - "8085:8080"
+      - "127.0.0.1:8085:8080"
     restart: unless-stopped
     # The image's own entrypoint runs first: it installs _PIP_ADDITIONAL_REQUIREMENTS,
     # then runs this bash command unchanged.
@@ -134,8 +134,8 @@ services:
     networks:
       - odctl
     ports:
-      - "7233:7233" # gRPC, for SDK clients and workers
-      - "8233:8233" # Web UI
+      - "127.0.0.1:7233:7233" # gRPC, for SDK clients and workers
+      - "127.0.0.1:8233:8233" # Web UI
     restart: unless-stopped
     mem_limit: 1g
     # The image's entrypoint is the temporal binary. --ip 0.0.0.0 binds gRPC and

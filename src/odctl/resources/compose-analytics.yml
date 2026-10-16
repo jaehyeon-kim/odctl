@@ -40,7 +40,7 @@ services:
     networks:
       - odctl
     ports:
-      - "9181:9181"
+      - "127.0.0.1:9181:9181"
     volumes:
       - ./clickhouse/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
     mem_limit: 512m
@@ -85,8 +85,8 @@ services:
     container_name: ch-11
     profiles: ["ch-lite"]
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
@@ -98,8 +98,8 @@ services:
     container_name: ch-11
     profiles: ["ch-full"]
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
@@ -111,8 +111,8 @@ services:
     container_name: ch-12
     profiles: ["ch-lite"]
     ports:
-      - "8124:8123"
-      - "9001:9000"
+      - "127.0.0.1:8124:8123"
+      - "127.0.0.1:9001:9000"
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
@@ -124,8 +124,8 @@ services:
     container_name: ch-12
     profiles: ["ch-full"]
     ports:
-      - "8124:8123"
-      - "9001:9000"
+      - "127.0.0.1:8124:8123"
+      - "127.0.0.1:9001:9000"
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
@@ -140,8 +140,8 @@ services:
     container_name: ch-21
     profiles: ["ch-full"]
     ports:
-      - "8125:8123"
-      - "9002:9000"
+      - "127.0.0.1:8125:8123"
+      - "127.0.0.1:9002:9000"
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
@@ -153,8 +153,8 @@ services:
     container_name: ch-22
     profiles: ["ch-full"]
     ports:
-      - "8126:8123"
-      - "9003:9000"
+      - "127.0.0.1:8126:8123"
+      - "127.0.0.1:9003:9000"
     volumes:
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/cluster-config.xml
       - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
@@ -172,7 +172,7 @@ services:
     networks:
       - odctl
     ports:
-      - "8080:8080" # Trino UI & JDBC connection port
+      - "127.0.0.1:8080:8080" # Trino UI & JDBC connection port
     mem_limit: 4g
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx3G"
@@ -203,7 +203,7 @@ services:
     networks:
       - odctl
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     mem_limit: 1500m
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx1G"

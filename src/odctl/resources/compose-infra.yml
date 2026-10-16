@@ -10,7 +10,7 @@ services:
     image: ghcr.io/jaehyeon-kim/odctl/postgres:${TAG:-latest}
     container_name: postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     networks:
       - odctl
     profiles:
@@ -64,9 +64,9 @@ services:
     image: &seaweed-image chrislusf/seaweedfs:4.48
     container_name: seaweed
     ports:
-      - "8333:8333" # S3 API
-      - "8889:8888" # Filer UI
-      - "9333:9333" # Master UI
+      - "127.0.0.1:8333:8333" # S3 API
+      - "127.0.0.1:8889:8888" # Filer UI
+      - "127.0.0.1:9333:9333" # Master UI
     networks:
       odctl:
         aliases:
@@ -131,7 +131,7 @@ services:
       - org.apache.iceberg.rest.RESTCatalogServer
     container_name: iceberg-catalog
     ports:
-      - "8181:8181"
+      - "127.0.0.1:8181:8181"
     networks:
       - odctl
     volumes:
