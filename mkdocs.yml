@@ -55,7 +55,7 @@ extra_css:
 extra:
   version:
     provider: mike
-  # Same property as the blog and dynamic-des, so all sit in one view. Filter by /odctl/.
+  # Same property as the blog and desflow, so all sit in one view. Filter by /odctl/.
   analytics:
     provider: google
     property: G-076N8WCGWZ
