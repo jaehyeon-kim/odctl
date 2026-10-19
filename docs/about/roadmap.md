@@ -1,6 +1,6 @@
 # Roadmap
 
-The work comes in the order shown, without dates: a release ships when it is ready. The timeline marks the work in progress and what follows it. Each planned item links to its GitHub issue.
+The work comes in the order shown, without dates: a release ships when it is ready. The timeline marks the work in progress and what follows it: features first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue.
 
 ## Now and next
 
@@ -9,24 +9,24 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: 'In 1.1.0: every service is reachable from your machine only, and the docs have this Roadmap and a [Changelog](changelog.md).'
   icon: ':material-play:'
   key: now
-- title: Testing and CI
-  content: 'The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. [#102](https://github.com/jaehyeon-kim/odctl/issues/102)'
+- title: Streaming
+  content: 'Flink writes to HTTP APIs such as Feast''s push endpoint, Spark reads Kafka without downloading packages, and a guide to Kafka retention. [#151](https://github.com/jaehyeon-kim/odctl/issues/151)'
   icon: ':material-clock-outline:'
   key: planned
-- title: Memory check, stable interface and JSON output
-  content: '`odctl up` warns when Docker has less memory than the profiles need. A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: MCP server
-  content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. [#141](https://github.com/jaehyeon-kim/odctl/issues/141)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: Models on the host
-  content: 'One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. [#109](https://github.com/jaehyeon-kim/odctl/issues/109)'
+- title: Feast
+  content: 'An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)'
   icon: ':material-clock-outline:'
   key: planned
 - title: OpenMetadata connectors and Kafka schemas
   content: 'A Python connector uploaded to S3 is picked up by OpenMetadata, the way the `airflow` profile picks up DAGs, and extra packages can be installed in the ingestion container. Kafka topics whose producers use no schema registry get their fields from JSON Schemas registered in Karapace, with no producer change. [#148](https://github.com/jaehyeon-kim/odctl/issues/148)'
+  icon: ':material-clock-outline:'
+  key: planned
+- title: Stable interface and JSON output
+  content: 'A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
+  icon: ':material-clock-outline:'
+  key: planned
+- title: MCP server
+  content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. [#141](https://github.com/jaehyeon-kim/odctl/issues/141)'
   icon: ':material-clock-outline:'
   key: planned
 ::/timeline::
@@ -34,6 +34,78 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Later
 
 The work after that, in the order it is planned.
+
+<div class="grid cards" markdown>
+
+-   __Langfuse__
+
+    ---
+
+    A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse.
+
+    [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
+
+-   __desflow server__
+
+    ---
+
+    After desflow 1.0, when its server ships: A profile that runs the [desflow](https://jaehyeon.me/desflow/) simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.
+
+    [#144](https://github.com/jaehyeon-kim/odctl/issues/144)
+
+-   __Snapshot and restore__
+
+    ---
+
+    `odctl snapshot` and `odctl restore` save a profile's data and bring it back, so a lab or an agent can start again from a known state.
+
+    [#142](https://github.com/jaehyeon-kim/odctl/issues/142)
+
+-   __Lineage and alerts__
+
+    ---
+
+    Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run.
+
+    [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
+
+-   __Kafka Connect transforms__
+
+    ---
+
+    Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.
+
+    [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
+
+-   __Testing and CI__
+
+    ---
+
+    The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night.
+
+    [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
+
+-   __Memory check__
+
+    ---
+
+    `odctl up` warns when Docker has less memory than the profiles it starts need.
+
+    [#155](https://github.com/jaehyeon-kim/odctl/issues/155)
+
+-   __Models on the host__
+
+    ---
+
+    One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2.
+
+    [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
+
+</div>
+
+## Alongside
+
+Work that does not wait for a release, published as it is ready.
 
 <div class="grid cards" markdown>
 
@@ -52,61 +124,5 @@ The work after that, in the order it is planned.
     Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.
 
     [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
-
--   __Lineage and alerts__
-
-    ---
-
-    Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run.
-
-    [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
-
--   __Feast__
-
-    ---
-
-    An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL.
-
-    [#150](https://github.com/jaehyeon-kim/odctl/issues/150)
-
--   __Streaming__
-
-    ---
-
-    Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and a guide to Kafka retention.
-
-    [#151](https://github.com/jaehyeon-kim/odctl/issues/151)
-
--   __Snapshot and restore__
-
-    ---
-
-    `odctl snapshot` and `odctl restore` save a profile's data and bring it back, so a lab or an agent can start again from a known state.
-
-    [#142](https://github.com/jaehyeon-kim/odctl/issues/142)
-
--   __Kafka Connect transforms__
-
-    ---
-
-    Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.
-
-    [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
-
--   __Langfuse__
-
-    ---
-
-    A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse.
-
-    [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
-
--   __desflow server__
-
-    ---
-
-    A profile that runs the [desflow](https://jaehyeon.me/desflow/) simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.
-
-    [#144](https://github.com/jaehyeon-kim/odctl/issues/144)
 
 </div>

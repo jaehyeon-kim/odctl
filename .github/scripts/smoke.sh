@@ -881,7 +881,7 @@ smoke_metadata() {
   [ "${hits:-0}" -gt 100 ] || fail "only ${hits:-0} tables searchable in Elasticsearch"
   pass "$hits tables ingested and searchable through Elasticsearch"
 
-  # The 2.0 features the upgrade was for. A 1.13 server has neither.
+  # 2.0 features the upgrade was for. A 1.13 server has neither.
   curl -fsS --max-time 15 -X POST "http://127.0.0.1:8585/mcp" -H "$auth" \
     -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"odctl-smoke","version":"1"}}}' \
@@ -932,7 +932,7 @@ smoke_feast() {
     "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
     || fail "could not install the feast client"
 
-  # The guide's repository, with warehouse="" in its source. Feast's REST client
+  # Repository from the guide, with warehouse="" in its source. Feast's REST client
   # puts warehouse into the URL path as a prefix for Polaris and Nessie style
   # catalogs, and Iceberg's REST fixture server serves the spec with no prefix,
   # so a real warehouse gives HTTP 400 "Ambiguous URI empty segment".
@@ -966,7 +966,7 @@ if got != [0.5, 0.75]:
 print("online ok")
 PYONLINE
 
-  # The guide's catalog settings, exported as the guide does.
+  # Catalog settings from the guide, exported as the guide does.
   eval "$(snippet feast-iceberg/commands.sh catalog-env)"
   snippet feast-iceberg/steps.py create-table > "$work/build.py"
 
@@ -1021,7 +1021,7 @@ smoke_temporal() {
   VIRTUAL_ENV="$work/.venv" uv pip install -q "temporalio==1.34.0" >/dev/null 2>&1 \
     || fail "could not install the temporalio SDK"
 
-  # The guide's worker script as written, then the same script with its Approval
+  # Worker script from the guide as written, then the same script with its Approval
   # workflow added and the body of main replaced by its approval step, as the
   # guide tells the reader to do.
   snippet temporal-workers/steps.py worker > "$work/greet.py"

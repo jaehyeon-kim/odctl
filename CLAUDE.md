@@ -31,6 +31,8 @@ uv run python scripts/gen_pages.py                # regenerate skills/odctl/SKIL
 uv run python scripts/diagrams.py [name ...]      # export diagrams; needs draw.io, Chrome and ffmpeg
 ```
 
+Run tests as often as a change needs. While fixing, rerun only the failed tests (`pytest --lf`) and the test files for the code changed; run `pytest tests/` in full once before each commit. Run the strict build only when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed (`registry.yml`, a compose file, or a command's `--help` text), at most once per commit. CI runs everything on every push.
+
 ## Rules
 
 - **Images follow the CLI version.** odctl runs its own images at its own version (`TAG`), never `latest`: Docker does not pull a tag it already has, so a cached `latest` keeps running old code. Third-party images are pinned to a version and updated by Renovate.
@@ -48,6 +50,8 @@ uv run python scripts/diagrams.py [name ...]      # export diagrams; needs draw.
 1. Bump `version` in `pyproject.toml`, run `uv lock`, and add the release to `docs/about/changelog.md`, with an Upgrading line for any change to ports, profiles, `.env` keys, volumes or workspace files. When it reaches `main`, the docs deploy as that version, aliased `latest`.
 2. Once the `main` pipeline for that commit is green, push tag `vX.Y.Z` on it. A tag on a commit whose checks fail builds no images and cannot be released until it is moved. The tag pipeline builds and pushes the `X.Y.Z` images, then runs e2e for every profile group (about an hour).
 3. Publish the GitHub release with that version's Changelog section as its text, so the two never differ: `python scripts/release_notes.py X.Y.Z > /tmp/notes.md`, then `gh release create vX.Y.Z --title vX.Y.Z --notes-file /tmp/notes.md`. `publish.yml` waits for a green tag pipeline and checks that every `X.Y.Z` image is in ghcr, then uploads to PyPI.
+
+Real projects find defects the profile e2e tests miss, so run the benchtop projects on a released odctl from time to time, when the owner asks. It is not a release step: each project starts a full compose stack, which takes too long to do at every release.
 
 ## Git
 
