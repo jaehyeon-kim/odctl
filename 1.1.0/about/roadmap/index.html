@@ -1764,6 +1764,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#alongside" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alongside
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1856,6 +1867,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#alongside" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alongside
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1877,7 +1899,7 @@
 
 
 <h1 id="roadmap">Roadmap</h1>
-<p>The work comes in the order shown, without dates: a release ships when it is ready. The timeline marks the work in progress and what follows it. Each planned item links to its GitHub issue.</p>
+<p>The work comes in the order shown, without dates: a release ships when it is ready. The timeline marks the work in progress and what follows it: features first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue.</p>
 <h2 id="now-and-next">Now and next</h2>
 <div class="nt-timeline vertical left">
 <div class="nt-timeline-before"></div>
@@ -1888,23 +1910,13 @@
 <div class="nt-timeline-dot now bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 5.14v14l11-7z"/></svg></span></span></div>
 </div>
 <div class="nt-timeline-item planned">
-<p class="nt-timeline-title">Testing and CI</p>
-<p class="nt-timeline-content">The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. <a href="https://github.com/jaehyeon-kim/odctl/issues/102">#102</a></p>
+<p class="nt-timeline-title">Streaming</p>
+<p class="nt-timeline-content">Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and a guide to Kafka retention. <a href="https://github.com/jaehyeon-kim/odctl/issues/151">#151</a></p>
 <div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
 </div>
 <div class="nt-timeline-item planned">
-<p class="nt-timeline-title">Memory check, stable interface and JSON output</p>
-<p class="nt-timeline-content"><code>odctl up</code> warns when Docker has less memory than the profiles need. A written list of what 1.x keeps stable: profile names, ports, <code>.env</code> keys, volumes and the workspace files. <code>--json</code> on <code>list</code>, <code>explain</code>, <code>ps</code> and <code>info</code>, and <code>--yes</code> on <code>init</code> and <code>down</code> for scripts. <a href="https://github.com/jaehyeon-kim/odctl/issues/140">#140</a></p>
-<div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
-</div>
-<div class="nt-timeline-item planned">
-<p class="nt-timeline-title">MCP server</p>
-<p class="nt-timeline-content">Tools for AI agents that show the profiles and what is running, with <code>up</code> and <code>down</code> behind a setting. <a href="https://github.com/jaehyeon-kim/odctl/issues/141">#141</a></p>
-<div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
-</div>
-<div class="nt-timeline-item planned">
-<p class="nt-timeline-title">Models on the host</p>
-<p class="nt-timeline-content">One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. <a href="https://github.com/jaehyeon-kim/odctl/issues/109">#109</a></p>
+<p class="nt-timeline-title">Feast</p>
+<p class="nt-timeline-content">An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. <a href="https://github.com/jaehyeon-kim/odctl/issues/150">#150</a></p>
 <div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
 </div>
 <div class="nt-timeline-item planned">
@@ -1912,11 +1924,75 @@
 <p class="nt-timeline-content">A Python connector uploaded to S3 is picked up by OpenMetadata, the way the <code>airflow</code> profile picks up DAGs, and extra packages can be installed in the ingestion container. Kafka topics whose producers use no schema registry get their fields from JSON Schemas registered in Karapace, with no producer change. <a href="https://github.com/jaehyeon-kim/odctl/issues/148">#148</a></p>
 <div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
 </div>
+<div class="nt-timeline-item planned">
+<p class="nt-timeline-title">Stable interface and JSON output</p>
+<p class="nt-timeline-content">A written list of what 1.x keeps stable: profile names, ports, <code>.env</code> keys, volumes and the workspace files. <code>--json</code> on <code>list</code>, <code>explain</code>, <code>ps</code> and <code>info</code>, and <code>--yes</code> on <code>init</code> and <code>down</code> for scripts. <a href="https://github.com/jaehyeon-kim/odctl/issues/140">#140</a></p>
+<div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
+</div>
+<div class="nt-timeline-item planned">
+<p class="nt-timeline-title">MCP server</p>
+<p class="nt-timeline-content">Tools for AI agents that show the profiles and what is running, with <code>up</code> and <code>down</code> behind a setting. <a href="https://github.com/jaehyeon-kim/odctl/issues/141">#141</a></p>
+<div class="nt-timeline-dot planned bigger"><span class="icon"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg></span></span></div>
+</div>
 </div>
 <div class="nt-timeline-after"></div>
 </div>
 <h2 id="later">Later</h2>
 <p>The work after that, in the order it is planned.</p>
+<div class="grid cards">
+<ul>
+<li>
+<p><strong>Langfuse</strong></p>
+<hr />
+<p>A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/120">#120</a></p>
+</li>
+<li>
+<p><strong>desflow server</strong></p>
+<hr />
+<p>After desflow 1.0, when its server ships: A profile that runs the <a href="https://jaehyeon.me/desflow/">desflow</a> simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/144">#144</a></p>
+</li>
+<li>
+<p><strong>Snapshot and restore</strong></p>
+<hr />
+<p><code>odctl snapshot</code> and <code>odctl restore</code> save a profile's data and bring it back, so a lab or an agent can start again from a known state.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/142">#142</a></p>
+</li>
+<li>
+<p><strong>Lineage and alerts</strong></p>
+<hr />
+<p>Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/149">#149</a></p>
+</li>
+<li>
+<p><strong>Kafka Connect transforms</strong></p>
+<hr />
+<p>Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/143">#143</a></p>
+</li>
+<li>
+<p><strong>Testing and CI</strong></p>
+<hr />
+<p>The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/102">#102</a></p>
+</li>
+<li>
+<p><strong>Memory check</strong></p>
+<hr />
+<p><code>odctl up</code> warns when Docker has less memory than the profiles it starts need.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/155">#155</a></p>
+</li>
+<li>
+<p><strong>Models on the host</strong></p>
+<hr />
+<p>One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2.</p>
+<p><a href="https://github.com/jaehyeon-kim/odctl/issues/109">#109</a></p>
+</li>
+</ul>
+</div>
+<h2 id="alongside">Alongside</h2>
+<p>Work that does not wait for a release, published as it is ready.</p>
 <div class="grid cards">
 <ul>
 <li>
@@ -1930,48 +2006,6 @@
 <hr />
 <p>Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.</p>
 <p><a href="https://github.com/jaehyeon-kim/odctl/issues/152">#152</a></p>
-</li>
-<li>
-<p><strong>Lineage and alerts</strong></p>
-<hr />
-<p>Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/149">#149</a></p>
-</li>
-<li>
-<p><strong>Feast</strong></p>
-<hr />
-<p>An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/150">#150</a></p>
-</li>
-<li>
-<p><strong>Streaming</strong></p>
-<hr />
-<p>Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and a guide to Kafka retention.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/151">#151</a></p>
-</li>
-<li>
-<p><strong>Snapshot and restore</strong></p>
-<hr />
-<p><code>odctl snapshot</code> and <code>odctl restore</code> save a profile's data and bring it back, so a lab or an agent can start again from a known state.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/142">#142</a></p>
-</li>
-<li>
-<p><strong>Kafka Connect transforms</strong></p>
-<hr />
-<p>Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/143">#143</a></p>
-</li>
-<li>
-<p><strong>Langfuse</strong></p>
-<hr />
-<p>A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/120">#120</a></p>
-</li>
-<li>
-<p><strong>desflow server</strong></p>
-<hr />
-<p>A profile that runs the <a href="https://jaehyeon.me/desflow/">desflow</a> simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.</p>
-<p><a href="https://github.com/jaehyeon-kim/odctl/issues/144">#144</a></p>
 </li>
 </ul>
 </div>
