@@ -31,7 +31,7 @@ uv run python scripts/gen_pages.py                # regenerate skills/odctl/SKIL
 uv run python scripts/diagrams.py [name ...]      # export diagrams; needs draw.io, Chrome and ffmpeg
 ```
 
-Run tests as often as a change needs. While fixing, rerun only the failed tests (`pytest --lf`) and the test files for the code changed; run `pytest tests/` in full once before each commit. Run the strict build only when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed (`registry.yml`, a compose file, or a command's `--help` text), at most once per commit. CI runs everything on every push.
+Run the unit suite, `pytest tests/`, in full once before each commit, never after each step. While fixing, run only the failed tests (`pytest --lf`) and the tests of the files you changed. Run the strict build only when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed (`registry.yml`, a compose file, or a command's `--help` text), at most once per commit. CI runs everything on every push.
 
 ## Rules
 
@@ -56,4 +56,4 @@ Real projects find defects the profile e2e tests miss, so run the benchtop proje
 ## Git
 
 - Commit or push only when asked. Do not create branches unless asked.
-- Merge a bot PR with the owner as author: `gh pr merge <n> --squash --author-email <maintainer email>`. A plain squash merge adds the bot to the contributors list. If a bot commit lands on `main`, rewrite it with the maintainer as author and rename the default branch and back so GitHub recounts contributors.
+- Merge a bot PR with the owner as author: `gh pr merge <n> --squash --author-email <maintainer email>`. A plain squash merge adds the bot to the contributors list. If a bot commit lands on `main`, rewrite it with the maintainer as author and rename the default branch and back so GitHub recounts contributors. Do this only with the owner's approval: the rewrite changes pushed history and needs a force push, and each force push is approved on its own.
