@@ -165,7 +165,7 @@ services:
   # [PROFILE: trino] Federated SQL Engine
   # ==========================================
   trino:
-    image: trinodb/trino:483
+    image: trinodb/trino:484
     container_name: trino
     profiles:
       - trino
