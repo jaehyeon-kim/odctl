@@ -18,16 +18,12 @@ odctl up kafka-lite
 
 The Kafka command-line tools are in the broker container, which is `kafka` in `kafka-lite` and `kafka-1` in `kafka-full`:
 
-docs/snippets/kafka/commands.sh:create-topic
-
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --topic demo --partitions 1 --replication-factor 1
 ```
 
 ## Produce and consume
-
-docs/snippets/kafka/commands.sh:produce-consume
 
 ```bash
 for i in 1 2 3 4 5; do echo "{\"n\":$i}"; done | docker exec -i kafka \

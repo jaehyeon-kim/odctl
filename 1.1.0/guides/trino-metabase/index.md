@@ -13,8 +13,6 @@ odctl up trino metabase
 
 ## Trino catalogs
 
-docs/snippets/trino-metabase/commands.sh:catalogs
-
 ```bash
 docker exec trino trino --execute "SHOW CATALOGS"
 ```
@@ -30,8 +28,6 @@ docker exec trino trino --execute "SHOW CATALOGS"
 Every catalog loads when Trino starts, even when its service is not running. A query against such a catalog fails until you start that profile. Catalogs finish loading after Trino's health endpoint starts answering, so `SHOW CATALOGS` can take a minute to list them all.
 
 Run a query:
-
-docs/snippets/trino-metabase/commands.sh:query
 
 ```bash
 docker exec trino trino --execute "SELECT 1"
@@ -54,8 +50,6 @@ Open `http://127.0.0.1:3000` and create the first admin account. Then add each d
 Metabase runs inside the `odctl` network, so it reaches each database by container name. Use the Starburst driver for Trino, because it is the Trino driver Metabase ships. It needs a catalog, and any catalog in the table above works.
 
 Metabase takes a while to start. It is ready when this request succeeds:
-
-docs/snippets/trino-metabase/commands.sh:metabase-health
 
 ```bash
 curl http://127.0.0.1:3000/api/health

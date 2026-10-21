@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1902,8 +1906,8 @@
 
 <h1 id="clickhouse">ClickHouse</h1>
 <p>The <code>ch-lite</code> profile runs one shard with two replicas, <code>ch-11</code> and <code>ch-12</code>, coordinated by ClickHouse Keeper in <code>ch-keeper</code>. <code>ch-full</code> adds a second shard, <code>ch-21</code> and <code>ch-22</code>. The end-to-end tests run the commands below on every release.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>ch-lite
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>ch-lite
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1929,30 +1933,45 @@
 <p>Every server creates the <code>feature_store</code> and <code>odctl</code> databases when it starts with no data.</p>
 <h2 id="create-a-table-and-query-it">Create a table and query it</h2>
 <p><code>clickhouse-client</code> is in each server container:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/clickhouse/commands.sh:merge-tree</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="s2">"SHOW DATABASES"</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="s2">"CREATE TABLE default.demo (id UInt32) ENGINE=MergeTree ORDER BY id"</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="s2">"INSERT INTO default.demo SELECT number FROM numbers(10)"</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="s2">"SELECT count() FROM default.demo"</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/clickhouse/commands.sh:merge-tree</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
+<span class="normal"><a href="#__codelineno-1-2">2</a></span>
+<span class="normal"><a href="#__codelineno-1-3">3</a></span>
+<span class="normal"><a href="#__codelineno-1-4">4</a></span>
+<span class="normal"><a href="#__codelineno-1-5">5</a></span>
+<span class="normal"><a href="#__codelineno-1-6">6</a></span>
+<span class="normal"><a href="#__codelineno-1-7">7</a></span>
+<span class="normal"><a href="#__codelineno-1-8">8</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="s2">"SHOW DATABASES"</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="w">  </span><span class="s2">"CREATE TABLE default.demo (id UInt32) ENGINE=MergeTree ORDER BY id"</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="w">  </span><span class="s2">"INSERT INTO default.demo SELECT number FROM numbers(10)"</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8"></a><span class="w">  </span><span class="s2">"SELECT count() FROM default.demo"</span>
+</span></code></pre></div></td></tr></table></div>
 <p>The last command prints <code>10</code>.</p>
 <p>ClickHouse also serves a query page at <a href="http://127.0.0.1:8123/play" rel="nofollow"><code>http://127.0.0.1:8123/play</code></a>. Enter <code>default</code> and <code>password</code> in the top right, write a query and press Run.</p>
 <p><img alt="ClickHouse play page with a query on default.demo" class="screenshot" src="../../images/clickhouse-play.png" /></p>
 <h2 id="replicate-across-the-cluster">Replicate across the cluster</h2>
 <p>In <code>ch-full</code>, <code>{cluster}</code> names <code>odctl_cluster</code>, which has two shards of two replicas. A table created <code>ON CLUSTER</code> with <code>ReplicatedMergeTree</code> is created on all four servers, and Keeper keeps the two replicas of each shard in step:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/clickhouse/commands.sh:replicated</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>ch-full
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="s2">"CREATE TABLE default.repl ON CLUSTER '{cluster}' (id UInt32) ENGINE=ReplicatedMergeTree ORDER BY id"</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="s2">"INSERT INTO default.repl SELECT number FROM numbers(50)"</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-12<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="s2">"SELECT count() FROM default.repl"</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-21<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="s2">"SELECT count() FROM default.repl"</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/clickhouse/commands.sh:replicated</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span>
+<span class="normal"><a href="#__codelineno-2-3">3</a></span>
+<span class="normal"><a href="#__codelineno-2-4">4</a></span>
+<span class="normal"><a href="#__codelineno-2-5">5</a></span>
+<span class="normal"><a href="#__codelineno-2-6">6</a></span>
+<span class="normal"><a href="#__codelineno-2-7">7</a></span>
+<span class="normal"><a href="#__codelineno-2-8">8</a></span>
+<span class="normal"><a href="#__codelineno-2-9">9</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>ch-full
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="w">  </span><span class="s2">"CREATE TABLE default.repl ON CLUSTER '{cluster}' (id UInt32) ENGINE=ReplicatedMergeTree ORDER BY id"</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-11<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6"></a><span class="w">  </span><span class="s2">"INSERT INTO default.repl SELECT number FROM numbers(50)"</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-12<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="s2">"SELECT count() FROM default.repl"</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ch-21<span class="w"> </span>clickhouse-client<span class="w"> </span>--password<span class="w"> </span>password<span class="w"> </span>-q<span class="w"> </span><span class="s2">"SELECT count() FROM default.repl"</span>
+</span></code></pre></div></td></tr></table></div>
 <p><code>ch-12</code>, the other replica of shard 1, returns <code>50</code> once replication has caught up. <code>ch-21</code> returns <code>0</code>, because shard 2 holds only the rows written to it.</p>
 <p>In <code>ch-lite</code>, <code>{cluster}</code> names <code>odctl_single_shard</code>, which holds <code>ch-11</code> and <code>ch-12</code> only, so <code>ON CLUSTER</code> statements finish without waiting for the missing shard.</p>
 <h2 id="from-another-container">From another container</h2>
@@ -2008,10 +2027,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

@@ -17,8 +17,6 @@ The server runs MLflow 3.16.1, so install the same client version on the host.
 
 ## Log a run with an artifact
 
-docs/snippets/mlflow/steps.py:log-run
-
 ```python
 import pathlib
 import mlflow
@@ -42,8 +40,6 @@ The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts,
 The runs are listed under the experiment in the Model training view:
 
 ## Register a model
-
-docs/snippets/mlflow/steps.py:register-model
 
 ```python
 import mlflow, numpy as np, xgboost as xgb
@@ -70,15 +66,11 @@ The registry lists each version, with the `champion` alias on the latest:
 
 `mlflow-serve` starts with the profile and waits idle while `MODEL_URI` is empty. `MODEL_URI` is set in `.odctl/.env`, which `odctl init` writes. Change its line there to:
 
-docs/snippets/mlflow/model-uri.env
-
 ```bash
 MODEL_URI="models:/demo-model@champion"
 ```
 
 Then run `odctl up mlflow` again, so the container starts with the new value, and score two rows:
-
-docs/snippets/mlflow/commands.sh:serve
 
 ```bash
 odctl up mlflow

@@ -2,8 +2,6 @@
 
 The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
 
-docs/snippets/feast-iceberg/commands.sh:install
-
 ```bash
 odctl up feast
 pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
@@ -12,8 +10,6 @@ pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
 ## Point the clients at the stack
 
 PyIceberg, which Feast uses to read Iceberg, takes its catalog settings from the environment:
-
-docs/snippets/feast-iceberg/commands.sh:catalog-env
 
 ```bash
 export PYICEBERG_CATALOG__ODCTL__TYPE=rest
@@ -27,8 +23,6 @@ export PYICEBERG_CATALOG__ODCTL__S3__REGION=us-east-1
 ```
 
 ## Create an Iceberg table
-
-docs/snippets/feast-iceberg/steps.py:create-table
 
 ```python
 import datetime, pyarrow as pa
@@ -54,8 +48,6 @@ t.append(pa.Table.from_pydict({
 
 `feature_repo/feature_store.yaml`:
 
-docs/snippets/feast-iceberg/feature_repo/feature_store.yaml
-
 ```yaml
 project: demo
 provider: local
@@ -71,8 +63,6 @@ entity_key_serialization_version: 3
 ```
 
 `feature_repo/definitions.py`:
-
-docs/snippets/feast-iceberg/feature_repo/definitions.py
 
 ```python
 from datetime import timedelta
@@ -96,8 +86,6 @@ fv = FeatureView(
 Pass `warehouse=""` and `catalog_name="odctl"`. Feast's REST client puts the warehouse into the URL path, and the catalog serves its API with no prefix, so a real warehouse value fails with HTTP 400.
 
 ## Register and materialise
-
-docs/snippets/feast-iceberg/commands.sh:apply-materialize
 
 ```bash
 feast -c feature_repo apply

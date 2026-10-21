@@ -2,8 +2,6 @@
 
 The `temporal` profile runs the Temporal development server: the server, the Web UI and a SQLite database in one container. odctl runs only the server. Your own process runs the worker that executes workflows and activities. The end-to-end tests run the code below on every release.
 
-docs/snippets/temporal-workers/commands.sh:install
-
 ```bash
 odctl up temporal
 pip install temporalio==1.34.0
@@ -14,8 +12,6 @@ The gRPC endpoint is `127.0.0.1:7233` with the namespace `default`, and the Web 
 ## A worker and a workflow
 
 The activity fails on its first attempt, so the result shows that the retry policy ran it again.
-
-docs/snippets/temporal-workers/steps.py:worker
 
 ```python
 import asyncio
@@ -59,8 +55,6 @@ if __name__ == "__main__":
 
 A workflow can wait for a signal, for example a person approving an agent's action. The workflow below waits until its `approve` signal arrives, and then returns who approved it:
 
-docs/snippets/temporal-workers/steps.py:approval-workflow
-
 ```python
 @workflow.defn
 class Approval:
@@ -78,8 +72,6 @@ class Approval:
 ```
 
 In `main` above, register it with the worker, start it, then send the signal:
-
-docs/snippets/temporal-workers/steps.py:approval-run
 
 ```python
 async with Worker(client, task_queue="demo", workflows=[Greet, Approval], activities=[greet]):

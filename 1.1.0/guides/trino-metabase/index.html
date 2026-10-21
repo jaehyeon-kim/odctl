@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1902,8 +1906,8 @@
 
 <h1 id="trino-and-metabase">Trino and Metabase</h1>
 <p>The <code>trino</code> profile runs Trino, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The <code>metabase</code> profile runs Metabase, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start <code>postgres</code>. The end-to-end tests run the commands below on every release.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>trino<span class="w"> </span>metabase
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>trino<span class="w"> </span>metabase
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1923,8 +1927,8 @@
 </tbody>
 </table>
 <h2 id="trino-catalogs">Trino catalogs</h2>
-<div class="language-bash highlight"><span class="filename">docs/snippets/trino-metabase/commands.sh:catalogs</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">"SHOW CATALOGS"</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/trino-metabase/commands.sh:catalogs</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">"SHOW CATALOGS"</span>
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1963,8 +1967,8 @@
 </table>
 <p>Every catalog loads when Trino starts, even when its service is not running. A query against such a catalog fails until you start that profile. Catalogs finish loading after Trino's health endpoint starts answering, so <code>SHOW CATALOGS</code> can take a minute to list them all.</p>
 <p>Run a query:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/trino-metabase/commands.sh:query</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">"SELECT 1"</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/trino-metabase/commands.sh:query</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>trino<span class="w"> </span>trino<span class="w"> </span>--execute<span class="w"> </span><span class="s2">"SELECT 1"</span>
+</span></code></pre></div></td></tr></table></div>
 <p>Trino has no password authentication, so it accepts any user name. <code>docker exec -it trino trino</code> connects as <code>trino</code>. Pass <code>--user user</code> to use the name the rest of the stack uses. <a href="../../how-it-works/#workspace">Workspace</a> explains the access rules in <code>trino/rules.json</code>.</p>
 <p>The Trino UI at <a href="http://127.0.0.1:8080" rel="nofollow"><code>http://127.0.0.1:8080</code></a> asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.</p>
 <p><img alt="Trino cluster overview" class="screenshot" src="../../images/trino-ui.png" /></p>
@@ -2002,8 +2006,8 @@
 </table>
 <p>Metabase runs inside the <code>odctl</code> network, so it reaches each database by container name. Use the Starburst driver for Trino, because it is the Trino driver Metabase ships. It needs a catalog, and any catalog in the table above works.</p>
 <p>Metabase takes a while to start. It is ready when this request succeeds:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/trino-metabase/commands.sh:metabase-health</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>http://127.0.0.1:3000/api/health
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/trino-metabase/commands.sh:metabase-health</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>curl<span class="w"> </span>http://127.0.0.1:3000/api/health
+</span></code></pre></div></td></tr></table></div>
 <p>A SQL question on the PostgreSQL connection, shown as a bar chart:</p>
 <p><img alt="Metabase bar chart of database sizes from a SQL question on PostgreSQL" class="screenshot" src="../../images/metabase.png" /></p>
 <h2 id="from-another-container">From another container</h2>
@@ -2059,10 +2063,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

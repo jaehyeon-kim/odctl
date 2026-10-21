@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1950,30 +1954,34 @@
 </ul>
 <h2 id="install">Install</h2>
 <p>odctl is a command-line tool, so install it into its own environment with uv or pipx.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>odctl
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pipx<span class="w"> </span>install<span class="w"> </span>odctl
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span>
+<span class="normal"><a href="#__codelineno-0-2">2</a></span>
+<span class="normal"><a href="#__codelineno-0-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>odctl
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="c1"># or</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3"></a>pipx<span class="w"> </span>install<span class="w"> </span>odctl
+</span></code></pre></div></td></tr></table></div>
 <p><code>pip install odctl</code> also works.</p>
 <h2 id="create-a-workspace">Create a workspace</h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>odctl<span class="w"> </span>init
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>odctl<span class="w"> </span>init
+</span></code></pre></div></td></tr></table></div>
 <p>This copies the compose files and their settings into <code>.odctl</code> in the current directory, and writes <code>.odctl/.env</code> with <code>TAG</code> set to the CLI version. odctl reads from <code>.odctl</code> whenever it exists, so you can edit any file there. <a href="../how-it-works/#workspace">Workspace</a> explains what changes with and without it, and how to customise it.</p>
 <h2 id="start-a-profile">Start a profile</h2>
 <p>List the profiles, then see what one of them starts:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>odctl<span class="w"> </span>list
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite<span class="w"> </span>--dry-run
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>odctl<span class="w"> </span>list
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite<span class="w"> </span>--dry-run
+</span></code></pre></div></td></tr></table></div>
 <p>The dry run prints which compose files and profiles it would start:</p>
 <p><img alt="odctl up kafka-lite --dry-run output" class="screenshot" src="../images/odctl-dry-run.png" /></p>
 <p>Start it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
+</span></code></pre></div></td></tr></table></div>
 <p>odctl starts the profiles <code>kafka-lite</code> depends on first, then Kafka. It waits until the services are running, and healthy where they define a health check. <code>odctl explain kafka-lite</code> prints its addresses, and the <a href="../profiles/messaging/#kafka-lite">Messaging page</a> lists the same.</p>
 <p>Check what is running, and stop everything when you are done:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>odctl<span class="w"> </span>ps<span class="w"> </span>--all
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>odctl<span class="w"> </span>down<span class="w"> </span>--all
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span>
+<span class="normal"><a href="#__codelineno-4-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1"></a>odctl<span class="w"> </span>ps<span class="w"> </span>--all
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2"></a>odctl<span class="w"> </span>down<span class="w"> </span>--all
+</span></code></pre></div></td></tr></table></div>
 <p><code>odctl down</code> removes the containers, and the data inside them goes with them. See <a href="../how-it-works/">How it works</a>.</p>
 <h2 id="use-it-with-an-ai-assistant">Use it with an AI assistant</h2>
 <p>The docs site publishes <a href="https://jaehyeon.me/odctl/llms.txt"><code>llms.txt</code></a>, an index of these pages for AI assistants, and <code>llms-full.txt</code> with every page in one file. The repository also has an odctl skill in <a href="https://github.com/jaehyeon-kim/odctl/blob/main/skills/odctl/SKILL.md"><code>skills/odctl/SKILL.md</code></a>, generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the <code>skills/odctl</code> folder into <code>~/.claude/skills/</code>.</p>
@@ -2028,10 +2036,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.select"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/code-lines.js"></script>
       
     
   </body>

@@ -2,16 +2,12 @@
 
 odctl's PostgreSQL image adds pgvector for vector search and pg_textsearch for BM25 keyword ranking. Both extensions are created in the `vector` database. Hybrid search runs both queries and combines their rankings, which your application or a final SQL query does. The end-to-end tests run the SQL below on every release.
 
-docs/snippets/hybrid-search/commands.sh:psql
-
 ```bash
 odctl up postgres
 docker exec -it postgres psql -U user -d vector
 ```
 
 ## Vector similarity with pgvector
-
-docs/snippets/hybrid-search/steps.sql:vector
 
 ```sql
 CREATE TABLE items (id bigserial primary key, embedding vector(3));
@@ -24,8 +20,6 @@ SELECT id FROM items ORDER BY embedding <-> '[1,0,0]' LIMIT 1;
 `<->` is the Euclidean distance, so the nearest row comes first.
 
 ## Keyword ranking with pg_textsearch
-
-docs/snippets/hybrid-search/steps.sql:bm25
 
 ```sql
 CREATE TABLE docs (id int primary key, content text);

@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1946,13 +1950,18 @@
 <p>Profiles: <code>airflow</code>. Stack <code>orch</code>, defined in <code>compose-orch.yml</code>.</p>
 <h3 id="airflow">airflow</h3>
 <p>Depends on: <code>postgres</code>, <code>storage</code>. <code>odctl up airflow</code> also starts: <code>deps</code>, <code>postgres</code>, <code>storage</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>• Airflow Web UI (Credentials: user / password):
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  * External (host): http://127.0.0.1:8085
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  * Internal (Docker): http://airflow:8080
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>• DAGs: read from s3://airflow/dags every 15 seconds.
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>• Plugins: copied from s3://airflow/plugins at start. Airflow loads
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  plugins only once, so run `odctl restart airflow` after changing one.
-</span></code></pre></div>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span>
+<span class="normal"><a href="#__codelineno-0-2">2</a></span>
+<span class="normal"><a href="#__codelineno-0-3">3</a></span>
+<span class="normal"><a href="#__codelineno-0-4">4</a></span>
+<span class="normal"><a href="#__codelineno-0-5">5</a></span>
+<span class="normal"><a href="#__codelineno-0-6">6</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>• Airflow Web UI (Credentials: user / password):
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>  * External (host): http://127.0.0.1:8085
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3"></a>  * Internal (Docker): http://airflow:8080
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4"></a>• DAGs: read from s3://airflow/dags every 15 seconds.
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5"></a>• Plugins: copied from s3://airflow/plugins at start. Airflow loads
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a>  plugins only once, so run `odctl restart airflow` after changing one.
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1975,20 +1984,32 @@
 <p>Profiles: <code>temporal</code>. Stack <code>orch</code>, defined in <code>compose-orch.yml</code>.</p>
 <h3 id="temporal_1">temporal</h3>
 <p>Depends on: <code>deps</code>. <code>odctl up temporal</code> also starts: <code>deps</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>• Temporal Web UI:
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  * External (host): http://127.0.0.1:8233
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  * Internal (Docker): http://temporal:8233
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>• gRPC endpoint for SDK clients and workers (namespace "default"):
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  * External (host): 127.0.0.1:7233
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  * Internal (Docker): temporal:7233
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>• Your environment needs: temporalio. odctl runs only the server, so
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  your own process runs the worker that executes workflows and
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  activities.
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>• Development server: the server, the UI and a SQLite database in one
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  process. History survives `odctl restart` and is lost on
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  `odctl down`, like every odctl service's data.
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>• Prometheus metrics: http://temporal:9090/metrics, inside the network.
-</span></code></pre></div>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-1-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-1-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-1-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-1-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-1-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-1-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-1-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-1-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-1-10">10</a></span>
+<span class="normal"><a href="#__codelineno-1-11">11</a></span>
+<span class="normal"><a href="#__codelineno-1-12">12</a></span>
+<span class="normal"><a href="#__codelineno-1-13">13</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>• Temporal Web UI:
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a>  * External (host): http://127.0.0.1:8233
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a>  * Internal (Docker): http://temporal:8233
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4"></a>• gRPC endpoint for SDK clients and workers (namespace "default"):
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5"></a>  * External (host): 127.0.0.1:7233
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6"></a>  * Internal (Docker): temporal:7233
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7"></a>• Your environment needs: temporalio. odctl runs only the server, so
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8"></a>  your own process runs the worker that executes workflows and
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9"></a>  activities.
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10"></a>• Development server: the server, the UI and a SQLite database in one
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11"></a>  process. History survives `odctl restart` and is lost on
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12"></a>  `odctl down`, like every odctl service's data.
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13"></a>• Prometheus metrics: http://temporal:9090/metrics, inside the network.
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -2058,10 +2079,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

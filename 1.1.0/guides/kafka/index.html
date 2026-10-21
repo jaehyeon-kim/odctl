@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1902,8 +1906,8 @@
 
 <h1 id="produce-and-consume-with-kafka">Produce and consume with Kafka</h1>
 <p>The <code>kafka-lite</code> profile runs one Kafka broker in KRaft mode, the Karapace schema registry, Kafka Connect and Kafka UI. <code>kafka-full</code> runs three brokers with the same services beside them. The end-to-end tests run the commands below on every release.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1936,16 +1940,21 @@
 </table>
 <h2 id="create-a-topic">Create a topic</h2>
 <p>The Kafka command-line tools are in the broker container, which is <code>kafka</code> in <code>kafka-lite</code> and <code>kafka-1</code> in <code>kafka-full</code>:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/kafka/commands.sh:create-topic</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-topics.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--create<span class="w"> </span>--topic<span class="w"> </span>demo<span class="w"> </span>--partitions<span class="w"> </span><span class="m">1</span><span class="w"> </span>--replication-factor<span class="w"> </span><span class="m">1</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka/commands.sh:create-topic</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
+<span class="normal"><a href="#__codelineno-1-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-topics.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="w">  </span>--create<span class="w"> </span>--topic<span class="w"> </span>demo<span class="w"> </span>--partitions<span class="w"> </span><span class="m">1</span><span class="w"> </span>--replication-factor<span class="w"> </span><span class="m">1</span>
+</span></code></pre></div></td></tr></table></div>
 <h2 id="produce-and-consume">Produce and consume</h2>
-<div class="language-bash highlight"><span class="filename">docs/snippets/kafka/commands.sh:produce-consume</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"{\"n\":</span><span class="nv">$i</span><span class="s2">}"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>kafka<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>/opt/kafka/bin/kafka-console-producer.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span>--topic<span class="w"> </span>demo
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-console-consumer.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--topic<span class="w"> </span>demo<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">5</span><span class="w"> </span>--timeout-ms<span class="w"> </span><span class="m">60000</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka/commands.sh:produce-consume</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span>
+<span class="normal"><a href="#__codelineno-2-3">3</a></span>
+<span class="normal"><a href="#__codelineno-2-4">4</a></span>
+<span class="normal"><a href="#__codelineno-2-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"{\"n\":</span><span class="nv">$i</span><span class="s2">}"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>kafka<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="w">  </span>/opt/kafka/bin/kafka-console-producer.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span>--topic<span class="w"> </span>demo
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>kafka<span class="w"> </span>/opt/kafka/bin/kafka-console-consumer.sh<span class="w"> </span>--bootstrap-server<span class="w"> </span>broker-1:19092<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5"></a><span class="w">  </span>--topic<span class="w"> </span>demo<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">5</span><span class="w"> </span>--timeout-ms<span class="w"> </span><span class="m">60000</span>
+</span></code></pre></div></td></tr></table></div>
 <p>The consumer reads through a consumer group, so its offsets are stored in the broker's <code>__consumer_offsets</code> topic.</p>
 <p>Kafka UI at <a href="http://127.0.0.1:8086" rel="nofollow"><code>http://127.0.0.1:8086</code></a> shows the topics, their messages, the consumer groups and the schemas in Karapace.</p>
 <p><img alt="Kafka UI listing the topics of odctl-cluster" class="screenshot" src="../../images/kafka-ui.png" /></p>
@@ -2002,10 +2011,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

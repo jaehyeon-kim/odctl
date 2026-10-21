@@ -21,8 +21,6 @@ The unauthenticated `default` user is turned off, so every client logs in as `us
 
 `valkey-cli` is in the container. Log in with a URL that carries the user and password:
 
-docs/snippets/valkey/commands.sh:round-trip
-
 ```bash
 vk=redis://user:password@localhost:6379
 docker exec valkey valkey-cli --no-auth-warning -u "$vk" ping

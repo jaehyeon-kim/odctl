@@ -912,16 +912,12 @@ odctl up kafka-lite
 
 The Kafka command-line tools are in the broker container, which is `kafka` in `kafka-lite` and `kafka-1` in `kafka-full`:
 
-docs/snippets/kafka/commands.sh:create-topic
-
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --topic demo --partitions 1 --replication-factor 1
 ```
 
 ## Produce and consume
-
-docs/snippets/kafka/commands.sh:produce-consume
 
 ```bash
 for i in 1 2 3 4 5; do echo "{\"n\":$i}"; done | docker exec -i kafka \
@@ -959,8 +955,6 @@ odctl up kafka-lite
 
 The `deps` image puts these connectors in the plugin folder: the Apache Iceberg sink, the Debezium PostgreSQL source, the ClickHouse sink, the Aiven JDBC connector, the Aiven S3 sink, the Redis connector and the MSK data generator. List the classes Connect has loaded:
 
-docs/snippets/kafka-connect/commands.sh:plugins
-
 ```bash
 curl -s http://127.0.0.1:8083/connector-plugins
 ```
@@ -971,8 +965,6 @@ The tests check that the list includes `org.apache.iceberg.connect.IcebergSinkCo
 
 A connector is a name and a `config` object, posted to `/connectors`. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) has a complete Iceberg sink configuration. Save it as `demo-iceberg.json` and post it:
 
-docs/snippets/kafka-connect/commands.sh:register
-
 ```bash
 curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-iceberg.json
@@ -982,16 +974,12 @@ The worker's default converters expect JSON with a schema envelope. A connector 
 
 ## Check and remove it
 
-docs/snippets/kafka-connect/commands.sh:status-remove
-
 ```bash
 curl -s http://127.0.0.1:8083/connectors/demo-iceberg/status
 curl -X DELETE http://127.0.0.1:8083/connectors/demo-iceberg
 ```
 
 The status shows the connector and each task as `RUNNING` or `FAILED`, with the error for a failed task. The worker's log has the rest:
-
-docs/snippets/kafka-connect/commands.sh:logs
 
 ```bash
 docker logs --tail 40 connect
@@ -1032,8 +1020,6 @@ odctl up flink-lite kafka-lite
 
 ## Create the topic and the target table
 
-docs/snippets/flink-sql/commands.sh:create-topic-table
-
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --if-not-exists --topic orders --partitions 1 --replication-factor 1
@@ -1046,13 +1032,9 @@ docker exec postgres psql -U user -d odctl -c "
 
 Open the SQL client in the JobManager container:
 
-docs/snippets/flink-sql/commands.sh:sql-client
-
 ```bash
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
-
-docs/snippets/flink-sql/steps.sql:kafka-to-postgres
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -1068,8 +1050,6 @@ The first `INSERT` writes three Avro records to Kafka and registers their schema
 Right after Kafka starts, Karapace can answer its health check and still time out on a schema write for a short while. If the first `INSERT` fails on the schema registry, run it again.
 
 ## Check the result
-
-docs/snippets/flink-sql/commands.sh:check
 
 ```bash
 docker exec postgres psql -U user -d odctl -c "SELECT * FROM supplier_stats ORDER BY supplier"
@@ -1102,8 +1082,6 @@ The coordinator is also published on `127.0.0.1:9123` and the tablet server on `
 
 The servers register in ZooKeeper once they are up. List the tablet servers and read the active coordinator:
 
-docs/snippets/fluss/commands.sh:registrations
-
 ```bash
 docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids
 docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active
@@ -1113,13 +1091,9 @@ The first prints `[0]`, the id of the one tablet server. The second names `fluss
 
 ## Write and read a table with Flink SQL
 
-docs/snippets/fluss/commands.sh:sql-client
-
 ```bash
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
-
-docs/snippets/fluss/steps.sql:table
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -1156,8 +1130,6 @@ odctl up kafka-lite catalog
 
 Create a namespace and a table through the catalog's REST API:
 
-docs/snippets/iceberg-ingestion/commands.sh:create-table
-
 ```bash
 api=http://127.0.0.1:8181/v1/namespaces
 curl -X POST -H 'Content-Type: application/json' -d '{"namespace":["demo"]}' "$api"
@@ -1167,8 +1139,6 @@ curl -X POST -H 'Content-Type: application/json' \
 ```
 
 Create the topic and the sink's control topic, then write some JSON records:
-
-docs/snippets/iceberg-ingestion/commands.sh:topics-produce
 
 ```bash
 for topic in demo-iceberg control-iceberg; do
@@ -1180,8 +1150,6 @@ for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -
 ```
 
 Save the sink's configuration as `demo-iceberg.json`:
-
-docs/snippets/kafka-connect/demo-iceberg.json
 
 ```json
 {
@@ -1213,8 +1181,6 @@ docs/snippets/kafka-connect/demo-iceberg.json
 
 Register it with Kafka Connect:
 
-docs/snippets/kafka-connect/commands.sh:register
-
 ```bash
 curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-iceberg.json
@@ -1226,14 +1192,10 @@ The table's data and metadata files are in SeaweedFS, whose browser at `http://1
 
 ## Flink SQL
 
-docs/snippets/iceberg-ingestion/commands.sh:flink-client
-
 ```bash
 odctl up flink-lite
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
-
-docs/snippets/iceberg-ingestion/steps.sql:flink
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -1270,8 +1232,6 @@ odctl up spark-lite
 
 ## Run SQL against Iceberg
 
-docs/snippets/spark/commands.sh:run-sql
-
 ```bash
 docker exec spark-master /opt/spark/bin/spark-sql -e "
   CREATE NAMESPACE IF NOT EXISTS iceberg.demo;
@@ -1285,8 +1245,6 @@ The query prints `3`. The table is in the same catalog that Flink, Kafka Connect
 ## See finished applications
 
 Every Spark application writes an event log to `/tmp/spark-events`, which all Spark containers share. List the logs:
-
-docs/snippets/spark/commands.sh:event-logs
 
 ```bash
 docker exec spark-master ls /tmp/spark-events
@@ -1322,8 +1280,6 @@ Every server creates the `feature_store` and `odctl` databases when it starts wi
 
 `clickhouse-client` is in each server container:
 
-docs/snippets/clickhouse/commands.sh:merge-tree
-
 ```bash
 docker exec ch-11 clickhouse-client --password password -q "SHOW DATABASES"
 
@@ -1342,8 +1298,6 @@ ClickHouse also serves a query page at `http://127.0.0.1:8123/play`. Enter `defa
 ## Replicate across the cluster
 
 In `ch-full`, `{cluster}` names `odctl_cluster`, which has two shards of two replicas. A table created `ON CLUSTER` with `ReplicatedMergeTree` is created on all four servers, and Keeper keeps the two replicas of each shard in step:
-
-docs/snippets/clickhouse/commands.sh:replicated
 
 ```bash
 odctl up ch-full
@@ -1380,8 +1334,6 @@ odctl up trino metabase
 
 ## Trino catalogs
 
-docs/snippets/trino-metabase/commands.sh:catalogs
-
 ```bash
 docker exec trino trino --execute "SHOW CATALOGS"
 ```
@@ -1397,8 +1349,6 @@ docker exec trino trino --execute "SHOW CATALOGS"
 Every catalog loads when Trino starts, even when its service is not running. A query against such a catalog fails until you start that profile. Catalogs finish loading after Trino's health endpoint starts answering, so `SHOW CATALOGS` can take a minute to list them all.
 
 Run a query:
-
-docs/snippets/trino-metabase/commands.sh:query
 
 ```bash
 docker exec trino trino --execute "SELECT 1"
@@ -1421,8 +1371,6 @@ Open `http://127.0.0.1:3000` and create the first admin account. Then add each d
 Metabase runs inside the `odctl` network, so it reaches each database by container name. Use the Starburst driver for Trino, because it is the Trino driver Metabase ships. It needs a catalog, and any catalog in the table above works.
 
 Metabase takes a while to start. It is ready when this request succeeds:
-
-docs/snippets/trino-metabase/commands.sh:metabase-health
 
 ```bash
 curl http://127.0.0.1:3000/api/health
@@ -1447,8 +1395,6 @@ The web UI is at `http://127.0.0.1:8085`, with user `user` and password `passwor
 ## Upload a DAG
 
 Any S3 client pointed at `http://127.0.0.1:8333` with key `user` and secret `password` can upload. This uses boto3 inside the Airflow container:
-
-docs/snippets/airflow-dags/commands.sh:upload
 
 ```bash
 docker exec -i airflow python - <<'PY'
@@ -1477,8 +1423,6 @@ Airflow checks the bucket every 15 seconds and then parses the new file.
 
 New DAGs start paused. Wait until the DAG is listed, then unpause and trigger it:
 
-docs/snippets/airflow-dags/commands.sh:run
-
 ```bash
 docker exec airflow airflow dags list | grep hello
 docker exec airflow airflow dags unpause hello
@@ -1498,8 +1442,6 @@ To install extra Python packages, set `_AIRFLOW_PIP_DEPS` in `.odctl/.env`, for 
 
 The `temporal` profile runs the Temporal development server: the server, the Web UI and a SQLite database in one container. odctl runs only the server. Your own process runs the worker that executes workflows and activities. The end-to-end tests run the code below on every release.
 
-docs/snippets/temporal-workers/commands.sh:install
-
 ```bash
 odctl up temporal
 pip install temporalio==1.34.0
@@ -1510,8 +1452,6 @@ The gRPC endpoint is `127.0.0.1:7233` with the namespace `default`, and the Web 
 ## A worker and a workflow
 
 The activity fails on its first attempt, so the result shows that the retry policy ran it again.
-
-docs/snippets/temporal-workers/steps.py:worker
 
 ```python
 import asyncio
@@ -1555,8 +1495,6 @@ if __name__ == "__main__":
 
 A workflow can wait for a signal, for example a person approving an agent's action. The workflow below waits until its `approve` signal arrives, and then returns who approved it:
 
-docs/snippets/temporal-workers/steps.py:approval-workflow
-
 ```python
 @workflow.defn
 class Approval:
@@ -1574,8 +1512,6 @@ class Approval:
 ```
 
 In `main` above, register it with the worker, start it, then send the signal:
-
-docs/snippets/temporal-workers/steps.py:approval-run
 
 ```python
 async with Worker(client, task_queue="demo", workflows=[Greet, Approval], activities=[greet]):
@@ -1611,8 +1547,6 @@ The server runs MLflow 3.16.1, so install the same client version on the host.
 
 ## Log a run with an artifact
 
-docs/snippets/mlflow/steps.py:log-run
-
 ```python
 import pathlib
 import mlflow
@@ -1636,8 +1570,6 @@ The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts,
 The runs are listed under the experiment in the Model training view:
 
 ## Register a model
-
-docs/snippets/mlflow/steps.py:register-model
 
 ```python
 import mlflow, numpy as np, xgboost as xgb
@@ -1664,15 +1596,11 @@ The registry lists each version, with the `champion` alias on the latest:
 
 `mlflow-serve` starts with the profile and waits idle while `MODEL_URI` is empty. `MODEL_URI` is set in `.odctl/.env`, which `odctl init` writes. Change its line there to:
 
-docs/snippets/mlflow/model-uri.env
-
 ```bash
 MODEL_URI="models:/demo-model@champion"
 ```
 
 Then run `odctl up mlflow` again, so the container starts with the new value, and score two rows:
-
-docs/snippets/mlflow/commands.sh:serve
 
 ```bash
 odctl up mlflow
@@ -1690,8 +1618,6 @@ Inside the `odctl` network, set the tracking URI to `http://mlflow:5000` and sco
 
 The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
 
-docs/snippets/feast-iceberg/commands.sh:install
-
 ```bash
 odctl up feast
 pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
@@ -1700,8 +1626,6 @@ pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
 ## Point the clients at the stack
 
 PyIceberg, which Feast uses to read Iceberg, takes its catalog settings from the environment:
-
-docs/snippets/feast-iceberg/commands.sh:catalog-env
 
 ```bash
 export PYICEBERG_CATALOG__ODCTL__TYPE=rest
@@ -1715,8 +1639,6 @@ export PYICEBERG_CATALOG__ODCTL__S3__REGION=us-east-1
 ```
 
 ## Create an Iceberg table
-
-docs/snippets/feast-iceberg/steps.py:create-table
 
 ```python
 import datetime, pyarrow as pa
@@ -1742,8 +1664,6 @@ t.append(pa.Table.from_pydict({
 
 `feature_repo/feature_store.yaml`:
 
-docs/snippets/feast-iceberg/feature_repo/feature_store.yaml
-
 ```yaml
 project: demo
 provider: local
@@ -1759,8 +1679,6 @@ entity_key_serialization_version: 3
 ```
 
 `feature_repo/definitions.py`:
-
-docs/snippets/feast-iceberg/feature_repo/definitions.py
 
 ```python
 from datetime import timedelta
@@ -1785,8 +1703,6 @@ Pass `warehouse=""` and `catalog_name="odctl"`. Feast's REST client puts the war
 
 ## Register and materialise
 
-docs/snippets/feast-iceberg/commands.sh:apply-materialize
-
 ```bash
 feast -c feature_repo apply
 feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
@@ -1804,8 +1720,6 @@ Once the repository is uploaded, the UI lists the project and its feature views:
 
 The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The end-to-end tests run the code below on every release.
 
-docs/snippets/evidently-reports/commands.sh:install
-
 ```bash
 odctl up evidently
 pip install evidently==0.7.23
@@ -1814,8 +1728,6 @@ pip install evidently==0.7.23
 The server runs Evidently 0.7.23, so install the same client version. The UI is at `http://127.0.0.1:8089`, with no login.
 
 ## Push a data drift report
-
-docs/snippets/evidently-reports/steps.py:report
 
 ```python
 import numpy as np, pandas as pd
@@ -1840,8 +1752,6 @@ Open the report under the project's Reports tab:
 
 ## Store a dataset
 
-docs/snippets/evidently-reports/steps.py:dataset
-
 ```python
 from evidently import DataDefinition, Dataset
 
@@ -1860,16 +1770,12 @@ Inside the `odctl` network, connect with `RemoteWorkspace("http://evidently:8000
 
 odctl's PostgreSQL image adds pgvector for vector search and pg_textsearch for BM25 keyword ranking. Both extensions are created in the `vector` database. Hybrid search runs both queries and combines their rankings, which your application or a final SQL query does. The end-to-end tests run the SQL below on every release.
 
-docs/snippets/hybrid-search/commands.sh:psql
-
 ```bash
 odctl up postgres
 docker exec -it postgres psql -U user -d vector
 ```
 
 ## Vector similarity with pgvector
-
-docs/snippets/hybrid-search/steps.sql:vector
 
 ```sql
 CREATE TABLE items (id bigserial primary key, embedding vector(3));
@@ -1882,8 +1788,6 @@ SELECT id FROM items ORDER BY embedding <-> '[1,0,0]' LIMIT 1;
 `<->` is the Euclidean distance, so the nearest row comes first.
 
 ## Keyword ranking with pg_textsearch
-
-docs/snippets/hybrid-search/steps.sql:bm25
 
 ```sql
 CREATE TABLE docs (id int primary key, content text);
@@ -1925,8 +1829,6 @@ The unauthenticated `default` user is turned off, so every client logs in as `us
 
 `valkey-cli` is in the container. Log in with a URL that carries the user and password:
 
-docs/snippets/valkey/commands.sh:round-trip
-
 ```bash
 vk=redis://user:password@localhost:6379
 docker exec valkey valkey-cli --no-auth-warning -u "$vk" ping
@@ -1963,8 +1865,6 @@ odctl up lineage
 
 A run is reported as a `START` event and a `COMPLETE` event with the same run id. The job reads one dataset and writes another:
 
-docs/snippets/lineage/commands.sh:send
-
 ```bash
 RUN_ID=a1b2c3d4-0000-4000-8000-000000000001
 NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
@@ -1984,8 +1884,6 @@ done
 The run id is a UUID, as OpenLineage requires.
 
 ## Read the lineage back
-
-docs/snippets/lineage/commands.sh:read
 
 ```bash
 curl http://127.0.0.1:5002/api/v1/namespaces
@@ -2021,8 +1919,6 @@ Log in as `admin@open-data.local` with the password `admin`. The domain is `open
 
 The login API takes the password base64-encoded and returns a JWT:
 
-docs/snippets/openmetadata/commands.sh:login
-
 ```bash
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
   -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \
@@ -2035,8 +1931,6 @@ AUTH="Authorization: Bearer $TOKEN"
 
 PostgreSQL is already running, so it serves as the source. The server reaches it by its container name:
 
-docs/snippets/openmetadata/commands.sh:service
-
 ```bash
 SVC=$(curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"name":"demo_pg","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}' \
@@ -2047,8 +1941,6 @@ SVC=$(curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
 ## Run a metadata ingestion
 
 Create a pipeline, deploy it as a DAG into the ingestion Airflow, and trigger it:
-
-docs/snippets/openmetadata/commands.sh:pipeline
 
 ```bash
 PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
@@ -2062,8 +1954,6 @@ curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipeli
 
 Airflow has to parse the new DAG file before the trigger works, so repeat the trigger every few seconds until it answers that the pipeline has been triggered. Then read the run's state:
 
-docs/snippets/openmetadata/commands.sh:status
-
 ```bash
 curl -s -H "$AUTH" \
   "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/demo_pg.demo_pg_metadata?fields=pipelineStatuses"
@@ -2074,8 +1964,6 @@ The first entry of `pipelineStatuses` reaches `success` when the tables are cata
 ## Search the catalogue
 
 Rebuild the search index, then query it:
-
-docs/snippets/openmetadata/commands.sh:search
 
 ```bash
 curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/apps/trigger/SearchIndexingApplication
@@ -2089,8 +1977,6 @@ curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_se
 Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), call the API at `http://openmetadata-server:8585`. The server also answers the Model Context Protocol at `http://127.0.0.1:8585/mcp` with the same token.
 
 ## Remove the example
-
-docs/snippets/openmetadata/commands.sh:remove
 
 ```bash
 curl -s -X DELETE -H "$AUTH" \
@@ -2124,8 +2010,6 @@ For example, the PostgreSQL dashboard:
 ## Send your own metrics
 
 Point an OpenTelemetry SDK at `http://127.0.0.1:4318`, its default HTTP port. The end-to-end tests post one metric with curl, which shows the path:
-
-docs/snippets/telemetry/commands.sh:send-metric
 
 ```bash
 ts=$(python3 -c "import time;print(int(time.time()*1e9))")

@@ -12,8 +12,6 @@ The web UI is at `http://127.0.0.1:8085`, with user `user` and password `passwor
 
 Any S3 client pointed at `http://127.0.0.1:8333` with key `user` and secret `password` can upload. This uses boto3 inside the Airflow container:
 
-docs/snippets/airflow-dags/commands.sh:upload
-
 ```bash
 docker exec -i airflow python - <<'PY'
 import boto3
@@ -40,8 +38,6 @@ Airflow checks the bucket every 15 seconds and then parses the new file.
 ## Run it
 
 New DAGs start paused. Wait until the DAG is listed, then unpause and trigger it:
-
-docs/snippets/airflow-dags/commands.sh:run
 
 ```bash
 docker exec airflow airflow dags list | grep hello

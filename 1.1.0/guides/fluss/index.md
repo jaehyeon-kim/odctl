@@ -17,8 +17,6 @@ The coordinator is also published on `127.0.0.1:9123` and the tablet server on `
 
 The servers register in ZooKeeper once they are up. List the tablet servers and read the active coordinator:
 
-docs/snippets/fluss/commands.sh:registrations
-
 ```bash
 docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids
 docker exec fluss-zookeeper zkCli.sh -server localhost:2181 get /fluss/coordinators/active
@@ -28,13 +26,9 @@ The first prints `[0]`, the id of the one tablet server. The second names `fluss
 
 ## Write and read a table with Flink SQL
 
-docs/snippets/fluss/commands.sh:sql-client
-
 ```bash
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
-
-docs/snippets/fluss/steps.sql:table
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';

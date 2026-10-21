@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1903,8 +1907,8 @@
 <h1 id="openlineage-and-marquez">OpenLineage and Marquez</h1>
 <p>The <code>lineage</code> profile runs Marquez: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. Anything that sends OpenLineage events over HTTP can report to it. The end-to-end tests run the commands below on every release.</p>
 <p><img alt="Your job sends OpenLineage events to marquez-api, which keeps them in PostgreSQL; marquez-web reads the API to draw the graph" src="../../images/path-lineage.png" /></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>lineage
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>lineage
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1929,26 +1933,40 @@
 </table>
 <h2 id="send-openlineage-events">Send OpenLineage events</h2>
 <p>A run is reported as a <code>START</code> event and a <code>COMPLETE</code> event with the same run id. The job reads one dataset and writes another:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/lineage/commands.sh:send</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">RUN_ID</span><span class="o">=</span>a1b2c3d4-0000-4000-8000-000000000001
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">NOW</span><span class="o">=</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>+%Y-%m-%dT%H:%M:%S.000Z<span class="k">)</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">for</span><span class="w"> </span>event<span class="w"> </span><span class="k">in</span><span class="w"> </span>START<span class="w"> </span>COMPLETE<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:5002/api/v1/lineage<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span>-d<span class="w"> </span><span class="s2">"{\"eventType\":\"</span><span class="nv">$event</span><span class="s2">\",\"eventTime\":\"</span><span class="nv">$NOW</span><span class="s2">\",</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="s2">         \"producer\":\"demo\",</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="s2">         \"run\":{\"runId\":\"</span><span class="nv">$RUN_ID</span><span class="s2">\"},</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="s2">         \"job\":{\"namespace\":\"demo\",\"name\":\"demo-job\"},</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="s2">         \"inputs\":[{\"namespace\":\"demo\",\"name\":\"raw-orders\"}],</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="s2">         \"outputs\":[{\"namespace\":\"demo\",\"name\":\"demo-dataset\"}]}"</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="k">done</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/lineage/commands.sh:send</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-1-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-1-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-1-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-1-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-1-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-1-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-1-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-1-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-1-10">10</a></span>
+<span class="normal"><a href="#__codelineno-1-11">11</a></span>
+<span class="normal"><a href="#__codelineno-1-12">12</a></span>
+<span class="normal"><a href="#__codelineno-1-13">13</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="nv">RUN_ID</span><span class="o">=</span>a1b2c3d4-0000-4000-8000-000000000001
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="nv">NOW</span><span class="o">=</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>+%Y-%m-%dT%H:%M:%S.000Z<span class="k">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="k">for</span><span class="w"> </span>event<span class="w"> </span><span class="k">in</span><span class="w"> </span>START<span class="w"> </span>COMPLETE<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="w">  </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:5002/api/v1/lineage<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="w">    </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="w">    </span>-d<span class="w"> </span><span class="s2">"{\"eventType\":\"</span><span class="nv">$event</span><span class="s2">\",\"eventTime\":\"</span><span class="nv">$NOW</span><span class="s2">\",</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8"></a><span class="s2">         \"producer\":\"demo\",</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9"></a><span class="s2">         \"run\":{\"runId\":\"</span><span class="nv">$RUN_ID</span><span class="s2">\"},</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10"></a><span class="s2">         \"job\":{\"namespace\":\"demo\",\"name\":\"demo-job\"},</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11"></a><span class="s2">         \"inputs\":[{\"namespace\":\"demo\",\"name\":\"raw-orders\"}],</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12"></a><span class="s2">         \"outputs\":[{\"namespace\":\"demo\",\"name\":\"demo-dataset\"}]}"</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13"></a><span class="k">done</span>
+</span></code></pre></div></td></tr></table></div>
 <p>The run id is a UUID, as OpenLineage requires.</p>
 <h2 id="read-the-lineage-back">Read the lineage back</h2>
-<div class="language-bash highlight"><span class="filename">docs/snippets/lineage/commands.sh:read</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>http://127.0.0.1:5002/api/v1/namespaces
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>curl<span class="w"> </span>http://127.0.0.1:5002/api/v1/namespaces/demo/jobs/demo-job
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>curl<span class="w"> </span>http://127.0.0.1:5002/api/v1/namespaces/demo/datasets/demo-dataset
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/lineage/commands.sh:read</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span>
+<span class="normal"><a href="#__codelineno-2-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>curl<span class="w"> </span>http://127.0.0.1:5002/api/v1/namespaces
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a>curl<span class="w"> </span>http://127.0.0.1:5002/api/v1/namespaces/demo/jobs/demo-job
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3"></a>curl<span class="w"> </span>http://127.0.0.1:5002/api/v1/namespaces/demo/datasets/demo-dataset
+</span></code></pre></div></td></tr></table></div>
 <p>Marquez writes the job, the run and the dataset from the events, so all three read back. The UI shows them under the <code>demo</code> namespace.</p>
 <p>The UI draws the job between the datasets it read and wrote:</p>
 <p><img alt="Marquez lineage graph of demo-job between two datasets" class="screenshot" src="../../images/marquez.png" /></p>
@@ -2005,10 +2023,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

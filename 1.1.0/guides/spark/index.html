@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1902,8 +1906,8 @@
 
 <h1 id="spark">Spark</h1>
 <p>The <code>spark-lite</code> profile runs a Spark master, one worker and the Spark History Server. <code>spark-full</code> runs three workers. Spark's default catalog is <code>iceberg</code>, already pointed at the Iceberg REST catalog, so <code>spark-sql</code> reads and writes Iceberg tables with no extra settings. The end-to-end tests run the commands below on every release.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>spark-lite
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>spark-lite
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1935,17 +1939,21 @@
 </tbody>
 </table>
 <h2 id="run-sql-against-iceberg">Run SQL against Iceberg</h2>
-<div class="language-bash highlight"><span class="filename">docs/snippets/spark/commands.sh:run-sql</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>spark-master<span class="w"> </span>/opt/spark/bin/spark-sql<span class="w"> </span>-e<span class="w"> </span><span class="s2">"</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="s2">  CREATE NAMESPACE IF NOT EXISTS iceberg.demo;</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="s2">  CREATE OR REPLACE TABLE iceberg.demo.t (id BIGINT) USING iceberg;</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="s2">  INSERT INTO iceberg.demo.t VALUES (1),(2),(3);</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="s2">  SELECT count(*) FROM iceberg.demo.t;"</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/spark/commands.sh:run-sql</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
+<span class="normal"><a href="#__codelineno-1-2">2</a></span>
+<span class="normal"><a href="#__codelineno-1-3">3</a></span>
+<span class="normal"><a href="#__codelineno-1-4">4</a></span>
+<span class="normal"><a href="#__codelineno-1-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>spark-master<span class="w"> </span>/opt/spark/bin/spark-sql<span class="w"> </span>-e<span class="w"> </span><span class="s2">"</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="s2">  CREATE NAMESPACE IF NOT EXISTS iceberg.demo;</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="s2">  CREATE OR REPLACE TABLE iceberg.demo.t (id BIGINT) USING iceberg;</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="s2">  INSERT INTO iceberg.demo.t VALUES (1),(2),(3);</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="s2">  SELECT count(*) FROM iceberg.demo.t;"</span>
+</span></code></pre></div></td></tr></table></div>
 <p>The query prints <code>3</code>. The table is in the same catalog that Flink, Kafka Connect and Trino use, so <a href="../iceberg-ingestion/">Ingest into Iceberg</a> shows the other engines writing to it.</p>
 <h2 id="see-finished-applications">See finished applications</h2>
 <p>Every Spark application writes an event log to <code>/tmp/spark-events</code>, which all Spark containers share. List the logs:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/spark/commands.sh:event-logs</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>spark-master<span class="w"> </span>ls<span class="w"> </span>/tmp/spark-events
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/spark/commands.sh:event-logs</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>spark-master<span class="w"> </span>ls<span class="w"> </span>/tmp/spark-events
+</span></code></pre></div></td></tr></table></div>
 <p>The Spark History Server at <a href="http://127.0.0.1:18080" rel="nofollow"><code>http://127.0.0.1:18080</code></a> reads the same directory, so the <code>spark-sql</code> run above appears there after it ends, with its jobs, stages and SQL plans. The master UI at <a href="http://127.0.0.1:9080" rel="nofollow"><code>http://127.0.0.1:9080</code></a> shows the workers and the applications the master has run.</p>
 <p>The event logs are on a volume held in memory, so <code>odctl down</code> removes them.</p>
 <p>The History Server lists the <code>spark-sql</code> run:</p>
@@ -2004,10 +2012,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

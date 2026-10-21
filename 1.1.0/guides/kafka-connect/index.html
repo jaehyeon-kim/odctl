@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -1947,8 +1951,8 @@
 <h1 id="kafka-connect">Kafka Connect</h1>
 <p>Both Kafka profiles run one Kafka Connect worker, <code>connect</code>, beside the brokers. It loads its plugins from the shared volume that the <code>deps</code> profile fills, and you manage connectors through its REST API. The end-to-end tests run the commands below on every release.</p>
 <p><img alt="A producer writes to a Kafka topic; the Iceberg sink in Connect writes data files to SeaweedFS and commits them through the catalog, which keeps its tables in PostgreSQL; Connect loads the sink from the deps volume" src="../../images/path-kafka-connect.png" /></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>kafka-lite
+</span></code></pre></div></td></tr></table></div>
 <table>
 <thead>
 <tr>
@@ -1981,28 +1985,30 @@
 </table>
 <h2 id="plugins">Plugins</h2>
 <p>The <code>deps</code> image puts these connectors in the plugin folder: the Apache Iceberg sink, the Debezium PostgreSQL source, the ClickHouse sink, the Aiven JDBC connector, the Aiven S3 sink, the Redis connector and the MSK data generator. List the classes Connect has loaded:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/kafka-connect/commands.sh:plugins</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:8083/connector-plugins
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka-connect/commands.sh:plugins</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:8083/connector-plugins
+</span></code></pre></div></td></tr></table></div>
 <p>The tests check that the list includes <code>org.apache.iceberg.connect.IcebergSinkConnector</code>, <code>io.debezium.connector.postgresql.PostgresConnector</code> and <code>com.clickhouse.kafka.connect.ClickHouseSinkConnector</code>. A plugin missing from the volume does not stop Connect from starting. It only leaves the class out of this list.</p>
 <h2 id="register-a-connector">Register a connector</h2>
 <p>A connector is a name and a <code>config</code> object, posted to <code>/connectors</code>. <a href="../iceberg-ingestion/">Ingest into Iceberg</a> has a complete Iceberg sink configuration. Save it as <code>demo-iceberg.json</code> and post it:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/kafka-connect/commands.sh:register</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>http://127.0.0.1:8083/connectors<span class="w"> </span>-d<span class="w"> </span>@demo-iceberg.json
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka-connect/commands.sh:register</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="w">  </span>http://127.0.0.1:8083/connectors<span class="w"> </span>-d<span class="w"> </span>@demo-iceberg.json
+</span></code></pre></div></td></tr></table></div>
 <p>The worker's default converters expect JSON with a schema envelope. A connector that reads plain JSON sets <code>"value.converter.schemas.enable": "false"</code> in its own config, as the Iceberg example does.</p>
 <h2 id="check-and-remove-it">Check and remove it</h2>
-<div class="language-bash highlight"><span class="filename">docs/snippets/kafka-connect/commands.sh:status-remove</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:8083/connectors/demo-iceberg/status
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>http://127.0.0.1:8083/connectors/demo-iceberg
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka-connect/commands.sh:status-remove</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span>
+<span class="normal"><a href="#__codelineno-3-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:8083/connectors/demo-iceberg/status
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2"></a>curl<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>http://127.0.0.1:8083/connectors/demo-iceberg
+</span></code></pre></div></td></tr></table></div>
 <p>The status shows the connector and each task as <code>RUNNING</code> or <code>FAILED</code>, with the error for a failed task. The worker's log has the rest:</p>
-<div class="language-bash highlight"><span class="filename">docs/snippets/kafka-connect/commands.sh:logs</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>logs<span class="w"> </span>--tail<span class="w"> </span><span class="m">40</span><span class="w"> </span>connect
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka-connect/commands.sh:logs</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1"></a>docker<span class="w"> </span>logs<span class="w"> </span>--tail<span class="w"> </span><span class="m">40</span><span class="w"> </span>connect
+</span></code></pre></div></td></tr></table></div>
 <p>Kafka UI lists the connector under Kafka Connect, Connectors:</p>
 <p><img alt="Kafka UI listing the demo-iceberg sink as running" class="screenshot" src="../../images/kafka-connect.png" /></p>
 <h2 id="postgresql-for-debezium">PostgreSQL for Debezium</h2>
 <p>The <code>postgres</code> profile runs PostgreSQL with <code>wal_level=logical</code>. Its init script creates the <code>cdc</code> schema and the <code>cdc_pub</code> publication for every table in that schema, so a Debezium source can read changes to tables you create in <code>cdc</code>. Start both profiles to use it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>postgres<span class="w"> </span>kafka-lite
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-5-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>postgres<span class="w"> </span>kafka-lite
+</span></code></pre></div></td></tr></table></div>
 <h2 id="from-another-container">From another container</h2>
 <p>Inside the <a href="../../how-it-works/#how-you-reach-a-service"><code>odctl</code> network</a>, the REST API is <code>http://connect:8083</code>, and connectors reach the brokers at <code>broker-1:19092</code>, the catalog at <code>http://catalog:8181</code> and SeaweedFS at <code>http://seaweed:8333</code>.</p>
 
@@ -2056,10 +2062,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/code-lines.js"></script>
       
     
   </body>

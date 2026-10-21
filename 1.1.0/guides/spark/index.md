@@ -16,8 +16,6 @@ odctl up spark-lite
 
 ## Run SQL against Iceberg
 
-docs/snippets/spark/commands.sh:run-sql
-
 ```bash
 docker exec spark-master /opt/spark/bin/spark-sql -e "
   CREATE NAMESPACE IF NOT EXISTS iceberg.demo;
@@ -31,8 +29,6 @@ The query prints `3`. The table is in the same catalog that Flink, Kafka Connect
 ## See finished applications
 
 Every Spark application writes an event log to `/tmp/spark-events`, which all Spark containers share. List the logs:
-
-docs/snippets/spark/commands.sh:event-logs
 
 ```bash
 docker exec spark-master ls /tmp/spark-events

@@ -18,8 +18,6 @@ Every server creates the `feature_store` and `odctl` databases when it starts wi
 
 `clickhouse-client` is in each server container:
 
-docs/snippets/clickhouse/commands.sh:merge-tree
-
 ```bash
 docker exec ch-11 clickhouse-client --password password -q "SHOW DATABASES"
 
@@ -38,8 +36,6 @@ ClickHouse also serves a query page at `http://127.0.0.1:8123/play`. Enter `defa
 ## Replicate across the cluster
 
 In `ch-full`, `{cluster}` names `odctl_cluster`, which has two shards of two replicas. A table created `ON CLUSTER` with `ReplicatedMergeTree` is created on all four servers, and Keeper keeps the two replicas of each shard in step:
-
-docs/snippets/clickhouse/commands.sh:replicated
 
 ```bash
 odctl up ch-full

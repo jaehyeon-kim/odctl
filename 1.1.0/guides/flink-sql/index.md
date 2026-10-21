@@ -19,8 +19,6 @@ odctl up flink-lite kafka-lite
 
 ## Create the topic and the target table
 
-docs/snippets/flink-sql/commands.sh:create-topic-table
-
 ```bash
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --if-not-exists --topic orders --partitions 1 --replication-factor 1
@@ -33,13 +31,9 @@ docker exec postgres psql -U user -d odctl -c "
 
 Open the SQL client in the JobManager container:
 
-docs/snippets/flink-sql/commands.sh:sql-client
-
 ```bash
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
-
-docs/snippets/flink-sql/steps.sql:kafka-to-postgres
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';
@@ -55,8 +49,6 @@ The first `INSERT` writes three Avro records to Kafka and registers their schema
 Right after Kafka starts, Karapace can answer its health check and still time out on a schema write for a short while. If the first `INSERT` fails on the schema registry, run it again.
 
 ## Check the result
-
-docs/snippets/flink-sql/commands.sh:check
 
 ```bash
 docker exec postgres psql -U user -d odctl -c "SELECT * FROM supplier_stats ORDER BY supplier"

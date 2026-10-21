@@ -12,8 +12,6 @@ odctl up kafka-lite catalog
 
 Create a namespace and a table through the catalog's REST API:
 
-docs/snippets/iceberg-ingestion/commands.sh:create-table
-
 ```bash
 api=http://127.0.0.1:8181/v1/namespaces
 curl -X POST -H 'Content-Type: application/json' -d '{"namespace":["demo"]}' "$api"
@@ -23,8 +21,6 @@ curl -X POST -H 'Content-Type: application/json' \
 ```
 
 Create the topic and the sink's control topic, then write some JSON records:
-
-docs/snippets/iceberg-ingestion/commands.sh:topics-produce
 
 ```bash
 for topic in demo-iceberg control-iceberg; do
@@ -36,8 +32,6 @@ for i in 1 2 3 4 5; do echo "{\"id\":$i,\"name\":\"n$i\"}"; done | docker exec -
 ```
 
 Save the sink's configuration as `demo-iceberg.json`:
-
-docs/snippets/kafka-connect/demo-iceberg.json
 
 ```json
 {
@@ -69,8 +63,6 @@ docs/snippets/kafka-connect/demo-iceberg.json
 
 Register it with Kafka Connect:
 
-docs/snippets/kafka-connect/commands.sh:register
-
 ```bash
 curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-iceberg.json
@@ -82,14 +74,10 @@ The table's data and metadata files are in SeaweedFS, whose browser at `http://1
 
 ## Flink SQL
 
-docs/snippets/iceberg-ingestion/commands.sh:flink-client
-
 ```bash
 odctl up flink-lite
 docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh
 ```
-
-docs/snippets/iceberg-ingestion/steps.sql:flink
 
 ```sql
 SET 'execution.runtime-mode' = 'batch';

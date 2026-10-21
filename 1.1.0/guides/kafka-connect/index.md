@@ -18,8 +18,6 @@ odctl up kafka-lite
 
 The `deps` image puts these connectors in the plugin folder: the Apache Iceberg sink, the Debezium PostgreSQL source, the ClickHouse sink, the Aiven JDBC connector, the Aiven S3 sink, the Redis connector and the MSK data generator. List the classes Connect has loaded:
 
-docs/snippets/kafka-connect/commands.sh:plugins
-
 ```bash
 curl -s http://127.0.0.1:8083/connector-plugins
 ```
@@ -30,8 +28,6 @@ The tests check that the list includes `org.apache.iceberg.connect.IcebergSinkCo
 
 A connector is a name and a `config` object, posted to `/connectors`. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) has a complete Iceberg sink configuration. Save it as `demo-iceberg.json` and post it:
 
-docs/snippets/kafka-connect/commands.sh:register
-
 ```bash
 curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-iceberg.json
@@ -41,16 +37,12 @@ The worker's default converters expect JSON with a schema envelope. A connector 
 
 ## Check and remove it
 
-docs/snippets/kafka-connect/commands.sh:status-remove
-
 ```bash
 curl -s http://127.0.0.1:8083/connectors/demo-iceberg/status
 curl -X DELETE http://127.0.0.1:8083/connectors/demo-iceberg
 ```
 
 The status shows the connector and each task as `RUNNING` or `FAILED`, with the error for a failed task. The worker's log has the rest:
-
-docs/snippets/kafka-connect/commands.sh:logs
 
 ```bash
 docker logs --tail 40 connect

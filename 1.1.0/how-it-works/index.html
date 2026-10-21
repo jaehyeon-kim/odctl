@@ -59,6 +59,10 @@
     
       <link rel="stylesheet" href="../stylesheets/roadmap.css">
     
+      <link rel="stylesheet" href="../stylesheets/tables.css">
+    
+      <link rel="stylesheet" href="../stylesheets/code-lines.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -2192,8 +2196,8 @@
 <h2 id="how-you-reach-a-service">How you reach a service</h2>
 <p>Every service publishes its ports on the host at <code>127.0.0.1</code> only, so a browser or client on your machine uses <a href="http://127.0.0.1:&lt;port&gt;" rel="nofollow"><code>http://127.0.0.1:&lt;port&gt;</code></a>, and other machines on your network cannot reach them. This works the same on macOS, Linux and WSL2: Docker Desktop forwards the port to the host's <code>127.0.0.1</code>, and WSL2 forwards it to Windows' <code>localhost</code>. To open a port to your network, remove <code>127.0.0.1:</code> from its line in <code>.odctl/compose-*.yml</code> and run <code>odctl recreate &lt;profile&gt;</code>. Each profile page lists the ports.</p>
 <p>Inside Docker, services reach each other by name on the <code>odctl</code> network, for example <code>http://catalog:8181</code> or <code>broker-1:19092</code> for Kafka. A container of your own reaches them the same way when it joins that network:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--network<span class="w"> </span>odctl<span class="w"> </span>curlimages/curl<span class="w"> </span>http://catalog:8181/v1/config
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--network<span class="w"> </span>odctl<span class="w"> </span>curlimages/curl<span class="w"> </span>http://catalog:8181/v1/config
+</span></code></pre></div></td></tr></table></div>
 <h2 id="where-data-lives">Where data lives</h2>
 <p>Services keep their data inside their containers.</p>
 <table>
@@ -2338,20 +2342,26 @@
 <h3 id="examples">Examples</h3>
 <p>Each example edits the workspace, then applies the change. <code>sed -i.bak</code> works with both GNU and macOS <code>sed</code>, and keeps the original as a <code>.bak</code> file.</p>
 <p>Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/'</span><span class="w"> </span>.odctl/compose-infra.yml
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>odctl<span class="w"> </span>recreate<span class="w"> </span>storage
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>docker<span class="w"> </span>inspect<span class="w"> </span>seaweed<span class="w"> </span>--format<span class="w"> </span><span class="s1">'{{.HostConfig.Memory}}'</span><span class="w">   </span><span class="c1"># 2147483648</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
+<span class="normal"><a href="#__codelineno-1-2">2</a></span>
+<span class="normal"><a href="#__codelineno-1-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/'</span><span class="w"> </span>.odctl/compose-infra.yml
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a>odctl<span class="w"> </span>recreate<span class="w"> </span>storage
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a>docker<span class="w"> </span>inspect<span class="w"> </span>seaweed<span class="w"> </span>--format<span class="w"> </span><span class="s1">'{{.HostConfig.Memory}}'</span><span class="w">   </span><span class="c1"># 2147483648</span>
+</span></code></pre></div></td></tr></table></div>
 <p>Publish Trino on port 8180 instead of 8080, when another program already uses 8080:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/"127.0.0.1:8080:8080" # Trino/"127.0.0.1:8180:8080" # Trino/'</span><span class="w"> </span>.odctl/compose-analytics.yml
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>trino
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>docker<span class="w"> </span>port<span class="w"> </span>trino<span class="w">   </span><span class="c1"># 8080/tcp -&gt; 127.0.0.1:8180</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span>
+<span class="normal"><a href="#__codelineno-2-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/"127.0.0.1:8080:8080" # Trino/"127.0.0.1:8180:8080" # Trino/'</span><span class="w"> </span>.odctl/compose-analytics.yml
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>trino
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3"></a>docker<span class="w"> </span>port<span class="w"> </span>trino<span class="w">   </span><span class="c1"># 8080/tcp -&gt; 127.0.0.1:8180</span>
+</span></code></pre></div></td></tr></table></div>
 <p>Install extra Python packages in the Airflow container, for DAGs that import them:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/^_AIRFLOW_PIP_DEPS=.*/_AIRFLOW_PIP_DEPS="dateparser==1.4.3"/'</span><span class="w"> </span>.odctl/.env
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>airflow
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>airflow<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import dateparser"</span>
-</span></code></pre></div>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span>
+<span class="normal"><a href="#__codelineno-3-2">2</a></span>
+<span class="normal"><a href="#__codelineno-3-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/^_AIRFLOW_PIP_DEPS=.*/_AIRFLOW_PIP_DEPS="dateparser==1.4.3"/'</span><span class="w"> </span>.odctl/.env
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2"></a>odctl<span class="w"> </span>up<span class="w"> </span>airflow
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>airflow<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import dateparser"</span>
+</span></code></pre></div></td></tr></table></div>
 <p>The packages install when the container starts, so the first start after the change takes longer. <code>_MLOPS_PIP_DEPS</code> does the same for the <code>mlflow</code> and <code>mlflow-serve</code> containers, for example a library a served model needs to load. <code>MODEL_URI</code> in the same file sets the model <code>mlflow-serve</code> serves, as <a href="../guides/mlflow/">MLflow tracking and model serving</a> shows.</p>
 <h3 id="trino-access-rules">Trino access rules</h3>
 <p>The shipped <code>trino/rules.json</code> grants every identity full table privileges and denies <code>analyst</code> schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.</p>
@@ -2408,10 +2418,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.select"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/code-lines.js"></script>
       
     
   </body>
