@@ -35,6 +35,14 @@
     },
     {
       "customType": "regex",
+      "description": "Track SPARK_V in versions.env, so the Spark Kafka connector jars follow the apache/spark image tag.",
+      "managerFilePatterns": ["/^src/odctl/resources/deps/versions\\.env$/"],
+      "matchStrings": ["(?m)^SPARK_V=(?<currentValue>\\S+)\\s*$"],
+      "depNameTemplate": "org.apache.spark:spark-sql-kafka-0-10_2.13",
+      "datasourceTemplate": "maven"
+    },
+    {
+      "customType": "regex",
       "description": "Track DEB_V in fetch_standalone_plugins.sh, which no built-in manager reads.",
       "managerFilePatterns": ["/^src/odctl/resources/deps/fetch_standalone_plugins\\.sh$/"],
       "matchStrings": ["(?m)^DEB_V=\"(?<currentValue>[^\"]+)\""],
@@ -106,7 +114,7 @@
     },
     {
       "description": "Group Spark and PySpark updates together to prevent Py4J mismatches",
-      "matchPackageNames": ["apache/spark", "pyspark"],
+      "matchPackageNames": ["apache/spark", "pyspark", "org.apache.spark:{/,}**"],
       "groupName": "Spark Ecosystem"
     },
     {

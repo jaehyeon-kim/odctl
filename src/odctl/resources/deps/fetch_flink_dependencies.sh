@@ -35,6 +35,13 @@ K_V=$(get_maven_version "org/apache/flink/flink-sql-connector-kafka" "[0-9]+\.[0
 if [ -z "$K_V" ]; then echo "❌ Error: Kafka connector for Flink ${FLINK_MINOR} is not published yet!"; exit 1; fi
 fetch_artifact "flink/2.x/kafka.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/${K_V}/flink-sql-connector-kafka-${K_V}.jar"
 
+# HTTP sink. The shaded SQL jar carries its own dependencies, which the plain
+# flink-connector-http jar does not. Its version ends in the Flink minor, as the
+# Kafka connector's does.
+H_V=$(get_maven_version "org/apache/flink/flink-sql-connector-http" "[0-9]+\.[0-9]+\.[0-9]+-${FLINK_MINOR}")
+if [ -z "$H_V" ]; then echo "❌ Error: HTTP connector for Flink ${FLINK_MINOR} is not published yet!"; exit 1; fi
+fetch_artifact "flink/2.x/http.jar" "https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-http/${H_V}/flink-sql-connector-http-${H_V}.jar"
+
 # Avro with Confluent Schema Registry. This uber JAR is a superset of
 # flink-sql-avro: it registers the plain 'avro' format factory as well as
 # 'avro-confluent' and 'debezium-avro-confluent', so adding both would duplicate

@@ -1,6 +1,6 @@
 # Evidently reports
 
-The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The end-to-end tests run the code below on every release.
+The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. Evidently covers data drift and data quality. It gives no estimate of a model's performance while the outcomes are unknown. NannyML does, but version 0.13.1 supports Python 3.9 to 3.12 and the Airflow image runs Python 3.13, so run NannyML in a Python 3.12 process on your machine. The end-to-end tests run the code below on every release.
 
 ```bash title="docs/snippets/evidently-reports/commands.sh:install"
 odctl up evidently

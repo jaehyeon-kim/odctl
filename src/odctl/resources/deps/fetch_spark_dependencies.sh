@@ -41,6 +41,29 @@ fetch_artifact "spark/iceberg-runtime.jar" "https://repo1.maven.org/maven2/org/a
 fetch_artifact "spark/openlineage.jar" "https://repo1.maven.org/maven2/io/openlineage/openlineage-spark_${SCALA_V}/${OL_SPARK_V}/openlineage-spark_${SCALA_V}-${OL_SPARK_V}.jar"
 fetch_artifact "spark/openmetadata-agent.jar" "$OM_SPARK_URL"
 
+# Kafka source and sink for batch and streaming reads without --packages. The
+# connector's own pom names the kafka-clients and commons-pool2 versions it was
+# built against, so they are read from there. The token provider is fetched below.
+# Scala parallel collections and jsr305, which the pom also declares, are in the
+# Spark image already.
+# The pom has CRLF line ends, so the tr removes carriage returns as well.
+KAFKA_POM=$(curl -sL "https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_${SCALA_V}/${SPARK_V}/spark-sql-kafka-0-10_${SCALA_V}-${SPARK_V}.pom" | tr -d ' \r\n' || true)
+pom_version() {
+    echo "$KAFKA_POM" | grep -Eo "<artifactId>${1}</artifactId><version>[^<]+</version>" | head -1 | sed -E 's#.*<version>([^<]+)</version>#\1#' || true
+}
+KAFKA_CLIENTS_V=$(pom_version "kafka-clients")
+POOL2_V=$(pom_version "commons-pool2")
+if [ -z "$KAFKA_CLIENTS_V" ] || [ -z "$POOL2_V" ]; then echo "❌ Error: Could not read the kafka-clients and commons-pool2 versions from the spark-sql-kafka-0-10 ${SPARK_V} pom!"; exit 1; fi
+fetch_artifact "spark/spark-sql-kafka.jar" "https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_${SCALA_V}/${SPARK_V}/spark-sql-kafka-0-10_${SCALA_V}-${SPARK_V}.jar"
+fetch_artifact "spark/spark-token-provider-kafka.jar" "https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_${SCALA_V}/${SPARK_V}/spark-token-provider-kafka-0-10_${SCALA_V}-${SPARK_V}.jar"
+fetch_artifact "spark/kafka-clients.jar" "https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/${KAFKA_CLIENTS_V}/kafka-clients-${KAFKA_CLIENTS_V}.jar"
+fetch_artifact "spark/commons-pool2.jar" "https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/${POOL2_V}/commons-pool2-${POOL2_V}.jar"
+
+# Avro for from_avro and to_avro. The module is not in the Spark distribution. Its
+# pom adds spark-tags, scala-parallel-collections and xz at compile scope, and the
+# Spark image has all three, so no other jar is fetched.
+fetch_artifact "spark/spark-avro.jar" "https://repo1.maven.org/maven2/org/apache/spark/spark-avro_${SCALA_V}/${SPARK_V}/spark-avro_${SCALA_V}-${SPARK_V}.jar"
+
 # Hadoop S3A, so the Iceberg procedures that walk storage through Hadoop's
 # FileSystem API work against SeaweedFS. S3FileIO covers the data path already;
 # these two jars are what remove_orphan_files and add_files need.

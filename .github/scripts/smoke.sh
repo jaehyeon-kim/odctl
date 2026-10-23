@@ -120,6 +120,7 @@ kafka_topic() {
 # kafka-lite runs the guide's commands. kafka-full keeps smoke_kafka below,
 # because its broker container is kafka-1, not the kafka the guide names.
 guide_kafka() {
+  local out
   retry 30 5 docker exec kafka /opt/kafka/bin/kafka-topics.sh \
     --bootstrap-server broker-1:19092 --list || fail "broker never became reachable"
   run_snippet kafka/commands.sh create-topic >/dev/null 2>&1 || fail "could not create the topic"
@@ -129,6 +130,17 @@ guide_kafka() {
   got=$(run_snippet kafka/commands.sh produce-consume 2>/dev/null | grep -c '"n"')
   [ "$got" -eq 5 ] || fail "group-mode consume returned $got of 5 messages"
   pass "produced and consumed 5 messages through a consumer group"
+
+  # demo was created without settings, so it shows the broker defaults.
+  out=$(run_snippet kafka/commands.sh retention-default 2>/dev/null)
+  grep -Eq '^ *retention\.ms=86400000 ' <<<"$out" && grep -Eq '^ *retention\.bytes=524288000 ' <<<"$out" \
+    || { echo "$out"; fail "a topic created without settings did not get one day and 500 MB"; }
+  pass "the broker defaults are one day and 500 MB per partition"
+  kafka_topic --delete --topic history >/dev/null 2>&1
+  out=$(run_snippet kafka/commands.sh retention-unlimited 2>/dev/null)
+  grep -q 'retention.ms=-1' <<<"$out" && grep -q 'retention.bytes=-1' <<<"$out" \
+    || { echo "$out"; fail "the topic did not take retention.ms=-1 and retention.bytes=-1"; }
+  pass "a topic created with retention.ms and retention.bytes at -1 keeps both"
 }
 
 smoke_kafka() {
@@ -227,6 +239,14 @@ SQL
   pass "Flink wrote 3 rows to an Iceberg table and read them back"
 }
 
+# Right after kafka-lite starts, Karapace answers its health check but times out
+# on a schema write until its producer reaches the broker. Wait for a write.
+wait_karapace_write() {
+  retry 24 5 curl -fsS --max-time 10 -X POST -H 'Content-Type: application/vnd.schemaregistry.v1+json' \
+    -d '{"schema": "{\"type\":\"string\"}"}' http://127.0.0.1:8081/subjects/smoke-ready/versions \
+    >/dev/null 2>&1 || fail "Karapace never accepted a schema"
+}
+
 # The Kafka, Avro with schema registry, and JDBC jars come from the deps image
 # and must match the Flink minor. Write Avro to Kafka through Karapace, read it
 # back, and write an aggregate to PostgreSQL over JDBC. flink-lite already starts
@@ -234,11 +254,7 @@ SQL
 smoke_flink_kafka_jdbc() {
   odctl up kafka-lite >/dev/null 2>&1 || fail "could not start kafka-lite for the Flink Kafka and JDBC check"
   retry 30 5 kafka_topic --list >/dev/null 2>&1 || fail "broker never became reachable"
-  # Right after it starts, Karapace answers its health check but times out on a
-  # schema write until its producer reaches the broker. Wait for a write.
-  retry 24 5 curl -fsS --max-time 10 -X POST -H 'Content-Type: application/vnd.schemaregistry.v1+json' \
-    -d '{"schema": "{\"type\":\"string\"}"}' http://127.0.0.1:8081/subjects/smoke-ready/versions \
-    >/dev/null 2>&1 || fail "Karapace never accepted a schema"
+  wait_karapace_write
   run_snippet flink-sql/commands.sh create-topic-table >/dev/null 2>&1 \
     || fail "could not create the topic or the JDBC target table"
   local out
@@ -250,6 +266,37 @@ smoke_flink_kafka_jdbc() {
     "SELECT string_agg(supplier || '=' || orders || '/' || total, ',' ORDER BY supplier) FROM supplier_stats" 2>/dev/null)
   [ "$rows" = "a=2/15,b=1/7.5" ] || { echo "$out" | grep -iE "error|exception" | tail -10; fail "Kafka Avro to JDBC through Flink SQL gave '$rows', expected a=2/15,b=1/7.5"; }
   pass "Flink read Avro from Kafka through the schema registry and wrote an aggregate to PostgreSQL over JDBC"
+
+  # Two different OVER windows in one streaming query are refused, so the guide
+  # runs one statement for each window size, each writing its own table.
+  local refused
+  refused=$(snippet flink-sql/steps.sql windows-refused | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  grep -qF '[ERROR]' <<<"$refused" || fail "Flink did not refuse two different OVER windows: $(tail -5 <<<"$refused")"
+  run_snippet flink-sql/commands.sh create-window-tables >/dev/null 2>&1 || fail "could not create the window tables"
+  out=$(snippet flink-sql/steps.sql windows-one-per-size | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  run_snippet flink-sql/commands.sh check-windows >/dev/null 2>&1 || fail "the guide's window check query failed"
+  rows=$(docker exec postgres psql -U user -d odctl -tAc \
+    "SELECT (SELECT count(*) FROM card_sum_10m) || ',' || (SELECT count(*) FROM card_sum_1h)" 2>/dev/null)
+  [ "$rows" = "20,20" ] || { echo "$out" | grep -iE "error|exception" | tail -10; fail "one statement for each OVER window gave '$rows' rows, expected 20,20"; }
+  pass "Flink refused two different OVER windows and one statement for each window size wrote its own table"
+}
+
+# The HTTP jar comes from the deps image. Push a feature value to Feast's /push
+# through the HTTP sink and read it back. The Flink job finishes even when Feast
+# rejects the request, so the read-back is the only proof. Feast caches its
+# registry for up to a minute after apply, and the read uses that cache too.
+smoke_flink_http() {
+  odctl up feast >/dev/null 2>&1 || fail "could not start feast for the Flink HTTP check"
+  retry 40 5 http_ok "http://127.0.0.1:6566/health" || fail "Feast never answered on :6566"
+  (cd "$SNIPPETS/flink-sql" && run_snippet flink-sql/commands.sh feast-apply) >/dev/null 2>&1 \
+    || fail "could not apply the Feast push source"
+  local out
+  out=$(snippet flink-sql/steps.sql feast-push | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  feast_value() { run_snippet flink-sql/commands.sh feast-read 2>/dev/null | grep -F 0.8999999761581421; }
+  retry 24 5 feast_value \
+    || { echo "$out" | grep -iE "error|exception" | tail -10; fail "Feast never returned the value the Flink HTTP sink pushed"; }
+  odctl down feast >/dev/null 2>&1 || fail "could not stop feast after the Flink HTTP check"
+  pass "Flink sent a row to Feast's /push through the HTTP sink and the value came back"
 }
 
 smoke_spark() {
@@ -259,6 +306,34 @@ smoke_spark() {
   out=$(run_snippet spark/commands.sh event-logs 2>/dev/null)
   [ -n "$out" ] || fail "no event log written, so the event log directory is not writable"
   pass "spark-sql wrote and read an Iceberg table, event logging works"
+
+  # The Kafka connector and its dependencies come from the deps image, so the
+  # job runs with no --packages option. kafka-lite is started here.
+  odctl up kafka-lite >/dev/null 2>&1 || fail "could not start kafka-lite for the Spark Kafka check"
+  retry 30 5 kafka_topic --list >/dev/null 2>&1 || fail "broker never became reachable"
+  kafka_topic --delete --topic spark-demo >/dev/null 2>&1
+  run_snippet spark/commands.sh kafka-topic >/dev/null 2>&1 || fail "could not create and fill the spark-demo topic"
+  out=$(cd "$SNIPPETS/spark" && run_snippet spark/commands.sh kafka-read 2>&1)
+  for n in 1 2 3; do
+    grep -qF "{\"n\":$n}" <<<"$out" || { echo "$out" | grep -iE "error|exception" | tail -10; fail "spark.read.format(kafka) did not return {\"n\":$n}"; }
+  done
+  pass "Spark read 3 messages from a Kafka topic with no --packages option"
+
+  # Avro records written with the schema registry, as the Flink SQL guide writes
+  # the orders topic: the job reads the subject's latest schema from Karapace,
+  # drops the 5-byte prefix and decodes the rest.
+  wait_karapace_write
+  kafka_topic --delete --topic orders >/dev/null 2>&1
+  docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+    --create --topic orders --partitions 1 --replication-factor 1 >/dev/null 2>&1 || fail "could not create the orders topic"
+  out=$(docker exec -i karapace python3 - < "$(dirname "$0")/spark_avro_producer.py" 2>&1) || { echo "$out" | tail -10; fail "could not write Avro records to the orders topic"; }
+  out=$(cd "$SNIPPETS/spark" && run_snippet spark/commands.sh avro-read 2>&1)
+  for row in "a|5.0" "a|10.0" "b|7.5"; do
+    grep -qE "^\| *${row%|*} *\| *${row#*|} *\|$" <<<"$out" \
+      || { echo "$out" | grep -iE "error|exception" | tail -10; fail "from_avro did not return ${row%|*} ${row#*|}"; }
+  done
+  pass "Spark decoded 3 Avro records written with the schema registry"
+  odctl down kafka-lite >/dev/null 2>&1 || fail "could not stop kafka-lite after the Spark Kafka check"
 }
 
 smoke_ch_lite() {
@@ -365,6 +440,27 @@ smoke_infra() {
       docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE '$s3'" >/dev/null 2>&1 || true
       [ "$body" = "odctl-smoke" ] || fail "read back '$body' from S3, expected odctl-smoke"
       pass "signed write, read back and delete through the S3 API"
+      # A model of a few hundred MB uploaded three times in a row. Without
+      # GOMEMLIMIT, SeaweedFS grew to its 512 MB limit and the kernel killed it
+      # during the second or third upload, with HTTP 500 for the client.
+      local big="http://localhost:8333/warehouse/odctl-big-$$.bin" n
+      docker exec seaweed sh -c "head -c 267832560 /dev/urandom > /tmp/odctl-big.bin" >/dev/null 2>&1 \
+        || fail "could not create a 268 MB file in the seaweed container"
+      for n in 1 2 3; do
+        docker exec seaweed sh -c \
+          "curl -fsS $sig '$cred' -X PUT --data-binary @/tmp/odctl-big.bin '$big'" >/dev/null 2>&1 \
+          || fail "upload $n of 3 of a 268 MB file failed; seaweed OOMKilled=$(docker inspect -f '{{.State.OOMKilled}}' seaweed 2>&1)"
+      done
+      [ "$(docker inspect -f '{{.State.OOMKilled}} {{.State.Running}}' seaweed)" = "false true" ] \
+        || fail "seaweed was killed or stopped during the large uploads"
+      docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE '$big'; rm -f /tmp/odctl-big.bin" >/dev/null 2>&1 || true
+      pass "three uploads of 268 MB passed and seaweed was not killed"
+      # How it works shows how to create a bucket before its profile exists.
+      local buckets
+      buckets=$(run_snippet storage/commands.sh create-bucket 2>&1) || fail "the create-bucket example failed: $buckets"
+      grep -q "'desflow'" <<<"$buckets" || fail "the bucket list has no desflow: $buckets"
+      docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE 'http://localhost:8333/desflow'" >/dev/null 2>&1 || true
+      pass "the create-bucket example created a bucket with the S3 login"
       assert_metrics http://seaweed:9327/metrics ;;
     catalog)
       retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
@@ -494,16 +590,22 @@ smoke_mlflow() {
   pass "logged a run with a proxied artifact and read it back"
   assert_metrics http://mlflow:5000/metrics
   smoke_model_server
+  smoke_model_features
 }
 
 # The guide runs its Python on the host, with the client versions the server
 # image pins, so read them from the Dockerfile the image is built from.
+# mlflow_snippet <section> [sed expression] [timeout in seconds]: the optional
+# sed expression changes the section before it runs, and the timeout stops a
+# call that hangs, as a download from the host does without its setting.
 mlflow_snippet() {
   local dockerfile="$SNIPPETS/../../src/odctl/resources/docker/mlflow/Dockerfile" mlflow xgboost
+  local edit="${2:-}" limit="${3:-}"
   mlflow=$(grep -oE 'mlflow/mlflow:v[0-9.]+' "$dockerfile" | head -1 | cut -dv -f2)
   xgboost=$(grep -oE "xgboost~=[0-9.]+" "$dockerfile" | head -1 | cut -d= -f2)
-  (cd "$(mktemp -d)" && snippet mlflow/steps.py "$1" \
-    | GIT_PYTHON_REFRESH=quiet uv run --no-project --quiet --python 3.12 \
+  (cd "$(mktemp -d)" && cp "$SNIPPETS/mlflow/driver_score.py" . && snippet mlflow/steps.py "$1" \
+    | if [ -n "$edit" ]; then sed -e "$edit"; else cat; fi \
+    | GIT_PYTHON_REFRESH=quiet ${limit:+timeout -k 5 "$limit"} uv run --no-project --quiet --python 3.12 \
       --with "mlflow==$mlflow" --with "xgboost~=$xgboost" python -)
 }
 
@@ -535,6 +637,68 @@ smoke_model_server() {
     *'"predictions"'*) pass "served models:/demo-model@champion and scored: $(tail -1 <<<"$got")" ;;
     *) fail "/invocations returned no predictions: ${got:-<empty>}" ;;
   esac
+
+  # The server resolves the alias once, at start. Register a second version
+  # whose trees split, so that it predicts differently. That moves champion to
+  # it, and the server must keep answering as version 1 until the restart.
+  local before="$(tail -1 <<<"$got")" stale rc out
+  mlflow_snippet register-model 's/max_depth=2)/max_depth=2, min_child_weight=0)/' >/dev/null 2>&1 \
+    || fail "could not register a second version of demo-model"
+  stale=$(curl -s -X POST http://127.0.0.1:5003/invocations \
+    -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}')
+  [ "$stale" = "$before" ] || fail "the served model changed before a restart: '$stale', was '$before'"
+  out=$(timeout 300 bash -o pipefail -c "$(snippet mlflow/commands.sh new-version)" 2>/dev/null); rc=$?
+  [ "$rc" -ne 124 ] || fail "the restarted mlflow-serve gave no answer within 300 seconds"
+  grep -q 'Restart complete' <<<"$out" || fail "odctl restart mlflow did not complete: $out"
+  [ "$rc" -eq 0 ] || fail "the scoring request after the restart failed with exit $rc"
+  got=$(tail -1 <<<"$out")
+  case "$got" in
+    *'Restart complete'*) fail "the restarted mlflow-serve answered with an empty body" ;;
+    *'"predictions"'*) [ "$got" != "$before" ] || fail "the restarted server still serves version 1: $got" ;;
+    *) fail "no predictions after the restart: $got" ;;
+  esac
+  pass "a new version behind the alias is served after odctl restart mlflow: $got"
+
+  # From the host, a download works only with the setting the guide names. Without
+  # it the call waits on presigned URLs for seaweed:8333 and never returns.
+  local files
+  files=$(mlflow_snippet download "" 120 2>&1) || fail "the download with the setting failed: $files"
+  grep -q MLmodel <<<"$files" || fail "the downloaded model has no MLmodel file: $files"
+  if mlflow_snippet download '/MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD/d' 45 >/dev/null 2>&1; then
+    fail "the download worked without MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false, so the guide's reason is stale"
+  fi
+  pass "a registered model downloads from the host with the setting and not without it"
+}
+
+# A model that reads online features calls feast-serve over HTTP from inside
+# mlflow-serve. This starts feast itself, applies the Flink guide's push source
+# and pushes one value, then serves the guide's model against it.
+smoke_model_features() {
+  odctl up feast >/dev/null 2>&1 || fail "could not start feast for the features model"
+  retry 40 5 http_ok "http://127.0.0.1:6566/health" || fail "Feast never answered on :6566"
+  (cd "$SNIPPETS/flink-sql" && run_snippet flink-sql/commands.sh feast-apply) >/dev/null 2>&1 \
+    || fail "could not apply the Feast push source"
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%S)
+  retry 12 5 curl -fsS -X POST http://127.0.0.1:6566/push -H 'Content-Type: application/json' \
+    -d "{\"push_source_name\": \"driver_stats_push\", \"allow_registry_cache\": false, \"df\": {\"driver_id\": [1001], \"conv_rate\": [0.9], \"event_timestamp\": [\"$now\"]}}" \
+    >/dev/null 2>&1 || fail "could not push a feature value to Feast"
+  mlflow_snippet features-model >/dev/null 2>&1 || fail "could not register the features model"
+  sed -i'' -e '/^MODEL_URI=/d' .odctl/.env
+  cat "$SNIPPETS/mlflow/model-uri-features.env" >> .odctl/.env
+  odctl up mlflow >/dev/null 2>&1 || fail "could not start mlflow-serve with the features model"
+  retry 30 5 http_ok "http://127.0.0.1:5003/ping" || fail "no HTTP response from :5003 for the features model"
+  local got
+  # feast-serve caches its registry for up to a minute after apply, and until it
+  # refreshes the model gets an error from it, so score again until it answers.
+  for _ in $(seq 1 24); do
+    got=$(run_snippet mlflow/commands.sh features-score 2>/dev/null)
+    grep -Eq '"predictions": ?\[' <<<"$got" && break
+    sleep 5
+  done
+  grep -Eq '"predictions": ?\[1\]' <<<"$got" || fail "the features model did not score driver 1001 as 1: ${got:-<empty>}"
+  odctl down feast >/dev/null 2>&1 || fail "could not stop feast after the features model"
+  pass "mlflow-serve scored a driver with a feature read from feast-serve: $got"
 }
 
 # Airflow: a healthy api-server proves nothing. On Airflow 3 the profile shipped
@@ -620,6 +784,14 @@ smoke_deps() {
   jars=$(docker run --rm -v "$vol":/d alpine sh -c 'find /d -name "*.jar" | wc -l' 2>/dev/null | tr -d '[:space:]')
   [ "${jars:-0}" -gt 0 ] || fail "no jars under $vol, so the Flink and Spark copies would be silent no-ops"
   pass "$jars jars present for the Flink and Spark profiles to copy"
+
+  # The HTTP jar for Flink and the Kafka and Avro jars for Spark are not checked by name above.
+  local jar
+  for jar in flink/2.x/http.jar spark/spark-sql-kafka.jar spark/spark-token-provider-kafka.jar \
+      spark/kafka-clients.jar spark/commons-pool2.jar spark/spark-avro.jar; do
+    docker run --rm -v "$vol":/d alpine sh -c "[ -s /d/$jar ]" || fail "$jar is missing or empty in $vol"
+  done
+  pass "the Flink HTTP jar, the four Spark Kafka jars and the Spark Avro jar are in $vol"
 
   # An upgrade must not leave the previous version's jars beside the new ones:
   # Kafka Connect loaded Debezium 3.5.1 over 3.7.0 that way (#126). Plant a jar
@@ -1227,6 +1399,7 @@ case "$PROFILE" in
   flink-lite)
     smoke_flink
     smoke_flink_kafka_jdbc
+    smoke_flink_http
     assert_metrics http://jobmanager:9249/metrics http://taskmanager-a:9249/metrics ;;
   flink-full)
     smoke_flink

@@ -10,7 +10,8 @@ itself, the registry, the smoke script or the images, still runs everything.
 Groups are listed here rather than derived, because the grouping is a decision:
 lite and full variants share a large image, so running them together pays for
 the pull once. Which compose file each group needs comes from registry.yml, so
-the mapping is not repeated.
+the mapping is not repeated, except the profiles a group's case starts from
+another file, listed in ALSO_RUNS.
 
 Usage: select-profiles.py <changed-file>...
        select-profiles.py --all
@@ -56,6 +57,7 @@ GROUPS = [
 RUN_EVERYTHING = (
     "src/odctl/",
     ".github/scripts/smoke.sh",
+    ".github/scripts/spark_avro_producer.py",
     ".github/scripts/select-profiles.py",
     ".github/workflows/",
 )
@@ -66,6 +68,17 @@ COMPOSE_PREFIX = "src/odctl/resources/compose-"
 
 REGISTRY = Path("src/odctl/resources/registry.yml")
 
+# smoke.sh starts some profiles from another group's case: the kafka case starts
+# catalog, the flink case starts kafka-lite and feast, the spark case starts
+# kafka-lite, and the fluss case starts flink-lite. A change to that compose file
+# needs these groups as well as the ones the registry maps to it.
+ALSO_RUNS = {
+    "compose-infra.yml": ["kafka-lite kafka-full"],
+    "compose-kafka.yml": ["flink-lite flink-full", "spark-lite spark-full"],
+    "compose-flink.yml": ["fluss"],
+    "compose-mlops.yml": ["flink-lite flink-full"],
+}
+
 # smoke.sh runs the guide commands in docs/snippets/<guide>/, so a change there
 # needs the groups whose assertions run that guide. A folder missing from this
 # map runs everything, and a test fails until it is added.
@@ -74,12 +87,13 @@ SNIPPET_GROUPS = {
     "kafka": ["kafka-lite kafka-full"],
     "kafka-connect": ["kafka-lite kafka-full"],
     "iceberg-ingestion": ["kafka-lite kafka-full", "flink-lite flink-full"],
-    "flink-sql": ["flink-lite flink-full"],
+    "flink-sql": ["flink-lite flink-full", "mlflow"],
     "fluss": ["fluss"],
     "spark": ["spark-lite spark-full"],
     "clickhouse": ["ch-lite ch-full"],
     "trino-metabase": ["trino", "metabase"],
     "hybrid-search": ["postgres"],
+    "storage": ["storage"],
     "valkey": ["valkey"],
     "airflow-dags": ["airflow"],
     "temporal-workers": ["temporal"],
@@ -133,7 +147,8 @@ def select(changed: list, registry_path: Path = REGISTRY) -> list:
     selected = []
     for group in GROUPS:
         files = {mapping.get(p) for p in group.split()}
-        if files & touched_files or group in snippet_groups:
+        also = any(group in ALSO_RUNS.get(name, []) for name in touched_files)
+        if files & touched_files or group in snippet_groups or also:
             selected.append(group)
     return selected
 

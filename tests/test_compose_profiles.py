@@ -506,6 +506,22 @@ class TestComposeShape:
             misplaced
         )
 
+    def test_seaweed_soft_memory_limit_is_three_quarters_of_its_hard_limit(self):
+        """
+        SeaweedFS is a Go program. With no GOMEMLIMIT its heap grows to mem_limit
+        while it buffers a large upload, and the kernel kills the container (two
+        of four uploads of a 268 MB model failed with HTTP 500 and exit code
+        137). The soft limit stays at three quarters of the hard limit, so a
+        change to one needs a change to the other.
+        """
+        seaweed = _services(get_internal_resources_dir() / "compose-infra.yml")[
+            "seaweed"
+        ]
+        hard = int(str(seaweed["mem_limit"]).removesuffix("m")) * 1024**2
+        soft = seaweed["environment"]["GOMEMLIMIT"]
+        assert str(soft).endswith("MiB"), soft
+        assert int(str(soft).removesuffix("MiB")) * 1024**2 == hard * 3 // 4
+
     def test_no_image_uses_a_floating_tag(self):
         """
         A floating tag changes the stack with no commit and no dashboard entry,
@@ -647,3 +663,32 @@ def test_init_deps_copies_only_changed_jars_and_renames_them_into_place():
     assert 'cmp -s "$$file" "$$dest"' in script
     assert 'mv -f "$$dest.partial" "$$dest"' in script
     assert "cp -r" not in script
+
+
+def test_streaming_jars_are_fetched_and_spark_version_matches_the_image():
+    """The Flink HTTP jar and the Spark Kafka and Avro jars come from the deps image."""
+    import re
+
+    resources = get_internal_resources_dir()
+    fetched = {
+        "fetch_flink_dependencies.sh": ["flink/2.x/http.jar"],
+        "fetch_spark_dependencies.sh": [
+            "spark/spark-sql-kafka.jar",
+            "spark/spark-token-provider-kafka.jar",
+            "spark/kafka-clients.jar",
+            "spark/commons-pool2.jar",
+            "spark/spark-avro.jar",
+        ],
+    }
+    for script, jars in fetched.items():
+        text = (resources / "deps" / script).read_text()
+        for jar in jars:
+            assert f'fetch_artifact "{jar}"' in text, f"{script} does not fetch {jar}"
+
+    versions = (resources / "deps" / "versions.env").read_text()
+    spark_v = re.search(r"^SPARK_V=(\S+)$", versions, re.M).group(1)
+    dockerfile = (resources / "docker" / "spark" / "Dockerfile").read_text()
+    tag = re.search(r"^FROM apache/spark:(\S+)$", dockerfile, re.M).group(1)
+    assert spark_v == tag, (
+        "SPARK_V must equal the apache/spark tag in the Spark Dockerfile"
+    )

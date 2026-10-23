@@ -113,10 +113,11 @@ A restart keeps the container, so it does not apply an edited compose file or `.
 
 Each example edits the workspace, then applies the change. `sed -i.bak` works with both GNU and macOS `sed`, and keeps the original as a `.bak` file.
 
-Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it:
+Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it. SeaweedFS is a Go program, and `GOMEMLIMIT` is a soft memory limit: as the memory the Go runtime manages nears it, the garbage collector runs more often and returns memory to the system sooner. It is three quarters of `mem_limit`, so change both:
 
 ```bash
-sed -i.bak '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' .odctl/compose-infra.yml
+sed -i.bak -e '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' \
+  -e '/^  seaweed:/,/^  [a-z]/ s/GOMEMLIMIT: 384MiB/GOMEMLIMIT: 1536MiB/' .odctl/compose-infra.yml
 odctl recreate storage
 docker inspect seaweed --format '{{.HostConfig.Memory}}'   # 2147483648
 ```
@@ -137,7 +138,22 @@ odctl up airflow
 docker exec airflow python -c "import dateparser"
 ```
 
-The packages install when the container starts, so the first start after the change takes longer. `_MLOPS_PIP_DEPS` does the same for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `MODEL_URI` in the same file sets the model `mlflow-serve` serves, as [MLflow tracking and model serving](guides/mlflow.md) shows.
+`_AIRFLOW_PIP_DEPS` and `_MLOPS_PIP_DEPS` both install their packages from PyPI again in every new container: at the first `odctl up`, after `odctl recreate`, and after `odctl down` and `odctl up`. `_AIRFLOW_PIP_DEPS` is for the Airflow containers. `_MLOPS_PIP_DEPS` is for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `odctl restart` keeps the container, so the packages stay. Each new container needs PyPI, and pinned versions (`transformers==5.20.2`) keep the installed packages the same. `MODEL_URI` in the same file sets the model `mlflow-serve` serves, as [MLflow tracking and model serving](guides/mlflow.md) shows.
+
+Create a bucket before its profile exists, for example for a project that has no profile. `seaweed-init` creates a fixed list of buckets, and `.odctl/seaweed/s3.json` gives the login `user` the `Admin` action, which creating a bucket needs. This runs boto3 in a container on the `odctl` network, where `seaweed:8333` resolves, and prints the buckets, which now include `desflow`:
+
+```bash title="docs/snippets/storage/commands.sh:create-bucket"
+docker run --rm -i --network odctl python:3.12-slim \
+  sh -c 'pip install -q --root-user-action=ignore boto3==1.43.118 && python -' <<'PY'
+import boto3
+s3 = boto3.client("s3", endpoint_url="http://seaweed:8333", region_name="us-east-1",
+                  aws_access_key_id="user", aws_secret_access_key="password")
+s3.create_bucket(Bucket="desflow")
+print(sorted(b["Name"] for b in s3.list_buckets()["Buckets"]))
+PY
+```
+
+Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile, but `odctl init --force`, which an upgrade needs, removes the edit.
 
 ### Trino access rules
 

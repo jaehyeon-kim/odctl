@@ -35,3 +35,35 @@ client = MlflowClient()
 version = max(int(mv.version) for mv in client.search_model_versions("name='demo-model'"))
 client.set_registered_model_alias("demo-model", "champion", version)
 # --8<-- [end:register-model]
+
+# --8<-- [start:download]
+import os
+
+os.environ["MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD"] = "false"
+import mlflow
+
+mlflow.set_tracking_uri("http://127.0.0.1:5004")
+path = mlflow.artifacts.download_artifacts("models:/demo-model@champion")
+print(sorted(os.listdir(path)))
+# --8<-- [end:download]
+
+# --8<-- [start:features-model]
+import mlflow, pandas as pd
+from mlflow import MlflowClient
+from mlflow.models import infer_signature
+
+mlflow.set_tracking_uri("http://127.0.0.1:5004")
+mlflow.set_experiment("driver-score")
+with mlflow.start_run():
+    mlflow.pyfunc.log_model(
+        name="model",
+        python_model="driver_score.py",
+        pip_requirements=["requests"],
+        signature=infer_signature(pd.DataFrame({"driver_id": [1001]}), [1]),
+        registered_model_name="driver-score",
+    )
+
+client = MlflowClient()
+version = max(int(mv.version) for mv in client.search_model_versions("name='driver-score'"))
+client.set_registered_model_alias("driver-score", "champion", version)
+# --8<-- [end:features-model]

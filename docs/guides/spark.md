@@ -44,6 +44,89 @@ The History Server lists the `spark-sql` run:
 
 ![Spark master UI with one worker](../images/spark-master.png){ .screenshot }
 
+## Read a Kafka topic
+
+The Kafka connector for Spark is in the shared volume with its dependencies, so a job reads Kafka with no `--packages` option. Start `kafka-lite` beside Spark, then create a topic and write three messages to it:
+
+```bash
+odctl up kafka-lite
+```
+
+```bash title="docs/snippets/spark/commands.sh:kafka-topic"
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+  --create --topic spark-demo --partitions 1 --replication-factor 1
+
+for i in 1 2 3; do echo "{\"n\":$i}"; done | docker exec -i kafka \
+  /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic spark-demo
+```
+
+Save this PySpark job as `read_kafka.py`. A batch read with `spark.read` reads the topic from its first offset to its last and then ends:
+
+```python title="docs/snippets/spark/read_kafka.py"
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("read-kafka").getOrCreate()
+
+df = (
+    spark.read.format("kafka")
+    .option("kafka.bootstrap.servers", "broker-1:19092")
+    .option("subscribe", "spark-demo")
+    .load()
+)
+df.selectExpr("CAST(value AS STRING) AS value").orderBy("value").show(truncate=False)
+```
+
+Copy the file into the master container and submit it:
+
+```bash title="docs/snippets/spark/commands.sh:kafka-read"
+docker cp read_kafka.py spark-master:/tmp/read_kafka.py
+docker exec spark-master /opt/spark/bin/spark-submit /tmp/read_kafka.py
+```
+
+The job prints a table with the values `{"n":1}`, `{"n":2}` and `{"n":3}`. Kafka returns each message as binary `key` and `value` columns, with the `topic`, `partition`, `offset`, `timestamp` and `timestampType` beside them.
+
+## Read Avro records written with the schema registry
+
+The `orders` topic that [Flink SQL](flink-sql.md#run-the-sql) fills holds Avro records written with the Karapace schema registry. Each value is a zero byte, the 4-byte id of the schema, and then the record in Avro's binary encoding, so Spark cannot read it as text. Save this job as `read_avro.py`. It gets the latest schema of the subject `orders-value` from Karapace, drops the 5 bytes and decodes the rest with `from_avro`, which needs no `--packages` option because the Avro module is in the shared volume. This works when all records were written with the subject's latest schema version. If the Flink section has not run, the job stops with `HTTP Error 404: Not Found`, because the subject does not exist yet.
+
+```python title="docs/snippets/spark/read_avro.py"
+import json
+import urllib.request
+
+from pyspark.sql import SparkSession
+from pyspark.sql.avro.functions import from_avro
+from pyspark.sql.functions import expr
+
+spark = SparkSession.builder.appName("read-avro").getOrCreate()
+
+# The latest schema of the subject, as the schema registry holds it.
+url = "http://karapace:8081/subjects/orders-value/versions/latest"
+with urllib.request.urlopen(url, timeout=30) as reply:
+    schema = json.load(reply)["schema"]
+
+raw = (
+    spark.read.format("kafka")
+    .option("kafka.bootstrap.servers", "broker-1:19092")
+    .option("subscribe", "orders")
+    .load()
+)
+
+# Skip the first 5 bytes of each value: a zero byte and the 4-byte schema id.
+orders = raw.select(
+    from_avro(expr("substring(value, 6, length(value) - 5)"), schema).alias("order")
+).select("order.*")
+orders.orderBy("supplier", "price").show()
+```
+
+Copy the file into the master container and submit it:
+
+```bash title="docs/snippets/spark/commands.sh:avro-read"
+docker cp read_avro.py spark-master:/tmp/read_avro.py
+docker exec spark-master /opt/spark/bin/spark-submit /tmp/read_avro.py
+```
+
+The job prints a table with the columns `supplier` and `price`, and the rows `a` 5.0, `a` 10.0 and `b` 7.5.
+
 ## From another container
 
 Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), submit applications to `spark://spark-master:7077`. Spark's settings, including the `iceberg` catalog and S3 access to SeaweedFS, are in `spark/spark-defaults.conf` in the workspace.

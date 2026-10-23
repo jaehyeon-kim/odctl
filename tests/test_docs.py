@@ -325,6 +325,21 @@ def test_snippet_changes_select_the_groups_that_run_them():
     assert selector.select(["docs/snippets/kafka/commands.sh"], registry) == [
         "kafka-lite kafka-full"
     ]
+    assert "spark-lite spark-full" in selector.select(
+        ["src/odctl/resources/compose-kafka.yml"], registry
+    )
+    assert "flink-lite flink-full" in selector.select(
+        ["src/odctl/resources/compose-mlops.yml"], registry
+    )
+    assert "flink-lite flink-full" in selector.select(
+        ["src/odctl/resources/compose-kafka.yml"], registry
+    )
+    assert "fluss" in selector.select(
+        ["src/odctl/resources/compose-flink.yml"], registry
+    )
+    assert "kafka-lite kafka-full" in selector.select(
+        ["src/odctl/resources/compose-infra.yml"], registry
+    )
     assert selector.select(["docs/snippets/unknown/x.sh"], registry) == list(
         selector.GROUPS
     )

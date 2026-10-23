@@ -80,6 +80,11 @@ services:
     # -metricsPort serves Prometheus metrics for every component `weed server` runs.
     command: "server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.domainName=warehouse.seaweed -ip.bind=0.0.0.0 -metricsPort=9327"
     mem_limit: 512m
+    environment:
+      # SeaweedFS is a Go program. Without a soft limit its garbage collector lets
+      # the heap grow to mem_limit while it buffers a large upload, and the kernel
+      # kills the container. Keep this at three quarters of mem_limit.
+      GOMEMLIMIT: 384MiB
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8888/ || exit 1"]
       interval: 5s
