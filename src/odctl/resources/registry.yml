@@ -276,7 +276,7 @@ stacks:
           * Internal (Docker): http://evidently:8000
         • Push reports with RemoteWorkspace("http://127.0.0.1:8089") from the
           host, or RemoteWorkspace("http://evidently:8000") from a container.
-          Reports are computed by the client, so it needs evidently==0.7.23.
+          Reports are computed by the client, so it needs evidently==0.7.23 and pandas<3.1.
           In Airflow, set _AIRFLOW_PIP_DEPS="evidently==0.7.23" in .env.
         • Projects, reports, dashboards and datasets: the evidently database
           on Postgres.

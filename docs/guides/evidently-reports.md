@@ -4,10 +4,10 @@ The `evidently` profile runs the Evidently UI and API. It keeps projects, report
 
 ```bash title="docs/snippets/evidently-reports/commands.sh:install"
 odctl up evidently
-pip install evidently==0.7.23
+pip install evidently==0.7.23 "pandas<3.1"
 ```
 
-The server runs Evidently 0.7.23, so install the same client version. The UI is at `http://127.0.0.1:8089`, with no login.
+The server runs Evidently 0.7.23, so install the same client version. Evidently 0.7.23 fails to import with pandas 3.1, so keep pandas below 3.1. The UI is at `http://127.0.0.1:8089`, with no login.
 
 ## Push a data drift report
 

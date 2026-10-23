@@ -1369,7 +1369,7 @@ pd.testing.assert_frame_equal(back[list(data.columns)].reset_index(drop=True), d
 ws.delete_project(project.id)
 PYEOF
   } | (cd "$(mktemp -d)" && uv run --no-project --quiet --python 3.12 \
-      --with "evidently==$version" --with requests python -) \
+      --with "evidently==$version" --with "pandas<3.1" --with requests python -) \
     || fail "report or dataset round trip failed"
   pass "pushed a drift report and read it back, and a dataset round-tripped"
 }
