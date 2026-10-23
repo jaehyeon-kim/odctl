@@ -219,10 +219,11 @@ A restart keeps the container, so it does not apply an edited compose file or `.
 
 Each example edits the workspace, then applies the change. `sed -i.bak` works with both GNU and macOS `sed`, and keeps the original as a `.bak` file.
 
-Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it:
+Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it. SeaweedFS is a Go program, and `GOMEMLIMIT` is a soft memory limit: as the memory the Go runtime manages nears it, the garbage collector runs more often and returns memory to the system sooner. It is three quarters of `mem_limit`, so change both:
 
 ```bash
-sed -i.bak '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' .odctl/compose-infra.yml
+sed -i.bak -e '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' \
+  -e '/^  seaweed:/,/^  [a-z]/ s/GOMEMLIMIT: 384MiB/GOMEMLIMIT: 1536MiB/' .odctl/compose-infra.yml
 odctl recreate storage
 docker inspect seaweed --format '{{.HostConfig.Memory}}'   # 2147483648
 ```
@@ -243,7 +244,22 @@ odctl up airflow
 docker exec airflow python -c "import dateparser"
 ```
 
-The packages install when the container starts, so the first start after the change takes longer. `_MLOPS_PIP_DEPS` does the same for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `MODEL_URI` in the same file sets the model `mlflow-serve` serves, as [MLflow tracking and model serving](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) shows.
+`_AIRFLOW_PIP_DEPS` and `_MLOPS_PIP_DEPS` both install their packages from PyPI again in every new container: at the first `odctl up`, after `odctl recreate`, and after `odctl down` and `odctl up`. `_AIRFLOW_PIP_DEPS` is for the Airflow containers. `_MLOPS_PIP_DEPS` is for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `odctl restart` keeps the container, so the packages stay. Each new container needs PyPI, and pinned versions (`transformers==5.20.2`) keep the installed packages the same. `MODEL_URI` in the same file sets the model `mlflow-serve` serves, as [MLflow tracking and model serving](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) shows.
+
+Create a bucket before its profile exists, for example for a project that has no profile. `seaweed-init` creates a fixed list of buckets, and `.odctl/seaweed/s3.json` gives the login `user` the `Admin` action, which creating a bucket needs. This runs boto3 in a container on the `odctl` network, where `seaweed:8333` resolves, and prints the buckets, which now include `desflow`:
+
+```bash
+docker run --rm -i --network odctl python:3.12-slim \
+  sh -c 'pip install -q --root-user-action=ignore boto3==1.43.118 && python -' <<'PY'
+import boto3
+s3 = boto3.client("s3", endpoint_url="http://seaweed:8333", region_name="us-east-1",
+                  aws_access_key_id="user", aws_secret_access_key="password")
+s3.create_bucket(Bucket="desflow")
+print(sorted(b["Name"] for b in s3.list_buckets()["Buckets"]))
+PY
+```
+
+Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile, but `odctl init --force`, which an upgrade needs, removes the edit.
 
 ### Trino access rules
 
@@ -524,7 +540,9 @@ Depends on: `postgres`, `storage`. `odctl up mlflow` also starts: `deps`, `postg
   * External (host): http://127.0.0.1:5004
   * Internal (Docker): http://mlflow:5000
 • MLflow Model Scoring Server, idle until MODEL_URI in .env names a model;
-  run `odctl up mlflow` again after setting it:
+  run `odctl up mlflow` again after setting it. It loads the model once,
+  when it starts, so a new version behind the same alias needs
+  `odctl restart mlflow`, and the server answers nothing for about 16 seconds:
   * External (host): http://127.0.0.1:5003/invocations
   * Internal (Docker): http://mlflow-serve:5003/invocations
 • Liveness: http://127.0.0.1:5003/ping and http://127.0.0.1:5003/health
@@ -931,6 +949,28 @@ The consumer reads through a consumer group, so its offsets are stored in the br
 
 Kafka UI at `http://127.0.0.1:8086` shows the topics, their messages, the consumer groups and the schemas in Karapace.
 
+## Keep messages longer
+
+The brokers delete old messages. A partition keeps data for one day or up to 500 MB, and a segment is deleted once either limit is passed. The compose file sets both: `KAFKA_LOG_RETENTION_MS` is `86400000` and `KAFKA_LOG_RETENTION_BYTES` is `524288000`. A topic created without settings takes these values:
+
+```bash
+docker exec kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server broker-1:19092 \
+  --describe --all --entity-type topics --entity-name demo | grep -E '^ *retention\.(ms|bytes)='
+```
+
+The output shows `retention.ms=86400000` and `retention.bytes=524288000`. To keep everything in one topic, set `retention.ms` and `retention.bytes` to `-1` when you create it. `-1` means no limit. Other topics keep the broker defaults.
+
+```bash
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+  --create --topic history --partitions 1 --replication-factor 1 \
+  --config retention.ms=-1 --config retention.bytes=-1
+
+docker exec kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server broker-1:19092 \
+  --describe --entity-type topics --entity-name history
+```
+
+The describe command lists the settings of that topic: `retention.ms=-1` and `retention.bytes=-1`. `retention.bytes` applies to each partition, so a topic with three partitions at 500 MB can hold 1.5 GB. To change an existing topic, use `kafka-configs.sh --alter --add-config` with the same two settings. If older messages are missing, see [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/#older-messages-are-missing).
+
 ## Kafka Connect
 
 Both Kafka profiles run a Kafka Connect worker beside the brokers. [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md) lists the plugins it loads and shows how to register a connector.
@@ -1001,7 +1041,7 @@ Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-
 
 # Flink SQL: Kafka to PostgreSQL
 
-The `flink-lite` profile runs a Flink JobManager, one TaskManager and the SQL Gateway. `flink-full` runs three TaskManagers. Flink's connector jars for Kafka, Avro with the schema registry, JDBC and Iceberg come from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
+The `flink-lite` profile runs a Flink JobManager, one TaskManager and the SQL Gateway. `flink-full` runs three TaskManagers. Flink's connector jars for Kafka, Avro with the schema registry, JDBC, Iceberg and HTTP come from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
 
 This guide reads Avro records from Kafka through the Karapace schema registry and writes an aggregate to PostgreSQL over JDBC. [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) shows Flink writing an Iceberg table.
 
@@ -1058,6 +1098,151 @@ docker exec postgres psql -U user -d odctl -c "SELECT * FROM supplier_stats ORDE
 Supplier `a` has 2 orders totalling 15, and supplier `b` has 1 order totalling 7.5. The Flink UI at `http://127.0.0.1:8082` shows the jobs the SQL client submitted.
 
 The two `INSERT` statements run as two batch jobs, listed under Completed Jobs.
+
+## Send rows to an HTTP API
+
+The HTTP connector sends rows to a URL. This section pushes a feature value to Feast, which takes it at `/push` and serves it from its online store.
+
+```bash
+odctl up feast
+```
+
+Feast needs a push source before it accepts a push. Save these definitions as `definitions.py`:
+
+```python
+from datetime import timedelta
+from feast import Entity, FeatureView, Field, FileSource, PushSource
+from feast.types import Float32, Int64
+from feast.value_type import ValueType
+
+driver = Entity(name="driver", join_keys=["driver_id"], value_type=ValueType.INT64)
+# Nothing reads this file. A push source needs a batch source behind it.
+batch = FileSource(path="/tmp/driver_stats.parquet", timestamp_field="event_timestamp")
+push = PushSource(name="driver_stats_push", batch_source=batch)
+driver_stats = FeatureView(
+    name="driver_stats",
+    entities=[driver],
+    ttl=timedelta(days=1),
+    schema=[Field(name="driver_id", dtype=Int64), Field(name="conv_rate", dtype=Float32)],
+    source=push,
+    online=True,
+)
+```
+
+Copy the definitions into the Feast container and apply them. `--skip-source-validation` stops Feast from looking for the file behind the batch source:
+
+```bash
+docker cp definitions.py feast-serve:/tmp/feature_repo/definitions.py
+docker exec feast-serve feast -c /tmp/feature_repo apply --skip-source-validation
+```
+
+Open the SQL client as above and run these statements:
+
+```sql
+SET 'execution.runtime-mode' = 'batch';
+SET 'table.dml-sync' = 'true';
+CREATE TABLE feast_push (
+  push_source_name STRING,
+  df ROW<driver_id ARRAY<BIGINT>, conv_rate ARRAY<DOUBLE>, event_timestamp ARRAY<TIMESTAMP_LTZ(3)>>,
+  allow_registry_cache BOOLEAN
+) WITH (
+  'connector' = 'http-async-sink',
+  'url' = 'http://feast-serve:6566/push',
+  'format' = 'json',
+  'http.sink.writer.request.mode' = 'single',
+  'http.sink.header.Content-Type' = 'application/json'
+);
+INSERT INTO feast_push SELECT 'driver_stats_push', ROW(ARRAY[CAST(1001 AS BIGINT)], ARRAY[CAST(0.9 AS DOUBLE)], ARRAY[CURRENT_TIMESTAMP]), FALSE;
+```
+
+The connector is `http-async-sink`. Its default sends rows in batches as one JSON array. Feast's `/push` takes one JSON object, so `http.sink.writer.request.mode` is `single`, which sends one request for each row. The sink sends no `Content-Type` header, and Feast answers 422 without one, so `http.sink.header.Content-Type` sets it. The column names are the field names of the request body. Feast reads `df` as a table of columns, so each field holds an array.
+
+Feast caches its registry for up to a minute after `apply`. `allow_registry_cache` set to `FALSE` makes the push read the registry again, so it works at once. The timestamp must be new: a push with the same `event_timestamp` as the stored value does not replace it, so the statement uses `CURRENT_TIMESTAMP`.
+
+The Flink job finishes and prints `Complete execution` even when Feast rejects the request. The failure is only in the TaskManager log as `Http Sink failed to write`. Read the value back from Feast to check the push:
+
+```bash
+curl -s -X POST http://127.0.0.1:6566/get-online-features \
+  -H 'Content-Type: application/json' \
+  -d '{"features": ["driver_stats:conv_rate"], "entities": {"driver_id": [1001]}}'
+```
+
+The answer holds `0.8999999761581421` for `conv_rate`, which is 0.9 as a 32-bit float. The read also uses the cached registry, so right after `apply` it can answer that the feature view does not exist. Run it again after a minute.
+
+## Several rolling windows
+
+A feature such as the sum of a card's payments over 10 minutes, 1 hour and 1 day needs one rolling window for each size. A streaming query cannot hold two different `OVER` windows. Flink's documentation says that for streaming queries the `OVER` windows of all aggregates in one `SELECT` must be identical ([Over aggregation](https://github.com/apache/flink/blob/release-2.2/docs/content/docs/dev/table/sql/queries/over-agg.md), Flink 2.2). Run this in the SQL client to see Flink refuse a query with a 10 minute and a 1 hour window:
+
+```sql
+SET 'execution.runtime-mode' = 'streaming';
+CREATE TABLE payments (card BIGINT, amount DOUBLE, seq BIGINT, ts AS TO_TIMESTAMP_LTZ(seq * 60000, 3), WATERMARK FOR ts AS ts) WITH ('connector'='datagen','fields.seq.kind'='sequence','fields.seq.start'='1','fields.seq.end'='20','fields.card.min'='1','fields.card.max'='2','fields.amount.min'='1','fields.amount.max'='10');
+SELECT card,
+  SUM(amount) OVER (PARTITION BY card ORDER BY ts RANGE BETWEEN INTERVAL '10' MINUTE PRECEDING AND CURRENT ROW) AS sum_10m,
+  SUM(amount) OVER (PARTITION BY card ORDER BY ts RANGE BETWEEN INTERVAL '1' HOUR PRECEDING AND CURRENT ROW) AS sum_1h
+FROM payments;
+```
+
+The client prints `[ERROR] Could not execute SQL statement.` with this reason:
+
+```text
+org.apache.flink.table.api.TableException: Over Agg: Unsupported use of OVER windows. All aggregates must be computed on the same window. please re-check the over window statement.
+```
+
+The first route is one statement for each window size, each writing its own table. Create the two PostgreSQL tables:
+
+```bash
+docker exec postgres psql -U user -d odctl -c "
+  CREATE TABLE card_sum_10m (card BIGINT, amount_sum DOUBLE PRECISION);
+  CREATE TABLE card_sum_1h (card BIGINT, amount_sum DOUBLE PRECISION);"
+```
+
+Then run the two statements in a new SQL client session. The `sequence` field makes the source stop after 20 rows, and the event time `ts` makes each job write every row before it finishes. An `OVER` window on `PROCTIME()` would lose the rows still waiting for their timer when a bounded source ends:
+
+```sql
+SET 'execution.runtime-mode' = 'streaming';
+SET 'table.dml-sync' = 'true';
+CREATE TABLE payments (card BIGINT, amount DOUBLE, seq BIGINT, ts AS TO_TIMESTAMP_LTZ(seq * 60000, 3), WATERMARK FOR ts AS ts) WITH ('connector'='datagen','fields.seq.kind'='sequence','fields.seq.start'='1','fields.seq.end'='20','fields.card.min'='1','fields.card.max'='2','fields.amount.min'='1','fields.amount.max'='10');
+CREATE TABLE sum_10m (card BIGINT, amount_sum DOUBLE) WITH ('connector'='jdbc','url'='jdbc:postgresql://postgres:5432/odctl','table-name'='card_sum_10m','username'='user','password'='password');
+CREATE TABLE sum_1h (card BIGINT, amount_sum DOUBLE) WITH ('connector'='jdbc','url'='jdbc:postgresql://postgres:5432/odctl','table-name'='card_sum_1h','username'='user','password'='password');
+INSERT INTO sum_10m SELECT card, SUM(amount) OVER (PARTITION BY card ORDER BY ts RANGE BETWEEN INTERVAL '10' MINUTE PRECEDING AND CURRENT ROW) FROM payments;
+INSERT INTO sum_1h SELECT card, SUM(amount) OVER (PARTITION BY card ORDER BY ts RANGE BETWEEN INTERVAL '1' HOUR PRECEDING AND CURRENT ROW) FROM payments;
+```
+
+Each table holds 20 rows:
+
+```bash
+docker exec postgres psql -U user -d odctl -c "
+  SELECT (SELECT count(*) FROM card_sum_10m) AS rows_10m, (SELECT count(*) FROM card_sum_1h) AS rows_1h"
+```
+
+The cost is one job for each window size, each reading the source again, and one table for each size that a reader has to join on the key. With four sizes that is four jobs.
+
+The second route is one `KeyedProcessFunction` in the DataStream API, which keeps the events of the longest window in Flink state and computes every size from them. This sketch is not run by the end-to-end tests:
+
+```python
+from pyflink.common import Types
+from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
+from pyflink.datastream.state import ListStateDescriptor
+
+WINDOWS_MS = {"10m": 600_000, "1h": 3_600_000, "1d": 86_400_000, "7d": 604_800_000}
+
+
+class RollingSums(KeyedProcessFunction):
+    def open(self, runtime_context: RuntimeContext):
+        # Every event of the longest window, for each key, kept in Flink state.
+        self.events = runtime_context.get_list_state(
+            ListStateDescriptor("events", Types.TUPLE([Types.LONG(), Types.DOUBLE()]))
+        )
+
+    def process_element(self, value, ctx):
+        now = ctx.timestamp()
+        kept = [(t, a) for t, a in self.events.get() if now - t <= WINDOWS_MS["7d"]]
+        kept.append((now, value[1]))
+        self.events.update(kept)
+        yield value[0], {n: sum(a for t, a in kept if now - t <= ms) for n, ms in WINDOWS_MS.items()}
+```
+
+One job computes all sizes, but you write and test the code in Python or Java instead of SQL, and you manage the state, which grows with the events of the longest window for each key.
 
 ## From another container
 
@@ -1255,6 +1440,89 @@ The Spark History Server at `http://127.0.0.1:18080` reads the same directory, s
 The event logs are on a volume held in memory, so `odctl down` removes them.
 
 The History Server lists the `spark-sql` run:
+
+## Read a Kafka topic
+
+The Kafka connector for Spark is in the shared volume with its dependencies, so a job reads Kafka with no `--packages` option. Start `kafka-lite` beside Spark, then create a topic and write three messages to it:
+
+```bash
+odctl up kafka-lite
+```
+
+```bash
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
+  --create --topic spark-demo --partitions 1 --replication-factor 1
+
+for i in 1 2 3; do echo "{\"n\":$i}"; done | docker exec -i kafka \
+  /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server broker-1:19092 --topic spark-demo
+```
+
+Save this PySpark job as `read_kafka.py`. A batch read with `spark.read` reads the topic from its first offset to its last and then ends:
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("read-kafka").getOrCreate()
+
+df = (
+    spark.read.format("kafka")
+    .option("kafka.bootstrap.servers", "broker-1:19092")
+    .option("subscribe", "spark-demo")
+    .load()
+)
+df.selectExpr("CAST(value AS STRING) AS value").orderBy("value").show(truncate=False)
+```
+
+Copy the file into the master container and submit it:
+
+```bash
+docker cp read_kafka.py spark-master:/tmp/read_kafka.py
+docker exec spark-master /opt/spark/bin/spark-submit /tmp/read_kafka.py
+```
+
+The job prints a table with the values `{"n":1}`, `{"n":2}` and `{"n":3}`. Kafka returns each message as binary `key` and `value` columns, with the `topic`, `partition`, `offset`, `timestamp` and `timestampType` beside them.
+
+## Read Avro records written with the schema registry
+
+The `orders` topic that [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/#run-the-sql) fills holds Avro records written with the Karapace schema registry. Each value is a zero byte, the 4-byte id of the schema, and then the record in Avro's binary encoding, so Spark cannot read it as text. Save this job as `read_avro.py`. It gets the latest schema of the subject `orders-value` from Karapace, drops the 5 bytes and decodes the rest with `from_avro`, which needs no `--packages` option because the Avro module is in the shared volume. This works when all records were written with the subject's latest schema version. If the Flink section has not run, the job stops with `HTTP Error 404: Not Found`, because the subject does not exist yet.
+
+```python
+import json
+import urllib.request
+
+from pyspark.sql import SparkSession
+from pyspark.sql.avro.functions import from_avro
+from pyspark.sql.functions import expr
+
+spark = SparkSession.builder.appName("read-avro").getOrCreate()
+
+# The latest schema of the subject, as the schema registry holds it.
+url = "http://karapace:8081/subjects/orders-value/versions/latest"
+with urllib.request.urlopen(url, timeout=30) as reply:
+    schema = json.load(reply)["schema"]
+
+raw = (
+    spark.read.format("kafka")
+    .option("kafka.bootstrap.servers", "broker-1:19092")
+    .option("subscribe", "orders")
+    .load()
+)
+
+# Skip the first 5 bytes of each value: a zero byte and the 4-byte schema id.
+orders = raw.select(
+    from_avro(expr("substring(value, 6, length(value) - 5)"), schema).alias("order")
+).select("order.*")
+orders.orderBy("supplier", "price").show()
+```
+
+Copy the file into the master container and submit it:
+
+```bash
+docker cp read_avro.py spark-master:/tmp/read_avro.py
+docker exec spark-master /opt/spark/bin/spark-submit /tmp/read_avro.py
+```
+
+The job prints a table with the columns `supplier` and `price`, and the rows `a` 5.0, `a` 10.0 and `b` 7.5.
 
 ## From another container
 
@@ -1565,7 +1833,7 @@ print(mlflow.get_run(run.info.run_id).info.artifact_uri)
 print([f.path for f in mlflow.MlflowClient().list_artifacts(run.info.run_id)])
 ```
 
-The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. The run and its artifact appear in the UI.
+The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. Downloads from your machine need one setting, as [Load a model from your machine](#load-a-model-from-your-machine) shows. The run and its artifact appear in the UI.
 
 The runs are listed under the experiment in the Model training view:
 
@@ -1610,9 +1878,112 @@ curl -X POST http://127.0.0.1:5003/invocations \
 
 The response holds a `predictions` list, one per input row. Check the body rather than the status code, because the server answers 200 with an error payload when scoring fails. `http://127.0.0.1:5003/ping` answers once the model is loaded.
 
+## Move the alias to a new version
+
+`mlflow-serve` resolves `MODEL_URI` once, when its container starts. A new version registered behind an unchanged alias such as `champion` is not served until you run `odctl restart mlflow`. Nothing reports an error in the meantime, and the predictions stay those of the old version. To see the change in `.env`, use a version URI such as `models:/demo-model/2` and run `odctl up mlflow` again.
+
+Run the code from [Register a model](#register-a-model) again with `min_child_weight=0` added to `XGBClassifier`. The trees then split, so the new version predicts differently. It registers version 2 and moves `champion` to it. Then restart the containers and score again:
+
+```bash
+odctl restart mlflow
+# The server answers nothing for about 16 seconds while the model loads.
+until curl -fs http://127.0.0.1:5003/ping >/dev/null; do sleep 2; done
+curl -X POST http://127.0.0.1:5003/invocations \
+  -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}'
+```
+
+The predictions now come from version 2: `{"predictions": [0, 1]}` instead of `[0, 0]`.
+
+## Load a model from your machine
+
+Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name only containers in the `odctl` network resolve, so `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` on your machine wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
+
+```python
+import os
+
+os.environ["MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD"] = "false"
+import mlflow
+
+mlflow.set_tracking_uri("http://127.0.0.1:5004")
+path = mlflow.artifacts.download_artifacts("models:/demo-model@champion")
+print(sorted(os.listdir(path)))
+```
+
+The output is a listing of the model files that includes `MLmodel`. `mlflow-serve` is not affected, because it loads its model inside the `odctl` network.
+
+## Serve a model that reads online features
+
+The MLflow image has no Feast client. A model can still read online features from `feast-serve` over HTTP, with an `mlflow.pyfunc.PythonModel` whose `predict` method sends the request. This one reads `conv_rate` of the `driver_stats` feature view from [Send rows to an HTTP API](https://jaehyeon.me/odctl/latest/guides/flink-sql/#send-rows-to-an-http-api) and scores a driver 1 when it is above 0.5. Start Feast with `odctl up feast`, apply that guide's definitions and push a value, then save the model class as `driver_score.py`:
+
+```python
+import mlflow
+import requests
+
+
+class DriverScore(mlflow.pyfunc.PythonModel):
+    """Scores a driver 1 when the online store holds a conversion rate above 0.5."""
+
+    def predict(self, context, model_input, params=None):
+        reply = requests.post(
+            "http://feast-serve:6566/get-online-features",
+            json={
+                "features": ["driver_stats:conv_rate"],
+                "entities": {"driver_id": [int(i) for i in model_input["driver_id"]]},
+            },
+            timeout=10,
+        ).json()
+        names = reply["metadata"]["feature_names"]
+        rates = reply["results"][names.index("conv_rate")]["values"]
+        return [int(rate is not None and rate > 0.5) for rate in rates]
+
+
+mlflow.models.set_model(DriverScore())
+```
+
+Then register it from a file, so that the server loads the class from the code and not from a copy pickled on your machine. Run this in the folder that holds `driver_score.py`. It gives the model a signature and no input example, because an example would make MLflow call `predict` on your machine, where `feast-serve` does not resolve:
+
+```python
+import mlflow, pandas as pd
+from mlflow import MlflowClient
+from mlflow.models import infer_signature
+
+mlflow.set_tracking_uri("http://127.0.0.1:5004")
+mlflow.set_experiment("driver-score")
+with mlflow.start_run():
+    mlflow.pyfunc.log_model(
+        name="model",
+        python_model="driver_score.py",
+        pip_requirements=["requests"],
+        signature=infer_signature(pd.DataFrame({"driver_id": [1001]}), [1]),
+        registered_model_name="driver-score",
+    )
+
+client = MlflowClient()
+version = max(int(mv.version) for mv in client.search_model_versions("name='driver-score'"))
+client.set_registered_model_alias("driver-score", "champion", version)
+```
+
+The run prints three warnings, about integer columns, type hints on `predict` and the missing input example, and then `Created version '1' of model 'driver-score'`; the warnings do not stop the registration.
+
+Serve it as in [Serve the model](#serve-the-model), with this line in `.odctl/.env`:
+
+```bash
+MODEL_URI="models:/driver-score@champion"
+```
+
+Run `odctl up mlflow` again, then score the driver:
+
+```bash
+curl -X POST http://127.0.0.1:5003/invocations \
+  -H 'Content-Type: application/json' \
+  -d '{"dataframe_split": {"columns": ["driver_id"], "data": [[1001]]}}'
+```
+
+The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Send rows to an HTTP API](https://jaehyeon.me/odctl/latest/guides/flink-sql/#send-rows-to-an-http-api)), and the reply is an error; run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach.
+
 ## From Airflow or another container
 
-Inside the `odctl` network, set the tracking URI to `http://mlflow:5000` and score at `http://mlflow-serve:5003/invocations`. Extra Python packages for both MLflow containers go in `_MLOPS_PIP_DEPS` in `.odctl/.env`, followed by `odctl recreate mlflow`.
+Inside the `odctl` network, set the tracking URI to `http://mlflow:5000` and score at `http://mlflow-serve:5003/invocations`. Extra Python packages for both MLflow containers go in `_MLOPS_PIP_DEPS` in `.odctl/.env`, followed by `odctl recreate mlflow`. Each new `mlflow` and `mlflow-serve` container downloads and installs them from PyPI again: at the first `odctl up`, after `odctl recreate`, and after `odctl down` and `odctl up`. `odctl restart` keeps the container, so the packages stay. Each of those starts needs PyPI, and pinned versions (`transformers==5.20.2`) keep the installed packages the same.
 
 # Feast with Iceberg
 
@@ -1718,7 +2089,7 @@ Once the repository is uploaded, the UI lists the project and its feature views:
 
 # Evidently reports
 
-The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. The end-to-end tests run the code below on every release.
+The `evidently` profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the `evidently` database on PostgreSQL. The client computes each report and pushes the result. Evidently covers data drift and data quality. It gives no estimate of a model's performance while the outcomes are unknown. NannyML does, but version 0.13.1 supports Python 3.9 to 3.12 and the Airflow image runs Python 3.13, so run NannyML in a Python 3.12 process on your machine. The end-to-end tests run the code below on every release.
 
 ```bash
 odctl up evidently
@@ -2426,6 +2797,10 @@ Usage: odctl recreate [OPTIONS] {profiles}...
 
 Each service has a memory limit, listed on its [profile page](https://jaehyeon.me/odctl/latest/profiles/index.md). The limits of everything you start add up, and Docker needs that much memory available. Give Docker 8 to 16 GB, start fewer profiles at once, or choose a lite profile over a full one. To lower a limit, edit `mem_limit` in the compose file in `.odctl` and run `odctl recreate <profile>`.
 
+## Uploads fail with HTTP 500 and seaweed exited with code 137
+
+`seaweed` reached its memory limit while it buffered a large upload, and the kernel killed it. The client sees HTTP 500 and every profile that uses S3 loses its storage until the container starts again. `docker inspect seaweed --format '{{.State.OOMKilled}}'` prints `true` after such a kill. odctl sets `GOMEMLIMIT` in `compose-infra.yml` to three quarters of `mem_limit`, so SeaweedFS collects garbage more often as it nears the limit; a workspace made by an earlier release lacks it until `odctl init --force`. A model or file of several hundred MB can still reach the limit. Raise `mem_limit` and `GOMEMLIMIT` together, as [How it works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) shows for 2 GB, and run `odctl recreate storage`.
+
 ## A port is already in use
 
 Every service publishes fixed host ports, listed on its profile page. If another program holds one, `odctl up` fails to start that service. Stop the other program, or change the host side of the port mapping in `.odctl/compose-*.yml` and run `odctl recreate <profile>`. Containers still reach each other on their internal ports, so only clients on your host need the new port.
@@ -2447,105 +2822,69 @@ After you upgrade the CLI, every command except `odctl init` warns that `.odctl/
 ## A service is up but does not work
 
 `odctl logs <profile>` shows the logs of a profile's containers. Add `-s <service>` for one service, or `-f` to follow them. `odctl ps --all` shows every container odctl manages and its state.
+
+## Older messages are missing
+
+The Kafka brokers delete messages after one day, or when a partition passes 500 MB. A consumer that starts from the beginning of a topic sees only what is left. [Keep messages longer](https://jaehyeon.me/odctl/latest/guides/kafka/#keep-messages-longer) shows how to read these limits and how to set `retention.ms` and `retention.bytes` to `-1` on a topic that must keep everything.
 # About
 
 # Roadmap
 
-The work comes in the order shown, without dates: a release ships when it is ready. The timeline marks the work in progress and what follows it: features first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue.
+The work comes in the order shown, without dates: a release ships when it is ready. Features come first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue where one exists.
 
-## Now and next
+## Next releases
 
-Localhost-only services
-
-In 1.1.0: every service is reachable from your machine only, and the docs have this Roadmap and a [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md).
-
-Streaming
-
-Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and a guide to Kafka retention. [#151](https://github.com/jaehyeon-kim/odctl/issues/151)
-
-Feast
+1.3.0: Feast
 
 An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)
 
-OpenMetadata connectors and Kafka schemas
+1.4.0: OpenMetadata connectors and Kafka schemas
 
 A Python connector uploaded to S3 is picked up by OpenMetadata, the way the `airflow` profile picks up DAGs, and extra packages can be installed in the ingestion container. Kafka topics whose producers use no schema registry get their fields from JSON Schemas registered in Karapace, with no producer change. [#148](https://github.com/jaehyeon-kim/odctl/issues/148)
 
-Stable interface and JSON output
+1.5.0: Stable interface and JSON output
 
 A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)
 
-MCP server
+1.6.0: MCP server
 
 Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. [#141](https://github.com/jaehyeon-kim/odctl/issues/141)
 
-## Later
+1.7.0: Langfuse
 
-The work after that, in the order it is planned.
+A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
 
-- **Langfuse**
+1.8.0: Snapshot and restore
 
-  ______________________________________________________________________
+`odctl snapshot` and `odctl restore` save a profile's data and bring it back, so a lab or an agent can start again from a known state. [#142](https://github.com/jaehyeon-kim/odctl/issues/142)
 
-  A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse.
+1.9.0: Lineage and alerts
 
-  [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
+Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
 
-- **desflow server**
+1.10.0: Kafka Connect transforms
 
-  ______________________________________________________________________
+Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
-  After desflow 1.0, when its server ships: A profile that runs the [desflow](https://jaehyeon.me/desflow/) simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.
+1.11.0: Memory check and models on the host
 
-  [#144](https://github.com/jaehyeon-kim/odctl/issues/144)
+`odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. The guide also covers the Ollama embeddings route, batch embedding in Airflow and a hand-run rerank server. [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
 
-- **Snapshot and restore**
+MLOps guides
 
-  ______________________________________________________________________
+Guides for a prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables. No new service and no new version: the guides are published when they reach `main`.
 
-  `odctl snapshot` and `odctl restore` save a profile's data and bring it back, so a lab or an agent can start again from a known state.
+Agents guides
 
-  [#142](https://github.com/jaehyeon-kim/odctl/issues/142)
+Guides for traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL. No new service and no new version.
 
-- **Lineage and alerts**
+Retrieval guides
 
-  ______________________________________________________________________
+Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.
 
-  Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run.
+1.12.0: Label Studio
 
-  [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
-
-- **Kafka Connect transforms**
-
-  ______________________________________________________________________
-
-  Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.
-
-  [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
-
-- **Testing and CI**
-
-  ______________________________________________________________________
-
-  The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night.
-
-  [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
-
-- **Memory check**
-
-  ______________________________________________________________________
-
-  `odctl up` warns when Docker has less memory than the profiles it starts need.
-
-  [#155](https://github.com/jaehyeon-kim/odctl/issues/155)
-
-- **Models on the host**
-
-  ______________________________________________________________________
-
-  One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2.
-
-  [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
+A `label-studio` profile for labelling data by hand, on odctl's PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides.
 
 ## Alongside
 
@@ -2567,9 +2906,71 @@ Work that does not wait for a release, published as it is ready.
 
   [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
 
+- **Testing and CI**
+
+  ______________________________________________________________________
+
+  Lands between 1.10.0 and 1.11.0, and changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.11.0.
+
+  [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
+
+## After desflow 1.0
+
+- **desflow server**
+
+  ______________________________________________________________________
+
+  When the desflow server ships: a profile that runs the [desflow](https://jaehyeon.me/desflow/) simulation server, so a project can start simulations that write to Kafka, PostgreSQL or Iceberg.
+
+  [#144](https://github.com/jaehyeon-kim/odctl/issues/144)
+
+## Released
+
+Newest first.
+
+1.2.0: Streaming
+
+Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and guides to Kafka retention and to several rolling windows in Flink SQL. The release also fixes the MLflow and storage guides and sets `GOMEMLIMIT`, a soft limit for the Go runtime, on `seaweed`, so large model uploads do not hit its container memory limit.
+
+1.1.0: localhost-only services
+
+Every service is reachable from your machine only, Kafka no longer publishes the minikube listener ports, an odctl skill and `llms.txt` help AI assistants, and the docs have this Roadmap and a [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md).
+
+1.0.2: Python 3.15
+
+odctl is tested on Python 3.15, ZooKeeper and Metabase are updated, and Renovate groups image updates by compose file.
+
+1.0.1: upgrade fixes
+
+Old jars no longer stay in the shared deps volume after an upgrade, and without a workspace odctl's images run with odctl's own version instead of a cached `latest`.
+
+1.0.0: documentation site and compatibility promise
+
+A documentation site with guides, profile pages and the CLI reference; semantic versioning with a compatibility promise for 1.x; and `odctl up` works straight after `odctl recreate`.
+
+What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md) and on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.2.0
+
+Flink can send rows to an HTTP API, Spark reads Kafka with no extra options, SeaweedFS survives uploads of large models, and the guides cover cases that real projects met.
+
+- Flink's SQL client has the HTTP connector. [Send rows to an HTTP API](https://jaehyeon.me/odctl/latest/guides/flink-sql/#send-rows-to-an-http-api) pushes a feature value to Feast.
+- Spark has the Kafka connector and the Avro module, so a job reads a topic, including Avro records written with the schema registry, with no `--packages` option. See [Read a Kafka topic](https://jaehyeon.me/odctl/latest/guides/spark/#read-a-kafka-topic) and [Read Avro records written with the schema registry](https://jaehyeon.me/odctl/latest/guides/spark/#read-avro-records-written-with-the-schema-registry).
+- [Keep messages longer](https://jaehyeon.me/odctl/latest/guides/kafka/#keep-messages-longer) shows the broker's one-day and 500 MB retention and how to turn both off for a topic. [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/#older-messages-are-missing) lists the symptom.
+- `seaweed` sets `GOMEMLIMIT` to three quarters of its memory limit, so uploads of a model of a few hundred MB no longer end with HTTP 500 and a killed container. [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/#uploads-fail-with-http-500-and-seaweed-exited-with-code-137) says what to do when the limit is still reached, and [How it works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) changes both values together.
+- The [MLflow guide](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) has three new sections: [Move the alias to a new version](https://jaehyeon.me/odctl/latest/guides/mlflow/#move-the-alias-to-a-new-version), which needs `odctl restart mlflow`, [Load a model from your machine](https://jaehyeon.me/odctl/latest/guides/mlflow/#load-a-model-from-your-machine) and [Serve a model that reads online features](https://jaehyeon.me/odctl/latest/guides/mlflow/#serve-a-model-that-reads-online-features).
+- The text on `_MLOPS_PIP_DEPS` now says that every new `mlflow` and `mlflow-serve` container installs the packages from PyPI again. [How it works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) and the MLflow guide have the details.
+- [How it works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) shows how to create a bucket before its profile exists.
+- [Several rolling windows](https://jaehyeon.me/odctl/latest/guides/flink-sql/#several-rolling-windows) shows that Flink SQL refuses two different `OVER` windows in one streaming query, and the two ways around it.
+- The [Evidently guide](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md) says what Evidently does not estimate and why NannyML needs Python 3.12.
+
+### Upgrading
+
+- A workspace made by `odctl init` with an earlier release keeps its old `compose-infra.yml`, which has no `GOMEMLIMIT` for `seaweed`. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate storage`.
 
 ## Version 1.1.0
 
