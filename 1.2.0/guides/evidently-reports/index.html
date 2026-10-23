@@ -1769,6 +1769,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../about/why-odctl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why odctl
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../about/roadmap/" class="md-nav__link">
         
   
@@ -1908,9 +1936,9 @@
 <p>The <code>evidently</code> profile runs the Evidently UI and API. It keeps projects, reports, dashboards and datasets in the <code>evidently</code> database on PostgreSQL. The client computes each report and pushes the result. Evidently covers data drift and data quality. It gives no estimate of a model's performance while the outcomes are unknown. NannyML does, but version 0.13.1 supports Python 3.9 to 3.12 and the Airflow image runs Python 3.13, so run NannyML in a Python 3.12 process on your machine. The end-to-end tests run the code below on every release.</p>
 <div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/evidently-reports/commands.sh:install</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span>
 <span class="normal"><a href="#__codelineno-0-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>odctl<span class="w"> </span>up<span class="w"> </span>evidently
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">evidently</span><span class="o">==</span><span class="m">0</span>.7.23
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">evidently</span><span class="o">==</span><span class="m">0</span>.7.23<span class="w"> </span><span class="s2">"pandas&lt;3.1"</span>
 </span></code></pre></div></td></tr></table></div>
-<p>The server runs Evidently 0.7.23, so install the same client version. The UI is at <a href="http://127.0.0.1:8089" rel="nofollow"><code>http://127.0.0.1:8089</code></a>, with no login.</p>
+<p>The server runs Evidently 0.7.23, so install the same client version. Evidently 0.7.23 fails to import with pandas 3.1, so keep pandas below 3.1. The UI is at <a href="http://127.0.0.1:8089" rel="nofollow"><code>http://127.0.0.1:8089</code></a>, with no login.</p>
 <h2 id="push-a-data-drift-report">Push a data drift report</h2>
 <div class="language-python highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/evidently-reports/steps.py:report</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1"> 1</a></span>
 <span class="normal"><a href="#__codelineno-1-2"> 2</a></span>

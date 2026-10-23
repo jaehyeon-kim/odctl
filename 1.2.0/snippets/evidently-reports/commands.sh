@@ -3,5 +3,5 @@
 
 # --8<-- [start:install]
 odctl up evidently
-pip install evidently==0.7.23
+pip install evidently==0.7.23 "pandas<3.1"
 # --8<-- [end:install]
