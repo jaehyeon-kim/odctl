@@ -61,6 +61,7 @@
 
 ## About
 
+- [Why odctl](https://jaehyeon.me/odctl/latest/about/why-odctl/index.md)
 - [Roadmap](https://jaehyeon.me/odctl/latest/about/roadmap/index.md)
 - [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md)
 
