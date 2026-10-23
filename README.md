@@ -9,6 +9,8 @@
 
 A curated collection of open-source technologies and an accompanying CLI (`odctl`) for experimenting with modern data architecture and MLOps locally.
 
+To see why it exists, read [Why odctl](https://jaehyeon.me/odctl/latest/about/why-odctl/).
+
 Provisioning a local data environment with distributed systems can be highly complex. The Open Data Stack streamlines this process by resolving dependency conflicts, network routing configurations, and integration challenges across tools like Kafka, Spark, Flink, Iceberg, and Airflow. It provides a cohesive, Docker-based blueprint that operates seamlessly out of the box.
 
 Documentation: [jaehyeon.me/odctl](https://jaehyeon.me/odctl/). It covers every profile with its ports, images and memory limits, the CLI reference, guides and troubleshooting.

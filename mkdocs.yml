@@ -106,6 +106,7 @@ nav:
   - CLI reference: cli.md
   - Troubleshooting: troubleshooting.md
   - About:
+      - Why odctl: about/why-odctl.md
       - Roadmap: about/roadmap.md
       - Changelog: about/changelog.md
 
