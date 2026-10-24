@@ -72,6 +72,17 @@ run_snippet() {
   bash -o pipefail -c "$code"
 }
 
+# Run a section and check its output: snippet_says kafka/commands.sh list -F 'orders'.
+# The whole output is read before grep looks at it. A grep -q at the end of a pipe
+# stops at the first match, the command then fails writing its next line, and
+# pipefail reports the check as failed.
+snippet_says() {
+  local file="$1" section="$2" out
+  shift 2
+  out=$(run_snippet "$file" "$section" 2>/dev/null) || return 1
+  grep -q "$@" <<<"$out"
+}
+
 # Run a guide's Runnable Example from the current directory, where the .odctl
 # workspace is, and check that its output matches an extended regular
 # expression: run_example kafka '"n":5'. The optional third argument is the
@@ -300,7 +311,7 @@ print(snap[0]["summary"].get("total-records", "") if snap else "")' 2>/dev/null)
   fi
   run_snippet kafka-connect/commands.sh logs >/dev/null 2>&1 || fail "could not read the Connect log"
   local status
-  run_snippet iceberg-ingestion/commands.sh records 2>/dev/null | grep -qF '"total-records":"5"' \
+  snippet_says iceberg-ingestion/commands.sh records -F '"total-records":"5"' \
     || fail "the guide's records step does not show 5 records"
   status=$(run_snippet iceberg-ingestion/commands.sh status-remove 2>/dev/null)
   grep -q '"state":"RUNNING"' <<<"$status" || { echo "$status"; fail "the connector status was not RUNNING"; }
@@ -579,16 +590,16 @@ smoke_infra() {
       pass "table created through the catalog and its metadata read back"
       # How It Works reaches the catalog from a container on the odctl network,
       # previews a start and pulls the catalog's images.
-      run_snippet how-it-works/commands.sh reach 2>/dev/null | grep -q '"defaults"' \
+      snippet_says how-it-works/commands.sh reach '"defaults"' \
         || fail "a container on the odctl network did not reach catalog:8181"
-      run_snippet how-it-works/commands.sh dry-run 2>/dev/null | grep -q 'compose-flink.yml' \
+      snippet_says how-it-works/commands.sh dry-run 'compose-flink.yml' \
         || fail "odctl up flink-lite --dry-run did not list compose-flink.yml"
-      run_snippet how-it-works/commands.sh pull 2>/dev/null | grep -q 'All images pulled successfully' \
+      snippet_says how-it-works/commands.sh pull 'All images pulled successfully' \
         || fail "odctl pull catalog did not finish"
       run_snippet how-it-works/commands.sh up-pull >/dev/null 2>&1 || fail "odctl up catalog --pull failed"
-      run_snippet how-it-works/commands.sh tag-override 2>/dev/null | grep -q 'odctl/postgres:1.1.0' \
+      snippet_says how-it-works/commands.sh tag-override 'odctl/postgres:1.1.0' \
         || fail "a TAG in the shell did not change the image odctl explain shows"
-      run_snippet how-it-works/commands.sh workspace-flag 2>/dev/null | grep -q 'catalog' \
+      snippet_says how-it-works/commands.sh workspace-flag 'catalog' \
         || fail "odctl --workspace ps catalog listed no catalog container"
       run_snippet how-it-works/commands.sh recreate-pull >/dev/null 2>&1 || fail "odctl recreate catalog --pull failed"
       retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered after the recreate"
@@ -657,7 +668,7 @@ for db in (d.get("data") if isinstance(d, dict) else d) or []:
 smoke_metabase() {
   local sid
   retry 60 5 http_ok "http://127.0.0.1:3000/api/health" || fail "no HTTP response from :3000"
-  run_snippet trino-metabase/commands.sh metabase-health 2>/dev/null | grep -q '"status":"ok"' \
+  snippet_says trino-metabase/commands.sh metabase-health '"status":"ok"' \
     || fail "Metabase health did not report ok"
   assert_metrics http://metabase:9191/metrics
   sid=$(retry_out 12 5 mb_session) || fail "could not obtain a Metabase session"
@@ -1222,6 +1233,11 @@ smoke_feast() {
   # catalogs, and Iceberg's REST fixture server serves the spec with no prefix,
   # so a real warehouse gives HTTP 400 "Ambiguous URI empty segment".
   cp "$SNIPPETS/feast-iceberg/feature_repo/"* "$work/feature_repo/"
+  # Its own project, because the guide's Runnable Example registers the same
+  # feature view in demo afterwards. feast teardown leaves the view's row in
+  # feature_view_version_history, so a second apply in demo fails on its key.
+  sed 's/^project: demo$/project: smoke/' "$work/feature_repo/feature_store.yaml" \
+    > "$work/feature_store.yaml" && mv "$work/feature_store.yaml" "$work/feature_repo/feature_store.yaml"
 
   cat > "$work/check.py" <<'PYCHECK'
 import datetime, sys, pandas as pd
@@ -1287,7 +1303,8 @@ PYONLINE
   curl -fsS --max-time 10 -X DELETE \
     "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
   curl -fsS --max-time 10 -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo" >/dev/null 2>&1 || true
-  rm -rf "$work"
+  # The venv stays: the guide's Runnable Example runs with it next, and the feast
+  # case removes $work after that.
 }
 
 # Temporal: a healthy server proves only that it answers. Workflows run in the
@@ -1533,7 +1550,8 @@ case "$PROFILE" in
   fluss)      smoke_fluss; run_example fluss '\| +3 +\| +c +\|' ;;
   feast)
     smoke_feast
-    run_example feast-iceberg '0.8999999761581421' "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash" ;;
+    run_example feast-iceberg '0.8999999761581421' "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash"
+    rm -rf "${TMPDIR:-/tmp}/odctl-feast-smoke" ;;
   evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
