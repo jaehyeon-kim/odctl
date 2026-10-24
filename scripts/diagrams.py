@@ -1,4 +1,4 @@
-"""Export the draw.io diagrams under docs/images/ to the images the docs use.
+"""Export the draw.io diagrams under docs/assets/diagrams/ to the images the docs use.
 
 Each `<name>.drawio` becomes one image beside it:
 
@@ -9,6 +9,9 @@ Each `<name>.drawio` becomes one image beside it:
 - `<name>.gif` as well when the file has more than one page: each page is one step of a
   sequence, held for `STEP_SECONDS`.
 - `<name>.png` otherwise.
+
+Every GIF also gets a still beside it: `<name>.png`, its last frame, for a reader or a
+format that does not play a GIF.
 
 Files whose name starts with an underscore, such as `_legend.drawio`, hold the shared
 shapes and are not exported.
@@ -28,7 +31,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-DIAGRAMS = Path(__file__).resolve().parent.parent / "docs" / "images"
+DIAGRAMS = Path(__file__).resolve().parent.parent / "docs" / "assets" / "diagrams"
 CHROME = os.environ.get(
     "CHROME", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 )
@@ -110,6 +113,79 @@ def _gif(frames_pattern, fps, out):
     )
 
 
+def _still(gif):
+    """Write the last frame of a GIF beside it as a PNG of the same name.
+
+    Args:
+        gif (Path): The GIF to take the frame from.
+
+    Returns:
+        Path: The PNG written.
+    """
+    still = gif.with_suffix(".png")
+    # -update 1 writes every frame to the one file, so the last frame is what is left
+    _run(
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(gif),
+            "-update",
+            "1",
+            str(still),
+        ]
+    )
+    return still
+
+
+def _same_size(frames):
+    """Pad every frame with white to the largest width and height among them.
+
+    draw.io sizes each page to its own shapes, so the pages of one diagram can differ by
+    a few pixels. ffmpeg resets its filters when the frame size changes, and ffmpeg 9.0.2
+    then stops with "Internal bug" and writes only the frames before the change.
+    """
+    sizes = {}
+    for frame in set(frames):
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+                str(frame),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        sizes[frame] = tuple(int(v) for v in probe.stdout.strip().split(","))
+    width = max(w for w, _ in sizes.values())
+    height = max(h for _, h in sizes.values())
+    for frame, size in sizes.items():
+        if size != (width, height):
+            padded = frame.with_name("padded-" + frame.name)
+            _run(
+                [
+                    "ffmpeg",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-i",
+                    str(frame),
+                    "-vf",
+                    f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:white",
+                    str(padded),
+                ]
+            )
+            padded.replace(frame)
+
+
 def _flow_frames(source, page, work, prefix):
     """Write FLOW_FRAMES PNGs of one page, the dashes moved one step each time.
 
@@ -167,14 +243,22 @@ def _export_one(source):
                 still = work / f"p{page:02d}.png"
                 _export(source, "png", still, page)
                 frames += [still] * (STEP_SECONDS * fps)
+        _same_size(frames)
         for i, frame in enumerate(frames):
             shutil.copy(frame, work / f"frame-{i:05d}.png")
         _gif(str(work / "frame-%05d.png"), fps, out)
+    _still(out)
     return out
 
 
 def main(names):
-    for tool in ("drawio", "ffmpeg", CHROME):
+    """
+    Export the named diagrams, or every diagram when none is named.
+
+    Args:
+        names (list): The diagram names without `.drawio`; empty for all of them.
+    """
+    for tool in ("drawio", "ffmpeg", "ffprobe", CHROME):
         _require(tool)
     sources = sorted(p for p in DIAGRAMS.glob("*.drawio") if not p.name.startswith("_"))
     if names:

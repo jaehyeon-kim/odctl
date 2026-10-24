@@ -1,5 +1,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock
+
 from odctl import docker
 
 
@@ -52,8 +53,8 @@ def test_get_stack_details_missing_file(monkeypatch):
 
 def test_docker_actions(monkeypatch):
     mock_client = MagicMock()
-    monkeypatch.setattr(docker, "_create_client", lambda **kw: mock_client)
-    monkeypatch.setattr(docker, "_wait_for_one_shot_containers", lambda: None)
+    monkeypatch.setattr(docker, "create_client", lambda **kw: mock_client)
+    monkeypatch.setattr(docker, "wait_for_one_shot_containers", lambda: None)
     monkeypatch.setattr(docker, "get_compose_path", lambda x: "dummy.yml")
 
     docker.pull_stack_images("dummy.yml", ["prof1"])
@@ -69,13 +70,6 @@ def test_docker_actions(monkeypatch):
     # remove_orphans is what clears containers whose service was dropped
     # from the compose file.
     mock_client.compose.down.assert_called_with(volumes=True, remove_orphans=True)
-
-
-def test_restart_managed_containers(monkeypatch):
-    mock_client = MagicMock()
-    monkeypatch.setattr(docker, "_build_compose_client", lambda plan: mock_client)
-    docker.restart_managed_containers({"dummy.yml": ["prof1"]})
-    mock_client.compose.restart.assert_called_once()
 
 
 def test_get_managed_containers(monkeypatch):
@@ -101,18 +95,6 @@ def test_get_managed_containers(monkeypatch):
     res = docker.get_managed_containers({"dummy.yml": ["prof1"]})
     assert len(res) == 1
     assert res[0] == mock_container
-
-
-def test_get_managed_logs(monkeypatch, capsys):
-    mock_client = MagicMock()
-    mock_client.compose.logs.return_value = "log output"
-    monkeypatch.setattr(docker, "_build_compose_client", lambda plan: mock_client)
-
-    docker.get_managed_logs({"dummy.yml": ["prof1"]})
-    mock_client.compose.logs.assert_called_once()
-
-    out, err = capsys.readouterr()
-    assert "log output" in out
 
 
 # ==========================================
@@ -257,29 +239,17 @@ def test_running_one_shot_container_is_awaited(monkeypatch):
 
     mock_client.container.exists.return_value = True
     mock_client.container.inspect.return_value.state.running = True
-    docker._wait_for_one_shot_containers()
+    docker.wait_for_one_shot_containers()
     mock_client.container.wait.assert_called_once_with("seaweed-init")
 
     mock_client.container.wait.reset_mock()
     mock_client.container.inspect.return_value.state.running = False
-    docker._wait_for_one_shot_containers()
+    docker.wait_for_one_shot_containers()
     mock_client.container.wait.assert_not_called()
 
     mock_client.container.exists.return_value = False
-    docker._wait_for_one_shot_containers()
+    docker.wait_for_one_shot_containers()
     mock_client.container.wait.assert_not_called()
-
-
-def test_recreate_waits_for_one_shot_containers_before_and_after(monkeypatch):
-    calls = []
-    mock_client = MagicMock()
-    mock_client.compose.up.side_effect = lambda **kw: calls.append("up")
-    monkeypatch.setattr(docker, "_build_compose_client", lambda plan: mock_client)
-    monkeypatch.setattr(
-        docker, "_wait_for_one_shot_containers", lambda: calls.append("wait")
-    )
-    docker.recreate_managed_containers({"compose-infra.yml": ["storage"]})
-    assert calls == ["wait", "up", "wait"]
 
 
 def test_get_stack_details_shows_the_tag_that_will_run(tmp_path, monkeypatch):

@@ -1,4 +1,4 @@
-# Sketch from docs/guides/flink-sql.md. It is not run by the end-to-end tests.
+# Sketch from docs/guides/rolling-windows.md. It is not run by the end-to-end tests.
 
 # --8<-- [start:keyed-sketch]
 from pyflink.common import Types

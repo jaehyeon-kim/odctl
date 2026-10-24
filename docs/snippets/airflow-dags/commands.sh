@@ -1,5 +1,11 @@
 # Commands from docs/guides/airflow-dags.md. .github/scripts/smoke.sh runs each section.
 
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up airflow
+# --8<-- [end:up]
+
 # --8<-- [start:upload]
 docker exec -i airflow python - <<'PY'
 import boto3

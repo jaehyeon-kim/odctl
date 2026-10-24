@@ -4,6 +4,7 @@ Projects, reports, dashboards and datasets go to the evidently database. Nothing
 here needs Docker.
 """
 
+import re
 from pathlib import Path
 
 import yaml
@@ -86,4 +87,4 @@ def test_evidently_has_an_e2e_group_and_a_smoke_test():
     selector = (REPO / ".github" / "scripts" / "select-profiles.py").read_text()
     assert '    "evidently",\n' in selector
     smoke = (REPO / ".github" / "scripts" / "smoke.sh").read_text()
-    assert "  evidently)  smoke_evidently ;;" in smoke
+    assert re.search(r"^  evidently\)\s+smoke_evidently\b", smoke, re.M)

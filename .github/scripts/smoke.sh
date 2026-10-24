@@ -72,6 +72,54 @@ run_snippet() {
   bash -o pipefail -c "$code"
 }
 
+# Run a guide's Runnable Example from the current directory, where the .odctl
+# workspace is, and check that its output matches an extended regular
+# expression: run_example kafka '"n":5'. The optional third argument is the
+# command that runs the file, such as a Python with the client installed.
+run_example() {
+  local guide="$1" want="$2" runner="${3:-bash}" file out
+  file=$(ls "$SNIPPETS/$guide"/example.* 2>/dev/null | head -1)
+  [ -n "$file" ] || fail "no runnable example in docs/snippets/$guide"
+  out=$($runner "$file" 2>&1) || { echo "$out" | tail -20; fail "the $guide example failed"; }
+  grep -qE -- "$want" <<<"$out" || { echo "$out" | tail -20; fail "the $guide example printed no '$want'"; }
+  pass "the $guide guide's runnable example printed '$want'"
+}
+
+# The commands that run the MLflow and Evidently examples: a Python 3.12 with
+# the client versions the images pin, as the guides tell the reader to install.
+mlflow_runner() {
+  local dockerfile="$SNIPPETS/../../src/odctl/resources/docker/mlflow/Dockerfile" mlflow xgboost
+  mlflow=$(grep -oE 'mlflow/mlflow:v[0-9.]+' "$dockerfile" | head -1 | cut -dv -f2)
+  xgboost=$(grep -oE "xgboost~=[0-9.]+" "$dockerfile" | head -1 | cut -d= -f2)
+  echo "uv run --no-project --quiet --python 3.12 --with mlflow==$mlflow --with xgboost~=$xgboost"
+}
+evidently_runner() {
+  local version
+  version=$(grep -oE 'evidently/evidently-service:[0-9.]+' \
+    "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2)
+  echo "uv run --no-project --quiet --python 3.12 --with evidently==$version --with pandas<3.1 python"
+}
+
+# How It Works edits a workspace file and applies it with odctl recreate. Each
+# check runs the guide's section, puts the file back and recreates again, so
+# later profiles in the same job see the shipped settings, and matches the
+# output against an extended regular expression.
+how_it_works_edit() {
+  local section="$1" file="$2" profile="$3" want="$4" out
+  out=$(run_snippet how-it-works/commands.sh "$section" 2>&1) || { echo "$out" | tail -20; fail "the $section example failed"; }
+  mv "$file.bak" "$file" || fail "the $section example left no $file.bak"
+  odctl recreate "$profile" >/dev/null 2>&1 || fail "could not recreate $profile after the $section example"
+  grep -qE -- "$want" <<<"$out" || { echo "$out" | tail -20; fail "the $section example printed no '$want'"; }
+  pass "How It Works' $section example printed '$want'"
+}
+how_it_works_trino() {
+  how_it_works_edit trino-port .odctl/compose-analytics.yml trino '8080/tcp -> 127\.0\.0\.1:8180'
+  retry 30 5 http_ok "http://127.0.0.1:8080/v1/info" || fail "Trino did not answer on 8080 after the port was put back"
+}
+how_it_works_airflow() {
+  how_it_works_edit airflow-deps .odctl/.env airflow '^1\.4\.3$'
+}
+
 # Metrics: nothing else here reads a metrics endpoint, so a change that breaks
 # one goes unseen. In 0.8.0 the JMX agent in KAFKA_OPTS broke every Kafka CLI
 # run, and only an unrelated topic check caught it. So each profile reads its
@@ -176,6 +224,50 @@ connect_plugins() {
   pass "Connect lists the Iceberg, Debezium and ClickHouse plugins"
 }
 
+# The Kafka Connect guide registers the MSK data generator, which needs only
+# Kafka, reads three of its records, then checks and removes the connector.
+connect_datagen() {
+  (cd "$SNIPPETS/kafka-connect" && run_snippet kafka-connect/commands.sh register) >/dev/null 2>&1 \
+    || fail "Connect rejected the data generator configuration"
+  local got status
+  got=$(run_snippet kafka-connect/commands.sh read 2>/dev/null | grep -c '"name"')
+  [ "$got" -eq 3 ] || fail "read $got of 3 data generator records from customers"
+  retry 12 5 sh -c "curl -fsS http://127.0.0.1:8083/connectors/demo-datagen/status | grep -q '\"state\":\"RUNNING\"'" \
+    || fail "the data generator was not RUNNING"
+  status=$(run_snippet kafka-connect/commands.sh status-remove 2>/dev/null)
+  grep -q '"state":"RUNNING"' <<<"$status" || { echo "$status"; fail "the data generator status was not RUNNING"; }
+  curl -fsS "http://127.0.0.1:8083/connectors/demo-datagen" >/dev/null 2>&1 \
+    && fail "the data generator is still registered after the delete"
+  pass "the data generator wrote records to customers, and was checked and removed"
+}
+
+# Getting Started runs each read-only command on kafka-lite, then restarts it.
+getting_started() {
+  local out
+  out=$(run_snippet getting-started/commands.sh list 2>&1) || fail "odctl list failed"
+  grep -q "kafka-lite" <<<"$out" || fail "odctl list does not name kafka-lite"
+  out=$(run_snippet getting-started/commands.sh list-details 2>&1) || fail "odctl list -d failed"
+  grep -q "kafka-ui" <<<"$out" || fail "odctl list -d does not name the kafka-ui service"
+  out=$(run_snippet getting-started/commands.sh explain 2>&1) || fail "odctl explain failed"
+  grep -q "karapace" <<<"$out" || fail "odctl explain kafka-lite does not name karapace"
+  out=$(run_snippet getting-started/commands.sh info 2>&1) || fail "odctl info failed"
+  grep -q "Reachable" <<<"$out" || fail "odctl info does not say Docker is reachable"
+  out=$(run_snippet getting-started/commands.sh ps 2>&1) || fail "odctl ps failed"
+  grep -q "connect" <<<"$out" || fail "odctl ps kafka-lite does not list connect"
+  out=$(run_snippet getting-started/commands.sh ps-all 2>&1) || fail "odctl ps --all failed"
+  grep -q "karapace" <<<"$out" || fail "odctl ps --all does not list karapace"
+  out=$(run_snippet getting-started/commands.sh logs 2>&1) || fail "odctl logs failed"
+  grep -q "^connect" <<<"$out" || fail "odctl logs printed no connect lines"
+  out=$(run_snippet getting-started/commands.sh logs-time 2>&1) || fail "odctl logs with --since and --until failed"
+  grep -qE "^connect +\| [0-9]{4}-" <<<"$out" || fail "odctl logs -t printed no timestamped connect lines: $out"
+  out=$(run_snippet getting-started/commands.sh down-dry-run 2>&1) || fail "odctl down --dry-run failed"
+  docker inspect connect >/dev/null 2>&1 || fail "odctl down --dry-run removed a container"
+  out=$(run_snippet getting-started/commands.sh restart 2>&1) || fail "odctl restart failed"
+  grep -q "Restart complete" <<<"$out" || fail "odctl restart did not complete"
+  retry 40 5 http_ok "http://127.0.0.1:8083/connectors" || fail "Connect never answered after the restart"
+  pass "Getting Started's list, explain, info, ps, logs, restart and down --dry-run ran on kafka-lite"
+}
+
 # The Iceberg sink is built from source, so prove it commits a snapshot rather
 # than only loading. It needs the catalog, which kafka-lite does not start.
 smoke_iceberg_sink() {
@@ -186,7 +278,7 @@ smoke_iceberg_sink() {
   run_snippet iceberg-ingestion/commands.sh topics-produce >/dev/null 2>&1 \
     || fail "could not create the topics or produce to demo-iceberg"
   # From the snippet folder, where the guide's @demo-iceberg.json is.
-  (cd "$SNIPPETS/kafka-connect" && run_snippet kafka-connect/commands.sh register) >/dev/null 2>&1 \
+  (cd "$SNIPPETS/iceberg-ingestion" && run_snippet iceberg-ingestion/commands.sh register) >/dev/null 2>&1 \
     || fail "Connect rejected the Iceberg sink configuration"
 
   # The first commit waits for the control consumer to join its group, which
@@ -208,7 +300,9 @@ print(snap[0]["summary"].get("total-records", "") if snap else "")' 2>/dev/null)
   fi
   run_snippet kafka-connect/commands.sh logs >/dev/null 2>&1 || fail "could not read the Connect log"
   local status
-  status=$(run_snippet kafka-connect/commands.sh status-remove 2>/dev/null)
+  run_snippet iceberg-ingestion/commands.sh records 2>/dev/null | grep -qF '"total-records":"5"' \
+    || fail "the guide's records step does not show 5 records"
+  status=$(run_snippet iceberg-ingestion/commands.sh status-remove 2>/dev/null)
   grep -q '"state":"RUNNING"' <<<"$status" || { echo "$status"; fail "the connector status was not RUNNING"; }
   curl -fsS "http://127.0.0.1:8083/connectors/demo-iceberg" >/dev/null 2>&1 \
     && fail "the connector is still registered after the delete"
@@ -270,11 +364,11 @@ smoke_flink_kafka_jdbc() {
   # Two different OVER windows in one streaming query are refused, so the guide
   # runs one statement for each window size, each writing its own table.
   local refused
-  refused=$(snippet flink-sql/steps.sql windows-refused | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  refused=$(snippet rolling-windows/steps.sql windows-refused | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
   grep -qF '[ERROR]' <<<"$refused" || fail "Flink did not refuse two different OVER windows: $(tail -5 <<<"$refused")"
-  run_snippet flink-sql/commands.sh create-window-tables >/dev/null 2>&1 || fail "could not create the window tables"
-  out=$(snippet flink-sql/steps.sql windows-one-per-size | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
-  run_snippet flink-sql/commands.sh check-windows >/dev/null 2>&1 || fail "the guide's window check query failed"
+  run_snippet rolling-windows/commands.sh create-window-tables >/dev/null 2>&1 || fail "could not create the window tables"
+  out=$(snippet rolling-windows/steps.sql windows-one-per-size | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  run_snippet rolling-windows/commands.sh check-windows >/dev/null 2>&1 || fail "the guide's window check query failed"
   rows=$(docker exec postgres psql -U user -d odctl -tAc \
     "SELECT (SELECT count(*) FROM card_sum_10m) || ',' || (SELECT count(*) FROM card_sum_1h)" 2>/dev/null)
   [ "$rows" = "20,20" ] || { echo "$out" | grep -iE "error|exception" | tail -10; fail "one statement for each OVER window gave '$rows' rows, expected 20,20"; }
@@ -288,11 +382,11 @@ smoke_flink_kafka_jdbc() {
 smoke_flink_http() {
   odctl up feast >/dev/null 2>&1 || fail "could not start feast for the Flink HTTP check"
   retry 40 5 http_ok "http://127.0.0.1:6566/health" || fail "Feast never answered on :6566"
-  (cd "$SNIPPETS/flink-sql" && run_snippet flink-sql/commands.sh feast-apply) >/dev/null 2>&1 \
+  (cd "$SNIPPETS/feast-iceberg" && run_snippet feast-iceberg/commands.sh push-apply) >/dev/null 2>&1 \
     || fail "could not apply the Feast push source"
   local out
-  out=$(snippet flink-sql/steps.sql feast-push | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
-  feast_value() { run_snippet flink-sql/commands.sh feast-read 2>/dev/null | grep -F 0.8999999761581421; }
+  out=$(snippet feast-iceberg/steps.sql feast-push | docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh 2>&1)
+  feast_value() { run_snippet feast-iceberg/commands.sh push-read 2>/dev/null | grep -F 0.8999999761581421; }
   retry 24 5 feast_value \
     || { echo "$out" | grep -iE "error|exception" | tail -10; fail "Feast never returned the value the Flink HTTP sink pushed"; }
   odctl down feast >/dev/null 2>&1 || fail "could not stop feast after the Flink HTTP check"
@@ -421,7 +515,8 @@ smoke_infra() {
       [ "$metres" = "714" ] || fail "PostGIS distance returned '$metres' km, expected 714"
       pass "PostGIS: geography distance works"
       # Read by the telemetry collector's postgresql receiver.
-      assert_pushed_metrics 'postgresql_.+' PostgreSQL ;;
+      assert_pushed_metrics 'postgresql_.+' PostgreSQL
+      run_example hybrid-search '^ +2$' ;;
     storage)
       retry 30 5 http_reachable "http://127.0.0.1:8333" || fail "S3 API never answered"
       # A port that answers is not a bucket that stores anything. Spark, Flink,
@@ -457,10 +552,11 @@ smoke_infra() {
       pass "three uploads of 268 MB passed and seaweed was not killed"
       # How it works shows how to create a bucket before its profile exists.
       local buckets
-      buckets=$(run_snippet storage/commands.sh create-bucket 2>&1) || fail "the create-bucket example failed: $buckets"
+      buckets=$(run_snippet how-it-works/commands.sh create-bucket 2>&1) || fail "the create-bucket example failed: $buckets"
       grep -q "'desflow'" <<<"$buckets" || fail "the bucket list has no desflow: $buckets"
       docker exec seaweed sh -c "curl -fsS $sig '$cred' -X DELETE 'http://localhost:8333/desflow'" >/dev/null 2>&1 || true
       pass "the create-bucket example created a bucket with the S3 login"
+      how_it_works_edit seaweed-memory .odctl/compose-infra.yml storage '^2147483648$'
       assert_metrics http://seaweed:9327/metrics ;;
     catalog)
       retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered"
@@ -481,6 +577,22 @@ smoke_infra() {
         | grep -q 'metadata-location' || fail "table metadata did not read back"
       curl -fsS -X DELETE "http://127.0.0.1:8181/v1/namespaces/smoke/tables/t" >/dev/null 2>&1 || true
       pass "table created through the catalog and its metadata read back"
+      # How It Works reaches the catalog from a container on the odctl network,
+      # previews a start and pulls the catalog's images.
+      run_snippet how-it-works/commands.sh reach 2>/dev/null | grep -q '"defaults"' \
+        || fail "a container on the odctl network did not reach catalog:8181"
+      run_snippet how-it-works/commands.sh dry-run 2>/dev/null | grep -q 'compose-flink.yml' \
+        || fail "odctl up flink-lite --dry-run did not list compose-flink.yml"
+      run_snippet how-it-works/commands.sh pull 2>/dev/null | grep -q 'All images pulled successfully' \
+        || fail "odctl pull catalog did not finish"
+      run_snippet how-it-works/commands.sh up-pull >/dev/null 2>&1 || fail "odctl up catalog --pull failed"
+      run_snippet how-it-works/commands.sh tag-override 2>/dev/null | grep -q 'odctl/postgres:1.1.0' \
+        || fail "a TAG in the shell did not change the image odctl explain shows"
+      run_snippet how-it-works/commands.sh workspace-flag 2>/dev/null | grep -q 'catalog' \
+        || fail "odctl --workspace ps catalog listed no catalog container"
+      run_snippet how-it-works/commands.sh recreate-pull >/dev/null 2>&1 || fail "odctl recreate catalog --pull failed"
+      retry 30 5 http_ok "http://127.0.0.1:8181/v1/config" || fail "REST catalog never answered after the recreate"
+      pass "How It Works' reach, dry-run, pull, up --pull, TAG, --workspace and recreate --pull examples ran"
       assert_metrics http://catalog:9404/metrics ;;
     valkey)
       retry 30 5 docker exec valkey valkey-cli --no-auth-warning -u "redis://user:password@localhost:6379" ping \
@@ -492,7 +604,8 @@ smoke_infra() {
       [ "$got" -eq 2 ] || fail "batch MGET returned $got of 2 values, expected 2"
       pass "authenticated, multi-key write and batch MGET round-tripped"
       # Read by the telemetry collector's redis receiver.
-      assert_pushed_metrics 'redis_.+' Valkey ;;
+      assert_pushed_metrics 'redis_.+' Valkey
+      run_example valkey '^\[5\]$' ;;
   esac
 }
 
@@ -676,17 +789,17 @@ smoke_model_server() {
 smoke_model_features() {
   odctl up feast >/dev/null 2>&1 || fail "could not start feast for the features model"
   retry 40 5 http_ok "http://127.0.0.1:6566/health" || fail "Feast never answered on :6566"
-  (cd "$SNIPPETS/flink-sql" && run_snippet flink-sql/commands.sh feast-apply) >/dev/null 2>&1 \
+  (cd "$SNIPPETS/feast-iceberg" && run_snippet feast-iceberg/commands.sh push-apply) >/dev/null 2>&1 \
     || fail "could not apply the Feast push source"
   local now
   now=$(date -u +%Y-%m-%dT%H:%M:%S)
   retry 12 5 curl -fsS -X POST http://127.0.0.1:6566/push -H 'Content-Type: application/json' \
-    -d "{\"push_source_name\": \"driver_stats_push\", \"allow_registry_cache\": false, \"df\": {\"driver_id\": [1001], \"conv_rate\": [0.9], \"event_timestamp\": [\"$now\"]}}" \
+    -d "{\"push_source_name\": \"driver_push\", \"allow_registry_cache\": false, \"df\": {\"driver_id\": [1001], \"conv_rate\": [0.9], \"event_timestamp\": [\"$now\"]}}" \
     >/dev/null 2>&1 || fail "could not push a feature value to Feast"
   mlflow_snippet features-model >/dev/null 2>&1 || fail "could not register the features model"
   sed -i'' -e '/^MODEL_URI=/d' .odctl/.env
   cat "$SNIPPETS/mlflow/model-uri-features.env" >> .odctl/.env
-  odctl up mlflow >/dev/null 2>&1 || fail "could not start mlflow-serve with the features model"
+  odctl recreate mlflow >/dev/null 2>&1 || fail "could not recreate mlflow-serve with the features model"
   retry 30 5 http_ok "http://127.0.0.1:5003/ping" || fail "no HTTP response from :5003 for the features model"
   local got
   # feast-serve caches its registry for up to a minute after apply, and until it
@@ -1193,29 +1306,14 @@ smoke_temporal() {
   VIRTUAL_ENV="$work/.venv" uv pip install -q "temporalio==1.34.0" >/dev/null 2>&1 \
     || fail "could not install the temporalio SDK"
 
-  # Worker script from the guide as written, then the same script with its Approval
-  # workflow added and the body of main replaced by its approval step, as the
-  # guide tells the reader to do.
+  # The worker step as the guide writes it, then the Runnable Example, which
+  # adds the Approval workflow and its signal to the same script.
   snippet temporal-workers/steps.py worker > "$work/greet.py"
-  snippet temporal-workers/steps.py approval-workflow > "$work/approval.part"
-  snippet temporal-workers/steps.py approval-run > "$work/run.part"
-  python3 - "$work" <<'PYEOF' || fail "could not combine the guide's approval steps"
-import pathlib, sys, textwrap
-work = pathlib.Path(sys.argv[1])
-script = (work / "greet.py").read_text()
-head, tail = script.split("async def main() -> None:\n")
-body, rest = tail.split("\n\n", 1)
-connect = body.splitlines()[0]
-run = textwrap.indent((work / "run.part").read_text().rstrip(), "    ")
-approval = (work / "approval.part").read_text()
-(work / "approval.py").write_text(
-    f"{head}{approval}\n\nasync def main() -> None:\n{connect}\n{run}\n\n{rest}")
-PYEOF
   local got
   got=$(cd "$work" && "$work/.venv/bin/python" greet.py 2>&1 | tail -1)
   [ "$got" = "hello odctl" ] || fail "the guide's worker printed '$got', expected hello odctl"
-  got=$(cd "$work" && "$work/.venv/bin/python" approval.py 2>&1 | tail -1)
-  [ "$got" = "approved by alice" ] || fail "the guide's approval step printed '$got', expected approved by alice"
+  got=$(cd "$work" && "$work/.venv/bin/python" "$SNIPPETS/temporal-workers/example.py" 2>&1 | tail -1)
+  [ "$got" = "approved by alice" ] || fail "the guide's example printed '$got', expected approved by alice"
   pass "the guide's worker retried its activity, and its approval workflow completed on a signal"
 
   cat > "$work/workflows.py" <<'PYEOF'
@@ -1390,9 +1488,11 @@ SPARK_MASTER=http://spark-master:8080/metrics/master/prometheus/
 
 case "$PROFILE" in
   kafka-lite)
-    guide_kafka; connect_plugins
+    guide_kafka; connect_plugins; connect_datagen; getting_started
     assert_metrics http://kafka:9404/metrics "${KAFKA_SIDE[@]}"
-    smoke_iceberg_sink ;;
+    smoke_iceberg_sink
+    run_example kafka 'Processed a total of 5 messages'
+    run_example kafka-connect 'Processed a total of 3 messages' ;;
   kafka-full)
     smoke_kafka kafka-1; connect_plugins
     assert_metrics http://kafka-{1,2,3}:9404/metrics "${KAFKA_SIDE[@]}" ;;
@@ -1400,31 +1500,41 @@ case "$PROFILE" in
     smoke_flink
     smoke_flink_kafka_jdbc
     smoke_flink_http
-    assert_metrics http://jobmanager:9249/metrics http://taskmanager-a:9249/metrics ;;
+    assert_metrics http://jobmanager:9249/metrics http://taskmanager-a:9249/metrics
+    run_example flink-sql 'b +\| +1 +\| +7\.5'
+    run_example rolling-windows '20 +\| +20'
+    run_example iceberg-ingestion 'records written by the Kafka Connect sink' ;;
   flink-full)
     smoke_flink
     assert_metrics http://jobmanager:9249/metrics http://taskmanager-{a,b,c}:9249/metrics ;;
   spark-lite)
     smoke_spark
-    assert_metrics "$SPARK_MASTER" http://spark-worker-1:8081/metrics/prometheus/ ;;
+    assert_metrics "$SPARK_MASTER" http://spark-worker-1:8081/metrics/prometheus/
+    run_example spark '"n":3' ;;
   spark-full)
     smoke_spark
     assert_metrics "$SPARK_MASTER" http://spark-worker-{1,2,3}:8081/metrics/prometheus/ ;;
-  ch-lite)               smoke_ch_lite ;;
+  ch-lite)               smoke_ch_lite; run_example clickhouse 'ch-12 holds 50 rows' ;;
   ch-full)               smoke_ch_full ;;
-  trino)                 smoke_trino ;;
+  trino)                 smoke_trino; how_it_works_trino ;;
   deps)       smoke_deps ;;
   postgres|storage|catalog|valkey) smoke_infra ;;
-  metabase)   smoke_metabase ;;
-  airflow)    smoke_airflow ;;
+  metabase)   smoke_metabase; run_example trino-metabase '"status":"ok"' ;;
+  airflow)    smoke_airflow; run_example airflow-dags 'success'; how_it_works_airflow ;;
   temporal)   smoke_temporal ;;
-  mlflow)     smoke_mlflow ;;
-  lineage)    smoke_lineage ;;
-  telemetry)  smoke_telemetry ;;
-  metadata)   smoke_metadata ;;
-  fluss)      smoke_fluss ;;
-  feast)      smoke_feast ;;
-  evidently)  smoke_evidently ;;
+  mlflow)
+    smoke_mlflow
+    how_it_works_edit mlops-deps .odctl/.env mlflow '^0\.9\.0$'
+    how_it_works_edit timezone .odctl/.env mlflow '^AE[DS]T$'
+    run_example mlflow '"predictions": \[0, 0\]' "$(mlflow_runner) bash" ;;
+  lineage)    smoke_lineage; run_example lineage 'COMPLETED' ;;
+  telemetry)  smoke_telemetry; run_example telemetry '"42"' ;;
+  metadata)   smoke_metadata; run_example openmetadata 'removed demo_pg' ;;
+  fluss)      smoke_fluss; run_example fluss '\| +3 +\| +c +\|' ;;
+  feast)
+    smoke_feast
+    run_example feast-iceberg '0.8999999761581421' "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash" ;;
+  evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

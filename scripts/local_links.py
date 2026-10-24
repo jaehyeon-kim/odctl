@@ -13,9 +13,29 @@ _LOCAL = re.compile(r"(?<!<pre>)<code>(http://127\.0\.0\.1[^<\s]*)</code>")
 
 
 def link_local_addresses(html: str) -> str:
-    """Wrap each inline-code local address in a nofollow link."""
+    """
+    Wrap each inline-code local address in a nofollow link.
+
+    Args:
+        html (str): A page's rendered HTML.
+
+    Returns:
+        str: The HTML with every bare inline-code `http://127.0.0.1` address linked.
+    """
     return _LOCAL.sub(r'<a href="\1" rel="nofollow"><code>\1</code></a>', html)
 
 
 def on_page_content(html, page, config, files):
+    """
+    Link the local addresses of one page, as MkDocs calls the hook.
+
+    Args:
+        html (str): The page's rendered HTML.
+        page (Page): The page, unused.
+        config (MkDocsConfig): The site configuration, unused.
+        files (Files): The site's files, unused.
+
+    Returns:
+        str: The HTML with its local addresses linked.
+    """
     return link_local_addresses(html)

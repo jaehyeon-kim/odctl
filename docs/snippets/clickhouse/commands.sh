@@ -1,5 +1,11 @@
 # Commands from docs/guides/clickhouse.md. .github/scripts/smoke.sh runs each section.
 
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up ch-lite
+# --8<-- [end:up]
+
 # --8<-- [start:merge-tree]
 docker exec ch-11 clickhouse-client --password password -q "SHOW DATABASES"
 

@@ -20,3 +20,13 @@ t.append(pa.Table.from_pydict({
     "conv_rate": [0.5, 0.75],
 }, schema=schema))
 # --8<-- [end:create-table]
+
+# --8<-- [start:read]
+from feast import FeatureStore
+
+fs = FeatureStore(repo_path="feature_repo")
+print(fs.get_online_features(
+    features=["driver_stats:conv_rate"],
+    entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
+).to_dict())
+# --8<-- [end:read]

@@ -2,7 +2,9 @@
 
 The `trino` profile runs Trino, which queries PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey through one SQL interface. The `metabase` profile runs Metabase, which draws charts and dashboards over those databases. Metabase keeps its own settings and dashboards in PostgreSQL, so both profiles start `postgres`. The end-to-end tests run the commands below on every release.
 
-```bash
+This guide builds on [Getting Started](../getting-started.md). The catalogs read the services of earlier guides, such as [Kafka](kafka.md), [Ingest into Iceberg](iceberg-ingestion.md) and [ClickHouse](clickhouse.md), when their profiles are running. Start both profiles:
+
+```bash title="docs/snippets/trino-metabase/commands.sh:up"
 odctl up trino metabase
 ```
 
@@ -11,11 +13,15 @@ odctl up trino metabase
 | Trino UI and JDBC from the host | `http://127.0.0.1:8080` |
 | Metabase from the host | `http://127.0.0.1:3000` |
 
-## Trino catalogs
+## Trino Catalogs
+
+A Trino catalog is a configured connection to one data source. This lists them:
 
 ```bash title="docs/snippets/trino-metabase/commands.sh:catalogs"
 docker exec trino trino --execute "SHOW CATALOGS"
 ```
+
+The command prints `"clickhouse"`, `"iceberg"`, `"kafka"`, `"postgres"`, `"system"` and `"valkey"`, one per line, with a `Picked up JAVA_TOOL_OPTIONS` line before them:
 
 | Catalog | Reads | Needs |
 | --- | --- | --- |
@@ -27,13 +33,13 @@ docker exec trino trino --execute "SHOW CATALOGS"
 
 Every catalog loads when Trino starts, even when its service is not running. A query against such a catalog fails until you start that profile. Catalogs finish loading after Trino's health endpoint starts answering, so `SHOW CATALOGS` can take a minute to list them all.
 
-Run a query:
+This runs a query with no table:
 
 ```bash title="docs/snippets/trino-metabase/commands.sh:query"
 docker exec trino trino --execute "SELECT 1"
 ```
 
-Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Workspace](../how-it-works.md#workspace) explains the access rules in `trino/rules.json`.
+It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Trino Access Rules](../how-it-works.md#trino-access-rules) explains the rules in `trino/rules.json`.
 
 The Trino UI at `http://127.0.0.1:8080` asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.
 
@@ -51,7 +57,7 @@ Open `http://127.0.0.1:3000` and create the first admin account. Then add each d
 
 Metabase runs inside the `odctl` network, so it reaches each database by container name. Use the Starburst driver for Trino, because it is the Trino driver Metabase ships. It needs a catalog, and any catalog in the table above works.
 
-Metabase takes a while to start. It is ready when this request succeeds:
+Metabase takes a while to start. It is ready when this request answers `{"status":"ok"}`:
 
 ```bash title="docs/snippets/trino-metabase/commands.sh:metabase-health"
 curl http://127.0.0.1:3000/api/health
@@ -61,6 +67,29 @@ A SQL question on the PostgreSQL connection, shown as a bar chart:
 
 ![Metabase bar chart of database sizes from a SQL question on PostgreSQL](../images/metabase.png){ .screenshot }
 
-## From another container
+## From Another Container
 
 Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), Trino is at `http://trino:8080` and Metabase at `http://metabase:3000`.
+
+## Runnable Example
+
+Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace. It waits for the catalogs and for Metabase before it runs the commands above:
+
+```bash title="docs/snippets/trino-metabase/example.sh"
+#!/usr/bin/env bash
+# Starts trino and metabase, waits until every Trino catalog has loaded and
+# Metabase answers, then lists the catalogs and runs a query.
+set -euo pipefail
+
+odctl up trino metabase
+
+# Catalogs finish loading after Trino's health endpoint answers.
+until docker exec trino trino --execute "SHOW CATALOGS" 2>/dev/null | grep '"valkey"' >/dev/null; do sleep 5; done
+docker exec trino trino --execute "SHOW CATALOGS"
+docker exec trino trino --execute "SELECT 1"
+
+until curl -fs http://127.0.0.1:3000/api/health; do sleep 5; done
+echo
+```
+
+It prints the six catalogs, `"1"` and `{"status":"ok"}`.

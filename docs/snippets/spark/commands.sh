@@ -1,5 +1,15 @@
 # Commands from docs/guides/spark.md. .github/scripts/smoke.sh runs each section.
 
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up spark-lite
+# --8<-- [end:up]
+
+# --8<-- [start:up-kafka-lite]
+odctl up kafka-lite
+# --8<-- [end:up-kafka-lite]
+
 # --8<-- [start:run-sql]
 docker exec spark-master /opt/spark/bin/spark-sql -e "
   CREATE NAMESPACE IF NOT EXISTS iceberg.demo;

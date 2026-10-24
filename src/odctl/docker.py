@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,7 +10,7 @@ from python_on_whales import DockerClient
 from odctl.config import get_active_dir, get_compose_path
 
 
-def _create_client(
+def create_client(
     compose_files: List[str] | None = None, profiles: List[str] | None = None
 ) -> DockerClient:
     """
@@ -39,7 +38,7 @@ def _create_client(
 
 
 # Global client used for basic checks
-client = _create_client()
+client = create_client()
 
 
 def is_docker_running() -> bool:
@@ -215,6 +214,15 @@ def _expand(value: str, env: Dict[str, str]) -> str:
     """
 
     def replace(match: re.Match) -> str:
+        """
+        Return the value of one variable reference in a compose string.
+
+        Args:
+            match (re.Match): A match of `_VARIABLE_PATTERN`: the name, the operator and its default.
+
+        Returns:
+            str: The variable's value, or the default its operator selects.
+        """
         name, operator, default = match.group(1), match.group(2), match.group(3)
         current = env.get(name)
         if operator is None:
@@ -342,7 +350,7 @@ def pull_stack_images(compose_filename: str, profiles: List[str]):
         profiles (List[str]): The profiles indicating which services to pull.
     """
     path = get_compose_path(compose_filename)
-    stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
+    stack_client = create_client(compose_files=[str(path)], profiles=profiles)
     stack_client.compose.pull()
 
 
@@ -353,7 +361,7 @@ def pull_stack_images(compose_filename: str, profiles: List[str]):
 _ONE_SHOT_CONTAINERS = ("seaweed-init",)
 
 
-def _wait_for_one_shot_containers():
+def wait_for_one_shot_containers():
     """Block until any one-shot container that is still running has exited."""
     for name in _ONE_SHOT_CONTAINERS:
         if (
@@ -375,7 +383,7 @@ def launch_stack(compose_filename: str, profiles: List[str]):
         profiles (List[str]): The profiles to launch.
     """
     path = get_compose_path(compose_filename)
-    stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
+    stack_client = create_client(compose_files=[str(path)], profiles=profiles)
 
     # The 'deps' profile contains an ephemeral container that exits after copying files.
     # Docker Compose's --wait flag fails if it sees a container exit (even with code 0).
@@ -384,7 +392,7 @@ def launch_stack(compose_filename: str, profiles: List[str]):
         stack_client.compose.up(detach=False)
     else:
         # For all other long-running services, we detach and wait for healthchecks
-        _wait_for_one_shot_containers()
+        wait_for_one_shot_containers()
         stack_client.compose.up(detach=True, wait=True)
 
 
@@ -401,7 +409,7 @@ def stop_stack(
                                          with the stack. Defaults to False.
     """
     path = get_compose_path(compose_filename)
-    stack_client = _create_client(compose_files=[str(path)], profiles=profiles)
+    stack_client = create_client(compose_files=[str(path)], profiles=profiles)
     # volumes=True will remove named volumes defined in the compose file.
     # remove_orphans catches containers whose service no longer exists in the
     # compose file, which teardown would otherwise leave running forever: an
@@ -441,115 +449,3 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
             managed_containers.append(c)
 
     return managed_containers
-
-
-def _build_compose_client(execution_plan: Dict[str, List[str]]) -> DockerClient:
-    """
-    Build a unified DockerClient for multiple compose files and profiles.
-
-    Args:
-        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
-
-    Returns:
-        DockerClient: A client configured to target all specified files and profiles simultaneously.
-    """
-    files = [str(get_compose_path(f)) for f in execution_plan.keys()]
-    # Flatten the lists of profiles and deduplicate them
-    profiles = list(set(p for profs in execution_plan.values() for p in profs))
-
-    # Initialize a single client capable of cross-file execution
-    return _create_client(compose_files=files, profiles=profiles)
-
-
-def restart_managed_containers(execution_plan: Dict[str, List[str]]):
-    """
-    Restart containers across all requested profiles.
-
-    Args:
-        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
-    """
-    compose_client = _build_compose_client(execution_plan)
-    compose_client.compose.restart()
-
-
-def recreate_managed_containers(
-    execution_plan: Dict[str, List[str]], pull: bool = False
-):
-    """
-    Replace the containers of the requested profiles.
-
-    A restart keeps the container, so an edit to a compose file never reaches it.
-    This replaces each one from its current definition instead, which is what
-    applies a new memory limit, port, image tag or environment variable. Profiles
-    outside the plan are untouched, unlike `up`, which stops what it is not asked
-    for.
-
-    Args:
-        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
-        pull (bool, optional): Pull images before recreating. Defaults to False.
-    """
-    compose_client = _build_compose_client(execution_plan)
-    _wait_for_one_shot_containers()
-    compose_client.compose.up(
-        detach=True,
-        wait=True,
-        force_recreate=True,
-        pull="always" if pull else "missing",
-    )
-    # The wait above passes while a one-shot container is still at work, so the
-    # next command could find it running; wait here until it has finished.
-    _wait_for_one_shot_containers()
-
-
-def get_managed_logs(
-    execution_plan: Dict[str, List[str]],
-    follow: bool = False,
-    tail: str = "all",
-    timestamps: bool = False,
-    since: Optional[str] = None,
-    until: Optional[str] = None,
-    service: Optional[str] = None,
-):
-    """
-    Fetch or stream logs for the requested execution plan.
-
-    Args:
-        execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
-        follow (bool, optional): If True, streams the logs continuously. Defaults to False.
-        tail (str, optional): Number of lines to show from the end of the logs. Defaults to "all".
-        timestamps (bool, optional): If True, prints timestamps for each log line. Defaults to False.
-        since (str, optional): Show logs since a specific timestamp or relative time. Defaults to None.
-        until (str, optional): Show logs before a specific timestamp or relative time. Defaults to None.
-        service (str, optional): Restrict logs to a specific compose service name. Defaults to None.
-    """
-    compose_client = _build_compose_client(execution_plan)
-
-    kwargs: Dict[str, Any] = {}
-    if service:
-        # Compose expects a list of services to filter by
-        kwargs["services"] = [service]
-    if tail != "all":
-        kwargs["tail"] = tail
-    if timestamps:
-        kwargs["timestamps"] = True
-    if since:
-        kwargs["since"] = since
-    if until:
-        kwargs["until"] = until
-
-    try:
-        if follow:
-            # stream=True yields (source, bytes) tuples in real-time
-            for source, content in compose_client.compose.logs(
-                stream=True, follow=True, **kwargs
-            ):
-                # Write raw bytes to preserve Docker Compose's native formatting
-                sys.stdout.buffer.write(content)
-                sys.stdout.flush()
-        else:
-            # Fetches the log history as a single string block
-            logs_output = compose_client.compose.logs(**kwargs)
-            if logs_output:
-                print(logs_output)
-    except KeyboardInterrupt:
-        pass  # Handle user pressing Ctrl+C gracefully

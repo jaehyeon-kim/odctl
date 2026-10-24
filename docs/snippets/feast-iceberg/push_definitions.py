@@ -6,9 +6,9 @@ from feast.value_type import ValueType
 driver = Entity(name="driver", join_keys=["driver_id"], value_type=ValueType.INT64)
 # Nothing reads this file. A push source needs a batch source behind it.
 batch = FileSource(path="/tmp/driver_stats.parquet", timestamp_field="event_timestamp")
-push = PushSource(name="driver_stats_push", batch_source=batch)
-driver_stats = FeatureView(
-    name="driver_stats",
+push = PushSource(name="driver_push", batch_source=batch)
+driver_pushed = FeatureView(
+    name="driver_pushed",
     entities=[driver],
     ttl=timedelta(days=1),
     schema=[Field(name="driver_id", dtype=Int64), Field(name="conv_rate", dtype=Float32)],

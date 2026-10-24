@@ -70,12 +70,12 @@ REGISTRY = Path("src/odctl/resources/registry.yml")
 
 # smoke.sh starts some profiles from another group's case: the kafka case starts
 # catalog, the flink case starts kafka-lite and feast, the spark case starts
-# kafka-lite, and the fluss case starts flink-lite. A change to that compose file
-# needs these groups as well as the ones the registry maps to it.
+# kafka-lite, and the fluss and feast cases start flink-lite. A change to that
+# compose file needs these groups as well as the ones the registry maps to it.
 ALSO_RUNS = {
     "compose-infra.yml": ["kafka-lite kafka-full"],
     "compose-kafka.yml": ["flink-lite flink-full", "spark-lite spark-full"],
-    "compose-flink.yml": ["fluss"],
+    "compose-flink.yml": ["fluss", "feast"],
     "compose-mlops.yml": ["flink-lite flink-full"],
 }
 
@@ -84,21 +84,23 @@ ALSO_RUNS = {
 # map runs everything, and a test fails until it is added.
 SNIPPET_PREFIX = "docs/snippets/"
 SNIPPET_GROUPS = {
+    "getting-started": ["kafka-lite kafka-full"],
+    "how-it-works": ["storage", "catalog", "trino", "airflow"],
     "kafka": ["kafka-lite kafka-full"],
     "kafka-connect": ["kafka-lite kafka-full"],
     "iceberg-ingestion": ["kafka-lite kafka-full", "flink-lite flink-full"],
-    "flink-sql": ["flink-lite flink-full", "mlflow"],
+    "flink-sql": ["flink-lite flink-full"],
+    "rolling-windows": ["flink-lite flink-full"],
     "fluss": ["fluss"],
     "spark": ["spark-lite spark-full"],
     "clickhouse": ["ch-lite ch-full"],
     "trino-metabase": ["trino", "metabase"],
     "hybrid-search": ["postgres"],
-    "storage": ["storage"],
     "valkey": ["valkey"],
     "airflow-dags": ["airflow"],
     "temporal-workers": ["temporal"],
     "mlflow": ["mlflow"],
-    "feast-iceberg": ["feast"],
+    "feast-iceberg": ["feast", "flink-lite flink-full", "mlflow"],
     "evidently-reports": ["evidently"],
     "lineage": ["lineage"],
     "openmetadata": ["metadata"],
@@ -106,8 +108,16 @@ SNIPPET_GROUPS = {
 }
 
 
-def profile_to_file(registry_path: Path = REGISTRY) -> dict:
-    """Map each profile to the compose file the registry says provides it."""
+def _profile_to_file(registry_path: Path = REGISTRY) -> dict:
+    """
+    Map each profile to the compose file the registry says provides it.
+
+    Args:
+        registry_path (Path): The registry.yml to read.
+
+    Returns:
+        dict: The compose file name of each profile.
+    """
     data = yaml.safe_load(registry_path.read_text())
     mapping = {}
     for stack in data["stacks"].values():
@@ -117,12 +127,30 @@ def profile_to_file(registry_path: Path = REGISTRY) -> dict:
 
 
 def select(changed: list, registry_path: Path = REGISTRY) -> list:
-    """Return the profile groups that the changed files require."""
+    """
+    Return the profile groups that the changed files require.
+
+    Args:
+        changed (list): The paths of the changed files, relative to the repository.
+        registry_path (Path): The registry.yml that maps profiles to compose files.
+
+    Returns:
+        list: The groups to run, every group when a change affects them all, or none.
+    """
     changed = [c for c in changed if c.strip()]
     if not changed:
         return []
 
     def is_compose(path: str) -> bool:
+        """
+        Tell whether a path is one of odctl's compose files.
+
+        Args:
+            path (str): A changed file's path, relative to the repository.
+
+        Returns:
+            bool: True when the path is under the compose files' folder.
+        """
         return path.startswith(COMPOSE_PREFIX)
 
     broad = [
@@ -141,7 +169,7 @@ def select(changed: list, registry_path: Path = REGISTRY) -> list:
                 return list(GROUPS)
             snippet_groups.update(SNIPPET_GROUPS[guide])
 
-    mapping = profile_to_file(registry_path)
+    mapping = _profile_to_file(registry_path)
     touched_files = {Path(c).name for c in changed if is_compose(c)}
 
     selected = []
@@ -154,6 +182,7 @@ def select(changed: list, registry_path: Path = REGISTRY) -> list:
 
 
 def main() -> None:
+    """Print the groups for the files named on the command line, or every group with `--all`, as JSON."""
     args = sys.argv[1:]
     if "--all" in args:
         print(json.dumps(list(GROUPS)))

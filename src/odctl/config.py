@@ -7,7 +7,12 @@ _workspace_override: Optional[Path] = None
 
 
 def set_workspace_override(path: Optional[Path]) -> None:
-    """Record the workspace directory requested via the global `--workspace` flag."""
+    """
+    Record the workspace directory requested via the global `--workspace` flag.
+
+    Args:
+        path (Optional[Path]): The folder given to `--workspace`, or None for the default.
+    """
     global _workspace_override
     _workspace_override = path.resolve() if path is not None else None
 
@@ -70,7 +75,7 @@ def get_compose_path(filename: str) -> Path:
     Get the path to a specific docker-compose file.
 
     Args:
-        filename (str): The name of the compose file (e.g., 'compose-infra.yml').
+        filename (str): The name of the compose file (for example, 'compose-infra.yml').
 
     Returns:
         Path: The path to the requested file within the active directory.

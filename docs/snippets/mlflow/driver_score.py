@@ -9,7 +9,7 @@ class DriverScore(mlflow.pyfunc.PythonModel):
         reply = requests.post(
             "http://feast-serve:6566/get-online-features",
             json={
-                "features": ["driver_stats:conv_rate"],
+                "features": ["driver_pushed:conv_rate"],
                 "entities": {"driver_id": [int(i) for i in model_input["driver_id"]]},
             },
             timeout=10,

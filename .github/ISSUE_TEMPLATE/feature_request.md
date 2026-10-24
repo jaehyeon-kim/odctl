@@ -12,7 +12,7 @@ A clear and concise description of what the problem is. Ex. I'm always frustrate
 
 **Describe the solution you'd like**
 
-A clear and concise description of what you want to happen. (e.g., "I want a new profile added to `compose-orch.yml` for Dagster", or "Add a dedicated connector script for MongoDB CDC.")
+A clear and concise description of what you want to happen. (for example, "I want a new profile added to `compose-orch.yml` for Dagster", or "Add a dedicated connector script for MongoDB CDC.")
 
 **Describe alternatives you've considered**
 

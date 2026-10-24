@@ -1,7 +1,7 @@
 [project]
 name = "odctl"
-version = "1.2.0"
-description = "Orchestrator for the Open Data Stack"
+version = "1.2.1"
+description = "Run an open data stack on your machine, with its services already connected, from one command."
 readme = "README.md"
 authors = [
     { name = "Jaehyeon Kim", email = "dottami@gmail.com" }
@@ -9,7 +9,7 @@ authors = [
 keywords = [
     "open-data",
     "cli",
-    "orchestrator",
+    "data-stack",
     "docker",
     "docker-compose",
     "data-engineering",
