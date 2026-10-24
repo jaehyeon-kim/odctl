@@ -78,6 +78,11 @@
   ],
   "packageRules": [
     {
+      "description": "Kafka stays below 4.4: Kafka 4.4.0 moved AppInfoParser to org.apache.kafka.common.utils.internals, and the Iceberg Kafka Connect sink still calls the old class, so its task fails on a 4.4 Connect worker. Raise this when an Iceberg release no longer uses it. See issue #161.",
+      "matchPackageNames": ["apache/kafka"],
+      "allowedVersions": "<4.4"
+    },
+    {
       "description": "Flink stays on 2.2: it is the newest minor with Kafka and JDBC connector releases. Raise this when both connectors publish a build for the next minor, and move FLINK_MINOR in versions.env with it. See issue #9.",
       "matchPackageNames": ["flink", "org.apache.flink:{/,}**"],
       "allowedVersions": "<2.3"
