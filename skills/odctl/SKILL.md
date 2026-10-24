@@ -91,8 +91,8 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka` | `apache/kafka:4.3.1` | `9092:9092` | `1500m` |
-| `connect` | `apache/kafka:4.3.1` | `8083:8083` | `2g` |
+| `kafka` | `apache/kafka:4.4.0` | `9092:9092` | `1500m` |
+| `connect` | `apache/kafka:4.4.0` | `8083:8083` | `2g` |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
 
@@ -113,10 +113,10 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka-1` | `apache/kafka:4.3.1` | `9092:9092` | `1500m` |
-| `kafka-2` | `apache/kafka:4.3.1` | `9093:9093` | `1500m` |
-| `kafka-3` | `apache/kafka:4.3.1` | `9094:9094` | `1500m` |
-| `connect` | `apache/kafka:4.3.1` | `8083:8083` | `2g` |
+| `kafka-1` | `apache/kafka:4.4.0` | `9092:9092` | `1500m` |
+| `kafka-2` | `apache/kafka:4.4.0` | `9093:9093` | `1500m` |
+| `kafka-3` | `apache/kafka:4.4.0` | `9094:9094` | `1500m` |
+| `connect` | `apache/kafka:4.4.0` | `8083:8083` | `2g` |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
 
@@ -266,7 +266,7 @@ Trino: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and B
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `trino` | `trinodb/trino:483` | `8080:8080` | `4g` |
+| `trino` | `trinodb/trino:484` | `8080:8080` | `4g` |
 
 ### metabase
 
@@ -280,7 +280,7 @@ Metabase: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), an
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `metabase` | `metabase/metabase:v0.63.19.3` | `3000:3000` | `1500m` |
+| `metabase` | `metabase/metabase:v0.64.3.1` | `3000:3000` | `1500m` |
 
 ## Orchestration
 
@@ -459,7 +459,7 @@ Telemetry (grafana/otel-lgtm): System telemetry, monitoring, and data lineage. `
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `otel-lgtm` | `grafana/otel-lgtm:0.35.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g` |
+| `otel-lgtm` | `grafana/otel-lgtm:0.37.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g` |
 
 ## Storage and Catalog
 

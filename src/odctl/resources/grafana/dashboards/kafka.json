@@ -1,6 +1,6 @@
 {
   "title": "Kafka brokers",
-  "description": "Kafka 4.3 brokers (scrape job kafka) through the Prometheus JMX exporter agent with no rules, so metric names are the exporter's default names for each MBean. Written for odctl.",
+  "description": "Kafka brokers (scrape job kafka) through the Prometheus JMX exporter agent with no rules, so metric names are the exporter's default names for each MBean. Written for odctl.",
   "tags": [
     "odctl",
     "kafka"

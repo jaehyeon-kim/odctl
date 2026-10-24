@@ -1,6 +1,6 @@
 {
   "title": "Kafka Connect",
-  "description": "Kafka Connect worker from apache/kafka:4.3.1 (scrape job kafka-connect) through the Prometheus JMX exporter agent with no rules, so metric names are the exporter's default names for each MBean. Written for odctl.",
+  "description": "Kafka Connect worker from the apache/kafka image (scrape job kafka-connect) through the Prometheus JMX exporter agent with no rules, so metric names are the exporter's default names for each MBean. Written for odctl.",
   "tags": [
     "odctl",
     "kafka",

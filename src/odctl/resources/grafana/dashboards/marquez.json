@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Marquez API metrics from /metrics on the API port (scrape job marquez). Written for odctl: no published dashboard exists for Marquez. Marquez 0.51.1 serves Prometheus simpleclient 0.16.0 there: Dropwizard 2.1.12 metrics through DropwizardExports (every character outside [a-zA-Z0-9:] becomes an underscore, meters gain _total) and the hotspot JVM exports.",
+  "description": "Marquez API metrics from /metrics on the API port (scrape job marquez). Written for odctl: no published dashboard exists for Marquez. Marquez serves Prometheus simpleclient there: Dropwizard metrics through DropwizardExports (every character outside [a-zA-Z0-9:] becomes an underscore, meters gain _total) and the hotspot JVM exports.",
   "editable": true,
   "graphTooltip": 1,
   "id": null,

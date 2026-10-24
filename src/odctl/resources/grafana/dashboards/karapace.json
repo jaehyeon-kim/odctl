@@ -761,5 +761,5 @@
   "uid": "odctl-karapace",
   "version": 1,
   "weekStart": "",
-  "description": "Based on the dashboard in Karapace 6.2.4 (container/grafana/dashboards/karapace.json), changed for odctl: panels for metrics Karapace only sends over OpenTelemetry are removed, and HTTP and process panels are added."
+  "description": "Based on the dashboard in the Karapace repository (container/grafana/dashboards/karapace.json), changed for odctl: panels for metrics Karapace only sends over OpenTelemetry are removed, and HTTP and process panels are added."
 }

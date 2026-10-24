@@ -165,7 +165,7 @@ services:
   # [PROFILE: trino] Federated SQL Engine
   # ==========================================
   trino:
-    image: trinodb/trino:483
+    image: trinodb/trino:484
     container_name: trino
     profiles:
       - trino
@@ -196,7 +196,7 @@ services:
   # [PROFILE: metabase] BI & Dashboarding
   # ==========================================
   metabase:
-    image: metabase/metabase:v0.63.19.3
+    image: metabase/metabase:v0.64.3.1
     container_name: metabase
     profiles:
       - metabase

@@ -21,7 +21,7 @@
       }
     ]
   },
-  "description": "Temporal server metrics from the odctl temporal dev server (scrape job temporal). Based on server/server-general.json in github.com/temporalio/dashboards at commit aa9bdf1, with metric and label names checked against Temporal server 1.32.0.",
+  "description": "Temporal server metrics from the odctl temporal dev server (scrape job temporal). Based on server/server-general.json in github.com/temporalio/dashboards, with metric and label names checked against the Temporal server odctl runs.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
