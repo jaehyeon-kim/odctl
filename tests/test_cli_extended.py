@@ -221,3 +221,54 @@ def test_down_all_with_volumes_removes_deps_exactly_once(monkeypatch):
 
     assert result.exit_code == 0
     assert _stopped_files(mock_stop).count("compose-deps.yml") == 1
+
+
+def _down_all_mocks(monkeypatch):
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    mock_container = MagicMock()
+    mock_container.config.labels = {"com.docker.compose.service": "kafka"}
+    monkeypatch.setattr(
+        "odctl.docker.get_managed_containers", lambda plan: [mock_container]
+    )
+    monkeypatch.setattr(
+        "odctl.docker.get_stack_details", lambda f, p: (["kafka"], [], [], [])
+    )
+    return mock_stop
+
+
+def _no_prompt(*args, **kwargs):
+    raise AssertionError("--yes must skip the prompt")
+
+
+def test_down_all_volumes_yes_stops_without_a_prompt(monkeypatch):
+    mock_stop = _down_all_mocks(monkeypatch)
+    monkeypatch.setattr("odctl.main.typer.confirm", _no_prompt)
+
+    result = runner.invoke(app, ["down", "--all", "-v", "--yes"])
+
+    assert result.exit_code == 0
+    mock_stop.assert_called()
+
+
+def test_down_all_volumes_answered_no_stops_nothing(monkeypatch):
+    mock_stop = _down_all_mocks(monkeypatch)
+
+    result = runner.invoke(app, ["down", "--all", "-v"], input="n\n")
+
+    assert result.exit_code == 1
+    mock_stop.assert_not_called()
+
+
+def test_init_force_yes_replaces_the_workspace_without_a_prompt(tmp_path, monkeypatch):
+    (tmp_path / ".odctl").mkdir()
+    monkeypatch.setattr("odctl.main.get_workspace_dir", lambda: tmp_path / ".odctl")
+    mock_init = MagicMock()
+    monkeypatch.setattr("odctl.main.init_workspace", mock_init)
+    monkeypatch.setattr("odctl.main.typer.confirm", _no_prompt)
+
+    result = runner.invoke(app, ["init", "--force", "-y"])
+
+    assert result.exit_code == 0
+    mock_init.assert_called_once_with(force=True)

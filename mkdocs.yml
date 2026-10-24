@@ -1,5 +1,5 @@
 site_name: Open Data Stack (odctl)
-site_description: One CLI for a local open data stack.
+site_description: Run an open data stack on your machine, with its services already connected, from one command.
 # mike appends a folder to site_url when it deploys a version. canonical_version
 # below makes that folder latest/, so every version's pages name the same page
 # under latest/ as canonical and search engines index one copy, not one per release.
@@ -29,6 +29,9 @@ theme:
     # numbers; docs/javascripts/code-lines.js adds a third that hides the line numbers.
     - content.code.copy
     - content.code.select
+    # Previous and next links at the foot of each page, so a reader can follow
+    # the pages in nav order: each guide builds on the pages before it.
+    - navigation.footer
 
 plugins:
   - search
@@ -49,10 +52,21 @@ plugins:
       full_output: llms-full.txt
       sections: {} # required by the plugin; filled from the nav by the hook
 
-# Makes local service addresses clickable, with rel="nofollow".
+# local_links.py makes local service addresses clickable, with rel="nofollow".
+# release_links.py points links to files on main at the release tag.
 hooks:
   - scripts/local_links.py
   - scripts/llmstxt_sections.py
+  - scripts/release_links.py
+
+# Labs is hidden until its first lab is published; remove these lines to show it.
+exclude_docs: |
+  labs.md
+  assets/diagrams/labs.*
+
+# A link to a heading that does not exist is a warning, which --strict fails.
+validation:
+  anchors: warn
 
 extra_css:
   - stylesheets/extra.css
@@ -74,16 +88,17 @@ extra:
 
 nav:
   - Home: index.md
-  - Getting started: getting-started.md
-  - How it works: how-it-works.md
+  - Getting Started: getting-started.md
+  - How It Works: how-it-works.md
   - Profiles: profiles/
   - Guides:
       - Streaming:
           - Kafka: guides/kafka.md
           - Kafka Connect: guides/kafka-connect.md
           - Flink SQL: guides/flink-sql.md
+          - Rolling Windows: guides/rolling-windows.md
           - Fluss: guides/fluss.md
-      - Lakehouse and batch:
+      - Lakehouse and Batch:
           - Ingest into Iceberg: guides/iceberg-ingestion.md
           - Spark: guides/spark.md
       - Analytics:
@@ -91,19 +106,18 @@ nav:
           - Trino and Metabase: guides/trino-metabase.md
       - Orchestration:
           - Airflow DAGs from S3: guides/airflow-dags.md
-          - Temporal workers: guides/temporal-workers.md
+          - Temporal Workers: guides/temporal-workers.md
       - ML and AI:
-          - MLflow: guides/mlflow.md
           - Feast with Iceberg: guides/feast-iceberg.md
-          - Evidently reports: guides/evidently-reports.md
-          - Hybrid search: guides/hybrid-search.md
+          - MLflow: guides/mlflow.md
+          - Evidently Reports: guides/evidently-reports.md
+          - Hybrid Search: guides/hybrid-search.md
           - Valkey: guides/valkey.md
-      - Metadata and operations:
+      - Metadata and Operations:
           - OpenLineage and Marquez: guides/lineage.md
           - OpenMetadata: guides/openmetadata.md
           - Telemetry: guides/telemetry.md
-  - Labs: labs.md
-  - CLI reference: cli.md
+  - CLI Reference: cli.md
   - Troubleshooting: troubleshooting.md
   - About:
       - Why odctl: about/why-odctl.md

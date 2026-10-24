@@ -1,5 +1,11 @@
 # Commands from docs/guides/valkey.md. .github/scripts/smoke.sh runs each section.
 
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up valkey
+# --8<-- [end:up]
+
 # --8<-- [start:round-trip]
 vk=redis://user:password@localhost:6379
 docker exec valkey valkey-cli --no-auth-warning -u "$vk" ping

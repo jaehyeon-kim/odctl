@@ -14,7 +14,7 @@ A clear and concise description of what the bug is.
 
 Steps to reproduce the behavior:
 
-1. What profiles were you trying to launch? (e.g., `odctl up airflow spark-lite ch-lite`)
+1. What profiles were you trying to launch? (for example, `odctl up airflow spark-lite ch-lite`)
 2. Run this CLI command: '...'
 3. See error
 
@@ -34,13 +34,13 @@ If applicable, paste the full CLI error or the specific container logs here (you
 
 **Environment (please complete the following information):**
 
-* OS: [e.g. Ubuntu 24.04, macOS Sonoma, Windows 11 / WSL2]
-* Python Version: [e.g. 3.12]
-* odctl version (`odctl info`): [e.g. 1.0.0]
-* Docker Version: [e.g. Docker Desktop 4.28.0, Docker Engine 25.0]
+* OS: [for example Ubuntu 24.04, macOS Sonoma, Windows 11 / WSL2]
+* Python Version: [for example 3.12]
+* odctl version (`odctl info`): [for example 1.0.0]
+* Docker Version: [for example Docker Desktop 4.28.0, Docker Engine 25.0]
 
 ## **Additional context**
 
-* Did you customize any files in your local `./.odctl/` workspace? (e.g., changing ports in `compose-orch.yml` or editing `registry.yml`)
+* Did you customize any files in your local `./.odctl/` workspace? (for example, changing ports in `compose-orch.yml` or editing `registry.yml`)
 * How much RAM/CPU is allocated to your Docker daemon? (Many Open Data profiles are resource-heavy)
 * Add any other context about the problem here.

@@ -1,8 +1,10 @@
 # ClickHouse
 
-The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. The end-to-end tests run the commands below on every release.
+ClickHouse is a column-oriented database for analytical queries. A shard holds part of a table's rows, and each replica of a shard holds a copy of that part. ClickHouse Keeper is the coordination service that keeps the replicas of a shard in step. The `ch-lite` profile runs one shard with two replicas, `ch-11` and `ch-12`, coordinated by ClickHouse Keeper in `ch-keeper`. `ch-full` adds a second shard, `ch-21` and `ch-22`. The end-to-end tests run the commands below on every release.
 
-```bash
+This guide builds on [Getting Started](../getting-started.md). Start the profile:
+
+```bash title="docs/snippets/clickhouse/commands.sh:up"
 odctl up ch-lite
 ```
 
@@ -14,9 +16,9 @@ odctl up ch-lite
 
 Every server creates the `feature_store` and `odctl` databases when it starts with no data.
 
-## Create a table and query it
+## Create a Table and Query It
 
-`clickhouse-client` is in each server container:
+`clickhouse-client` is in each server container. This lists the databases, then creates a table, writes 10 rows and counts them:
 
 ```bash title="docs/snippets/clickhouse/commands.sh:merge-tree"
 docker exec ch-11 clickhouse-client --password password -q "SHOW DATABASES"
@@ -29,13 +31,13 @@ docker exec ch-11 clickhouse-client --password password -q \
   "SELECT count() FROM default.demo"
 ```
 
-The last command prints `10`.
+The first command lists `default`, `feature_store`, `odctl` and the system databases. The last prints `10`.
 
 ClickHouse also serves a query page at `http://127.0.0.1:8123/play`. Enter `default` and `password` in the top right, write a query and press Run.
 
 ![ClickHouse play page with a query on default.demo](../images/clickhouse-play.png){ .screenshot }
 
-## Replicate across the cluster
+## Replicate Across the Cluster
 
 In `ch-full`, `{cluster}` names `odctl_cluster`, which has two shards of two replicas. A table created `ON CLUSTER` with `ReplicatedMergeTree` is created on all four servers, and Keeper keeps the two replicas of each shard in step:
 
@@ -51,10 +53,39 @@ docker exec ch-12 clickhouse-client --password password -q "SELECT count() FROM 
 docker exec ch-21 clickhouse-client --password password -q "SELECT count() FROM default.repl"
 ```
 
-`ch-12`, the other replica of shard 1, returns `50` once replication has caught up. `ch-21` returns `0`, because shard 2 holds only the rows written to it.
+The `CREATE` prints one line for each of the four servers, with status `0` for success. `ch-12`, the other replica of shard 1, returns `50` once replication has caught up. `ch-21` returns `0`, because shard 2 holds only the rows written to it.
 
 In `ch-lite`, `{cluster}` names `odctl_single_shard`, which holds `ch-11` and `ch-12` only, so `ON CLUSTER` statements finish without waiting for the missing shard.
 
-## From another container
+## From Another Container
 
 Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), connect to `ch-11:8123` over HTTP or `ch-11:9000` with the native protocol, with the same users. Trino's `clickhouse` catalog reads the `feature_store` database on `ch-11`, as [Trino and Metabase](trino-metabase.md) shows.
+
+## Runnable Example
+
+Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace. It runs on `ch-lite`, where `{cluster}` holds the two replicas of one shard, and uses tables of its own for each run:
+
+```bash title="docs/snippets/clickhouse/example.sh"
+#!/usr/bin/env bash
+# Starts ch-lite, writes 10 rows to a MergeTree table and 50 rows to a
+# replicated table, and counts the replicated rows on the other replica.
+# Each run uses its own table names.
+set -euo pipefail
+
+odctl up ch-lite
+
+run=$(date +%s)
+ch() { docker exec "$1" clickhouse-client --password password -q "$2"; }
+
+ch ch-11 "CREATE TABLE default.demo_$run (id UInt32) ENGINE=MergeTree ORDER BY id"
+ch ch-11 "INSERT INTO default.demo_$run SELECT number FROM numbers(10)"
+ch ch-11 "SELECT count() FROM default.demo_$run"
+
+ch ch-11 "CREATE TABLE default.repl_$run ON CLUSTER '{cluster}' (id UInt32) ENGINE=ReplicatedMergeTree ORDER BY id" >/dev/null
+ch ch-11 "INSERT INTO default.repl_$run SELECT number FROM numbers(50)"
+# ch-12 is the other replica of the same shard; replication takes a moment.
+until [ "$(ch ch-12 "SELECT count() FROM default.repl_$run")" = "50" ]; do sleep 1; done
+echo "ch-12 holds 50 rows of repl_$run"
+```
+
+It prints `10`, then `ch-12 holds 50 rows of` with the replicated table's name.

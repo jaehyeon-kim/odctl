@@ -7,7 +7,7 @@ description: Start a local open data stack with odctl and reach its services. Us
 
 odctl starts open source data services as Docker Compose profiles. Install it with `uv tool install odctl` or `pipx install odctl`; it needs Docker. This file is generated from odctl's `registry.yml` and compose files.
 
-## How to use it
+## How to Use It
 
 - Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.
 - `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.
@@ -32,6 +32,45 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 | `odctl logs` | Fetch the logs of containers managed by specific profiles. |
 | `odctl restart` | Restart one or more specific profiles. |
 | `odctl recreate` | Replace one or more profiles' containers, applying compose file changes. |
+
+## Options
+
+Global options go before the command, as in `odctl --workspace ../shared/.odctl ps --all`.
+
+| Command | Option | Does |
+| --- | --- | --- |
+| global | `--verbose` | Enable debug-level logging across all commands. |
+| global | `--workspace, -w` | Path to the odctl workspace directory (default: ./.odctl). |
+| `odctl list` | `--details, -d` | Inspect docker-compose files to show exact services and exposed host ports. |
+| `odctl init` | `--force, -f` | Wipe out the existing workspace and recreate it from scratch. |
+| `odctl init` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
+| `odctl pull` | `--all, -a` | Pull images for ALL available profiles in the registry. |
+| `odctl up` | `--dry-run` | Preview the execution plan without actually starting anything. |
+| `odctl up` | `--pull` | Pull the images again before starting, to fetch a tag that changed in the registry. |
+| `odctl down` | `--all, -a` | Stop ALL running profiles. |
+| `odctl down` | `--volumes, -v` | Also remove named volumes, including the shared jar volume once no other profile uses it. |
+| `odctl down` | `--dry-run` | Preview the teardown plan without actually stopping anything. |
+| `odctl down` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
+| `odctl ps` | `--all, -a` | Show all containers managed by odctl. |
+| `odctl logs` | `--service, -s` | Filter to a specific compose service (Use 'odctl ps' to find names). |
+| `odctl logs` | `--follow, -f` | Follow log output in real-time. |
+| `odctl logs` | `--tail, -n` | Number of lines to show from the end of the logs. |
+| `odctl logs` | `--timestamps, -t` | Show timestamps. |
+| `odctl logs` | `--since` | Show logs since timestamp or relative (for example '42m'). |
+| `odctl logs` | `--until` | Show logs before a timestamp or relative. |
+| `odctl recreate` | `--pull` | Pull images before recreating. |
+
+## Workspace Settings
+
+`odctl init` writes these keys to `.odctl/.env`. Run `odctl recreate <profile>` after changing one.
+
+| Key | Sets |
+| --- | --- |
+| `TAG` | The tag of odctl's own images, set to the CLI version. A `TAG` in the shell overrides it. |
+| `TZ` | The time zone of the services that read it, `UTC` by default. |
+| `_AIRFLOW_PIP_DEPS` | Extra Python packages installed in every new Airflow container. |
+| `_MLOPS_PIP_DEPS` | Extra Python packages installed in every new `mlflow` and `mlflow-serve` container. |
+| `MODEL_URI` | The model `mlflow-serve` serves, such as `models:/<name>@<alias>`; empty means it waits idle. |
 
 ## Messaging
 
@@ -81,7 +120,7 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
 
-## Stream and batch processing
+## Stream and Batch Processing
 
 ### flink-lite
 
@@ -357,7 +396,7 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 | --- | --- | --- | --- |
 | `evidently` | `evidently/evidently-service:0.7.23` | `8089:8000` | `1g` |
 
-## Metadata and lineage
+## Metadata and Lineage
 
 ### metadata
 
@@ -422,7 +461,7 @@ Telemetry (grafana/otel-lgtm): System telemetry, monitoring, and data lineage. `
 | --- | --- | --- | --- |
 | `otel-lgtm` | `grafana/otel-lgtm:0.35.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g` |
 
-## Storage and catalog
+## Storage and Catalog
 
 ### postgres
 
@@ -465,7 +504,7 @@ SeaweedFS: SeaweedFS S3-compatible object storage. `odctl up storage` also start
 
 ### catalog
 
-Iceberg REST catalog: Iceberg REST Catalog. `odctl up catalog` also starts: `deps`, `postgres`, `storage`.
+Iceberg REST Catalog: Iceberg REST Catalog. `odctl up catalog` also starts: `deps`, `postgres`, `storage`.
 
 ```text
 • REST API Endpoint:
@@ -513,7 +552,7 @@ Apache Fluss: Stream storage (Fluss) and multi-model data store (Valkey Bundle).
 
 ### deps
 
-Shared dependencies: Shared dependencies, JARs, connectors, and Docker network `odctl up deps` also starts: nothing else.
+Shared Dependencies: Shared dependencies, JARs, connectors, and Docker network `odctl up deps` also starts: nothing else.
 
 ```text
 • Runs automatically on 'odctl up'.

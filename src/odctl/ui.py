@@ -157,7 +157,7 @@ def print_explain_panel(
         parts = p.split(":")
         svc_name = parts[0]
 
-        # Parse Host vs Container mapping (e.g., flink-sql-gateway:127.0.0.1:8084:8083)
+        # Parse Host vs Container mapping (for example, flink-sql-gateway:127.0.0.1:8084:8083)
         if len(parts) >= 3:
             host_port = parts[-2]
             container_port = parts[-1]

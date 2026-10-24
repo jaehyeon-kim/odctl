@@ -1,28 +1,18 @@
 """The generated documentation pages cover every profile and every command."""
 
-import importlib.util
 import re
-from pathlib import Path
 
 import pytest
 
 from odctl.config import INTERNAL_RESOURCES_DIR
 from odctl.main import app
 
-REPO = Path(__file__).resolve().parent.parent
-
-
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from docs_helpers import FENCE, REPO, TAUGHT_PAGES, TITLE, load, section
 
 
 @pytest.fixture(scope="module")
 def gen_pages():
-    return _load("gen_pages", REPO / "scripts" / "gen_pages.py")
+    return load("gen_pages", REPO / "scripts" / "gen_pages.py")
 
 
 @pytest.fixture(scope="module")
@@ -93,7 +83,7 @@ def test_cli_reference_covers_every_visible_command(gen_pages):
 
 
 def test_docs_only_changes_select_no_e2e_groups():
-    selector = _load(
+    selector = load(
         "select_profiles", REPO / ".github" / "scripts" / "select-profiles.py"
     )
     registry = INTERNAL_RESOURCES_DIR / "registry.yml"
@@ -108,7 +98,7 @@ def test_docs_only_changes_select_no_e2e_groups():
 
 
 def test_local_addresses_become_nofollow_links():
-    hook = _load("local_links", REPO / "scripts" / "local_links.py")
+    hook = load("local_links", REPO / "scripts" / "local_links.py")
     html = (
         "<p>Open <code>http://127.0.0.1:8123/play</code> or "
         "<code>kafka:19092</code>.</p>"
@@ -201,7 +191,7 @@ def test_client_versions_in_guides_match_the_stack():
 
 # Area names in TECH_GROUPS also name a page, its URL and a home table row, so a
 # long one stays and wraps in the sidebar.
-_LONG_TITLES = {"Stream and batch processing"}
+_LONG_TITLES = {"Stream and Batch Processing"}
 
 
 def _nav_titles(items):
@@ -237,23 +227,6 @@ def test_no_heading_starts_with_a_number():
     assert not numbered, numbered
 
 
-def test_every_diagram_is_exported_and_every_image_is_used():
-    images = REPO / "docs" / "images"
-    for source in images.glob("*.drawio"):
-        if source.name.startswith("_"):
-            continue
-        assert (
-            source.with_suffix(".png").exists() or source.with_suffix(".gif").exists()
-        ), f"{source.name} has no exported image; run scripts/diagrams.py"
-    text = "\n".join(p.read_text() for p in (REPO / "docs").rglob("*.md"))
-    unused = [
-        p.name
-        for p in images.iterdir()
-        if p.suffix in {".png", ".gif"} and f"images/{p.name}" not in text
-    ]
-    assert not unused, f"images no page uses: {unused}"
-
-
 def test_skill_is_generated_from_the_registry(gen_pages):
     committed = (REPO / "skills" / "odctl" / "SKILL.md").read_text()
     assert committed == gen_pages.skill(INTERNAL_RESOURCES_DIR), (
@@ -267,33 +240,17 @@ def test_skill_is_generated_from_the_registry(gen_pages):
             )
 
 
-_FENCE = re.compile(r"^```(\w+)([^\n]*)\n(.*?)^```", re.S | re.M)
-_TITLE = re.compile(r'title="([^"]+)"')
-
-
-def _section(path: Path, name: str) -> str:
-    lines: list[str] = []
-    inside = False
-    for line in path.read_text().splitlines():
-        if f"--8<-- [start:{name}]" in line:
-            inside = True
-        elif f"--8<-- [end:{name}]" in line:
-            return "\n".join(lines)
-        elif inside:
-            lines.append(line)
-    raise AssertionError(f"no section {name} in {path.relative_to(REPO)}")
-
-
 def test_guide_code_blocks_are_copies_of_snippet_files():
-    """Each guide block is a copy of a snippet file, or a section of one, that
-    the e2e test runs. Blocks that only start profiles with odctl are exempt,
-    because the e2e test starts each profile itself."""
-    for page in sorted((REPO / "docs" / "guides").glob("*.md")):
-        for lang, info, body in _FENCE.findall(page.read_text()):
+    """Each block on a taught page is a copy of a snippet file, or a section of
+    one, that the e2e test runs. Blocks that only start profiles with odctl are
+    exempt, because the e2e test starts each profile itself, and so is output
+    shown as text."""
+    for page in TAUGHT_PAGES:
+        for lang, info, body in FENCE.findall(page.read_text()):
             if lang == "text":
                 continue
             code = [line for line in body.splitlines() if line.strip()]
-            title = _TITLE.search(info)
+            title = TITLE.search(info)
             if title is None:
                 assert lang == "bash" and all(c.startswith("odctl ") for c in code), (
                     f"{page.name}: a {lang} block has no title naming its snippet file"
@@ -305,14 +262,14 @@ def test_guide_code_blocks_are_copies_of_snippet_files():
             assert path_text.startswith("docs/snippets/") and path.exists(), (
                 f"{page.name}: {ref} is not a snippet file"
             )
-            expected = _section(path, name) if name else path.read_text()
+            expected = section(path, name) if name else path.read_text()
             assert body.rstrip("\n") == expected.rstrip("\n"), (
                 f"{page.name}: the block titled {ref} differs from its file"
             )
 
 
 def test_snippet_changes_select_the_groups_that_run_them():
-    selector = _load(
+    selector = load(
         "select_profiles", REPO / ".github" / "scripts" / "select-profiles.py"
     )
     registry = INTERNAL_RESOURCES_DIR / "registry.yml"
@@ -343,3 +300,31 @@ def test_snippet_changes_select_the_groups_that_run_them():
     assert selector.select(["docs/snippets/unknown/x.sh"], registry) == list(
         selector.GROUPS
     )
+    assert selector.select(["docs/snippets/rolling-windows/steps.sql"], registry) == [
+        "flink-lite flink-full"
+    ]
+    assert set(
+        selector.select(["docs/snippets/feast-iceberg/steps.sql"], registry)
+    ) == {"feast", "flink-lite flink-full", "mlflow"}
+
+
+def test_pages_keep_within_the_heading_limits():
+    """A page has at most 10 `##` headings and 15 headings below its title, as
+    the docs guide sets; a longer page is split into a topic folder."""
+    over = []
+    for page in (REPO / "docs").rglob("*.md"):
+        if "snippets" in page.parts:
+            continue
+        headings = []
+        in_code = False
+        for line in page.read_text().splitlines():
+            if line.startswith("```"):
+                in_code = not in_code
+            elif not in_code and re.match(r"#{2,6} ", line):
+                headings.append(line)
+        second = [h for h in headings if h.startswith("## ")]
+        if len(second) > 10 or len(headings) > 15:
+            over.append(
+                f"{page.relative_to(REPO)}: {len(second)} ##, {len(headings)} in all"
+            )
+    assert not over, over

@@ -23,6 +23,15 @@ def _pages(items):
 
 
 def on_config(config):
+    """
+    Set the llmstxt plugin's sections from the site nav, one per top-level entry.
+
+    Args:
+        config (MkDocsConfig): The loaded MkDocs configuration.
+
+    Returns:
+        MkDocsConfig: The same configuration, with the sections set.
+    """
     sections = {}
     for item in config.nav:
         title, value = next(iter(item.items()))

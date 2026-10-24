@@ -2,7 +2,7 @@
 
 The work comes in the order shown, without dates: a release ships when it is ready. Features come first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue where one exists.
 
-## Next releases
+## Next Releases
 
 ::timeline::
 - title: '1.3.0: Feast'
@@ -64,14 +64,6 @@ The work comes in the order shown, without dates: a release ships when it is rea
 Work that does not wait for a release, published as it is ready.
 
 <div class="grid cards" markdown>
-
--   __Labs__
-
-    ---
-
-    A series in seven parts that takes one generated dataset of web events and logs through Kafka, Flink, ClickHouse, Spark, Trino and the MLOps tools, each lab listed on the [Labs](../labs.md) page as it is published.
-
-    [benchtop #1](https://github.com/jaehyeon-kim/benchtop/issues/1)
 
 -   __Guides__
 

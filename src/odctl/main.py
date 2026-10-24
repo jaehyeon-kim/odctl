@@ -8,16 +8,15 @@ from odctl import config, ui
 from odctl.docker import (
     find_unpublished_images,
     get_managed_containers,
-    get_managed_logs,
     get_stack_details,
     is_docker_running,
     launch_stack,
     pull_stack_images,
-    recreate_managed_containers,
     resolve_image_tag,
-    restart_managed_containers,
     stop_stack,
 )
+from odctl.logs import get_managed_logs
+from odctl.projects import recreate_managed_containers, restart_managed_containers
 from odctl.planner import (
     build_execution_plan,
     expand_plan_dependencies,
@@ -37,10 +36,11 @@ from odctl.workspace import (
 app = typer.Typer(
     name="odctl",
     help="""
-[bold cyan]ODCTL CLI[/bold cyan] - Orchestrator for the Open Data Stack.
+[bold cyan]odctl[/bold cyan]: run an open data stack on your machine, with its services
+already connected, from one command.
 
-Manage your local data engineering and MLOps infrastructure effortlessly.
-Provides commands to inspect, provision, and tear down curated Docker Compose stacks.
+Commands list the profiles, start and stop them with Docker Compose, and show
+what is running.
 """,
     no_args_is_help=True,
     rich_markup_mode="rich",
@@ -71,10 +71,21 @@ def main(
         None,
         "--workspace",
         "-w",
-        help="Path to the ODCTL workspace directory (default: ./.odctl).",
+        help="Path to the odctl workspace directory (default: ./.odctl).",
         rich_help_panel="Global Options",
     ),
 ):
+    """
+    Set up logging and the workspace before any command runs.
+
+    It also sets TAG to the CLI version when no workspace sets it, and warns when the
+    workspace was made by another odctl version.
+    \f
+    Args:
+        ctx (typer.Context): The Typer context; its `obj` gets the global options.
+        verbose (bool): Log at debug level instead of warning level.
+        workspace (Optional[Path]): The workspace folder to use instead of `./.odctl`.
+    """
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
@@ -120,8 +131,14 @@ def list_profiles(
     """
     List all available profiles and their capabilities.
 
-    A [bold]profile[/bold] is a specific capability or technology (e.g., `kafka-lite`, `spark-lite`, `airflow`)
+    A [bold]profile[/bold] is a specific capability or technology (for example, `kafka-lite`, `spark-lite`, `airflow`)
     provided by the Open Data Stack. This command lists them alongside their parent stack.
+    \f
+    Args:
+        details (bool): Also read the compose files to show each profile's services and host ports.
+
+    Raises:
+        typer.Exit: With code 1 when the registry or a compose file cannot be read.
     """
     try:
         registry = load_registry()
@@ -141,7 +158,8 @@ def list_profiles(
 )
 def explain(
     profile: str = typer.Argument(
-        ..., help="The target profile to inspect (e.g., 'airflow', 'kafka-lite')."
+        ...,
+        help="The target profile to inspect (for example, 'airflow', 'kafka-lite').",
     ),
 ):
     """
@@ -149,6 +167,12 @@ def explain(
 
     Displays a detailed breakdown of what a profile provisions, its container images,
     exposed host ports, and any prerequisite profiles it depends on.
+    \f
+    Args:
+        profile (str): The profile to describe.
+
+    Raises:
+        typer.Exit: With code 1 when the registry has no such profile.
     """
     registry = load_registry()
     profile_map = get_profile_map()
@@ -196,7 +220,9 @@ def explain(
   [dim]# Initialize a new workspace in ./.odctl/[/dim]\n
   $ [bold cyan]odctl init[/bold cyan]\n\n
   [dim]# Recreate workspace, overwriting any local changes[/dim]\n
-  $ [bold cyan]odctl init --force[/bold cyan]
+  $ [bold cyan]odctl init --force[/bold cyan]\n\n
+  [dim]# The same, without the prompt, as in a script[/dim]\n
+  $ [bold cyan]odctl init --force --yes[/bold cyan]
 """,
 )
 def init(
@@ -206,14 +232,24 @@ def init(
         "-f",
         help="Wipe out the existing workspace and recreate it from scratch.",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Answer yes to the confirmation prompt, for scripts and CI.",
+    ),
 ):
     """
     Initialize a local .odctl workspace for custom configurations.
 
     Copies the bundled docker-compose files, configs, and `.env` template into a
     local `./.odctl/` directory. You can then edit these files directly to customize the stack.
+    \f
+    Args:
+        force (bool): Replace an existing workspace with a fresh copy, which resets local edits.
+        yes (bool): Skip the confirmation prompt of `--force`.
     """
-    if force and get_workspace_dir().exists():
+    if force and not yes and get_workspace_dir().exists():
         typer.confirm(
             "⚠️  This will wipe out local modifications. Are you sure?", abort=True
         )
@@ -247,8 +283,15 @@ def pull(
     """
     Pre-fetch Docker images without starting the containers.
 
-    Useful for downloading heavy images (like Spark, Flink, Kafka) ahead of time
-    or ensuring you have the latest versions before launching.
+    Useful for downloading heavy images (like Spark, Flink, Kafka) ahead of time,
+    or for fetching a tag that changed in the registry before launching.
+    \f
+    Args:
+        profiles (Optional[List[str]]): The profiles whose images to pull, with their dependencies.
+        all (bool): Pull the images of every profile in the registry.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable or a pull fails.
     """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -278,13 +321,14 @@ def pull(
   $ [bold cyan]odctl up ch-lite flink-lite[/bold cyan]\n\n
   [dim]# Preview what would be launched for Airflow[/dim]\n
   $ [bold cyan]odctl up airflow --dry-run[/bold cyan]\n\n
-  [dim]# Force pull latest images before launching[/dim]\n
+  [dim]# Pull the images again before launching[/dim]\n
   $ [bold cyan]odctl up kafka-lite --pull[/bold cyan]
 """,
 )
 def up(
     profiles: List[str] = typer.Argument(
-        ..., help="One or more profiles to launch (e.g., 'ch-lite', 'kafka-lite')."
+        ...,
+        help="One or more profiles to launch (for example, 'ch-lite', 'kafka-lite').",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -294,7 +338,7 @@ def up(
     pull: bool = typer.Option(
         False,
         "--pull",
-        help="Force pull the latest images from the registry before starting.",
+        help="Pull the images again before starting, to fetch a tag that changed in the registry.",
     ),
 ):
     """
@@ -307,6 +351,15 @@ def up(
     naming the tag rather than leaving Docker to report a missing manifest.
     Warns about any service whose declared profile belongs to another compose
     file, since the planner will never start it.
+    \f
+    Args:
+        profiles (List[str]): The profiles to start; their dependencies start first.
+        dry_run (bool): Print the plan without starting anything.
+        pull (bool): Pull the images again before starting each compose file.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable, an image for TAG is not
+            published, or a compose file fails to start.
     """
     if not dry_run and not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -396,7 +449,9 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
   [dim]# Stop all running profiles[/dim]\n
   $ [bold cyan]odctl down --all[/bold cyan]\n\n
   [dim]# Complete teardown and wipe all data[/dim]\n
-  $ [bold cyan]odctl down --all -v[/bold cyan]
+  $ [bold cyan]odctl down --all -v[/bold cyan]\n\n
+  [dim]# The same, without the prompt, as in a script[/dim]\n
+  $ [bold cyan]odctl down --all -v --yes[/bold cyan]
 """,
 )
 def down(
@@ -415,19 +470,35 @@ def down(
         "--dry-run",
         help="Preview the teardown plan without actually stopping anything.",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Answer yes to the confirmation prompt, for scripts and CI.",
+    ),
 ):
     """
     Stop and remove profile containers and networks.
 
-    Tears down the requested profiles. Services keep their data inside their
-    containers, so the data is removed with them.
-    Use [bold red]--volumes[/bold red] to also remove named volumes, such as the shared jar volume.
+    Tears down the requested profiles. Data kept inside a container is removed with it.
+    Unnamed volumes stay on disk, unused.
+    Use [bold red]--volumes[/bold red] to also remove the volumes, such as the shared jar volume.
+    \f
+    Args:
+        profiles (Optional[List[str]]): The profiles to stop.
+        all (bool): Stop every running profile.
+        volumes (bool): Also remove the volumes of the stopped services.
+        dry_run (bool): Print the teardown plan without stopping anything.
+        yes (bool): Skip the confirmation prompt of `--all --volumes`.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable or a compose file fails to stop.
     """
     if not dry_run and not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    if all and volumes and not dry_run:
+    if all and volumes and not dry_run and not yes:
         typer.confirm(
             "⚠️  This will destroy ALL profiles and WIPE ALL DATA. Are you sure?",
             abort=True,
@@ -500,7 +571,7 @@ def down(
     rich_help_panel="Inspection & Info",
     epilog="""
 [bold underline]Examples:[/bold underline]\n
-  [dim]# Show all running containers managed by ODCTL[/dim]\n
+  [dim]# Show all running containers managed by odctl[/dim]\n
   $ [bold cyan]odctl ps --all[/bold cyan]\n\n
   [dim]# Show containers just for specific profiles[/dim]\n
   $ [bold cyan]odctl ps kafka-lite spark-lite[/bold cyan]
@@ -511,13 +582,20 @@ def ps(
         None, help="Specific profiles to inspect."
     ),
     all: bool = typer.Option(
-        False, "--all", "-a", help="Show all containers managed by ODCTL."
+        False, "--all", "-a", help="Show all containers managed by odctl."
     ),
 ):
     """
     List Docker containers managed by the Open Data Stack.
 
     Filters out system containers and only shows those belonging to requested profiles.
+    \f
+    Args:
+        profiles (Optional[List[str]]): The profiles whose containers to show.
+        all (bool): Show every container that odctl manages.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable.
     """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -600,13 +678,30 @@ def logs(
         False, "--timestamps", "-t", help="Show timestamps."
     ),
     since: Optional[str] = typer.Option(
-        None, "--since", help="Show logs since timestamp or relative (e.g. '42m')."
+        None,
+        "--since",
+        help="Show logs since timestamp or relative (for example '42m').",
     ),
     until: Optional[str] = typer.Option(
         None, "--until", help="Show logs before a timestamp or relative."
     ),
 ):
-    """Fetch the logs of containers managed by specific profiles."""
+    """
+    Fetch the logs of containers managed by specific profiles.
+    \f
+
+    Args:
+        profiles (List[str]): The profiles whose logs to show.
+        service (Optional[str]): Show only this compose service.
+        follow (bool): Keep streaming new lines until Ctrl+C.
+        tail (str): How many lines to show from the end of each log.
+        timestamps (bool): Show a timestamp on each line.
+        since (Optional[str]): Show lines after this time, absolute or relative such as `42m`.
+        until (Optional[str]): Show lines before this time, absolute or relative.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable.
+    """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
@@ -625,7 +720,16 @@ def logs(
 
 @app.command(name="restart", rich_help_panel="Management")
 def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.")):
-    """Restart one or more specific profiles."""
+    """
+    Restart one or more specific profiles.
+    \f
+
+    Args:
+        profiles (List[str]): The profiles whose containers to restart.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable.
+    """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
@@ -641,7 +745,17 @@ def recreate(
     profiles: List[str] = typer.Argument(..., help="Profiles to recreate."),
     pull: bool = typer.Option(False, "--pull", help="Pull images before recreating."),
 ):
-    """Replace one or more profiles' containers, applying compose file changes."""
+    """
+    Replace one or more profiles' containers, applying compose file changes.
+    \f
+
+    Args:
+        profiles (List[str]): The profiles whose containers to replace.
+        pull (bool): Pull the images again before replacing the containers.
+
+    Raises:
+        typer.Exit: With code 1 when Docker is not reachable.
+    """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
@@ -649,7 +763,7 @@ def recreate(
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Recreating containers...")
     ui.print_info(
-        "Recreating replaces the containers, so their data goes with them.",
+        "Recreating replaces the containers. Data inside them is lost; PostgreSQL, SeaweedFS, ClickHouse and ZooKeeper keep their volumes.",
         style="yellow",
     )
     recreate_managed_containers(plan, pull=pull)

@@ -31,7 +31,15 @@ CLI_VERSION_TEXT = "<CLI version>"
 
 
 def load_registry(resources: Path) -> Registry:
-    """Read registry.yml from a resources directory into odctl's own model."""
+    """
+    Read registry.yml from a resources directory into odctl's own model.
+
+    Args:
+        resources (Path): The folder that holds registry.yml.
+
+    Returns:
+        Registry: The parsed registry.
+    """
     return Registry(**yaml.safe_load((resources / "registry.yml").read_text()))
 
 
@@ -107,7 +115,7 @@ TECH_GROUPS: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = [
         [("Kafka", ["kafka-lite", "kafka-full"])],
     ),
     (
-        "Stream and batch processing",
+        "Stream and Batch Processing",
         "Apache Flink, Apache Spark",
         [
             ("Apache Flink", ["flink-lite", "flink-full"]),
@@ -141,7 +149,7 @@ TECH_GROUPS: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = [
         ],
     ),
     (
-        "Metadata and lineage",
+        "Metadata and Lineage",
         "OpenMetadata, Marquez",
         [
             ("OpenMetadata", ["metadata"]),
@@ -154,15 +162,15 @@ TECH_GROUPS: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = [
         [("Telemetry (grafana/otel-lgtm)", ["telemetry"])],
     ),
     (
-        "Storage and catalog",
+        "Storage and Catalog",
         "PostgreSQL 18 with pgvector, pg_textsearch and PostGIS, SeaweedFS (S3), Iceberg REST catalog, Valkey Bundle, Apache Fluss",
         [
             ("PostgreSQL", ["postgres"]),
             ("SeaweedFS", ["storage"]),
-            ("Iceberg REST catalog", ["catalog"]),
+            ("Iceberg REST Catalog", ["catalog"]),
             ("Valkey", ["valkey"]),
             ("Apache Fluss", ["fluss"]),
-            ("Shared dependencies", ["deps"]),
+            ("Shared Dependencies", ["deps"]),
         ],
     ),
 ]
@@ -180,14 +188,26 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def tech_section(
+def _tech_section(
     title: str,
     profiles: List[str],
     registry: Registry,
     resources: Path,
     profile_map: Dict[str, dict],
 ) -> List[str]:
-    """Render one technology's section of an area page, a subsection per profile."""
+    """
+    Render one technology's section of an area page, a subsection per profile.
+
+    Args:
+        title (str): The technology's heading.
+        profiles (List[str]): Its profiles, all from one compose file.
+        registry (Registry): The parsed registry.
+        resources (Path): The folder that holds the compose files.
+        profile_map (Dict[str, dict]): The stack and compose file of each profile.
+
+    Returns:
+        List[str]: The section's Markdown lines.
+    """
     stack_id, stack = _stack_of(registry, profiles[0])
     compose = yaml.safe_load((resources / stack.file).read_text()) or {}
     lines = [
@@ -223,6 +243,9 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
     The nav has one entry per area in TECH_GROUPS. Each area page has a section
     per technology, and each profile is a subsection, which the index links to.
 
+    Args:
+        resources (Path): The folder that holds registry.yml and the compose files.
+
     Returns:
         Dict[str, str]: Page content keyed by its path under the docs directory.
     """
@@ -248,7 +271,7 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
         ]
         summary.append(f"- [{group}]({path})")
         for title, profiles in techs:
-            page += tech_section(title, profiles, registry, resources, profile_map)
+            page += _tech_section(title, profiles, registry, resources, profile_map)
             for profile in profiles:
                 _, stack = _stack_of(registry, profile)
                 index.append(
@@ -287,7 +310,12 @@ def _help_text(args: List[str]) -> str:
 
 
 def visible_commands() -> List[str]:
-    """List the commands `odctl --help` shows, in the order it shows them."""
+    """
+    List the commands `odctl --help` shows, in the order it shows them.
+
+    Returns:
+        List[str]: The names of the commands that are not hidden.
+    """
     from odctl.main import app
 
     return [
@@ -298,9 +326,14 @@ def visible_commands() -> List[str]:
 
 
 def cli_reference() -> str:
-    """Render the CLI reference from `odctl --help` and each command's help."""
+    """
+    Render the CLI reference from `odctl --help` and each command's help.
+
+    Returns:
+        str: The Markdown of the CLI reference page.
+    """
     lines = [
-        "# CLI reference",
+        "# CLI Reference",
         "",
         "This page holds the output of `odctl --help` and of `odctl <command> --help`, captured when the site was built.",
         "",
@@ -340,12 +373,114 @@ def _command_summaries() -> List[Tuple[str, str]]:
     return rows
 
 
+def _options(callback) -> List[Tuple[str, str]]:
+    """The flags and help text of each Typer option of one command function."""
+    import inspect
+
+    import typer
+
+    found = []
+    for param in inspect.signature(callback).parameters.values():
+        info = param.default
+        if isinstance(info, typer.models.OptionInfo):
+            decls = list(info.param_decls or [])
+            if isinstance(info.default, str) and info.default.startswith("-"):
+                decls.insert(0, info.default)
+            found.append((", ".join(decls), (info.help or "").strip()))
+    return found
+
+
+def command_options() -> List[Tuple[str, str, str]]:
+    """
+    Each option of each visible command, and the global options, from the Typer app.
+
+    Returns:
+        List[Tuple[str, str, str]]: The command (empty for a global option), the
+        option's flags joined with ", " such as "--all, -a", and its help text.
+    """
+    from odctl.main import app
+
+    rows: List[Tuple[str, str, str]] = []
+    if app.registered_callback is not None and app.registered_callback.callback:
+        rows += [("", f, h) for f, h in _options(app.registered_callback.callback)]
+    for command in app.registered_commands:
+        if command.hidden:
+            continue
+        name = command.name or command.callback.__name__  # type: ignore[union-attr]
+        rows += [(name, f, h) for f, h in _options(command.callback)]
+    return rows
+
+
+# What each `.env` key that `odctl init` writes is for. env_keys() reads the keys
+# from odctl/workspace.py, so a new key without a line here fails the skill build.
+ENV_KEYS = {
+    "TAG": "The tag of odctl's own images, set to the CLI version. A `TAG` in the shell overrides it.",
+    "TZ": "The time zone of the services that read it, `UTC` by default.",
+    "_AIRFLOW_PIP_DEPS": "Extra Python packages installed in every new Airflow container.",
+    "_MLOPS_PIP_DEPS": "Extra Python packages installed in every new `mlflow` and `mlflow-serve` container.",
+    "MODEL_URI": "The model `mlflow-serve` serves, such as `models:/<name>@<alias>`; empty means it waits idle.",
+}
+
+
+def env_keys() -> List[str]:
+    """
+    List the keys `odctl init` writes to `.odctl/.env`, in the order it writes them.
+
+    Returns:
+        List[str]: The key names, read from `workspace.py`.
+    """
+    source = (REPO / "src" / "odctl" / "workspace.py").read_text()
+    return re.findall(r"""f\.write\(f?["']([A-Z_]+)=""", source)
+
+
+def _command_tables() -> List[str]:
+    """The skill's Commands, Options and Workspace Settings tables, read from the CLI."""
+    lines = [
+        "## Commands",
+        "",
+        "| Command | Does |",
+        "| --- | --- |",
+    ]
+    lines += [f"| `odctl {name}` | {doc} |" for name, doc in _command_summaries()]
+    lines += [
+        "",
+        "## Options",
+        "",
+        "Global options go before the command, as in `odctl --workspace ../shared/.odctl ps --all`.",
+        "",
+        "| Command | Option | Does |",
+        "| --- | --- | --- |",
+    ]
+    lines += [
+        f"| {f'`odctl {name}`' if name else 'global'} | `{flags}` | {text} |"
+        for name, flags, text in command_options()
+    ]
+    lines += [
+        "",
+        "## Workspace Settings",
+        "",
+        "`odctl init` writes these keys to `.odctl/.env`. Run `odctl recreate <profile>` after changing one.",
+        "",
+        "| Key | Sets |",
+        "| --- | --- |",
+    ]
+    lines += [f"| `{key}` | {ENV_KEYS[key]} |" for key in env_keys()]
+    lines.append("")
+    return lines
+
+
 def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
     """
     Render the odctl skill for AI assistants from the registry and the compose files.
 
     It is committed at skills/odctl/SKILL.md, and a test fails when the file
     differs from this output, so a new profile, port or command reaches it.
+
+    Args:
+        resources (Path): The folder that holds registry.yml and the compose files.
+
+    Returns:
+        str: The skill's Markdown.
     """
     registry = load_registry(resources)
     profile_map = _profile_map(registry)
@@ -359,7 +494,7 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
         "",
         "odctl starts open source data services as Docker Compose profiles. Install it with `uv tool install odctl` or `pipx install odctl`; it needs Docker. This file is generated from odctl's `registry.yml` and compose files.",
         "",
-        "## How to use it",
+        "## How to Use It",
         "",
         "- Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.",
         "- `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.",
@@ -369,13 +504,8 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
         "- `odctl init` copies the compose files, `registry.yml` and `.env` into `.odctl/` in the current directory, so they can be edited. Run `odctl recreate <profile>` after editing a compose file or `.env`.",
         "- `-lite` profiles run one node of a tool; `-full` profiles run a cluster of it. Start one of the pair, not both.",
         "",
-        "## Commands",
-        "",
-        "| Command | Does |",
-        "| --- | --- |",
     ]
-    lines += [f"| `odctl {name}` | {doc} |" for name, doc in _command_summaries()]
-    lines.append("")
+    lines += _command_tables()
     for group, _, techs in TECH_GROUPS:
         lines += [f"## {group}", ""]
         for title, profiles in techs:
@@ -403,7 +533,12 @@ AREAS_MARKER = "<!-- areas table, generated by scripts/gen_pages.py -->"
 
 
 def areas_table() -> str:
-    """The home page table: each area and the technologies it runs."""
+    """
+    Render the home page table of each area and the technologies it runs.
+
+    Returns:
+        str: The Markdown table.
+    """
     lines = ["| Area | Technologies |", "| --- | --- |"]
     for group, summary, _ in TECH_GROUPS:
         lines.append(f"| [{group}](profiles/{_slug(group)}.md) | {summary} |")

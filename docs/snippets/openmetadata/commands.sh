@@ -2,6 +2,12 @@
 # steps before it set, so .github/scripts/smoke.sh runs a section with those
 # variables set.
 
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up metadata
+# --8<-- [end:up]
+
 # --8<-- [start:login]
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
   -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \

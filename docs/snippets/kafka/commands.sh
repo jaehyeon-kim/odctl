@@ -1,5 +1,11 @@
 # Commands from docs/guides/kafka.md. .github/scripts/smoke.sh runs each section.
 
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up kafka-lite
+# --8<-- [end:up]
+
 # --8<-- [start:create-topic]
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 \
   --create --topic demo --partitions 1 --replication-factor 1

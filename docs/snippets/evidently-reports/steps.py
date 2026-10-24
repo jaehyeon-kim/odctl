@@ -23,5 +23,5 @@ from evidently import DataDefinition, Dataset
 
 data = pd.DataFrame({"id": [1, 2, 3], "score": [0.1, 0.5, 0.9]})
 dataset_id = ws.add_dataset(project.id, Dataset.from_pandas(data, data_definition=DataDefinition()), "demo")
-ws.load_dataset(dataset_id).as_dataframe()
+print(ws.load_dataset(dataset_id).as_dataframe())
 # --8<-- [end:dataset]

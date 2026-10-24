@@ -2,18 +2,29 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.2.1
+
+`recreate`, `restart` and `logs` work on profiles from several compose files, `init` and `down` can skip their prompt, and the docs show every command with a runnable example.
+
+- `odctl recreate`, `odctl restart` and `odctl logs` work on profiles from more than one compose file, such as `odctl recreate storage kafka-lite`. They ran every file as one project, so `recreate` failed with `Conflict. The container name "/seaweed" is already in use`, and `restart` and `logs` left out the containers of all but one file. Each file now runs as its own project, as with `odctl up`. [Apply a Change](../how-it-works.md#apply-a-change) uses `odctl recreate`.
+- `odctl init --force --yes` and `odctl down --all --volumes --yes` run without asking `Are you sure?`, for scripts and CI. `-y` is the short form. See [Stop a Profile](../getting-started.md#stop-a-profile) and [Start Again](../how-it-works.md#start-again).
+- [Getting Started](../getting-started.md) runs every command on `kafka-lite`, with its output, and the [home page](../index.md#commands) lists each command with a link to its example.
+- Every guide ends with a Runnable Example that names the files to run. [Rolling Windows](../guides/rolling-windows.md) is a page of its own, and the Flink push to Feast moved to [Push Features from Flink SQL](../guides/feast-iceberg.md#push-features-from-flink-sql).
+- The animation on [How It Works](../how-it-works.md#what-odctl-up-does) shows its four steps again. Since 1.1.0 it showed steps 1 to 3 for a moment each and then stayed on step 4, because one step was exported 2 pixels narrower and ffmpeg stopped at the change in size.
+- The Labs page is hidden until its first lab is published.
+
 ## Version 1.2.0
 
 Flink can send rows to an HTTP API, Spark reads Kafka with no extra options, SeaweedFS survives uploads of large models, and the guides cover cases that real projects met.
 
-- Flink's SQL client has the HTTP connector. [Send rows to an HTTP API](../guides/flink-sql.md#send-rows-to-an-http-api) pushes a feature value to Feast.
-- Spark has the Kafka connector and the Avro module, so a job reads a topic, including Avro records written with the schema registry, with no `--packages` option. See [Read a Kafka topic](../guides/spark.md#read-a-kafka-topic) and [Read Avro records written with the schema registry](../guides/spark.md#read-avro-records-written-with-the-schema-registry).
-- [Keep messages longer](../guides/kafka.md#keep-messages-longer) shows the broker's one-day and 500 MB retention and how to turn both off for a topic. [Troubleshooting](../troubleshooting.md#older-messages-are-missing) lists the symptom.
-- `seaweed` sets `GOMEMLIMIT` to three quarters of its memory limit, so uploads of a model of a few hundred MB no longer end with HTTP 500 and a killed container. [Troubleshooting](../troubleshooting.md#uploads-fail-with-http-500-and-seaweed-exited-with-code-137) says what to do when the limit is still reached, and [How it works](../how-it-works.md#examples) changes both values together.
-- The [MLflow guide](../guides/mlflow.md) has three new sections: [Move the alias to a new version](../guides/mlflow.md#move-the-alias-to-a-new-version), which needs `odctl restart mlflow`, [Load a model from your machine](../guides/mlflow.md#load-a-model-from-your-machine) and [Serve a model that reads online features](../guides/mlflow.md#serve-a-model-that-reads-online-features).
-- The text on `_MLOPS_PIP_DEPS` now says that every new `mlflow` and `mlflow-serve` container installs the packages from PyPI again. [How it works](../how-it-works.md#examples) and the MLflow guide have the details.
-- [How it works](../how-it-works.md#examples) shows how to create a bucket before its profile exists.
-- [Several rolling windows](../guides/flink-sql.md#several-rolling-windows) shows that Flink SQL refuses two different `OVER` windows in one streaming query, and the two ways around it.
+- Flink's SQL client has the HTTP connector. [Push Features from Flink SQL](../guides/feast-iceberg.md#push-features-from-flink-sql) pushes a feature value to Feast.
+- Spark has the Kafka connector and the Avro module, so a job reads a topic, including Avro records written with the schema registry, with no `--packages` option. See [Read a Kafka Topic](../guides/spark.md#read-a-kafka-topic) and [Read Avro Records Written with the Schema Registry](../guides/spark.md#read-avro-records-written-with-the-schema-registry).
+- [Keep Messages Longer](../guides/kafka.md#keep-messages-longer) shows the broker's one-day and 500 MB retention and how to turn both off for a topic. [Troubleshooting](../troubleshooting.md#older-messages-are-missing) lists the symptom.
+- `seaweed` sets `GOMEMLIMIT` to three quarters of its memory limit, so uploads of a model of a few hundred MB no longer end with HTTP 500 and a killed container. [Troubleshooting](../troubleshooting.md#uploads-fail-with-http-500-and-seaweed-exited-with-code-137) says what to do when the limit is still reached, and [How It Works](../how-it-works.md#examples) changes both values together.
+- The [MLflow guide](../guides/mlflow.md) has three new sections: [Move the Alias to a New Version](../guides/mlflow.md#move-the-alias-to-a-new-version), which needs `odctl restart mlflow`, [Load a Model from Your Machine](../guides/mlflow.md#load-a-model-from-your-machine) and [Serve a Model That Reads Online Features](../guides/mlflow.md#serve-a-model-that-reads-online-features).
+- The docs now say that the packages in `_MLOPS_PIP_DEPS` are installed from PyPI again in every new `mlflow` and `mlflow-serve` container. [How It Works](../how-it-works.md#examples) lists when a new container is made.
+- [How It Works](../how-it-works.md#examples) shows how to create a bucket before its profile exists.
+- [Rolling Windows](../guides/rolling-windows.md) shows that Flink SQL refuses two different `OVER` windows in one streaming query, and the two ways around it.
 - The [Evidently guide](../guides/evidently-reports.md) says what Evidently does not estimate and why NannyML needs Python 3.12.
 
 ### Upgrading
@@ -24,10 +35,10 @@ Flink can send rows to an HTTP API, Spark reads Kafka with no extra options, Sea
 
 Every service is now reachable from your machine only, and the docs have a [Roadmap](roadmap.md) and a [Changelog](changelog.md).
 
-- Every published port binds to `127.0.0.1`, on macOS, Linux and WSL2, so other machines on your network cannot reach the services. [How you reach a service](../how-it-works.md#how-you-reach-a-service) says how to open a port when you need to.
+- Every published port binds to `127.0.0.1`, on macOS, Linux and WSL2, so other machines on your network cannot reach the services. [How You Reach a Service](../how-it-works.md#how-you-reach-a-service) says how to open a port when you need to.
 - Kafka no longer publishes ports 29092, 29093 and 29094, which were listeners for a minikube cluster.
-- An odctl skill and `llms.txt` help an AI assistant choose a profile and reach its services. See [Use it with an AI assistant](../getting-started.md#use-it-with-an-ai-assistant).
-- Eight guides show in a diagram how data moves between their services, and [How it works](../how-it-works.md) shows what `odctl up` checks and the order it starts services in. The end-to-end tests run every command the guides show.
+- An odctl skill and `llms.txt` help an AI assistant choose a profile and reach its services. See [Use It with an AI Assistant](../getting-started.md#use-it-with-an-ai-assistant).
+- Eight guides show in a diagram how data moves between their services, and [How It Works](../how-it-works.md) shows what `odctl up` checks and the order it starts services in. The end-to-end tests run every command the guides show.
 - The tables of `odctl ps` and `odctl explain` draw straight right borders on rows with port mappings.
 - `odctl down --help` says what `--volumes` removes.
 
