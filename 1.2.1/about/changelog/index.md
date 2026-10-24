@@ -1,0 +1,49 @@
+# Changelog
+
+Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.2.1
+
+`recreate`, `restart` and `logs` work on profiles from several compose files, `init` and `down` can skip their prompt, and the docs show every command with a runnable example.
+
+- `odctl recreate`, `odctl restart` and `odctl logs` work on profiles from more than one compose file, such as `odctl recreate storage kafka-lite`. They ran every file as one project, so `recreate` failed with `Conflict. The container name "/seaweed" is already in use`, and `restart` and `logs` left out the containers of all but one file. Each file now runs as its own project, as with `odctl up`. [Apply a Change](https://jaehyeon.me/odctl/latest/how-it-works/#apply-a-change) uses `odctl recreate`.
+- `odctl init --force --yes` and `odctl down --all --volumes --yes` run without asking `Are you sure?`, for scripts and CI. `-y` is the short form. See [Stop a Profile](https://jaehyeon.me/odctl/latest/getting-started/#stop-a-profile) and [Start Again](https://jaehyeon.me/odctl/latest/how-it-works/#start-again).
+- [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) runs every command on `kafka-lite`, with its output, and the [home page](https://jaehyeon.me/odctl/latest/#commands) lists each command with a link to its example.
+- Every guide ends with a Runnable Example that names the files to run. [Rolling Windows](https://jaehyeon.me/odctl/latest/guides/rolling-windows/index.md) is a page of its own, and the Flink push to Feast moved to [Push Features from Flink SQL](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#push-features-from-flink-sql).
+- The animation on [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#what-odctl-up-does) shows its four steps again. Since 1.1.0 it showed steps 1 to 3 for a moment each and then stayed on step 4, because one step was exported 2 pixels narrower and ffmpeg stopped at the change in size.
+- The Labs page is hidden until its first lab is published.
+
+## Version 1.2.0
+
+Flink can send rows to an HTTP API, Spark reads Kafka with no extra options, SeaweedFS survives uploads of large models, and the guides cover cases that real projects met.
+
+- Flink's SQL client has the HTTP connector. [Push Features from Flink SQL](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#push-features-from-flink-sql) pushes a feature value to Feast.
+- Spark has the Kafka connector and the Avro module, so a job reads a topic, including Avro records written with the schema registry, with no `--packages` option. See [Read a Kafka Topic](https://jaehyeon.me/odctl/latest/guides/spark/#read-a-kafka-topic) and [Read Avro Records Written with the Schema Registry](https://jaehyeon.me/odctl/latest/guides/spark/#read-avro-records-written-with-the-schema-registry).
+- [Keep Messages Longer](https://jaehyeon.me/odctl/latest/guides/kafka/#keep-messages-longer) shows the broker's one-day and 500 MB retention and how to turn both off for a topic. [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/#older-messages-are-missing) lists the symptom.
+- `seaweed` sets `GOMEMLIMIT` to three quarters of its memory limit, so uploads of a model of a few hundred MB no longer end with HTTP 500 and a killed container. [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/#uploads-fail-with-http-500-and-seaweed-exited-with-code-137) says what to do when the limit is still reached, and [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) changes both values together.
+- The [MLflow guide](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) has three new sections: [Move the Alias to a New Version](https://jaehyeon.me/odctl/latest/guides/mlflow/#move-the-alias-to-a-new-version), which needs `odctl restart mlflow`, [Load a Model from Your Machine](https://jaehyeon.me/odctl/latest/guides/mlflow/#load-a-model-from-your-machine) and [Serve a Model That Reads Online Features](https://jaehyeon.me/odctl/latest/guides/mlflow/#serve-a-model-that-reads-online-features).
+- The docs now say that the packages in `_MLOPS_PIP_DEPS` are installed from PyPI again in every new `mlflow` and `mlflow-serve` container. [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) lists when a new container is made.
+- [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) shows how to create a bucket before its profile exists.
+- [Rolling Windows](https://jaehyeon.me/odctl/latest/guides/rolling-windows/index.md) shows that Flink SQL refuses two different `OVER` windows in one streaming query, and the two ways around it.
+- The [Evidently guide](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md) says what Evidently does not estimate and why NannyML needs Python 3.12.
+
+### Upgrading
+
+- A workspace made by `odctl init` with an earlier release keeps its old `compose-infra.yml`, which has no `GOMEMLIMIT` for `seaweed`. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate storage`.
+
+## Version 1.1.0
+
+Every service is now reachable from your machine only, and the docs have a [Roadmap](https://jaehyeon.me/odctl/latest/about/roadmap/index.md) and a [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md).
+
+- Every published port binds to `127.0.0.1`, on macOS, Linux and WSL2, so other machines on your network cannot reach the services. [How You Reach a Service](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service) says how to open a port when you need to.
+- Kafka no longer publishes ports 29092, 29093 and 29094, which were listeners for a minikube cluster.
+- An odctl skill and `llms.txt` help an AI assistant choose a profile and reach its services. See [Use It with an AI Assistant](https://jaehyeon.me/odctl/latest/getting-started/#use-it-with-an-ai-assistant).
+- Eight guides show in a diagram how data moves between their services, and [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/index.md) shows what `odctl up` checks and the order it starts services in. The end-to-end tests run every command the guides show.
+- The tables of `odctl ps` and `odctl explain` draw straight right borders on rows with port mappings.
+- `odctl down --help` says what `--volumes` removes.
+
+### Upgrading
+
+- To reach a service from another machine, run `odctl init`, remove `127.0.0.1:` from the service's port line in `.odctl/compose-*.yml`, and run `odctl recreate <profile>`.
+- A Kafka client in minikube cannot use `host.minikube.internal:29092` any more. Add a listener for it to the Kafka service in `.odctl/compose-kafka.yml`.
+- A workspace made by `odctl init` with an earlier release keeps its old compose files, which publish on all interfaces and include port 29092. Run `odctl init --force` to copy the new files; it replaces your edits.
