@@ -139,7 +139,7 @@
       ],
       "title": "ClickHouse version",
       "type": "stat",
-      "description": "Version of each server as an integer, for example 25012011 for 25.12.11."
+      "description": "Version of each server as one integer, for example 25012011 for 25.12.11: major × 1,000,000 + minor × 1,000 + patch."
     },
     {
       "datasource": {

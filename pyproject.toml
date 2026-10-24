@@ -1,6 +1,6 @@
 [project]
 name = "odctl"
-version = "1.2.1"
+version = "1.2.2"
 description = "Run an open data stack on your machine, with its services already connected, from one command."
 readme = "README.md"
 authors = [

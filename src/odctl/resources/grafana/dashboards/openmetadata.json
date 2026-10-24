@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "OpenMetadata server metrics from the Micrometer Prometheus registry on the admin port, /prometheus (scrape job openmetadata). Written for odctl. The dashboard bundled with OpenMetadata 2.0.1 (openmetadata-service/src/main/resources/monitoring/request-latency-dashboard.json) queries request_latency_total{quantile} and request_percentage_*, which 2.0.1 does not export, so every query had to be replaced. Names follow Micrometer 1.16.7 PrometheusNamingConvention.",
+  "description": "OpenMetadata server metrics from the Micrometer Prometheus registry on the admin port, /prometheus (scrape job openmetadata). Written for odctl. The dashboard bundled with OpenMetadata 2 (openmetadata-service/src/main/resources/monitoring/request-latency-dashboard.json) queries request_latency_total{quantile} and request_percentage_*, which OpenMetadata 2 does not export, so every query had to be replaced. Names follow Micrometer's PrometheusNamingConvention.",
   "editable": true,
   "graphTooltip": 1,
   "id": null,

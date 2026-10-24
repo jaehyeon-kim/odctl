@@ -53,7 +53,7 @@
       }
     ]
   },
-  "description": "Job manager and task manager metrics from the Flink Prometheus reporter (scrape job flink). Based on grafana.com dashboard 14911 revision 1, adapted to the metrics Flink 2.2 registers.",
+  "description": "Job manager and task manager metrics from the Flink Prometheus reporter (scrape job flink). Based on grafana.com dashboard 14911, adapted to the metrics Flink 2 registers.",
   "editable": true,
   "gnetId": 14911,
   "graphTooltip": 0,

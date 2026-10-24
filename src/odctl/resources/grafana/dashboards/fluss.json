@@ -8126,5 +8126,5 @@
   "uid": "odctl-fluss",
   "version": 1,
   "weekStart": "",
-  "description": "Fluss CoordinatorServer and TabletServer metrics from the fluss scrape job. Based on the detail dashboard in apache/fluss v1.0.0 (website/docs/assets/fluss-quickstart-observability.zip), with metric names updated for Fluss 1.0.0."
+  "description": "Fluss CoordinatorServer and TabletServer metrics from the fluss scrape job. Based on the detail dashboard in apache/fluss (website/docs/assets/fluss-quickstart-observability.zip), with metric names updated to the ones the Fluss servers export."
 }

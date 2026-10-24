@@ -7807,5 +7807,5 @@
   "version": 1,
   "weekStart": "",
   "id": null,
-  "description": "Official SeaweedFS dashboard (other/metrics/grafana_seaweedfs.json at tag 4.48), adapted to odctl's single weed server process scraped as job seaweedfs."
+  "description": "Official SeaweedFS dashboard (other/metrics/grafana_seaweedfs.json in the SeaweedFS repository), adapted to odctl's single weed server process scraped as job seaweedfs."
 }
