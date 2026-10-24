@@ -108,7 +108,7 @@ The predictions now come from version 2: `{"predictions": [0, 1]}` instead of `[
 
 ## Load a Model from Your Machine
 
-Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name only containers in the `odctl` network resolve, so `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` on your machine wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
+Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name that only containers in the `odctl` network resolve. On your machine, `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` therefore wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
 
 ```python
 import os
@@ -175,7 +175,7 @@ version = max(int(mv.version) for mv in client.search_model_versions("name='driv
 client.set_registered_model_alias("driver-score", "champion", version)
 ```
 
-The run prints three warnings, about integer columns, type hints on `predict` and the missing input example, and then `Created version '1' of model 'driver-score'`; the warnings do not stop the registration.
+The run prints three warnings, about integer columns, type hints on `predict` and the missing input example, and then `Created version '1' of model 'driver-score'`. The warnings do not stop the registration.
 
 Serve it as in [Serve the Model](#serve-the-model), with this line in `.odctl/.env`:
 
@@ -191,7 +191,7 @@ curl -X POST http://127.0.0.1:5003/invocations \
   -d '{"dataframe_split": {"columns": ["driver_id"], "data": [[1001]]}}'
 ```
 
-The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Push Features from Flink SQL](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#push-features-from-flink-sql)), and the reply is an error; run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach. The limit is set today by `mem_limit` in the `mlflow-serve` service of `.odctl/compose-mlops.yml`, where an edit can change it.
+The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Push Features from Flink SQL](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#push-features-from-flink-sql)), and the reply is an error. Run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach. The limit is set today by `mem_limit` in the `mlflow-serve` service of `.odctl/compose-mlops.yml`, where an edit can change it.
 
 ## From Another Container
 

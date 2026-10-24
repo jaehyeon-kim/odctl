@@ -215,7 +215,7 @@ print(sorted(b["Name"] for b in s3.list_buckets()["Buckets"]))
 PY
 ```
 
-Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile, but `odctl init --force`, which an upgrade needs, removes the edit.
+Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile. An upgrade needs `odctl init --force`, which removes that edit.
 
 ### Trino Access Rules
 

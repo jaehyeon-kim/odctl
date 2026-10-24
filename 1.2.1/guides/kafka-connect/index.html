@@ -2098,7 +2098,7 @@
 <span class="normal"><a href="#__codelineno-3-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="w">  </span>http://127.0.0.1:8083/connectors<span class="w"> </span>-d<span class="w"> </span>@demo-datagen.json
 </span></code></pre></div></td></tr></table></div>
-<p>The reply repeats the configuration, with <code>"tasks":[]</code> and <code>"type":"source"</code>; the worker starts the task right after it answers.</p>
+<p>The reply repeats the configuration, with <code>"tasks":[]</code> and <code>"type":"source"</code>. The worker starts the task right after it answers.</p>
 <h2 id="read-its-records">Read Its Records</h2>
 <p>The broker creates <code>customers</code> when the connector first writes to it, because automatic topic creation is on by default. This reads the first three records with their keys:</p>
 <div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka-connect/commands.sh:read</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span>
@@ -2107,7 +2107,7 @@
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="w">  </span>--topic<span class="w"> </span>customers<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">3</span><span class="w"> </span>--timeout-ms<span class="w"> </span><span class="m">60000</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="w">  </span>--formatter-property<span class="w"> </span>print.key<span class="o">=</span><span class="nb">true</span>
 </span></code></pre></div></td></tr></table></div>
-<p>Each line is a key, a tab and a value such as <code>{"name":"Patrina","visits":"3"}</code>; the names and numbers are random. The consumer ends with <code>Processed a total of 3 messages</code>.</p>
+<p>Each line is a key, a tab and a value such as <code>{"name":"Patrina","visits":"3"}</code>. The names and numbers are random. The consumer ends with <code>Processed a total of 3 messages</code>.</p>
 <h2 id="check-and-remove-it">Check and Remove It</h2>
 <p>This reads the connector's status, then deletes it:</p>
 <div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/kafka-connect/commands.sh:status-remove</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-5-1">1</a></span>

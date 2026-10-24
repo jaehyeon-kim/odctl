@@ -72,7 +72,7 @@ Work that does not wait for a release, published as it is ready.
 
   ______________________________________________________________________
 
-  Lands between 1.10.0 and 1.11.0, and changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.11.0.
+  It lands between 1.10.0 and 1.11.0. It changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.11.0.
 
   [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
 
@@ -92,7 +92,7 @@ Newest first.
 
 1.2.0: Streaming
 
-Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and guides to Kafka retention and to several rolling windows in Flink SQL. The release also fixes the MLflow and storage guides and sets `GOMEMLIMIT`, a soft limit for the Go runtime, on `seaweed`, so large model uploads do not hit its container memory limit.
+Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and new guides cover Kafka retention and several rolling windows in Flink SQL. The release also fixes the MLflow and storage guides and sets `GOMEMLIMIT`, a soft limit for the Go runtime, on `seaweed`, so large model uploads do not hit its container memory limit.
 
 1.1.0: localhost-only services
 
@@ -108,6 +108,6 @@ Old jars no longer stay in the shared deps volume after an upgrade, and without 
 
 1.0.0: documentation site and compatibility promise
 
-A documentation site with guides, profile pages and the CLI reference; semantic versioning with a compatibility promise for 1.x; and `odctl up` works straight after `odctl recreate`.
+A documentation site with guides, profile pages and the CLI reference. Semantic versioning with a compatibility promise for 1.x. `odctl up` works straight after `odctl recreate`.
 
 What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md) and on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).

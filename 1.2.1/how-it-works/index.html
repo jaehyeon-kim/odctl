@@ -2472,7 +2472,7 @@
 </span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7"></a><span class="s">print(sorted(b["Name"] for b in s3.list_buckets()["Buckets"]))</span>
 </span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8"></a><span class="s">PY</span>
 </span></code></pre></div></td></tr></table></div>
-<p>Two other ways exist. <code>weed shell</code> inside the <code>seaweed</code> container runs <code>s3.bucket.create -name desflow</code>, the command <code>seaweed-init</code> runs. Adding the name to <code>BUCKETS</code> in <code>.odctl/compose-infra.yml</code> creates it at every start of the <code>storage</code> profile, but <code>odctl init --force</code>, which an upgrade needs, removes the edit.</p>
+<p>Two other ways exist. <code>weed shell</code> inside the <code>seaweed</code> container runs <code>s3.bucket.create -name desflow</code>, the command <code>seaweed-init</code> runs. Adding the name to <code>BUCKETS</code> in <code>.odctl/compose-infra.yml</code> creates it at every start of the <code>storage</code> profile. An upgrade needs <code>odctl init --force</code>, which removes that edit.</p>
 <h3 id="trino-access-rules">Trino Access Rules</h3>
 <p>The shipped <code>trino/rules.json</code> grants every identity full table privileges and denies <code>analyst</code> schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.</p>
 <h3 id="start-again">Start Again</h3>

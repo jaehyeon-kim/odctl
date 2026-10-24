@@ -1,6 +1,6 @@
 # Feast with Iceberg
 
-Feast is a feature store: it keeps the definitions of a model's input features and serves their values. The offline store holds the history of each feature, for training. The online store holds each entity's latest value, for serving a prediction quickly, and materialising copies values from the offline store to the online store. The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
+Feast is a feature store: it keeps the definitions of a model's input features and serves their values. The offline store holds the history of each feature, for training. The online store holds each entity's latest value, for serving a prediction quickly. Materialising copies values from the offline store to the online store. The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
 
 This guide builds on [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md), which writes Iceberg tables through the catalog, and [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md), whose SQL client the last step uses. Follow the arrows from the `feast` CLI on the left: definitions go to the registry, and values go from Iceberg to Valkey.
 
@@ -127,7 +127,7 @@ It prints `{'driver_id': [1001, 1002], 'conv_rate': [0.5, 0.75]}`.
 
 ## Serve from the Stack
 
-The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes; the interval is set today by `time.sleep(15)` in `x-feast-repo-sync` in `.odctl/compose-mlops.yml`.
+The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes. The interval is set today by `time.sleep(15)` in `x-feast-repo-sync` in `.odctl/compose-mlops.yml`.
 
 Once the repository is uploaded, the UI lists the project and its feature views:
 
