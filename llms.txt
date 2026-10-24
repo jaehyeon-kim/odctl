@@ -1,59 +1,56 @@
 # Open Data Stack (odctl)
 
-> One CLI for a local open data stack.
+> Run an open data stack on your machine, with its services already connected, from one command.
 
 ## Home
 
 - [Home](https://jaehyeon.me/odctl/latest/index.md)
 
-## Getting started
+## Getting Started
 
-- [Getting started](https://jaehyeon.me/odctl/latest/getting-started/index.md)
+- [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md)
 
-## How it works
+## How It Works
 
-- [How it works](https://jaehyeon.me/odctl/latest/how-it-works/index.md)
+- [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/index.md)
 
 ## Profiles
 
 - [Overview](https://jaehyeon.me/odctl/latest/profiles/index.md)
 - [Analytics](https://jaehyeon.me/odctl/latest/profiles/analytics/index.md)
 - [Messaging](https://jaehyeon.me/odctl/latest/profiles/messaging/index.md)
-- [Metadata and lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)
+- [Metadata and Lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)
 - [MLOps](https://jaehyeon.me/odctl/latest/profiles/mlops/index.md)
 - [Observability](https://jaehyeon.me/odctl/latest/profiles/observability/index.md)
 - [Orchestration](https://jaehyeon.me/odctl/latest/profiles/orchestration/index.md)
-- [Storage and catalog](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/index.md)
-- [Stream and batch processing](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/index.md)
+- [Storage and Catalog](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/index.md)
+- [Stream and Batch Processing](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/index.md)
 
 ## Guides
 
 - [Kafka](https://jaehyeon.me/odctl/latest/guides/kafka/index.md)
 - [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md)
 - [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md)
+- [Rolling Windows](https://jaehyeon.me/odctl/latest/guides/rolling-windows/index.md)
 - [Fluss](https://jaehyeon.me/odctl/latest/guides/fluss/index.md)
 - [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md)
 - [Spark](https://jaehyeon.me/odctl/latest/guides/spark/index.md)
 - [ClickHouse](https://jaehyeon.me/odctl/latest/guides/clickhouse/index.md)
 - [Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md)
 - [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md)
-- [Temporal workers](https://jaehyeon.me/odctl/latest/guides/temporal-workers/index.md)
-- [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)
+- [Temporal Workers](https://jaehyeon.me/odctl/latest/guides/temporal-workers/index.md)
 - [Feast with Iceberg](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/index.md)
-- [Evidently reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)
-- [Hybrid search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
+- [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)
+- [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)
+- [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
 - [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)
 - [OpenLineage and Marquez](https://jaehyeon.me/odctl/latest/guides/lineage/index.md)
 - [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)
 - [Telemetry](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md)
 
-## Labs
+## CLI Reference
 
-- [Labs](https://jaehyeon.me/odctl/latest/labs/index.md)
-
-## CLI reference
-
-- [CLI reference](https://jaehyeon.me/odctl/latest/cli/index.md)
+- [CLI Reference](https://jaehyeon.me/odctl/latest/cli/index.md)
 
 ## Troubleshooting
 
