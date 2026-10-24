@@ -2060,7 +2060,7 @@
 <ul>
 <li>The Kafka brokers and Kafka Connect run <code>apache/kafka:4.4.0</code>, up from 4.3.1. odctl's Kafka settings do not change. The <a href="https://archive.apache.org/dist/kafka/4.4.0/RELEASE_NOTES.html">Kafka 4.4.0 release notes</a> list what is new.</li>
 <li>Trino runs 484, up from 483. Metabase runs v0.64.3.1, up from v0.63.19.3. <code>otel-lgtm</code> runs <code>grafana/otel-lgtm:0.37.0</code>, up from 0.35.0. The deps image has the PostgreSQL JDBC driver 42.7.14, up from 42.7.13.</li>
-<li>The Grafana dashboard descriptions no longer name the exact version of the component they show, so they stay true when an image is updated. They name a major version only where the metrics differ between major versions, such as Flink 2.</li>
+<li>The Grafana dashboard descriptions no longer name the exact version of the component they show, so they stay true when an image is updated. They name a major version only where it tells two kinds apart: Flink 2, whose metrics differ from Flink 1, and OpenMetadata 2, which is maintained beside OpenMetadata 1.</li>
 </ul>
 <h3 id="upgrading">Upgrading</h3>
 <ul>

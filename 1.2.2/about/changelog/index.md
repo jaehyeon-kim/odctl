@@ -8,7 +8,7 @@ Kafka 4.4, and newer images for Trino, Metabase and the observability stack.
 
 - The Kafka brokers and Kafka Connect run `apache/kafka:4.4.0`, up from 4.3.1. odctl's Kafka settings do not change. The [Kafka 4.4.0 release notes](https://archive.apache.org/dist/kafka/4.4.0/RELEASE_NOTES.html) list what is new.
 - Trino runs 484, up from 483. Metabase runs v0.64.3.1, up from v0.63.19.3. `otel-lgtm` runs `grafana/otel-lgtm:0.37.0`, up from 0.35.0. The deps image has the PostgreSQL JDBC driver 42.7.14, up from 42.7.13.
-- The Grafana dashboard descriptions no longer name the exact version of the component they show, so they stay true when an image is updated. They name a major version only where the metrics differ between major versions, such as Flink 2.
+- The Grafana dashboard descriptions no longer name the exact version of the component they show, so they stay true when an image is updated. They name a major version only where it tells two kinds apart: Flink 2, whose metrics differ from Flink 1, and OpenMetadata 2, which is maintained beside OpenMetadata 1.
 
 ### Upgrading
 
