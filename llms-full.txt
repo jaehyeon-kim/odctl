@@ -437,7 +437,7 @@ print(sorted(b["Name"] for b in s3.list_buckets()["Buckets"]))
 PY
 ```
 
-Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile, but `odctl init --force`, which an upgrade needs, removes the edit.
+Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile. An upgrade needs `odctl init --force`, which removes that edit.
 
 ### Trino Access Rules
 
@@ -1248,7 +1248,7 @@ curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-datagen.json
 ```
 
-The reply repeats the configuration, with `"tasks":[]` and `"type":"source"`; the worker starts the task right after it answers.
+The reply repeats the configuration, with `"tasks":[]` and `"type":"source"`. The worker starts the task right after it answers.
 
 ## Read Its Records
 
@@ -1260,7 +1260,7 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server br
   --formatter-property print.key=true
 ```
 
-Each line is a key, a tab and a value such as `{"name":"Patrina","visits":"3"}`; the names and numbers are random. The consumer ends with `Processed a total of 3 messages`.
+Each line is a key, a tab and a value such as `{"name":"Patrina","visits":"3"}`. The names and numbers are random. The consumer ends with `Processed a total of 3 messages`.
 
 ## Check and Remove It
 
@@ -2559,7 +2559,7 @@ It prints `hello odctl` and then `approved by alice`. It can run again, because 
 
 # Feast with Iceberg
 
-Feast is a feature store: it keeps the definitions of a model's input features and serves their values. The offline store holds the history of each feature, for training. The online store holds each entity's latest value, for serving a prediction quickly, and materialising copies values from the offline store to the online store. The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
+Feast is a feature store: it keeps the definitions of a model's input features and serves their values. The offline store holds the history of each feature, for training. The online store holds each entity's latest value, for serving a prediction quickly. Materialising copies values from the offline store to the online store. The `feast` profile runs the Feast UI and the online feature server. Feast stores no feature values of its own. Feature definitions live in a SQL registry in PostgreSQL, offline values come from Iceberg tables through the REST catalog, and online values are served from Valkey. You run `feast apply` and the other client commands from your own environment. The end-to-end tests run the steps below on every release.
 
 This guide builds on [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md), which writes Iceberg tables through the catalog, and [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md), whose SQL client the last step uses. Follow the arrows from the `feast` CLI on the left: definitions go to the registry, and values go from Iceberg to Valkey.
 
@@ -2686,7 +2686,7 @@ It prints `{'driver_id': [1001, 1002], 'conv_rate': [0.5, 0.75]}`.
 
 ## Serve from the Stack
 
-The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes; the interval is set today by `time.sleep(15)` in `x-feast-repo-sync` in `.odctl/compose-mlops.yml`.
+The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes. The interval is set today by `time.sleep(15)` in `x-feast-repo-sync` in `.odctl/compose-mlops.yml`.
 
 Once the repository is uploaded, the UI lists the project and its feature views:
 
@@ -3021,7 +3021,7 @@ The predictions now come from version 2: `{"predictions": [0, 1]}` instead of `[
 
 ## Load a Model from Your Machine
 
-Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name only containers in the `odctl` network resolve, so `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` on your machine wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
+Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name that only containers in the `odctl` network resolve. On your machine, `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` therefore wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
 
 ```python
 import os
@@ -3088,7 +3088,7 @@ version = max(int(mv.version) for mv in client.search_model_versions("name='driv
 client.set_registered_model_alias("driver-score", "champion", version)
 ```
 
-The run prints three warnings, about integer columns, type hints on `predict` and the missing input example, and then `Created version '1' of model 'driver-score'`; the warnings do not stop the registration.
+The run prints three warnings, about integer columns, type hints on `predict` and the missing input example, and then `Created version '1' of model 'driver-score'`. The warnings do not stop the registration.
 
 Serve it as in [Serve the Model](#serve-the-model), with this line in `.odctl/.env`:
 
@@ -3104,7 +3104,7 @@ curl -X POST http://127.0.0.1:5003/invocations \
   -d '{"dataframe_split": {"columns": ["driver_id"], "data": [[1001]]}}'
 ```
 
-The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Push Features from Flink SQL](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#push-features-from-flink-sql)), and the reply is an error; run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach. The limit is set today by `mem_limit` in the `mlflow-serve` service of `.odctl/compose-mlops.yml`, where an edit can change it.
+The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Push Features from Flink SQL](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#push-features-from-flink-sql)), and the reply is an error. Run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach. The limit is set today by `mem_limit` in the `mlflow-serve` service of `.odctl/compose-mlops.yml`, where an edit can change it.
 
 ## From Another Container
 
@@ -3519,7 +3519,7 @@ It prints the new run's id and `COMPLETED`.
 
 # Catalogue a Database with OpenMetadata
 
-A data catalogue lists the databases, tables and columns of an organisation, so people can search them and see who owns each one. The `metadata` profile runs OpenMetadata, a data catalogue: the server with its UI and REST API, Elasticsearch for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The end-to-end tests run the commands below on every release.
+A data catalogue lists the databases, tables and columns of an organisation, so people can search them and see who owns each one. The `metadata` profile runs OpenMetadata, a data catalogue: the server with its UI and REST API, Elasticsearch for search, and an ingestion container. The ingestion container is an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The end-to-end tests run the commands below on every release.
 
 This guide builds on [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md). It uses the PostgreSQL that the profile starts as the database to catalogue.
 
@@ -4292,7 +4292,7 @@ Work that does not wait for a release, published as it is ready.
 
   ______________________________________________________________________
 
-  Lands between 1.10.0 and 1.11.0, and changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.11.0.
+  It lands between 1.10.0 and 1.11.0. It changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.11.0.
 
   [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
 
@@ -4312,7 +4312,7 @@ Newest first.
 
 1.2.0: Streaming
 
-Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and guides to Kafka retention and to several rolling windows in Flink SQL. The release also fixes the MLflow and storage guides and sets `GOMEMLIMIT`, a soft limit for the Go runtime, on `seaweed`, so large model uploads do not hit its container memory limit.
+Flink writes to HTTP APIs such as Feast's push endpoint, Spark reads Kafka without downloading packages, and new guides cover Kafka retention and several rolling windows in Flink SQL. The release also fixes the MLflow and storage guides and sets `GOMEMLIMIT`, a soft limit for the Go runtime, on `seaweed`, so large model uploads do not hit its container memory limit.
 
 1.1.0: localhost-only services
 
@@ -4328,7 +4328,7 @@ Old jars no longer stay in the shared deps volume after an upgrade, and without 
 
 1.0.0: documentation site and compatibility promise
 
-A documentation site with guides, profile pages and the CLI reference; semantic versioning with a compatibility promise for 1.x; and `odctl up` works straight after `odctl recreate`.
+A documentation site with guides, profile pages and the CLI reference. Semantic versioning with a compatibility promise for 1.x. `odctl up` works straight after `odctl recreate`.
 
 What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md) and on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
