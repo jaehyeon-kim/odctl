@@ -21,8 +21,8 @@ Depends on: `deps`. `odctl up kafka-lite` also starts: `deps`.
 
 | Service    | Image                               | Host:container ports | Memory limit |
 | ---------- | ----------------------------------- | -------------------- | ------------ |
-| `kafka`    | `apache/kafka:4.4.0`                | `9092:9092`          | `1500m`      |
-| `connect`  | `apache/kafka:4.4.0`                | `8083:8083`          | `2g`         |
+| `kafka`    | `apache/kafka:4.3.1`                | `9092:9092`          | `1500m`      |
+| `connect`  | `apache/kafka:4.3.1`                | `8083:8083`          | `2g`         |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
 
@@ -43,9 +43,9 @@ Depends on: `deps`. `odctl up kafka-full` also starts: `deps`.
 
 | Service    | Image                               | Host:container ports | Memory limit |
 | ---------- | ----------------------------------- | -------------------- | ------------ |
-| `kafka-1`  | `apache/kafka:4.4.0`                | `9092:9092`          | `1500m`      |
-| `kafka-2`  | `apache/kafka:4.4.0`                | `9093:9093`          | `1500m`      |
-| `kafka-3`  | `apache/kafka:4.4.0`                | `9094:9094`          | `1500m`      |
-| `connect`  | `apache/kafka:4.4.0`                | `8083:8083`          | `2g`         |
+| `kafka-1`  | `apache/kafka:4.3.1`                | `9092:9092`          | `1500m`      |
+| `kafka-2`  | `apache/kafka:4.3.1`                | `9093:9093`          | `1500m`      |
+| `kafka-3`  | `apache/kafka:4.3.1`                | `9094:9094`          | `1500m`      |
+| `connect`  | `apache/kafka:4.3.1`                | `8083:8083`          | `2g`         |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
