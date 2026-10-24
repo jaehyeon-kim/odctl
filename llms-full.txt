@@ -213,11 +213,11 @@ odctl down --all --volumes --yes
 
 ## Code in the Guides
 
-Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.2.1/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
+Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.2.2/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
 
 ## Use It with an AI Assistant
 
-The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.2.1/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.2.2/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.
 # How It Works
 
 # How It Works
@@ -586,7 +586,7 @@ Depends on: `postgres`. `odctl up trino` also starts: `deps`, `postgres`.
 
 | Service | Image               | Host:container ports | Memory limit |
 | ------- | ------------------- | -------------------- | ------------ |
-| `trino` | `trinodb/trino:483` | `8080:8080`          | `4g`         |
+| `trino` | `trinodb/trino:484` | `8080:8080`          | `4g`         |
 
 ## Metabase
 
@@ -602,9 +602,9 @@ Depends on: `postgres`. `odctl up metabase` also starts: `deps`, `postgres`.
   * Internal (Docker): http://metabase:3000
 ```
 
-| Service    | Image                          | Host:container ports | Memory limit |
-| ---------- | ------------------------------ | -------------------- | ------------ |
-| `metabase` | `metabase/metabase:v0.63.19.3` | `3000:3000`          | `1500m`      |
+| Service    | Image                         | Host:container ports | Memory limit |
+| ---------- | ----------------------------- | -------------------- | ------------ |
+| `metabase` | `metabase/metabase:v0.64.3.1` | `3000:3000`          | `1500m`      |
 
 # Messaging
 
@@ -629,8 +629,8 @@ Depends on: `deps`. `odctl up kafka-lite` also starts: `deps`.
 
 | Service    | Image                               | Host:container ports | Memory limit |
 | ---------- | ----------------------------------- | -------------------- | ------------ |
-| `kafka`    | `apache/kafka:4.3.1`                | `9092:9092`          | `1500m`      |
-| `connect`  | `apache/kafka:4.3.1`                | `8083:8083`          | `2g`         |
+| `kafka`    | `apache/kafka:4.4.0`                | `9092:9092`          | `1500m`      |
+| `connect`  | `apache/kafka:4.4.0`                | `8083:8083`          | `2g`         |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
 
@@ -651,10 +651,10 @@ Depends on: `deps`. `odctl up kafka-full` also starts: `deps`.
 
 | Service    | Image                               | Host:container ports | Memory limit |
 | ---------- | ----------------------------------- | -------------------- | ------------ |
-| `kafka-1`  | `apache/kafka:4.3.1`                | `9092:9092`          | `1500m`      |
-| `kafka-2`  | `apache/kafka:4.3.1`                | `9093:9093`          | `1500m`      |
-| `kafka-3`  | `apache/kafka:4.3.1`                | `9094:9094`          | `1500m`      |
-| `connect`  | `apache/kafka:4.3.1`                | `8083:8083`          | `2g`         |
+| `kafka-1`  | `apache/kafka:4.4.0`                | `9092:9092`          | `1500m`      |
+| `kafka-2`  | `apache/kafka:4.4.0`                | `9093:9093`          | `1500m`      |
+| `kafka-3`  | `apache/kafka:4.4.0`                | `9094:9094`          | `1500m`      |
+| `connect`  | `apache/kafka:4.4.0`                | `8083:8083`          | `2g`         |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
 
@@ -816,7 +816,7 @@ Depends on: `deps`. `odctl up telemetry` also starts: `deps`.
 
 | Service     | Image                      | Host:container ports                                | Memory limit |
 | ----------- | -------------------------- | --------------------------------------------------- | ------------ |
-| `otel-lgtm` | `grafana/otel-lgtm:0.35.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g`         |
+| `otel-lgtm` | `grafana/otel-lgtm:0.37.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g`         |
 
 # Orchestration
 
@@ -4335,6 +4335,18 @@ What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.2.2
+
+Kafka 4.4, and newer images for Trino, Metabase and the observability stack.
+
+- The Kafka brokers and Kafka Connect run `apache/kafka:4.4.0`, up from 4.3.1. odctl's Kafka settings do not change. The [Kafka 4.4.0 release notes](https://archive.apache.org/dist/kafka/4.4.0/RELEASE_NOTES.html) list what is new.
+- Trino runs 484, up from 483. Metabase runs v0.64.3.1, up from v0.63.19.3. `otel-lgtm` runs `grafana/otel-lgtm:0.37.0`, up from 0.35.0. The deps image has the PostgreSQL JDBC driver 42.7.14, up from 42.7.13.
+- The Grafana dashboard descriptions no longer name the exact version of the component they show, so they stay true when an image is updated. They name a major version only where the metrics differ between major versions, such as Flink 2.
+
+### Upgrading
+
+- A workspace made by `odctl init` with an earlier release keeps its old compose files, and so the old images. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate` for the profiles you use, such as `odctl recreate kafka-lite`.
 
 ## Version 1.2.1
 
