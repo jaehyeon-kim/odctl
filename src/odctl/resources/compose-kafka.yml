@@ -29,7 +29,7 @@ services:
   # [LITE] Single Broker Cluster (Container: kafka)
   # ==========================================
   kafka:
-    image: &kafka-image apache/kafka:4.4.0
+    image: &kafka-image apache/kafka:4.3.1
     container_name: kafka
     volumes: *broker-volumes
     command: ["bash", "-c", "KAFKA_OPTS=\"$$ODCTL_JMX_AGENT\" exec /etc/kafka/docker/run"]
