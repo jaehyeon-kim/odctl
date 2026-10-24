@@ -58,7 +58,7 @@ curl -X POST -H 'Content-Type: application/json' \
   http://127.0.0.1:8083/connectors -d @demo-datagen.json
 ```
 
-The reply repeats the configuration, with `"tasks":[]` and `"type":"source"`; the worker starts the task right after it answers.
+The reply repeats the configuration, with `"tasks":[]` and `"type":"source"`. The worker starts the task right after it answers.
 
 ## Read Its Records
 
@@ -70,7 +70,7 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server br
   --formatter-property print.key=true
 ```
 
-Each line is a key, a tab and a value such as `{"name":"Patrina","visits":"3"}`; the names and numbers are random. The consumer ends with `Processed a total of 3 messages`.
+Each line is a key, a tab and a value such as `{"name":"Patrina","visits":"3"}`. The names and numbers are random. The consumer ends with `Processed a total of 3 messages`.
 
 ## Check and Remove It
 

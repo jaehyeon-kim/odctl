@@ -1,6 +1,6 @@
 # Catalogue a Database with OpenMetadata
 
-A data catalogue lists the databases, tables and columns of an organisation, so people can search them and see who owns each one. The `metadata` profile runs OpenMetadata, a data catalogue: the server with its UI and REST API, Elasticsearch for search, and an ingestion container, an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The end-to-end tests run the commands below on every release.
+A data catalogue lists the databases, tables and columns of an organisation, so people can search them and see who owns each one. The `metadata` profile runs OpenMetadata, a data catalogue: the server with its UI and REST API, Elasticsearch for search, and an ingestion container. The ingestion container is an Airflow that runs the ingestion pipelines the server deploys. Its own tables are in the `omt` database on PostgreSQL. The end-to-end tests run the commands below on every release.
 
 This guide builds on [Getting Started](../getting-started.md). It uses the PostgreSQL that the profile starts as the database to catalogue.
 
