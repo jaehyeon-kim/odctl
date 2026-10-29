@@ -418,6 +418,8 @@ ENV_KEYS = {
     "TZ": "The time zone of the services that read it, `UTC` by default.",
     "_AIRFLOW_PIP_DEPS": "Extra Python packages installed in every new Airflow container.",
     "_MLOPS_PIP_DEPS": "Extra Python packages installed in every new `mlflow` and `mlflow-serve` container.",
+    "_METADATA_PIP_DEPS": "Extra Python packages installed in every new `openmetadata-ingestion` container.",
+    "METADATA_AUTOPILOT": "`true` turns on OpenMetadata's AutoPilot, which creates and runs default agents for a service added in the UI; it is `false` by default.",
     "MODEL_URI": "The model `mlflow-serve` serves, such as `models:/<name>@<alias>`; empty means it waits idle.",
 }
 

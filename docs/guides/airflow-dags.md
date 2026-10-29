@@ -43,7 +43,7 @@ boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(
 PY
 ```
 
-The upload prints nothing. Airflow checks the bucket every 15 seconds and then parses the new file. The interval is set today by `refresh_interval` in `AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST` in `.odctl/compose-orch.yml`, where an edit can change it.
+The upload prints nothing. Airflow checks the bucket every 15 seconds and then parses the new file. The interval is set today by `refresh_interval` in `AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST` in `.odctl/compose-orch.yml`, where an edit can change it. Two other profiles also read their code from a bucket; [How It Works](../how-it-works.md#where-data-lives) compares the three.
 
 ## Run It
 

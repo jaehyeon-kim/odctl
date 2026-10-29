@@ -5,12 +5,12 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.3.0: Feast'
-  content: 'An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)'
+- title: '1.3.0: OpenMetadata connectors'
+  content: 'A Python connector uploaded to S3 is picked up by the ingestion container regularly, the way the `airflow` profile picks up DAGs. Services and agents for it are created through the API, extra packages can be installed in the ingestion container, AutoPilot is off by default (`METADATA_AUTOPILOT`), and OpenMetadata moves to 2.0.7. [#148](https://github.com/jaehyeon-kim/odctl/issues/148)'
   icon: ':material-play:'
   key: now
-- title: '1.4.0: OpenMetadata connectors and Kafka schemas'
-  content: 'A Python connector uploaded to S3 is picked up by OpenMetadata, the way the `airflow` profile picks up DAGs, and extra packages can be installed in the ingestion container. Kafka topics whose producers use no schema registry get their fields from JSON Schemas registered in Karapace, with no producer change. [#148](https://github.com/jaehyeon-kim/odctl/issues/148)'
+- title: '1.4.0: Feast'
+  content: 'An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)'
   icon: ':material-clock-outline:'
   key: planned
 - title: '1.5.0: Stable interface and JSON output'
@@ -100,6 +100,14 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.2.2: newer images"
+
+    Trino, Metabase, `otel-lgtm` and the PostgreSQL JDBC driver in the deps image are updated, and the Grafana dashboard descriptions no longer name the exact version of the component they show.
+
+??? note "1.2.1: recreate on several files"
+
+    `odctl recreate`, `odctl restart` and `odctl logs` work on profiles from more than one compose file, `odctl init` and `odctl down` can skip their prompt, and the docs show every command with a runnable example.
 
 ??? note "1.2.0: Streaming"
 

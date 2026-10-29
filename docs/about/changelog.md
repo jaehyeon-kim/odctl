@@ -2,6 +2,28 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.3.0
+
+Custom connectors for OpenMetadata, extra packages for its ingestion container, AutoPilot off by default, and OpenMetadata 2.0.7.
+
+- A Python connector uploaded to `s3://openmetadata/connectors` is importable in the ingestion container within about 15 seconds, and a change to it is used by the next agent run with no restart. [Add a Custom Connector](../guides/openmetadata.md#add-a-custom-connector) creates its service and agent through the API.
+- OpenMetadata's AutoPilot, which creates and runs default agents for a service added in the UI, is off by default. The new `.env` key `METADATA_AUTOPILOT` turns it on, and the new `openmetadata-init` service applies it each time `metadata` starts. See [Register PostgreSQL as a Database Service](../guides/openmetadata.md#register-postgresql-as-a-database-service).
+- `_METADATA_PIP_DEPS` in `.odctl/.env` installs extra Python packages in the `openmetadata-ingestion` container, as `_AIRFLOW_PIP_DEPS` does for Airflow. See [Examples](../how-it-works.md#examples).
+- `openmetadata-ingestion` has a healthcheck, so `odctl up` and `odctl recreate` return once its Airflow answers.
+- [Where Data Lives](../how-it-works.md#where-data-lives) shows the three profiles that read their code from a bucket: `airflow`, `feast` and `metadata`.
+- OpenMetadata and its ingestion container run 2.0.7, up from 2.0.1.
+- On a new database the sign-in domain is `odctl.io`, and a second admin `user@odctl.io` has the password `password`. The ingestion Airflow takes `user` and `password`.
+
+### Upgrading
+
+- The `metadata` profile now also starts `storage`, SeaweedFS on 127.0.0.1 ports 8333, 8889 and 9333, from which the ingestion container takes connectors.
+- Two new `.env` keys, `_METADATA_PIP_DEPS` and `METADATA_AUTOPILOT`, are written by `odctl init`. An existing `.env` works without them: add the lines, or get them with `odctl init --force`.
+- AutoPilot is now off unless `METADATA_AUTOPILOT="true"`, so a service added in the OpenMetadata UI no longer gets default agents. An existing `.env` has no key, which means off. Set `METADATA_AUTOPILOT="true"` in `.odctl/.env` to keep the old behaviour.
+- `openmetadata-migrate` runs `openmetadata-ops.sh migrate` against your existing database on the next start of `metadata`, by `odctl up` or `odctl recreate`, for the move from 2.0.1 to 2.0.7. Going back to 2.0.1 afterwards is not tested.
+- The sign-in domain `odctl.io` and the password `password` of `user` apply to a new database only. A database from an earlier release keeps its users `admin@open-data.local` and `user@open-data.local`, both with the password `admin`, because the server restores a user's stored email on every update (`UserRepository.java`, `entitySpecificUpdate`, at `2.0.7-release`) and keeps a stored password. On that database `admin@odctl.io` and `user@odctl.io` fail with HTTP 400, "You have entered an invalid username or password."
+- The ingestion Airflow login changes from `admin` / `admin` to `user` / `password`.
+- A workspace made by `odctl init` with an earlier release keeps its old `compose-metadata.yml`, `compose-infra.yml` and `registry.yml`, has no `openmetadata/connector_sync.py` or `openmetadata/autopilot_init.py`, and so has none of the changes above. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate metadata storage`.
+
 ## Version 1.2.2
 
 Newer images for Trino, Metabase and the observability stack.

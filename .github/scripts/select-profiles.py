@@ -85,7 +85,7 @@ ALSO_RUNS = {
 SNIPPET_PREFIX = "docs/snippets/"
 SNIPPET_GROUPS = {
     "getting-started": ["kafka-lite kafka-full"],
-    "how-it-works": ["storage", "catalog", "trino", "airflow"],
+    "how-it-works": ["storage", "catalog", "trino", "airflow", "metadata"],
     "kafka": ["kafka-lite kafka-full"],
     "kafka-connect": ["kafka-lite kafka-full"],
     "iceberg-ingestion": ["kafka-lite kafka-full", "flink-lite flink-full"],

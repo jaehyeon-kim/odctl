@@ -129,7 +129,7 @@ It prints `{'driver_id': [1001, 1002], 'conv_rate': [0.5, 0.75]}`.
 
 ## Serve from the Stack
 
-The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes. The interval is set today by `time.sleep(15)` in `x-feast-repo-sync` in `.odctl/compose-mlops.yml`.
+The UI at `http://127.0.0.1:8890` and the online feature server at `http://127.0.0.1:6566` load their repository from `s3://feast/repo`. To serve your features, upload the repository there with container addresses in its `feature_store.yaml`: `postgres:5432`, `valkey:6379` and `http://catalog:8181`. The services check that prefix every 15 seconds and restart Feast when it changes. The interval is set today by `time.sleep(15)` in `x-feast-repo-sync` in `.odctl/compose-mlops.yml`. Two other profiles also read their code from a bucket; [How It Works](../how-it-works.md#where-data-lives) compares the three.
 
 Once the repository is uploaded, the UI lists the project and its feature views:
 
