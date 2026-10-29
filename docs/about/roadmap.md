@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.3.0: OpenMetadata connectors'
-  content: 'A Python connector uploaded to S3 is picked up by the ingestion container regularly, the way the `airflow` profile picks up DAGs. Services and agents for it are created through the API, extra packages can be installed in the ingestion container, AutoPilot is off by default (`METADATA_AUTOPILOT`), and OpenMetadata moves to 2.0.7. [#148](https://github.com/jaehyeon-kim/odctl/issues/148)'
-  icon: ':material-play:'
-  key: now
 - title: '1.4.0: Feast'
   content: 'An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.5.0: Stable interface and JSON output'
   content: 'A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
   icon: ':material-clock-outline:'
@@ -100,6 +96,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.3.0: OpenMetadata connectors"
+
+    Custom OpenMetadata connectors uploaded to S3 are picked up by the ingestion container with no restart, AutoPilot is off by default, extra packages can be installed in the ingestion container, and OpenMetadata runs 2.0.7.
 
 ??? note "1.2.2: newer images"
 
