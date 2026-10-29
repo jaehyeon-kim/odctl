@@ -75,6 +75,14 @@ Most services keep their data inside their containers. PostgreSQL, SeaweedFS, Cl
 
 A database, a bucket, a topic or an Iceberg table therefore lasts until its profile is stopped, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
 
+Three profiles read their code from a SeaweedFS bucket, so uploading a file deploys it, and the upload lasts as long as the bucket does. The `storage` profile creates the buckets.
+
+| Profile | Prefix | What it holds | How a change is picked up |
+| --- | --- | --- | --- |
+| `airflow` | `s3://airflow/dags` | DAG files | Airflow's S3 DAG bundle checks the prefix every 15 seconds (`refresh_interval` in `compose-orch.yml`), and the next parse of the file picks the change up |
+| `feast` | `s3://feast/repo` | the feature repository | `feast-ui` and `feast-serve` list the prefix every 15 seconds (`x-feast-repo-sync` in `compose-mlops.yml`), copy it again when it changed, and restart Feast. An empty prefix gives the repository bundled with odctl |
+| `metadata` | `s3://openmetadata/connectors` | connector modules | `openmetadata-ingestion` lists the prefix every 15 seconds (`openmetadata/connector_sync.py`) and copies it again when it changed, with no restart, because each agent run imports the modules from disk |
+
 ## Which Images Run
 
 Most services run their project's official image, pinned to an exact version. odctl builds five images of its own and publishes them to `ghcr.io/jaehyeon-kim/odctl/`:
@@ -136,10 +144,12 @@ odctl --workspace ./.odctl ps catalog
 | --- | --- |
 | `compose-*.yml` | Host ports, memory limits and environment variables of each service |
 | `registry.yml` | The profiles, their compose files and their dependencies |
-| `.env` | `TAG`, the time zone of the services that read it (`TZ`, `UTC` by default), extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`) and the MLflow services (`_MLOPS_PIP_DEPS`), and the model the MLflow model server serves (`MODEL_URI`) |
+| `.env` | `TAG`, the time zone of the services that read it (`TZ`, `UTC` by default), extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`), the MLflow services (`_MLOPS_PIP_DEPS`), the OpenMetadata ingestion container (`_METADATA_PIP_DEPS`), whether OpenMetadata's AutoPilot creates default agents for a service added in its UI (`METADATA_AUTOPILOT`, off by default), and the model the MLflow model server serves (`MODEL_URI`) |
 | `grafana/dashboards/` | The Grafana dashboard for each service |
 | `trino/rules.json` | Trino's file-based access control |
 | `evidently/config.yaml` | The Evidently server's settings |
+| `openmetadata/connector_sync.py` | How the ingestion container copies custom connectors from S3 |
+| `openmetadata/autopilot_init.py` | How the `openmetadata-init` service sets AutoPilot from `METADATA_AUTOPILOT` |
 
 ### Apply a Change
 
@@ -186,6 +196,26 @@ docker exec airflow python -c "import dateparser; print(dateparser.__version__)"
 
 The last command prints `1.4.3`.
 
+Install an extra Python package in the OpenMetadata ingestion container, for a custom connector that imports it:
+
+```bash title="docs/snippets/how-it-works/commands.sh:metadata-deps"
+sed -i.bak 's/^_METADATA_PIP_DEPS=.*/_METADATA_PIP_DEPS="dateparser==1.4.3"/' .odctl/.env
+odctl recreate metadata
+docker exec openmetadata-ingestion python -c "import dateparser; print(dateparser.__version__)"
+```
+
+The last command prints `1.4.3`.
+
+Turn on OpenMetadata's AutoPilot, which creates and runs default agents for a service added in the OpenMetadata UI and is off by default. The `openmetadata-init` service applies the key each time `metadata` starts, and prints the result:
+
+```bash title="docs/snippets/how-it-works/commands.sh:metadata-autopilot"
+sed -i.bak 's/^METADATA_AUTOPILOT=.*/METADATA_AUTOPILOT="true"/' .odctl/.env
+odctl recreate metadata
+docker logs openmetadata-init 2>&1 | tail -1
+```
+
+The last command prints `AutoPilot active: true`.
+
 Install an extra Python package in the MLflow containers, for a model that imports it:
 
 ```bash title="docs/snippets/how-it-works/commands.sh:mlops-deps"
@@ -194,7 +224,13 @@ odctl recreate mlflow
 docker exec mlflow-serve python -c "import tabulate; print(tabulate.__version__)"
 ```
 
-The last command prints `0.9.0`. `_AIRFLOW_PIP_DEPS` and `_MLOPS_PIP_DEPS` both install their packages from PyPI again in every new container: at the first `odctl up`, after `odctl recreate`, and after `odctl down` and `odctl up`. `_AIRFLOW_PIP_DEPS` is for the Airflow containers. `_MLOPS_PIP_DEPS` is for the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load. `odctl restart` keeps the container, so the packages stay. Each new container needs PyPI, and pinned versions (`transformers==5.20.2`) keep the installed packages the same.
+The last command prints `0.9.0`. Each key installs its packages for its own containers:
+
+- `_AIRFLOW_PIP_DEPS`: the Airflow containers.
+- `_MLOPS_PIP_DEPS`: the `mlflow` and `mlflow-serve` containers, for example a library a served model needs to load.
+- `_METADATA_PIP_DEPS`: the `openmetadata-ingestion` container, for example a library a custom connector imports.
+
+All three install their packages from PyPI again in every new container: at the first `odctl up`, after `odctl recreate`, and after `odctl down` and `odctl up`. `odctl restart` keeps the container, so the packages stay. Each new container needs PyPI, and pinned versions (`transformers==5.20.2`) keep the installed packages the same.
 
 Set the time zone of the services that read `TZ`, here the MLflow containers:
 

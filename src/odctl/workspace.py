@@ -114,6 +114,20 @@ def init_workspace(force: bool = False):
             f.write('# _MLOPS_PIP_DEPS="pyod river"\n')
             f.write('_MLOPS_PIP_DEPS=""\n\n')
 
+            f.write("# OpenMetadata Ingestion Additional Dependencies\n")
+            f.write('# _METADATA_PIP_DEPS="faker"\n')
+            f.write('_METADATA_PIP_DEPS=""\n\n')
+
+            f.write("# OpenMetadata AutoPilot\n")
+            f.write(
+                "# When a service is added in the OpenMetadata UI, AutoPilot creates\n"
+            )
+            f.write(
+                "# and runs default agents for it. It is off unless this is true.\n"
+            )
+            f.write('# METADATA_AUTOPILOT="true"\n')
+            f.write('METADATA_AUTOPILOT="false"\n\n')
+
             # Left empty on purpose. mlflow-serve has nothing to serve until a
             # model is logged, so an empty value keeps it waiting idle instead
             # of serving something unintended.

@@ -1094,7 +1094,7 @@ smoke_fluss() {
   pass "Flink wrote 3 rows to a Fluss table and read them back"
 }
 
-# OpenMetadata: the version endpoint answers through every failure the 2.0.1
+# OpenMetadata: the version endpoint answers through every failure an
 # upgrade could cause. The ingestion container runs its own Airflow 3, whose
 # health path moved to /api/v2/monitor/health, and a stale image or a failed
 # migration both leave a server that still reports a version. Drive the whole
@@ -1110,13 +1110,22 @@ smoke_metadata() {
   pass "schema migration completed"
   assert_metrics http://openmetadata-server:8586/prometheus
 
-  # The principal domain odctl sets is open-data.local, not the upstream
+  # The principal domain odctl sets is odctl.io, not the upstream
   # default. A wrong domain fails with a misleading invalid password error.
   local token
   token=$(om_step login 'echo "$TOKEN"' 2>/dev/null | tail -1)
-  [ -n "$token" ] || fail "admin@open-data.local could not log in"
+  [ -n "$token" ] || fail "admin@odctl.io could not log in"
   pass "admin logged in and received a JWT"
   local auth="Authorization: Bearer $token"
+
+  # user is the second admin. Its entry in AUTHORIZER_ADMIN_PRINCIPALS,
+  # user:password, sets its first password.
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+    -d "{\"email\":\"user@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
+    http://127.0.0.1:8585/api/v1/users/login)
+  [ "$code" = "200" ] || fail "user@odctl.io could not log in with the password password (HTTP $code)"
+  pass "user@odctl.io logged in with the password password"
 
   # Airflow 3 moved this path. The old /health returns 404 with a message saying so.
   retry 60 5 http_ok "http://127.0.0.1:8087/api/v2/monitor/health" \
@@ -1125,6 +1134,20 @@ smoke_metadata() {
     'wget -q -O- http://openmetadata-ingestion:8080/api/v2/monitor/health' >/dev/null 2>&1 \
     || fail "the server cannot reach the ingestion container, so no pipeline can deploy"
   pass "ingestion Airflow healthy and reachable from the server"
+
+  # AIRFLOW_ADMIN_USER and AIRFLOW_ADMIN_PASSWORD set this login. A new token
+  # answers 201, and a wrong login 401.
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+    -d '{"username":"user","password":"password"}' http://127.0.0.1:8087/auth/token)
+  [ "$code" = "201" ] || fail "the ingestion Airflow refused user / password (HTTP $code)"
+  pass "ingestion Airflow accepted user / password"
+
+  # openmetadata-init sets AutoPilot from METADATA_AUTOPILOT, false by default.
+  retry 24 5 om_autopilot_is "$token" False \
+    || fail "AutoPilot does not report active: false after the start"
+  [ "$(docker inspect -f '{{.State.ExitCode}}' openmetadata-init)" = "0" ] \
+    || fail "openmetadata-init did not exit with code 0"
+  pass "AutoPilot reports active: false and openmetadata-init exited 0"
 
   # A real ingestion, with the guide's steps. Postgres is already running, so it
   # is its own source.
@@ -1142,23 +1165,11 @@ smoke_metadata() {
   # Airflow's dag_processor has to parse the new file before it can be
   # triggered, so the guide's trigger can come too early. Trigger again here.
   if ! grep -q 'has been triggered' <<<"$out"; then
-    local triggered=no
-    for _ in $(seq 1 24); do
-      if curl -fsS --max-time 90 -X POST -H "$auth" \
-          "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$pipe" 2>/dev/null \
-          | grep -q 'has been triggered'; then triggered=yes; break; fi
-      sleep 5
-    done
-    [ "$triggered" = "yes" ] || fail "the pipeline never triggered"
+    om_trigger "$token" "$pipe" || fail "the pipeline never triggered"
   fi
 
-  local state=""
-  for _ in $(seq 1 30); do
-    state=$(TOKEN="$token" om_step status 2>/dev/null \
-      | python3 -c 'import json,sys; s=json.load(sys.stdin).get("pipelineStatuses") or []; print(s[0]["pipelineState"] if s else "")' 2>/dev/null)
-    case "$state" in success|failed|partialSuccess) break ;; esac
-    sleep 10
-  done
+  local state
+  state=$(om_run_state "$token" om_step "")
   [ "$state" = "success" ] || fail "ingestion run finished in state ${state:-none}, not success"
   pass "ingestion run reached success"
 
@@ -1191,8 +1202,214 @@ smoke_metadata() {
   done
   pass "Context Center pages and memories both answer"
 
+  smoke_metadata_connector "$token"
+  smoke_metadata_autopilot "$token"
+
   TOKEN="$token" om_step remove >/dev/null 2>&1 || fail "the guide's remove step failed"
-  pass "the guide's remove step deleted the service and its pipeline"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth" \
+    http://127.0.0.1:8585/api/v1/services/databaseServices/name/demo_connector)
+  [ "$code" = "404" ] || fail "the guide's remove step left the demo_connector service (HTTP $code)"
+  retry 12 5 bash -c '! docker exec openmetadata-ingestion test -e /opt/airflow/connectors/demo_connector.py' \
+    || fail "the ingestion container kept the connector after the remove step deleted it from S3"
+  pass "the guide's remove step deleted both services, their pipelines and the uploaded connector"
+}
+
+# Trigger an ingestion pipeline until the server accepts it: Airflow has to parse
+# a new DAG file first. Usage: om_trigger <token> <pipeline id>
+om_trigger() {
+  local _
+  for _ in $(seq 1 24); do
+    if curl -fsS --max-time 90 -X POST -H "Authorization: Bearer $1" \
+        "http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$2" 2>/dev/null \
+        | grep -q 'has been triggered'; then return 0; fi
+    sleep 5
+  done
+  return 1
+}
+
+# The latest run of the pipeline a guide's status step reads, as "<run id> <state>",
+# or nothing when there is no run yet. The step is the guide's own: om_step for
+# demo_pg, om_connector_step for the custom connector.
+# Usage: om_latest_run <token> <om_step|om_connector_step>
+om_latest_run() {
+  TOKEN="$1" "$2" status 2>/dev/null | python3 -c '
+import json, sys
+runs = json.load(sys.stdin).get("pipelineStatuses") or []
+if runs:
+    print(runs[0]["runId"], runs[0]["pipelineState"])' 2>/dev/null
+}
+
+# Wait for the first run whose id is not <previous run id> to finish, and print its
+# state. Usage: om_run_state <token> <om_step|om_connector_step> <previous run id>
+om_run_state() {
+  local _ run state
+  for _ in $(seq 1 30); do
+    read -r run state < <(om_latest_run "$1" "$2")
+    if [ -n "${run:-}" ] && [ "$run" != "$3" ]; then
+      case "$state" in success|failed|partialSuccess) echo "$state"; return ;; esac
+    fi
+    sleep 10
+  done
+  echo ""
+}
+
+# Whether the guide's autopilot step prints <value>. Usage: om_autopilot_is <token> <True|False>
+om_autopilot_is() {
+  [ "$(TOKEN="$1" om_step autopilot 2>/dev/null | tail -1)" = "$2" ]
+}
+
+# Add a service the way the UI does: create it, then trigger AutoPilotApplication with
+# the service's entityLink. Usage: om_add_service_like_the_ui <token> <service name>
+om_add_service_like_the_ui() {
+  local auth="Authorization: Bearer $1"
+  curl -fsS -X PUT -H "$auth" -H 'Content-Type: application/json' \
+    -d "{\"name\":\"$2\",\"serviceType\":\"CustomDatabase\",\"connection\":{\"config\":{\"type\":\"CustomDatabase\",\"sourcePythonClass\":\"demo_connector.DemoSource\"}}}" \
+    http://127.0.0.1:8585/api/v1/services/databaseServices >/dev/null || fail "could not create the $2 service"
+  curl -fsS -X POST -H "$auth" -H 'Content-Type: application/json' \
+    -d "{\"entityLink\":\"<#E::databaseService::$2>\"}" \
+    http://127.0.0.1:8585/api/v1/apps/trigger/AutoPilotApplication >/dev/null \
+    || fail "the server refused the AutoPilot trigger the UI sends"
+}
+
+# The number of agents a service has. Usage: om_agent_count <token> <service name>
+om_agent_count() {
+  curl -fsS -H "Authorization: Bearer $1" "http://127.0.0.1:8585/api/v1/services/ingestionPipelines?service=$2" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["paging"]["total"])'
+}
+
+om_delete_service() {
+  curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $1" \
+    "http://127.0.0.1:8585/api/v1/services/databaseServices/name/$2?hardDelete=true&recursive=true"
+}
+
+# With AutoPilot off, a service added the way the UI adds one gets no agent. The
+# check waits 60 seconds, as long as the on-case below allows AutoPilot to create its agent.
+smoke_metadata_autopilot() {
+  local agents
+  om_add_service_like_the_ui "$1" demo_ui
+  sleep 60
+  agents=$(om_agent_count "$1" demo_ui)
+  om_delete_service "$1" demo_ui
+  [ "$agents" = "0" ] || fail "a service added the way the UI adds one got $agents agents with AutoPilot off"
+  pass "a service added the way the UI adds one, with its AutoPilot trigger, got no agent"
+}
+
+# The same two calls with AutoPilot on create at least one agent. It proves
+# METADATA_AUTOPILOT=true works and that the off-case above could have failed.
+smoke_metadata_autopilot_on() {
+  local agents=0 _
+  om_add_service_like_the_ui "$1" demo_ui_on
+  for _ in $(seq 1 12); do
+    agents=$(om_agent_count "$1" demo_ui_on)
+    [ "${agents:-0}" -ge 1 ] && break
+    sleep 5
+  done
+  om_delete_service "$1" demo_ui_on
+  [ "${agents:-0}" -ge 1 ] || fail "a service added the way the UI adds one got no agent with AutoPilot on"
+  pass "with METADATA_AUTOPILOT true, a service added the way the UI adds one got $agents agent(s)"
+}
+
+# The How It Works example turns AutoPilot on and recreates metadata. While it is on,
+# check the UI's calls create an agent, then put the key back and check it is off.
+how_it_works_autopilot() {
+  local out
+  out=$(run_snippet how-it-works/commands.sh metadata-autopilot 2>&1) || { echo "$out" | tail -20; fail "the metadata-autopilot example failed"; }
+  grep -qE -- 'AutoPilot active: true' <<<"$out" || { echo "$out" | tail -20; fail "the metadata-autopilot example printed no 'AutoPilot active: true'"; }
+  pass "How It Works' metadata-autopilot example printed 'AutoPilot active: true'"
+  smoke_metadata_autopilot_on "$(om_token)"
+  mv .odctl/.env.bak .odctl/.env || fail "the metadata-autopilot example left no .env.bak"
+  odctl recreate metadata >/dev/null 2>&1 || fail "could not recreate metadata after the metadata-autopilot example"
+  retry 24 5 om_autopilot_is "$(om_token)" False \
+    || fail "AutoPilot is not off again after the key was put back"
+  pass "AutoPilot is off again after the key was put back"
+}
+
+# Run a connector section until its output has <text>. Usage: om_connector_says <section> <text>
+om_connector_says() {
+  om_connector_step "$1" 2>/dev/null | grep -qF "$2"
+}
+
+# The guide's custom connector steps, run from the folder that holds the file, as
+# the guide tells the reader. Usage: om_connector_step <section> [extra commands]
+om_connector_step() {
+  local code
+  code=$(snippet openmetadata/connector/commands.sh "$1")
+  (cd "$CONNECTOR_DIR" && bash -o pipefail -c 'AUTH="Authorization: Bearer ${TOKEN:-}"
+'"$code"'
+'"${2:-}")
+}
+
+# A custom connector uploaded to s3://openmetadata/connectors is importable in the
+# ingestion container, and a service and an agent made through the API run it.
+# Then a changed connector is used by the next run with no restart, which is why
+# nothing here restarts the container: its start time must not move.
+smoke_metadata_connector() {
+  local token="$1" auth="Authorization: Bearer $1" started svc pipe out run state agents
+  CONNECTOR_DIR=$(mktemp -d)
+  cp "$SNIPPETS/openmetadata/connector/demo_connector.py" "$CONNECTOR_DIR/"
+  started=$(docker inspect -f '{{.State.StartedAt}}' openmetadata-ingestion)
+
+  om_connector_step upload >/dev/null 2>&1 || fail "could not upload the connector to s3://openmetadata/connectors"
+  retry 12 5 om_connector_says copied demo_connector.py \
+    || fail "the ingestion container never copied the connector from S3"
+  pass "the connector reached /opt/airflow/connectors in the ingestion container"
+
+  svc=$(TOKEN="$token" om_connector_step service 'echo "$SVC"' 2>/dev/null | tail -1)
+  [ -n "$svc" ] || fail "could not create the CustomDatabase service through the API"
+  out=$(TOKEN="$token" SVC="$svc" om_connector_step agent 'echo; echo "$PIPE"' 2>/dev/null)
+  pipe=$(tail -1 <<<"$out")
+  [ -n "$pipe" ] || fail "could not create the custom connector's agent"
+  grep -q 'has been created' <<<"$out" || { echo "$out"; fail "the custom connector's agent did not deploy a DAG"; }
+  grep -q 'has been triggered' <<<"$out" || om_trigger "$token" "$pipe" || fail "the custom connector's agent never triggered"
+  state=$(om_run_state "$token" om_connector_step "")
+  [ "$state" = "success" ] || fail "the custom connector's run finished in state ${state:-none}, not success"
+  out=$(TOKEN="$token" om_connector_step table 2>/dev/null)
+  grep -q '"fullyQualifiedName":"demo_connector.demo_db.public.orders"' <<<"$out" \
+    && grep -q '"name":"id"' <<<"$out" && grep -q '"name":"amount"' <<<"$out" \
+    || fail "the custom connector's table orders, with its columns id and amount, is not in the catalogue"
+  pass "the custom connector's agent ran and its table orders is in the catalogue"
+
+  # A service made through the API starts no AutoPilot agents. The UI does.
+  agents=$(curl -fsS -H "$auth" "http://127.0.0.1:8585/api/v1/services/ingestionPipelines?service=demo_connector" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["paging"]["total"])')
+  [ "$agents" = "1" ] || fail "the demo_connector service has $agents agents, not only its own"
+  pass "the demo_connector service has only its own agent"
+
+  # Change the connector, upload it again and trigger the same agent.
+  read -r run _ < <(om_latest_run "$token" om_connector_step)
+  om_connector_step change >/dev/null 2>&1 || fail "could not change the connector"
+  om_connector_step upload >/dev/null 2>&1 || fail "could not upload the changed connector"
+  retry 12 5 om_connector_says copied-change 1 \
+    || fail "the ingestion container never copied the changed connector"
+  TOKEN="$token" PIPE="$pipe" om_connector_step retrigger 2>/dev/null | grep -q 'has been triggered' \
+    || fail "the custom connector's agent did not trigger again"
+  state=$(om_run_state "$token" om_connector_step "$run")
+  [ "$state" = "success" ] || fail "the second run finished in state ${state:-none}, not success"
+  TOKEN="$token" om_connector_step changed-table 2>/dev/null \
+    | grep -q '"name":"orders_v2"' || fail "the changed connector's table orders_v2 is not in the catalogue"
+  [ "$(docker inspect -f '{{.State.StartedAt}}' openmetadata-ingestion)" = "$started" ] \
+    || fail "the ingestion container restarted while the connector changed"
+  pass "the changed connector was used by the next run, with no restart"
+  rm -rf "$CONNECTOR_DIR"
+}
+
+# The guide's runnable example needs demo_connector.py in the folder it runs in.
+smoke_metadata_example() {
+  local out
+  cp "$SNIPPETS/openmetadata/connector/demo_connector.py" .
+  out=$(bash "$SNIPPETS/openmetadata/example.sh" 2>&1) || { rm -f demo_connector.py; echo "$out" | tail -20; fail "the openmetadata example failed"; }
+  rm -f demo_connector.py
+  local want
+  for want in 'autopilot active: False' 'demo_pg ingestion: success' 'demo_connector ingestion: success' \
+      '^custom table: orders$' 'removed demo_pg and demo_connector'; do
+    grep -qE -- "$want" <<<"$out" || { echo "$out" | tail -20; fail "the openmetadata example printed no '$want'"; }
+  done
+  pass "the openmetadata guide's runnable example ran both services and printed its results"
+}
+
+# An admin token, from the guide's login step.
+om_token() {
+  om_step login 'echo "$TOKEN"' 2>/dev/null | tail -1
 }
 
 # The OpenMetadata guide's steps share shell variables: login sets TOKEN, the
@@ -1546,7 +1763,13 @@ case "$PROFILE" in
     run_example mlflow '"predictions": \[0, 0\]' "$(mlflow_runner) bash" ;;
   lineage)    smoke_lineage; run_example lineage 'COMPLETED' ;;
   telemetry)  smoke_telemetry; run_example telemetry '"42"' ;;
-  metadata)   smoke_metadata; run_example openmetadata 'removed demo_pg' ;;
+  metadata)
+    smoke_metadata
+    smoke_metadata_example
+    how_it_works_edit metadata-deps .odctl/.env metadata '^1\.4\.3$'
+    how_it_works_autopilot
+    retry 60 5 http_ok "http://127.0.0.1:8087/api/v2/monitor/health" \
+      || fail "ingestion Airflow did not answer after the package was put back" ;;
   fluss)      smoke_fluss; run_example fluss '\| +3 +\| +c +\|' ;;
   feast)
     smoke_feast

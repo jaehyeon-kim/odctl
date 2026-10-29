@@ -33,7 +33,7 @@ services:
   # [PROFILE: metadata] OpenMetadata DB Migration
   # ==========================================
   openmetadata-migrate:
-    image: &om-server-image docker.getcollate.io/openmetadata/server:2.0.1
+    image: &om-server-image docker.getcollate.io/openmetadata/server:2.0.7
     container_name: openmetadata-migrate
     command: "./bootstrap/openmetadata-ops.sh migrate"
     profiles:
@@ -99,8 +99,10 @@ services:
       # Security & Auth
       AUTHORIZER_CLASS_NAME: org.openmetadata.service.security.DefaultAuthorizer
       AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
-      AUTHORIZER_ADMIN_PRINCIPALS: "[admin,user]"
-      AUTHORIZER_PRINCIPAL_DOMAIN: "open-data.local"
+      # name:password sets that admin's first password; a bare name gets "admin".
+      # It applies when the user is created, so an existing database keeps its password.
+      AUTHORIZER_ADMIN_PRINCIPALS: "[admin,user:password]"
+      AUTHORIZER_PRINCIPAL_DOMAIN: "odctl.io"
       AUTHORIZER_INGESTION_PRINCIPALS: "[ingestion-bot]"
       AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
       AUTHORIZER_ALLOWED_REGISTRATION_DOMAIN: '["all"]'
@@ -111,6 +113,9 @@ services:
       JWT_KEY_ID: "Gb389a-9f76-gdjs-a92j-0242bk94356"
       # Ingestion & Lineage Connectivity
       PIPELINE_SERVICE_CLIENT_ENDPOINT: http://openmetadata-ingestion:8080
+      # The ingestion Airflow's login, AIRFLOW_ADMIN_USER and AIRFLOW_ADMIN_PASSWORD below
+      AIRFLOW_USERNAME: user
+      AIRFLOW_PASSWORD: password
       SERVER_HOST_API_URL: http://openmetadata-server:8585/api
     depends_on:
       openmetadata-es:
@@ -128,13 +133,32 @@ services:
   # [PROFILE: metadata] OpenMetadata Ingestion (Standard Image)
   # ==========================================
   openmetadata-ingestion:
-    image: docker.getcollate.io/openmetadata/ingestion:2.0.1
+    image: &om-ingestion-image docker.getcollate.io/openmetadata/ingestion:2.0.7
     container_name: openmetadata-ingestion
-    # The 2.0 image sets no default CMD, so without these the entrypoint runs
-    # `airflow` with no subcommand and exits 2. This is what upstream's own
-    # compose file uses, and the script starts the scheduler and the API server.
-    entrypoint: /bin/bash
-    command: "/opt/airflow/ingestion_dependency.sh"
+    # The image's own entrypoint runs first: it installs _PIP_ADDITIONAL_REQUIREMENTS,
+    # then runs this bash command unchanged. The 2.0 image sets no default CMD, so
+    # without one the entrypoint runs `airflow` with no subcommand and exits 2.
+    # ingestion_dependency.sh starts the scheduler and the API server.
+    #
+    # Custom connectors come from s3://openmetadata/connectors, as DAGs come from
+    # s3://airflow/dags. connector_sync.py --once copies them before Airflow starts,
+    # and a second run of it in the background lists the prefix every 15 seconds. Its
+    # first pass copies the files again, and later passes copy only on a change.
+    # Nothing restarts: each agent run is a new process that imports the connector
+    # from disk. A failed copy never stops Airflow. Keep
+    # the words that name an Airflow component out of this command: the entrypoint
+    # then waits for a database that only ingestion_dependency.sh configures.
+    command:
+      - bash
+      - -c
+      - |
+        mkdir -p /opt/airflow/connectors
+        python /opt/odctl/connector_sync.py --once
+        python /opt/odctl/connector_sync.py &
+        export PYTHONPATH="$${PYTHONPATH:+$$PYTHONPATH:}/opt/airflow/connectors"
+        exec bash /opt/airflow/ingestion_dependency.sh
+    volumes:
+      - ./openmetadata/connector_sync.py:/opt/odctl/connector_sync.py:ro
     profiles:
       - metadata
     networks:
@@ -144,6 +168,14 @@ services:
     environment:
       AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW_ADMIN_USER: user
+      AIRFLOW_ADMIN_PASSWORD: password
+      # For copying the connectors from s3://openmetadata/connectors.
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-user}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-password}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      # Extra Python packages, installed by the image's entrypoint at start.
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_METADATA_PIP_DEPS:-}
       # Unified Postgres config
       DB_HOST: postgres
       DB_PORT: 5432
@@ -156,6 +188,44 @@ services:
       AIRFLOW__LINEAGE__AIRFLOW_SERVICE_NAME: local_airflow
       AIRFLOW__LINEAGE__OPENMETADATA_API_ENDPOINT: http://openmetadata-server:8585/api
     mem_limit: 1500m
+    # Waiting for openmetadata-init to complete is what lets `docker compose up --wait`
+    # accept that a one-shot service exits.
+    depends_on:
+      openmetadata-server:
+        condition: service_healthy
+      openmetadata-init:
+        condition: service_completed_successfully
+    # Healthy once Airflow answers. The start period covers up to 60 seconds for the
+    # first connector copy, the image entrypoint's pip install of _METADATA_PIP_DEPS
+    # and the Airflow start.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/v2/monitor/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  # ==========================================
+  # [PROFILE: metadata] AutoPilot setting
+  # ==========================================
+  # AutoPilot creates and runs default agents for a service added in the UI. This
+  # one-shot service sets it on or off from METADATA_AUTOPILOT (off by default) on
+  # every start, so it also applies to a database from an earlier release.
+  openmetadata-init:
+    image: *om-ingestion-image
+    container_name: openmetadata-init
+    command: ["python", "/opt/odctl/autopilot_init.py"]
+    profiles:
+      - metadata
+    networks:
+      - odctl
+    volumes:
+      - ./openmetadata/autopilot_init.py:/opt/odctl/autopilot_init.py:ro
+    environment:
+      METADATA_AUTOPILOT: ${METADATA_AUTOPILOT:-false}
+    # The script uses about 12 MB of anonymous memory. memory.peak, which also counts
+    # page cache, reached 38 MB on a cold cache.
+    mem_limit: 64m
     depends_on:
       openmetadata-server:
         condition: service_healthy

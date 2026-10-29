@@ -10,7 +10,7 @@ odctl up metadata
 
 # --8<-- [start:login]
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin@open-data.local\",\"password\":\"$(printf admin | base64)\"}" \
+  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf admin | base64)\"}" \
   http://127.0.0.1:8585/api/v1/users/login \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
 AUTH="Authorization: Bearer $TOKEN"
@@ -22,6 +22,12 @@ SVC=$(curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/databaseServices \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 # --8<-- [end:service]
+
+# --8<-- [start:autopilot]
+curl -s -H "$AUTH" \
+  "http://127.0.0.1:8585/api/v1/apps/name/AutoPilotApplication?fields=appConfiguration" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["appConfiguration"]["active"])'
+# --8<-- [end:autopilot]
 
 # --8<-- [start:pipeline]
 PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
@@ -44,6 +50,13 @@ curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_se
 # --8<-- [end:search]
 
 # --8<-- [start:remove]
-curl -s -X DELETE -H "$AUTH" \
-  "http://127.0.0.1:8585/api/v1/services/databaseServices/name/demo_pg?hardDelete=true&recursive=true"
+for service in demo_pg demo_connector; do
+  curl -s -X DELETE -H "$AUTH" \
+    "http://127.0.0.1:8585/api/v1/services/databaseServices/name/$service?hardDelete=true&recursive=true"
+done
+docker exec openmetadata-ingestion python -c '
+import boto3
+boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(
+    Bucket="openmetadata", Key="connectors/demo_connector.py")
+'
 # --8<-- [end:remove]

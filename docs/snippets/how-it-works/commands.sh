@@ -1,8 +1,9 @@
 # Commands from docs/how-it-works.md. .github/scripts/smoke.sh runs dry-run,
 # reach, pull, up-pull, tag-override, workspace-flag and recreate-pull in the
 # catalog case, seaweed-memory and create-bucket in the storage case,
-# trino-port in the trino case, airflow-deps in the airflow case, and
-# mlops-deps and timezone in the mlflow case.
+# trino-port in the trino case, airflow-deps in the airflow case,
+# mlops-deps and timezone in the mlflow case, and metadata-deps and
+# metadata-autopilot in the metadata case.
 
 # --8<-- [start:dry-run]
 odctl up flink-lite --dry-run
@@ -50,6 +51,18 @@ sed -i.bak 's/^_AIRFLOW_PIP_DEPS=.*/_AIRFLOW_PIP_DEPS="dateparser==1.4.3"/' .odc
 odctl recreate airflow
 docker exec airflow python -c "import dateparser; print(dateparser.__version__)"
 # --8<-- [end:airflow-deps]
+
+# --8<-- [start:metadata-deps]
+sed -i.bak 's/^_METADATA_PIP_DEPS=.*/_METADATA_PIP_DEPS="dateparser==1.4.3"/' .odctl/.env
+odctl recreate metadata
+docker exec openmetadata-ingestion python -c "import dateparser; print(dateparser.__version__)"
+# --8<-- [end:metadata-deps]
+
+# --8<-- [start:metadata-autopilot]
+sed -i.bak 's/^METADATA_AUTOPILOT=.*/METADATA_AUTOPILOT="true"/' .odctl/.env
+odctl recreate metadata
+docker logs openmetadata-init 2>&1 | tail -1
+# --8<-- [end:metadata-autopilot]
 
 # --8<-- [start:mlops-deps]
 sed -i.bak 's/^_MLOPS_PIP_DEPS=.*/_MLOPS_PIP_DEPS="tabulate==0.9.0"/' .odctl/.env

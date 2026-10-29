@@ -316,13 +316,19 @@ stacks:
     description: "Data catalog, discovery, and governance platform."
     profiles: ["metadata"]
     depends_on:
-      metadata: ["postgres"]
+      metadata: ["postgres", "storage"]
     role: "Enterprise data catalog utilizing Elasticsearch and Postgres backends."
     usage: |
-      • OpenMetadata UI & REST API:
+      • OpenMetadata UI & REST API (Credentials: admin@odctl.io / admin, or
+        user@odctl.io / password, on a new database; a database from an
+        earlier release keeps admin@open-data.local and user@open-data.local,
+        both with the password admin):
         - External (host): http://127.0.0.1:8585
         - Internal (Docker): http://openmetadata-server:8585
-      • Ingestion Pipeline UI:
+      • Ingestion Pipeline UI (Credentials: user / password):
         - External (host): http://127.0.0.1:8087
         - Internal (Docker): http://openmetadata-ingestion:8080
-      • Default Admin: admin@open-data.local / admin
+      • Custom connectors: files in s3://openmetadata/connectors, checked every
+        15 seconds and copied into the ingestion container when they change.
+      • AutoPilot (default agents for a service added in the UI) is off unless
+        METADATA_AUTOPILOT="true" is set in .odctl/.env.

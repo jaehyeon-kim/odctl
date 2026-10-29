@@ -70,6 +70,8 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | `TZ` | The time zone of the services that read it, `UTC` by default. |
 | `_AIRFLOW_PIP_DEPS` | Extra Python packages installed in every new Airflow container. |
 | `_MLOPS_PIP_DEPS` | Extra Python packages installed in every new `mlflow` and `mlflow-serve` container. |
+| `_METADATA_PIP_DEPS` | Extra Python packages installed in every new `openmetadata-ingestion` container. |
+| `METADATA_AUTOPILOT` | `true` turns on OpenMetadata's AutoPilot, which creates and runs default agents for a service added in the UI; it is `false` by default. |
 | `MODEL_URI` | The model `mlflow-serve` serves, such as `models:/<name>@<alias>`; empty means it waits idle. |
 
 ## Messaging
@@ -91,8 +93,8 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka` | `apache/kafka:4.3.1` | `9092:9092` | `1500m` |
-| `connect` | `apache/kafka:4.3.1` | `8083:8083` | `2g` |
+| `kafka` | `apache/kafka:4.3.2` | `9092:9092` | `1500m` |
+| `connect` | `apache/kafka:4.3.2` | `8083:8083` | `2g` |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
 
@@ -113,10 +115,10 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka-1` | `apache/kafka:4.3.1` | `9092:9092` | `1500m` |
-| `kafka-2` | `apache/kafka:4.3.1` | `9093:9093` | `1500m` |
-| `kafka-3` | `apache/kafka:4.3.1` | `9094:9094` | `1500m` |
-| `connect` | `apache/kafka:4.3.1` | `8083:8083` | `2g` |
+| `kafka-1` | `apache/kafka:4.3.2` | `9092:9092` | `1500m` |
+| `kafka-2` | `apache/kafka:4.3.2` | `9093:9093` | `1500m` |
+| `kafka-3` | `apache/kafka:4.3.2` | `9094:9094` | `1500m` |
+| `connect` | `apache/kafka:4.3.2` | `8083:8083` | `2g` |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
 
@@ -280,7 +282,7 @@ Metabase: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), an
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `metabase` | `metabase/metabase:v0.64.3.1` | `3000:3000` | `1500m` |
+| `metabase` | `metabase/metabase:v0.64.3.5` | `3000:3000` | `1500m` |
 
 ## Orchestration
 
@@ -400,24 +402,31 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 
 ### metadata
 
-OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metadata` also starts: `deps`, `postgres`.
+OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metadata` also starts: `deps`, `postgres`, `storage`.
 
 ```text
-• OpenMetadata UI & REST API:
+• OpenMetadata UI & REST API (Credentials: admin@odctl.io / admin, or
+  user@odctl.io / password, on a new database; a database from an
+  earlier release keeps admin@open-data.local and user@open-data.local,
+  both with the password admin):
   - External (host): http://127.0.0.1:8585
   - Internal (Docker): http://openmetadata-server:8585
-• Ingestion Pipeline UI:
+• Ingestion Pipeline UI (Credentials: user / password):
   - External (host): http://127.0.0.1:8087
   - Internal (Docker): http://openmetadata-ingestion:8080
-• Default Admin: admin@open-data.local / admin
+• Custom connectors: files in s3://openmetadata/connectors, checked every
+  15 seconds and copied into the ingestion container when they change.
+• AutoPilot (default agents for a service added in the UI) is off unless
+  METADATA_AUTOPILOT="true" is set in .odctl/.env.
 ```
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
 | `openmetadata-es` | `docker.elastic.co/elasticsearch/elasticsearch:9.3.0` | `9200:9200`, `9300:9300` | `2g` |
-| `openmetadata-migrate` | `docker.getcollate.io/openmetadata/server:2.0.1` | none | `1g` |
-| `openmetadata-server` | `docker.getcollate.io/openmetadata/server:2.0.1` | `8585:8585`, `8586:8586` | `2g` |
-| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.1` | `8087:8080` | `1500m` |
+| `openmetadata-migrate` | `docker.getcollate.io/openmetadata/server:2.0.7` | none | `1g` |
+| `openmetadata-server` | `docker.getcollate.io/openmetadata/server:2.0.7` | `8585:8585`, `8586:8586` | `2g` |
+| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.7` | `8087:8080` | `1500m` |
+| `openmetadata-init` | `docker.getcollate.io/openmetadata/ingestion:2.0.7` | none | `64m` |
 
 ### lineage
 
