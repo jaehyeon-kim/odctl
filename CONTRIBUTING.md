@@ -4,12 +4,12 @@ This file is for people who change odctl itself: the CLI, its compose files and 
 
 ## Set Up
 
-odctl uses [uv](https://docs.astral.sh/uv/) and needs Docker. Clone the repository, install the dependencies and the project in development mode, and install the pre-commit hooks, which run the formatting and type checks on each commit:
+odctl uses [uv](https://docs.astral.sh/uv/) and needs Docker. Clone the repository, install the dependencies and the project in development mode, and install the pre-commit hooks, which run the formatting and type checks on each commit. The `mcp` extra holds the dependencies of the MCP server, which the tests need:
 
 ```bash
 git clone https://github.com/jaehyeon-kim/odctl.git
 cd odctl
-uv sync
+uv sync --extra mcp
 uvx pre-commit install
 ```
 
@@ -19,7 +19,8 @@ Exporting the diagrams also needs draw.io, Chrome and ffmpeg.
 
 | Path | Contents |
 |---|---|
-| `src/odctl/main.py` | the Typer CLI (`list`, `explain`, `ps`, `info`, `init`, `pull`, `up`, `down`, `logs`, `restart`, `recreate`) |
+| `src/odctl/main.py` | the Typer CLI (`list`, `explain`, `ps`, `info`, `init`, `pull`, `up`, `down`, `logs`, `restart`, `recreate`, `mcp`) |
+| `src/odctl/mcp_server.py` | the MCP server of `odctl mcp`: each tool calls the command of the same name in `main.py` |
 | `src/odctl/models.py`, `reports.py` | the models of the `--json` output of `list`, `explain`, `ps` and `info`, and the functions that build them; `ui.py` renders the same models as tables and panels |
 | `src/odctl/registry.py`, `resources/registry.yml` | profiles, the services in each, dependencies, ports and usage text |
 | `src/odctl/planner.py`, `docker.py`, `projects.py`, `logs.py`, `workspace.py`, `config.py`, `ui.py` | startup order, Docker Compose calls, `restart` and `recreate`, and `logs`, each with one Compose project per file as `up` runs them, the `.odctl` workspace, settings, terminal output |
@@ -40,7 +41,7 @@ Exporting the diagrams also needs draw.io, Chrome and ffmpeg.
 ## Tests
 
 ```bash
-uv run pytest tests/ -q
+uv run --extra mcp pytest tests/ -q
 uvx pre-commit run --all-files                    # ruff, ruff format, mypy, whitespace, YAML, TOML
 DISABLE_MKDOCS_2_WARNING=true uv run mkdocs build --strict
 uv run mkdocs serve -a 127.0.0.1:8000             # docs at http://127.0.0.1:8000/odctl/
@@ -59,7 +60,7 @@ Run the unit suite in full once before each commit. While fixing, run only the f
 A pull request runs these checks:
 
 - pre-commit;
-- the unit tests on each supported Python version, and once at the lowest dependency versions `pyproject.toml` allows;
+- the unit tests on each supported Python version and at the lowest dependency versions `pyproject.toml` allows, once without the `mcp` extra and once with it;
 - the strict docs build;
 - the image builds, when an image input changed.
 
@@ -81,7 +82,7 @@ For a group name with a colon, such as `metadata:deps`, the e2e job starts the p
 - **One profile per tool**, with `-lite` and `-full` variants where a tool has a small and a clustered form (`kafka-lite`, `kafka-full`).
 - **Fixed container names.** Every service has a `container_name`, so `odctl up` cannot scale a service; several copies are separate named services (Flink's `taskmanager-a` and `taskmanager-b`).
 - **A feature merges only with its docs.** Each command, option, profile and `.env` key needs a tested example on a guide, Getting Started or How It Works, a reference entry (the CLI reference, a profile page or How It Works), and a place in the skill; a command also needs a line in the README's Commands section. `test_every_feature_has_its_docs` checks this, and its short list of exceptions gives a reason for each.
-- **What stays stable in 1.x.** [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what every 1.x release keeps. Removing or renaming a profile, an `.env` key, a named volume, a workspace file or a JSON key, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key or a JSON key breaks nothing. Any other change of behaviour gets an Upgrading line in the Changelog.
+- **What stays stable in 1.x.** [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what every 1.x release keeps. Removing or renaming a profile, an `.env` key, a named volume, a workspace file, a JSON key, an MCP tool or an MCP tool's parameter, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key, a JSON key, an MCP tool or an optional MCP parameter breaks nothing. Any other change of behaviour gets an Upgrading line in the Changelog.
 - **Renovate** opens its pull requests on Mondays, with image updates grouped by compose file. Agree a change to its configuration (`.github/renovate.json`) with the maintainer first.
 
 ## Add a Profile

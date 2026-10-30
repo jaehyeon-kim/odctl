@@ -1,0 +1,14 @@
+import sys
+
+import anyio
+from mcp import Client, StdioServerParameters
+
+
+async def main(command):
+    server = StdioServerParameters(command=command[0], args=command[1:])
+    async with Client(server) as client:
+        for tool in (await client.list_tools()).tools:
+            print(f"{tool.name}: {tool.description}")
+
+
+anyio.run(main, sys.argv[1:])

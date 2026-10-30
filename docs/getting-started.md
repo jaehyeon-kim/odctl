@@ -395,6 +395,27 @@ This prints what `odctl down` would stop, without stopping anything:
 odctl down kafka-lite --dry-run
 ```
 
+With `--volumes`, the dry run also lists the named volumes that `odctl down --volumes` would remove, and adds a line for each container it stops that has unnamed volumes, with their number:
+
+```bash title="docs/snippets/getting-started/commands.sh:down-volumes-dry-run"
+odctl down kafka-lite --volumes --dry-run
+```
+
+```text
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Dry Run Teardown Plan                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+🛑 compose-kafka.yml
+  └─ 💥 Stop Profile: kafka-lite
+  └─ 🗑  Remove Volume: 3 unnamed volume(s) of connect
+  └─ 🗑  Remove Volume: 3 unnamed volume(s) of kafka
+🛑 compose-deps.yml
+  └─ 💥 Stop Profile: deps
+  └─ 🗑  Remove Volume: odctl-shared-deps
+```
+
+`kafka-lite` has no named volume of its own, and no other profile has a container, so the only named volume listed is the shared jar volume `odctl-shared-deps`. The dry run reads each container's volumes from Docker, so `connect` and `kafka` show their three unnamed volumes each, and a container with none, such as `karapace`, gets no line. Without Docker the dry run cannot count them, and says so. `odctl down --volumes` removes the shared jar volume with the last profile, and the unnamed volumes with their containers, as [Where Data Lives](how-it-works.md#where-data-lives) explains.
+
 This stops the profile and removes its containers:
 
 ```bash title="docs/snippets/getting-started/commands.sh:down"
@@ -419,4 +440,4 @@ Every command and file in these pages is kept in the repository under [`docs/sni
 
 ## Use It with an AI Assistant
 
-The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/main/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/main/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`. With the `mcp` extra, `odctl mcp` gives an MCP client odctl's commands as tools, as [MCP Server](guides/mcp-server.md) sets up.

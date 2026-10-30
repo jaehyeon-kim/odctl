@@ -421,6 +421,37 @@ def stop_stack(
     stack_client.compose.down(volumes=remove_volumes, remove_orphans=True)
 
 
+def get_declared_volume_names(compose_filename: str) -> set:
+    """
+    Fetch the Docker names of the volumes a compose file declares, external ones too.
+
+    A mount of one of these is a named volume. Any other volume a container mounts
+    is an unnamed one, which Docker creates from the image's `VOLUME` line.
+
+    Args:
+        compose_filename (str): The name of the compose file to parse.
+
+    Returns:
+        set: The volume names, each the `name` of its entry or else its key.
+    """
+    with open(get_compose_path(compose_filename), "r") as f:
+        declared = yaml.safe_load(f).get("volumes") or {}
+    return {
+        (spec.get("name") if isinstance(spec, dict) else None) or key
+        for key, spec in declared.items()
+    }
+
+
+def get_volume_names() -> set:
+    """
+    Fetch the names of the volumes that exist, as `docker volume ls` lists them.
+
+    Returns:
+        set: The volume names.
+    """
+    return {volume.name for volume in client.volume.list()}
+
+
 def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     """
     Fetch Docker containers matching the requested execution plan.

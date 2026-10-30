@@ -64,12 +64,12 @@ With the `catalog` profile running, it prints the catalog's configuration as JSO
 
 ## Where Data Lives
 
-Most services keep their data inside their containers. PostgreSQL, SeaweedFS, ClickHouse and Fluss's ZooKeeper are the exception: their images declare a data volume, so Docker gives each of these containers an unnamed volume, which a recreate passes on to the new container.
+Most services keep their data inside their containers. PostgreSQL, SeaweedFS, ClickHouse with its Keeper, and Fluss's ZooKeeper are the exception: their images declare data volumes, so Docker gives each of these containers unnamed volumes, which a recreate passes on to the new container. The Kafka image declares three volumes too, so `kafka`, `kafka-1` to `kafka-3` and `connect` get unnamed volumes. Kafka keeps its topics in `/tmp/kafka-logs` inside the container, not in those volumes, so a recreate loses a topic's data.
 
 | Command | Containers | Your data |
 | --- | --- | --- |
 | `odctl restart` | kept | kept |
-| `odctl recreate` | replaced | lost, except in PostgreSQL, SeaweedFS, ClickHouse and ZooKeeper, which keep their volumes |
+| `odctl recreate` | replaced | lost, except in PostgreSQL, SeaweedFS, ClickHouse with its Keeper, and Fluss's ZooKeeper, which keep their volumes |
 | `odctl down` | removed | lost; the unnamed volumes stay on disk, unused |
 | `odctl down --volumes` | removed, with the unnamed volumes and the profile's named volumes such as `spark-events-data`. The `odctl-shared-deps` volume is removed too once no other profile has a container | lost |
 
@@ -271,7 +271,7 @@ odctl init --force --yes
 
 ## What Stays Stable in 1.x
 
-A project that pins `odctl>=1.0,<2` keeps working, because every 1.x release keeps what a script or a project reads from odctl. These six things stay the same:
+A project that pins `odctl>=1.0,<2` keeps working, because every 1.x release keeps what a script or a project reads from odctl. These seven things stay the same:
 
 - The profile names, such as `kafka-lite` ([Profiles](#profiles)).
 - The host ports that the services publish ([How You Reach a Service](#how-you-reach-a-service)).
@@ -279,5 +279,6 @@ A project that pins `odctl>=1.0,<2` keeps working, because every 1.x release kee
 - The names of the named volumes, `odctl-shared-deps` and `spark-events-data`, and which services keep their data in a volume ([Where Data Lives](#where-data-lives)).
 - The files `odctl init` copies into `.odctl` ([Workspace](#workspace)).
 - The keys of the `--json` output of `list`, `explain`, `ps` and `info` ([JSON Output](json-output.md)).
+- The names of the MCP tools and of their parameters ([MCP Server](guides/mcp-server.md)).
 
-Removing or renaming a profile, an `.env` key, a named volume, a workspace file or a JSON key, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key or a JSON key breaks nothing. Any other change of behaviour gets a line under Upgrading in the [Changelog](about/changelog.md).
+Removing or renaming a profile, an `.env` key, a named volume, a workspace file, a JSON key, an MCP tool or an MCP tool's parameter, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key, a JSON key, an MCP tool or an optional MCP parameter breaks nothing. Any other change of behaviour gets a line under Upgrading in the [Changelog](about/changelog.md).

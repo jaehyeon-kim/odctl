@@ -1,8 +1,8 @@
 # Commands from docs/getting-started.md. .github/scripts/smoke.sh runs list,
 # list-details, list-json, explain, explain-json, info, info-json, ps, ps-json,
-# ps-all, logs, logs-time, restart and down-dry-run in the kafka-lite case. The
-# e2e workflow itself starts each profile with up and stops it with down and
-# down-all.
+# ps-all, logs, logs-time, restart, down-dry-run and down-volumes-dry-run in the
+# kafka-lite case. The e2e workflow itself starts each profile with up and stops
+# it with down and down-all.
 
 # --8<-- [start:install]
 uv tool install odctl
@@ -78,6 +78,10 @@ odctl restart kafka-lite
 # --8<-- [start:down-dry-run]
 odctl down kafka-lite --dry-run
 # --8<-- [end:down-dry-run]
+
+# --8<-- [start:down-volumes-dry-run]
+odctl down kafka-lite --volumes --dry-run
+# --8<-- [end:down-volumes-dry-run]
 
 # --8<-- [start:down]
 odctl down kafka-lite

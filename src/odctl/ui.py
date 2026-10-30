@@ -244,7 +244,11 @@ def print_explain_panel(details: ProfileDetails):
     )
 
 
-def print_dry_run(execution_plan: Dict[str, List[str]], is_teardown: bool = False):
+def print_dry_run(
+    execution_plan: Dict[str, List[str]],
+    is_teardown: bool = False,
+    volumes: Optional[Dict[str, List[str]]] = None,
+):
     """
     Print the dry run execution or teardown plan to the console.
 
@@ -252,16 +256,22 @@ def print_dry_run(execution_plan: Dict[str, List[str]], is_teardown: bool = Fals
         execution_plan (Dict[str, List[str]]): The resolved mapping of files to profiles.
         is_teardown (bool, optional): If True, formats the output as a teardown plan
                                       instead of a startup plan. Defaults to False.
+        volumes (Optional[Dict[str, List[str]]], optional): For a teardown, the
+            volumes to remove, by compose file, each as the text printed after
+            `Remove Volume:`. Defaults to None, which prints no volumes.
     """
     title = "Dry Run Teardown Plan" if is_teardown else "Dry Run Execution Plan"
     color = "red" if is_teardown else "yellow"
 
     console.print(Panel(f"[bold {color}]{title}[/bold {color}]"))
+    volumes = volumes or {}
     for file, profs in execution_plan.items():
         if is_teardown:
             console.print(f"🛑 [cyan]{file}[/cyan]")
             for p in profs:
                 console.print(f"  └─ 💥 Stop Profile: [bold red]{p}[/bold red]")
+            for name in volumes.get(file, []):
+                console.print(f"  └─ 🗑  Remove Volume: [bold red]{name}[/bold red]")
         else:
             layer = (
                 "Infrastructure Layer"

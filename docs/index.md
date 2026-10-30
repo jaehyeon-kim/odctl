@@ -25,6 +25,7 @@ Each command has its own section in the CLI reference, with its options and exam
 | [`odctl logs`](cli.md#odctl-logs) | Read the logs of a profile's containers | [Getting Started](getting-started.md#see-what-is-running) |
 | [`odctl restart`](cli.md#odctl-restart) | Restart a profile's containers and keep them | [Getting Started](getting-started.md#restart-a-profile) |
 | [`odctl recreate`](cli.md#odctl-recreate) | Replace a profile's containers, to apply an edit to a compose file or `.env` | [How It Works](how-it-works.md#examples) |
+| [`odctl mcp`](cli.md#odctl-mcp) | Give an AI agent odctl's commands as MCP tools; needs the `mcp` extra | [MCP Server](guides/mcp-server.md) |
 
 ## What It Runs
 

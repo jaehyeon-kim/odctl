@@ -12,7 +12,8 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 - Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.
 - `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.
 - `odctl ps --json` and `odctl list --json` print what is running and every profile as JSON, which is easier to read than the tables; the keys stay the same in every 1.x release ([What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x)).
-- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove the profile's named volumes, such as Spark's `spark-events-data`, and the shared jar volume `odctl-shared-deps` once no other profile has a container. `odctl down --all --volumes` removes everything.
+- With the `mcp` extra (`uv tool install "odctl[mcp]"`), `odctl mcp` serves `list`, `explain`, `ps`, `info` and `logs` to an MCP client as tools, and `odctl mcp --allow-changes` adds `up` and `down` ([MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/)). Use the tools when the client has them, and the commands otherwise.
+- `odctl down <profile>` stops only the profiles named, not their dependencies. `down` removes the containers, and the data kept inside them is lost (How It Works, Where Data Lives). Add `--volumes` to also remove the volumes of the stopped containers, such as Spark's `spark-events-data`, and the shared jar volume `odctl-shared-deps` once no other profile has a container. `odctl down --all --volumes` removes everything. `--dry-run` lists what it would stop and, with `--volumes`, the volumes it would remove.
 - Every port is published on `127.0.0.1` only, so other machines cannot reach it. From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.
 - Logins are in each profile's notes below. Most services use the user `user` and the password `password`; some have no login.
 - `odctl init` copies the compose files, `registry.yml` and `.env` into `.odctl/` in the current directory, so they can be edited. Run `odctl recreate <profile>` after editing a compose file or `.env`.
@@ -33,6 +34,7 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 | `odctl logs` | Fetch the logs of containers managed by specific profiles. |
 | `odctl restart` | Restart one or more specific profiles. |
 | `odctl recreate` | Replace one or more profiles' containers, applying compose file changes. |
+| `odctl mcp` | Serve odctl's commands to an AI agent as MCP tools over stdio. |
 
 ## Options
 
@@ -51,8 +53,8 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | `odctl up` | `--dry-run` | Preview the execution plan without actually starting anything. |
 | `odctl up` | `--pull` | Pull the images again before starting, to fetch a tag that changed in the registry. |
 | `odctl down` | `--all, -a` | Stop ALL running profiles. |
-| `odctl down` | `--volumes, -v` | Also remove named volumes, including the shared jar volume once no other profile uses it. |
-| `odctl down` | `--dry-run` | Preview the teardown plan without actually stopping anything. |
+| `odctl down` | `--volumes, -v` | Also remove the volumes of the stopped containers, named and unnamed, and the shared jar volume once no other profile uses it. |
+| `odctl down` | `--dry-run` | Preview the teardown plan, with the volumes `--volumes` would remove, without stopping anything. |
 | `odctl down` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
 | `odctl ps` | `--all, -a` | Show all containers managed by odctl. |
 | `odctl ps` | `--json` | Print the output as JSON, for scripts and AI assistants. |
@@ -64,6 +66,7 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | `odctl logs` | `--since` | Show logs since timestamp or relative (for example '42m'). |
 | `odctl logs` | `--until` | Show logs before a timestamp or relative. |
 | `odctl recreate` | `--pull` | Pull images before recreating. |
+| `odctl mcp` | `--allow-changes` | Also serve `up` and `down`, which start and stop profiles. |
 
 ## Workspace Settings
 

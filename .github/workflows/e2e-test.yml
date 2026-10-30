@@ -73,7 +73,7 @@ jobs:
         run: uv python install 3.10
 
       - name: Install odctl
-        run: uv tool install .
+        run: uv tool install ".[mcp]"
 
       - name: Initialize odctl workspace
         run: odctl init --force --yes

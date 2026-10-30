@@ -282,10 +282,13 @@ getting_started() {
   grep -qE "^connect +\| [0-9]{4}-" <<<"$out" || fail "odctl logs -t printed no timestamped connect lines: $out"
   out=$(run_snippet getting-started/commands.sh down-dry-run 2>&1) || fail "odctl down --dry-run failed"
   docker inspect connect >/dev/null 2>&1 || fail "odctl down --dry-run removed a container"
+  out=$(run_snippet getting-started/commands.sh down-volumes-dry-run 2>&1) || fail "odctl down --volumes --dry-run failed"
+  grep -q "Remove Volume: odctl-shared-deps" <<<"$out" || fail "odctl down kafka-lite --volumes --dry-run does not name odctl-shared-deps"
+  docker volume inspect odctl-shared-deps >/dev/null 2>&1 || fail "odctl down --volumes --dry-run removed the shared jar volume"
   out=$(run_snippet getting-started/commands.sh restart 2>&1) || fail "odctl restart failed"
   grep -q "Restart complete" <<<"$out" || fail "odctl restart did not complete"
   retry 40 5 http_ok "http://127.0.0.1:8083/connectors" || fail "Connect never answered after the restart"
-  pass "Getting Started's list, explain, info, ps (each also with --json), logs, restart and down --dry-run ran on kafka-lite"
+  pass "Getting Started's list, explain, info, ps (each also with --json), logs, restart and down --dry-run (also with --volumes) ran on kafka-lite"
 }
 
 # The Iceberg sink is built from source, so prove it commits a snapshot rather
@@ -1863,6 +1866,46 @@ PYEOF
   pass "pushed a drift report and read it back, and a dataset round-tripped"
 }
 
+# The MCP Server guide. The client runs in its own environment, as the guide
+# says, because odctl's extra needs mcp 2.3.0 or later and other clients pin mcp
+# below 2. The server that the last two checks start is the one that the guide's
+# mcp.json names, which `claude mcp add` wrote. The example ends with `down
+# kafka-lite`, so this runs last.
+smoke_mcp_server() {
+  local work="${TMPDIR:-/tmp}/odctl-mcp-smoke" client out command arguments
+  rm -rf "$work"; mkdir -p "$work"
+  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the MCP client"
+  VIRTUAL_ENV="$work/.venv" uv pip install -q "mcp>=2.3.0,<3" >/dev/null 2>&1 \
+    || fail "could not install the MCP client"
+  client="$work/.venv/bin"
+
+  # From the folder that holds the snippet files, where the guide says to run
+  # the client. The read tools need no workspace.
+  out=$(cd "$SNIPPETS/mcp-server" && PATH="$client:$PATH" run_snippet mcp-server/commands.sh list-tools 2>&1) \
+    || { echo "$out" | tail -20; fail "the MCP list-tools step failed"; }
+  grep -q '^ps: ' <<<"$out" || { echo "$out"; fail "the read-only server does not list ps"; }
+  grep -q '^up: ' <<<"$out" && fail "the read-only server lists up"
+  out=$(cd "$SNIPPETS/mcp-server" && PATH="$client:$PATH" run_snippet mcp-server/commands.sh list-tools-changes 2>&1) \
+    || { echo "$out" | tail -20; fail "the MCP list-tools-changes step failed"; }
+  grep -q '^up: ' <<<"$out" && grep -q '^down: ' <<<"$out" \
+    || { echo "$out"; fail "the server started with --allow-changes does not list up and down"; }
+  pass "odctl mcp lists five read tools, and up and down with --allow-changes"
+
+  command=$(jq -r '.mcpServers.odctl.command' "$SNIPPETS/mcp-server/mcp.json")
+  read -r -a arguments <<<"$(jq -r '.mcpServers.odctl.args | join(" ")' "$SNIPPETS/mcp-server/mcp.json")"
+  out=$(cd "$SNIPPETS/mcp-server" && PATH="$client:$PATH" python mcp_client.py "$command" "${arguments[@]}" 2>&1) \
+    || { echo "$out" | tail -20; fail "the server that mcp.json names did not start"; }
+  grep -q '^ps: ' <<<"$out" || { echo "$out"; fail "the server that mcp.json names does not list ps"; }
+  pass "the server that the guide's mcp.json names started"
+
+  # From the folder that holds the workspace, as the example runs it.
+  out=$(PATH="$client:$PATH" python "$SNIPPETS/mcp-server/example.py" 2>&1) \
+    || { echo "$out" | tail -30; fail "the MCP Server example failed"; }
+  grep -q '"service": "connect"' <<<"$out" || { echo "$out" | tail -30; fail "the MCP Server example did not list connect"; }
+  grep -q 'Teardown complete.' <<<"$out" || { echo "$out" | tail -30; fail "the MCP Server example did not stop kafka-lite"; }
+  pass "the MCP Server example started, read and stopped kafka-lite through the tools"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -1883,7 +1926,8 @@ case "$PROFILE" in
     assert_metrics http://kafka:9404/metrics "${KAFKA_SIDE[@]}"
     smoke_iceberg_sink
     run_example kafka 'Processed a total of 5 messages'
-    run_example kafka-connect 'Processed a total of 3 messages' ;;
+    run_example kafka-connect 'Processed a total of 3 messages'
+    smoke_mcp_server ;;
   kafka-full)
     smoke_kafka kafka-1; connect_plugins
     assert_metrics http://kafka-{1,2,3}:9404/metrics "${KAFKA_SIDE[@]}" ;;
