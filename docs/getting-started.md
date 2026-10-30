@@ -289,7 +289,7 @@ It prints the active profiles, then a table with one row per container:
 
 A dash under Health means the service has no health check.
 
-`--json` prints the same containers as one object: each published port's host and container port as numbers, a missing health check as `null`, and, in `active_profiles`, the profiles you named whose services are all running, with their prerequisites from the same compose file. The list never holds `deps`, and it leaves out a profile whose services all belong to another listed profile, such as `spark-lite` beside `spark-full`:
+`--json` prints the same containers as one object. Each published port gives its host and container port as numbers, and a missing health check is `null`. `active_profiles` lists the profiles you named whose services are all running, with their prerequisites from the same compose file. It never holds `deps`, and it leaves out a profile whose services all belong to another listed profile, such as `spark-lite` beside `spark-full`:
 
 ```bash title="docs/snippets/getting-started/commands.sh:ps-json"
 odctl ps kafka-lite --json | python3 -m json.tool

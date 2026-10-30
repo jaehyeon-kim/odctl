@@ -10,7 +10,7 @@ from rich.table import Table
 from odctl.models import Info, ProfileDetails, ProfileInfo, PsReport
 
 console = Console()
-error_console = Console(stderr=True)
+_error_console = Console(stderr=True)
 
 _json_output = False
 
@@ -36,7 +36,7 @@ def _message_console() -> Console:
     Returns:
         Console: The stderr console under `--json`, otherwise the stdout console.
     """
-    return error_console if _json_output else console
+    return _error_console if _json_output else console
 
 
 def print_json(output: BaseModel | List[ProfileInfo]) -> None:

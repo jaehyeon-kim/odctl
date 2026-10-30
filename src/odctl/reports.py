@@ -336,14 +336,14 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
             if services and all(s in running_services for s in services):
                 active[profile] = set(services)
 
-    outermost = {
-        profile
-        for profile, services in active.items()
-        if not any(
-            profile != other and services < other_services
+    outermost = set()
+    for profile, profile_services in active.items():
+        is_strict_subset = any(
+            profile != other and profile_services < other_services
             for other, other_services in active.items()
         )
-    }
+        if not is_strict_subset:
+            outermost.add(profile)
     outermost.discard("deps")
     return sorted(outermost)
 

@@ -1215,7 +1215,7 @@ requires-dist = [
     { name = "python-on-whales", specifier = ">=0.70.0" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "rich", specifier = ">=13.7.0" },
-    { name = "typer", specifier = ">=0.12.0" },
+    { name = "typer", specifier = ">=0.18.0" },
 ]
 
 [package.metadata.requires-dev]

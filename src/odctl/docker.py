@@ -104,7 +104,10 @@ def get_stack_details(
                             ports.append(f"{svc_name}:{p}")
                         elif isinstance(p, dict) and "published" in p:
                             target = p.get("target", p["published"])
-                            ports.append(f"{svc_name}:{p['published']}:{target}")
+                            protocol = f"/{p['protocol']}" if p.get("protocol") else ""
+                            ports.append(
+                                f"{svc_name}:{p['published']}:{target}{protocol}"
+                            )
 
                 if "volumes" in svc_data:
                     for v in svc_data["volumes"]:

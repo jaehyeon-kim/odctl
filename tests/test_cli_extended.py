@@ -222,6 +222,13 @@ def test_explain_command(monkeypatch, tmp_path):
     assert bare.stdout == EXPLAIN_VALKEY_OUTPUT
 
 
+def test_explain_without_a_profile_is_a_usage_error():
+    """A missing required argument exits 2 with a usage error, as Click reports it."""
+    result = runner.invoke(app, ["explain"])
+    assert result.exit_code == 2
+    assert "Missing argument" in result.output
+
+
 def test_ps_command(monkeypatch, tmp_path):
     """The container table prints sorted rows, the active profiles and a dash for what Docker leaves out."""
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
@@ -419,6 +426,20 @@ def test_init_force_yes_replaces_the_workspace_without_a_prompt(tmp_path, monkey
 
     assert result.exit_code == 0
     mock_init.assert_called_once_with(force=True)
+
+
+def test_init_force_answered_no_keeps_the_workspace(tmp_path, monkeypatch):
+    """`init --force` answered `n` aborts and leaves the workspace as it is."""
+    mock_init = MagicMock()
+    monkeypatch.setattr("odctl.main.init_workspace", mock_init)
+    workspace = tmp_path / ".odctl"
+    workspace.mkdir()
+    monkeypatch.setattr("odctl.main.get_workspace_dir", lambda: workspace)
+
+    result = runner.invoke(app, ["init", "--force"], input="n\n")
+
+    assert result.exit_code == 1
+    mock_init.assert_not_called()
 
 
 @pytest.mark.parametrize(

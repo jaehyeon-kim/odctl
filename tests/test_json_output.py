@@ -305,6 +305,9 @@ services:
       - "7000-7001:7000-7001"
       - "6380:6380/tcp"
       - "9000"
+      - target: 9001
+        published: 9001
+        protocol: udp
     profiles: [valkey]
 """,
     )
@@ -315,6 +318,7 @@ services:
     assert "valkey:7000-7001:7000-7001" in listed
     assert "valkey:6380:6380/tcp" in listed
     assert "valkey:9000" in listed
+    assert "valkey:9001:9001/udp" in listed
     assert "Host -6379} → Container valkey:6379" in explained
     assert "Container valkey:6379" in explained
     assert "Container valkey:7000-7001" in explained
@@ -326,11 +330,12 @@ services:
         assert entry["services"][0]["ports"] == [
             {"host": 6379, "container": 6379, "protocol": "tcp"},
             {"host": 6380, "container": 6380, "protocol": "tcp"},
+            {"host": 9001, "container": 9001, "protocol": "udp"},
         ]
 
     monkeypatch.setenv("VK_PORT", "7777")
     expanded = json.loads(runner.invoke(app, ["explain", "valkey", "--json"]).stdout)
-    assert expanded["services"][0]["ports"][-1] == {
+    assert expanded["services"][0]["ports"][1] == {
         "host": 7777,
         "container": 6379,
         "protocol": "tcp",
