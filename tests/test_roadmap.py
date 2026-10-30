@@ -17,7 +17,10 @@ _VERSION_LINE = re.search(
 assert _VERSION_LINE is not None
 _VERSION = _VERSION_LINE.group(1)
 _PLANNED, _RELEASED = _ROADMAP.split("\n## Released\n", 1)
-_ENTRIES = re.findall(r"^- title: '([^']*)'\n((?:  .*\n)+)", _PLANNED, re.MULTILINE)
+# A YAML single-quoted title writes a quote as two, as in 'SimPy''s examples'
+_ENTRIES = re.findall(
+    r"^- title: '((?:[^']|'')*)'\n((?:  .*\n)+)", _PLANNED, re.MULTILINE
+)
 
 
 def _version(text: str) -> tuple[int, ...] | None:
