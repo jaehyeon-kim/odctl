@@ -369,6 +369,8 @@ Feast: Experiment tracking, model registry and model serving (MLflow), the featu
 • Online feature server for get_online_features:
   * External (host): http://127.0.0.1:6566
   * Internal (Docker): http://feast-serve:6566
+• MCP endpoint, for agents that list Feast's tools and read features:
+  http://127.0.0.1:6566/mcp
 • Liveness: http://127.0.0.1:6566/health
 ```
 

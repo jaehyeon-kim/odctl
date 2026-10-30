@@ -89,9 +89,13 @@ jobs:
         run: |
           chmod +x .github/scripts/smoke.sh
           for profile in ${{ matrix.profile_group }}; do
+            # A name such as metadata:deps is a group of its own for the same
+            # profile: odctl starts the part before the colon, and smoke.sh
+            # gets the whole name to choose its checks.
+            base="${profile%%:*}"
             echo "::group::Testing Profile: $profile"
-            echo "🚀 Launching $profile..."
-            odctl up "$profile"
+            echo "🚀 Launching $base..."
+            odctl up "$base"
 
             echo "⏳ Containers:"
             docker ps
@@ -116,8 +120,8 @@ jobs:
             # named teardown did not until 0.4.3, so compose rejected the
             # project with "depends on undefined service" and only the named
             # form could catch it. Naming the profile is also what a user runs.
-            echo "🧹 Tearing down $profile by name..."
-            yes | odctl down "$profile" --volumes
+            echo "🧹 Tearing down $base by name..."
+            yes | odctl down "$base" --volumes
 
             # Sweep afterwards so a failure above cannot leak state into the
             # next profile in the group. This is a no-op when the named

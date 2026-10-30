@@ -2,7 +2,7 @@
 
 The `flink-lite` profile runs a Flink JobManager, one TaskManager and the SQL Gateway. `flink-full` runs three TaskManagers. Flink's connector jars for Kafka, Avro with the schema registry, JDBC, Iceberg and HTTP come from the shared volume that the `deps` profile fills. The end-to-end tests run the commands below on every release.
 
-This guide reads Avro records from Kafka through the Karapace schema registry and writes an aggregate to PostgreSQL over JDBC. It builds on [Kafka](kafka.md), which starts `kafka-lite` and creates a topic. [Ingest into Iceberg](iceberg-ingestion.md) shows Flink writing an Iceberg table, [Rolling Windows](rolling-windows.md) computes features over several window sizes, and [Feast with Iceberg](feast-iceberg.md#push-features-from-flink-sql) sends rows to Feast over HTTP.
+This guide reads Avro records from Kafka through the Karapace schema registry and writes an aggregate to PostgreSQL over JDBC. It builds on [Kafka](kafka.md), which starts `kafka-lite` and creates a topic. [Ingest into Iceberg](iceberg-ingestion.md) shows Flink writing an Iceberg table, [Rolling Windows](rolling-windows.md) computes features over several window sizes, and [Feast with Iceberg](feast-iceberg.md#push-features) sends rows to Feast over HTTP.
 
 Follow the arrows from the TaskManager: it writes Avro records to the `orders` topic, reads them back and writes the totals to PostgreSQL.
 

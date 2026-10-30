@@ -12,7 +12,7 @@ schema = pa.schema([
     pa.field("event_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
     pa.field("conv_rate", pa.float32(), nullable=False),
 ])
-t = cat.create_table("demo.driver_stats", schema=schema)
+t = cat.create_table_if_not_exists("demo.driver_stats", schema=schema)
 now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 t.append(pa.Table.from_pydict({
     "driver_id": [1001, 1002],
@@ -30,3 +30,16 @@ print(fs.get_online_features(
     entity_rows=[{"driver_id": 1001}, {"driver_id": 1002}],
 ).to_dict())
 # --8<-- [end:read]
+
+# --8<-- [start:append]
+import datetime, pyarrow as pa
+from pyiceberg.catalog import load_catalog
+
+t = load_catalog("odctl").load_table("demo.driver_stats")
+now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+t.append(pa.Table.from_pydict({
+    "driver_id": [1001],
+    "event_timestamp": [now],
+    "conv_rate": [0.6],
+}, schema=t.schema().as_arrow()))
+# --8<-- [end:append]

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Starts feast and flink-lite, builds an Iceberg table of driver features,
 # registers a feature view over it, materialises it into Valkey and reads it
-# back, then pushes a value to the feature server through Flink SQL and reads
-# that back. Run it in an environment with
-# "feast[duckdb,iceberg,redis,postgres]==0.66.0" and pyarrow installed.
+# back, then pushes a value to the feature server over HTTP and through Flink
+# SQL, reads that back, and lists the feature server's MCP tools. Run it in an
+# environment with "feast[duckdb,iceberg,redis,postgres]==0.66.0", pyarrow and
+# "mcp>=1.24,<2" installed.
 set -euo pipefail
 
 odctl up feast flink-lite
@@ -55,13 +56,13 @@ cat > feature_repo/definitions.py <<'PY'
 from datetime import timedelta
 from feast import Entity, FeatureView, Field
 from feast.types import Float32
+from feast.value_type import ValueType
 from feast.infra.data_sources.contrib.iceberg_catalog.iceberg_source import IcebergSource
 
-driver = Entity(name="driver", join_keys=["driver_id"])
+driver = Entity(name="driver", join_keys=["driver_id"], value_type=ValueType.INT64)
 src = IcebergSource(
     warehouse="", namespace="demo", table="driver_stats",
     catalog_type="rest", catalog_name="odctl",
-    endpoint="http://127.0.0.1:8181",
     timestamp_field="event_timestamp",
 )
 fv = FeatureView(
@@ -70,7 +71,7 @@ fv = FeatureView(
 )
 PY
 
-feast -c feature_repo apply
+feast -c feature_repo apply --skip-source-validation
 feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
 
 python - <<'PY'
@@ -106,6 +107,14 @@ PY
 docker cp push_definitions.py feast-serve:/tmp/feature_repo/push_definitions.py
 docker exec feast-serve feast -c /tmp/feature_repo apply --skip-source-validation
 
+# Push 0.7 for driver 1001 over HTTP, stamped with the current time.
+curl -s -w '%{http_code}\n' -X POST http://127.0.0.1:6566/push \
+  -H 'Content-Type: application/json' -d @- <<JSON
+{"push_source_name": "driver_push", "allow_registry_cache": false, "to": "online",
+ "df": {"driver_id": [1001], "conv_rate": [0.7], "event_timestamp": ["$(date -u +%Y-%m-%dT%H:%M:%S)"]}}
+JSON
+
+# Flink pushes 0.9 for the same driver, with a newer timestamp.
 docker exec -i flink-jobmanager /opt/flink/bin/sql-client.sh <<'SQL' | grep -E 'ERROR|Complete'
 SET 'execution.runtime-mode' = 'batch';
 SET 'table.dml-sync' = 'true';
@@ -130,3 +139,29 @@ until curl -s -X POST http://127.0.0.1:6566/get-online-features \
     | grep 0.8999999761581421; do
   sleep 5
 done
+
+python - <<'PY'
+import asyncio
+import json
+
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+
+async def main():
+    async with streamable_http_client("http://127.0.0.1:6566/mcp") as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            for tool in (await session.list_tools()).tools:
+                print(tool.name)
+            result = await session.call_tool(
+                "get_online_features_get_online_features_post",
+                {"features": ["driver_pushed:conv_rate"], "entities": {"driver_id": [1001]}},
+            )
+            reply = json.loads(result.content[0].text)
+            names = reply["metadata"]["feature_names"]
+            print(reply["results"][names.index("conv_rate")]["values"])
+
+
+asyncio.run(main())
+PY
