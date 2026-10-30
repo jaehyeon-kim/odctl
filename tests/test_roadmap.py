@@ -6,12 +6,16 @@ when a release is tagged with the roadmap still showing it as planned or current
 """
 
 import re
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 _ROADMAP = (ROOT / "docs" / "about" / "roadmap.md").read_text()
-_VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+# tomllib needs Python 3.11, and odctl supports 3.10.
+_VERSION_LINE = re.search(
+    r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.MULTILINE
+)
+assert _VERSION_LINE is not None
+_VERSION = _VERSION_LINE.group(1)
 _PLANNED, _RELEASED = _ROADMAP.split("\n## Released\n", 1)
 _ENTRIES = re.findall(r"^- title: '([^']*)'\n((?:  .*\n)+)", _PLANNED, re.MULTILINE)
 
