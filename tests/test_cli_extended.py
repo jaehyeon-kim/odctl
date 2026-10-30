@@ -335,7 +335,10 @@ def test_down_named_profile_keeps_shared_deps_while_others_run(monkeypatch):
     mock_stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
-    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [MagicMock()])
+    other_profile = fake_container("spark-master", "spark-master", "running", None, {})
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers", lambda plan: [other_profile]
+    )
 
     result = runner.invoke(app, ["down", "kafka-lite", "-v"])
 

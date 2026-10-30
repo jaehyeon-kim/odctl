@@ -68,7 +68,7 @@ e2e runs only on a tag and on a manual run. odctl runs images tagged with its ow
 
 To check a profile on your machine, do what the e2e job does:
 
-1. Install the CLI with `uv tool install .`.
+1. Install the CLI with `uv tool install ".[mcp]"`. `smoke.sh` ends by starting `odctl mcp`, which needs the extra.
 2. Run `odctl init`.
 3. Start the profile with `odctl up <profile>`. Run one `odctl up` at a time.
 4. Run `.github/scripts/smoke.sh <profile>`.

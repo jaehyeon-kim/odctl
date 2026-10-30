@@ -692,3 +692,18 @@ def test_streaming_jars_are_fetched_and_spark_version_matches_the_image():
     assert spark_v == tag, (
         "SPARK_V must equal the apache/spark tag in the Spark Dockerfile"
     )
+
+
+def test_every_declared_volume_sets_its_name():
+    """`get_declared_volume_names` compares mounts with the `name:` of each volume.
+
+    Without `name:`, Compose names a volume `<project>_<key>`, and a volume the
+    function misses would be counted as an unnamed one in the `--volumes` dry run.
+    """
+    missing = [
+        f"{path.name}: {key}"
+        for path in _compose_files()
+        for key, spec in (yaml.safe_load(path.read_text()).get("volumes") or {}).items()
+        if not (isinstance(spec, dict) and spec.get("name"))
+    ]
+    assert not missing, "volumes without `name:`:\n" + "\n".join(missing)

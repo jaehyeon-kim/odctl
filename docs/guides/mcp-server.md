@@ -149,7 +149,7 @@ async def main():
 anyio.run(main)
 ```
 
-It prints the result of each tool under a line with the tool's name:
+It prints the result of each tool under a line with the tool's name. The output below shortens the path of the `.odctl` folder to `/home/you/project/.odctl`:
 
 ```text
 --- up

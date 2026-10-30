@@ -408,12 +408,14 @@ def stop_stack(
     Args:
         compose_filename (str): The compose file defining the target stack.
         profiles (List[str]): The profiles to stop.
-        remove_volumes (bool, optional): If True, destroys named volumes associated
-                                         with the stack. Defaults to False.
+        remove_volumes (bool, optional): If True, destroys the named volumes of the
+                                         stack and the unnamed volumes of its
+                                         containers. Defaults to False.
     """
     path = get_compose_path(compose_filename)
     stack_client = create_client(compose_files=[str(path)], profiles=profiles)
-    # volumes=True will remove named volumes defined in the compose file.
+    # volumes=True removes the named volumes defined in the compose file and the
+    # unnamed volumes of the containers it stops.
     # remove_orphans catches containers whose service no longer exists in the
     # compose file, which teardown would otherwise leave running forever: an
     # upgrade that drops or renames a service (ch-init-lite in 0.2.0, the
@@ -427,6 +429,10 @@ def get_declared_volume_names(compose_filename: str) -> set:
 
     A mount of one of these is a named volume. Any other volume a container mounts
     is an unnamed one, which Docker creates from the image's `VOLUME` line.
+
+    This relies on every declared volume setting `name:`, as odctl's compose files
+    do. Without it Compose names the volume `<project>_<key>`, and this function
+    would return the key.
 
     Args:
         compose_filename (str): The name of the compose file to parse.
