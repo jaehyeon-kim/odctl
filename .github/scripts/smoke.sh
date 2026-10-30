@@ -922,10 +922,13 @@ smoke_airflow_materialize() {
   }
 
   # A table left by the Runnable Example would make the guide's create step fail.
-  curl -fsS --max-time 10 -X DELETE \
-    "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
+  local code
+  code=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true")
+  case "$code" in 204|404) ;; *) fail "could not delete demo.driver_stats before the guide's create step (HTTP $code)";; esac
   eval "$(snippet feast-iceberg/commands.sh catalog-env)"
   run_step "could not create the Iceberg table through the catalog" "$py" build.py
+  # Delete the view, so that materialise starts again and the check reads this run's values.
+  (cd "$work" && "$work/.venv/bin/feast" -c feature_repo delete driver_stats) >/dev/null 2>&1 || true
   run_step "feast apply or materialize failed without a catalog address in the source" \
     env PATH="$work/.venv/bin:$PATH" bash -e -o pipefail -c "$(snippet feast-iceberg/commands.sh apply-materialize)"
   pass "the guide's source, with no catalog address, applied and materialised from the host"
@@ -1548,7 +1551,7 @@ smoke_feast() {
   # Its own project, so that the guide's Runnable Example can still register demo.
   # No feast teardown: it deletes every project in the registry, and it leaves each
   # view's row in feature_view_version_history, so the next apply of that view fails
-  # on its key. A second run applies the same definitions, which changes nothing.
+  # on its key. feast delete removes one view and its online values, and the view applies again.
   sed 's/^project: demo$/project: smoke/' "$work/feature_repo/feature_store.yaml" \
     > "$work/feature_store.yaml" && mv "$work/feature_store.yaml" "$work/feature_repo/feature_store.yaml"
 
@@ -1600,11 +1603,14 @@ PYONLINE
   }
 
   # A table left by the Runnable Example or by a reader would make the guide's create step fail.
-  curl -fsS --max-time 10 -X DELETE \
-    "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
+  local code
+  code=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true")
+  case "$code" in 204|404) ;; *) fail "could not delete demo.driver_stats before the guide's create step (HTTP $code)";; esac
   run_step "could not create the Iceberg table through the catalog" "$py" build.py
   pass "Iceberg table created through the REST catalog on SeaweedFS"
 
+  # Delete the view, so that materialise starts again and the check reads this run's values.
+  (cd "$work" && "$feast_bin" -c feature_repo delete driver_stats) >/dev/null 2>&1 || true
   run_step "feast apply or materialize failed" \
     env PATH="$work/.venv/bin:$PATH" bash -e -o pipefail -c "$(snippet feast-iceberg/commands.sh apply-materialize)"
   pass "feast apply registered the feature view, and materialize wrote to valkey"
@@ -1923,6 +1929,8 @@ case "$PROFILE" in
     run_example feast-iceberg '0.8999999761581421' "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash"
     smoke_feast_push_and_mcp
     run_example feast-vector-retrieval "\['Feast', 'Iceberg'\]" "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash"
+    # The two examples write their repositories into the current folder, as a reader's would.
+    rm -rf feature_repo vector_repo push_definitions.py
     rm -rf "${TMPDIR:-/tmp}/odctl-feast-smoke" ;;
   evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
   *)

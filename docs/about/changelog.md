@@ -43,7 +43,7 @@ Newer images for Trino, Metabase and the observability stack.
 - `odctl recreate`, `odctl restart` and `odctl logs` work on profiles from more than one compose file, such as `odctl recreate storage kafka-lite`. They ran every file as one project, so `recreate` failed with `Conflict. The container name "/seaweed" is already in use`, and `restart` and `logs` left out the containers of all but one file. Each file now runs as its own project, as with `odctl up`. [Apply a Change](../how-it-works.md#apply-a-change) uses `odctl recreate`.
 - `odctl init --force --yes` and `odctl down --all --volumes --yes` run without asking `Are you sure?`, for scripts and CI. `-y` is the short form. See [Stop a Profile](../getting-started.md#stop-a-profile) and [Start Again](../how-it-works.md#start-again).
 - [Getting Started](../getting-started.md) runs every command on `kafka-lite`, with its output, and the [home page](../index.md#commands) lists each command with a link to its example.
-- Every guide ends with a Runnable Example that names the files to run. [Rolling Windows](../guides/rolling-windows.md) is a page of its own, and the Flink push to Feast moved to [Push Features from Flink SQL](../guides/feast-iceberg.md#from-flink-sql).
+- Every guide ends with a Runnable Example that names the files to run. [Rolling Windows](../guides/rolling-windows.md) is a page of its own, and the Flink push to Feast moved to [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql) on the Feast guide.
 - The animation on [How It Works](../how-it-works.md#what-odctl-up-does) shows its four steps again. Since 1.1.0 it showed steps 1 to 3 for a moment each and then stayed on step 4, because one step was exported 2 pixels narrower and ffmpeg stopped at the change in size.
 - The Labs page is hidden until its first lab is published.
 
@@ -51,7 +51,7 @@ Newer images for Trino, Metabase and the observability stack.
 
 Flink can send rows to an HTTP API, Spark reads Kafka with no extra options, SeaweedFS survives uploads of large models, and the guides cover cases that real projects met.
 
-- Flink's SQL client has the HTTP connector. [Push Features from Flink SQL](../guides/feast-iceberg.md#from-flink-sql) pushes a feature value to Feast.
+- Flink's SQL client has the HTTP connector. [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql) on the Feast guide pushes a feature value to Feast.
 - Spark has the Kafka connector and the Avro module, so a job reads a topic, including Avro records written with the schema registry, with no `--packages` option. See [Read a Kafka Topic](../guides/spark.md#read-a-kafka-topic) and [Read Avro Records Written with the Schema Registry](../guides/spark.md#read-avro-records-written-with-the-schema-registry).
 - [Keep Messages Longer](../guides/kafka.md#keep-messages-longer) shows the broker's one-day and 500 MB retention and how to turn both off for a topic. [Troubleshooting](../troubleshooting.md#older-messages-are-missing) lists the symptom.
 - `seaweed` sets `GOMEMLIMIT` to three quarters of its memory limit, so uploads of a model of a few hundred MB no longer end with HTTP 500 and a killed container. [Troubleshooting](../troubleshooting.md#uploads-fail-with-http-500-and-seaweed-exited-with-code-137) says what to do when the limit is still reached, and [How It Works](../how-it-works.md#examples) changes both values together.

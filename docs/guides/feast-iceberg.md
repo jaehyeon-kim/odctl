@@ -500,10 +500,13 @@ INSERT INTO feast_push SELECT 'driver_push', ROW(ARRAY[CAST(1001 AS BIGINT)], AR
 SQL
 
 # The feature server can take up to a minute to see a new feature view.
+tries=0
 until curl -s -X POST http://127.0.0.1:6566/get-online-features \
     -H 'Content-Type: application/json' \
     -d '{"features": ["driver_pushed:conv_rate"], "entities": {"driver_id": [1001]}}' \
     | grep 0.8999999761581421; do
+  tries=$((tries + 1))
+  [ "$tries" -lt 24 ] || { echo "Flink's push did not arrive. Look for 'Http Sink failed to write' in the TaskManager log." >&2; exit 1; }
   sleep 5
 done
 
