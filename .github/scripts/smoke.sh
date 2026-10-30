@@ -1097,6 +1097,10 @@ sys.exit(0 if r and r[0][\"value\"][1] == \"42\" else 1)
 
   # The guide's metric, through the collector's OTLP HTTP receiver, which
   # forwards to Prometheus. This is the path an OpenTelemetry SDK uses.
+  snippet_says telemetry/commands.sh container -qx '200' \
+    || fail "the guide's container command got no 200 from otel-lgtm:4318"
+  pass "a container on the odctl network reaches the collector"
+
   run_snippet telemetry/commands.sh send-metric >/dev/null 2>&1 \
     || fail "the OTLP collector rejected a metric on :4318"
   retry 12 5 bash -c '
@@ -1113,13 +1117,16 @@ sys.exit(0 if r and r[0][\"value\"][1] == \"42\" else 1)
   retry 30 5 http_ok "http://127.0.0.1:3004/api/health" || fail "grafana never answered on :3004"
   curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "http://127.0.0.1:3004/api/datasources" 2>/dev/null \
     | grep -q "^401$" || fail "grafana answered without a login, anonymous access is still on"
-  curl -fsS --max-time 10 -u user:password \
-    "http://127.0.0.1:3004/api/datasources/proxy/uid/prometheus/api/v1/query?query=up" 2>/dev/null \
-    | python3 -c '
+  # Grafana answers "Unable to find datasource plugin" for a few seconds after
+  # its health check passes, so the query is retried.
+  retry 12 5 bash -c '
+    curl -fsS --max-time 10 -u user:password \
+      "http://127.0.0.1:3004/api/datasources/proxy/uid/prometheus/api/v1/query?query=up" 2>/dev/null \
+      | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-sys.exit(0 if d.get("status") == "success" and d["data"]["result"] else "no series")
-' || fail "grafana could not query prometheus through its data source"
+sys.exit(0 if d.get(\"status\") == \"success\" and d[\"data\"][\"result\"] else \"no series\")
+"' || fail "grafana could not query prometheus through its data source"
   pass "grafana logs in as user/password and queries prometheus"
 
   # A dashboard that fails to parse is logged and skipped, so count what loaded.

@@ -1,4 +1,5 @@
-# Commands from docs/guides/telemetry.md. .github/scripts/smoke.sh runs this section.
+# Commands from docs/guides/telemetry.md. .github/scripts/smoke.sh runs the
+# send-metric and container sections.
 
 # smoke.sh does not run the up sections, because the e2e workflow starts
 # each profile itself; they are the commands as the page shows them.
@@ -18,3 +19,9 @@ curl -X POST -H "Content-Type: application/json" --data-binary @/tmp/otlp.json \
   http://127.0.0.1:4318/v1/metrics
 curl "http://127.0.0.1:19090/api/v1/query?query=demo_total"
 # --8<-- [end:send-metric]
+
+# --8<-- [start:container]
+# An empty batch is enough to check the address. The collector answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -H "Content-Type: application/json" -d '{}' http://otel-lgtm:4318/v1/traces
+# --8<-- [end:container]

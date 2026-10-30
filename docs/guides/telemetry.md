@@ -53,6 +53,18 @@ The collector answers `{"partialSuccess":{}}`. The collector passes metrics on i
 
 Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), send OTLP to the collector at `otel-lgtm:4317` (gRPC) or `http://otel-lgtm:4318` (HTTP), as Airflow does. Prometheus is `http://otel-lgtm:9090` and Grafana is `http://otel-lgtm:3000`.
 
+This command sends an empty batch to the collector from a container on the network:
+
+```bash title="docs/snippets/telemetry/commands.sh:container"
+# An empty batch is enough to check the address. The collector answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -H "Content-Type: application/json" -d '{}' http://otel-lgtm:4318/v1/traces
+```
+
+```text
+200
+```
+
 ## Runnable Example
 
 Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace. It waits until Prometheus returns the metric:
