@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 from typer.testing import CliRunner
 from odctl.main import app
+from cli_workspace import fake_containers, write_workspace
 
 runner = CliRunner()
 
@@ -78,14 +79,159 @@ def test_logs_command(monkeypatch):
     mock_logs.assert_called()
 
 
-def test_list_command(monkeypatch):
-    result = runner.invoke(app, ["list"])
-    assert result.exit_code == 0
+# The expected text is what the commands print for the fixed workspace in
+# tests/cli_workspace.py at 100 columns.
+LIST_OUTPUT = """\
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Profile    ┃ Parent Stack ┃ Description                    ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ base       │ base         │ Shared network and setup.      │
+├────────────┼──────────────┼────────────────────────────────┤
+│ kafka-lite │ streaming    │ Event streaming for the tests. │
+│ kafka-full │              │                                │
+├────────────┼──────────────┼────────────────────────────────┤
+│ valkey     │ streaming    │ An in-memory cache.            │
+└────────────┴──────────────┴────────────────────────────────┘
+"""
+
+LIST_DETAILS_OUTPUT = """\
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Profile    ┃ Parent Stack ┃ Description            ┃ Services          ┃ Port Mappings           ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ base       │ base         │ Shared network and     │ init-base         │ N/A                     │
+│            │              │ setup.                 │                   │                         │
+├────────────┼──────────────┼────────────────────────┼───────────────────┼─────────────────────────┤
+│ kafka-lite │ streaming    │ Event streaming for    │ kafka, kafka-ui   │ kafka-ui:127.0.0.1:808… │
+│            │              │ the tests.             │                   │ kafka:127.0.0.1:9092:9… │
+│ kafka-full │              │                        │ kafka-1, kafka-ui │ kafka-1:127.0.0.1:9093… │
+│            │              │                        │                   │ kafka-ui:127.0.0.1:808… │
+├────────────┼──────────────┼────────────────────────┼───────────────────┼─────────────────────────┤
+│ valkey     │ streaming    │ An in-memory cache.    │ valkey            │ valkey:127.0.0.1:16379… │
+│            │              │                        │                   │ valkey:127.0.0.1:6379:… │
+└────────────┴──────────────┴────────────────────────┴───────────────────┴─────────────────────────┘
+"""
+
+EXPLAIN_KAFKA_LITE_OUTPUT = """\
+╭──────────────────────────────── 🔍 Profile Inspector: kafka-lite ────────────────────────────────╮
+│ Parent Stack: streaming                                                                          │
+│ Compose File: compose-kafka.yml                                                                  │
+│                                                                                                  │
+│ Description:                                                                                     │
+│ Event streaming for the tests.                                                                   │
+│                                                                                                  │
+│ Architecture Role:                                                                               │
+│ A broker with a dashboard.                                                                       │
+│                                                                                                  │
+│ Requires Dependencies:                                                                           │
+│   base                                                                                           │
+│                                                                                                  │
+│ Persistent Volumes:                                                                              │
+│   💾 ui-data                                                                                     │
+│   (Use 'odctl down -v' to wipe these volumes)                                                    │
+│                                                                                                  │
+│ Containers (Images):                                                                             │
+│   📦 kafka                  (apache/kafka:4.3.2)                                                 │
+│       ↳ Event Broker / Kafka Connect                                                             │
+│   📦 kafka-ui               (ghcr.io/kafbat/kafka-ui:v1.5.0)                                     │
+│       ↳ Kafka Dashboard                                                                          │
+│                                                                                                  │
+│ Network Mapping (Host → Docker):                                                                 │
+│   🔌 Host 8086  → Container kafka-ui:8080                                                        │
+│   🔌 Host 9092  → Container kafka:9092                                                           │
+│                                                                                                  │
+│ 🚀 How to Use It:                                                                                │
+│ Dashboard: http://127.0.0.1:8086                                                                 │
+│ Install with pip install feast[duckdb].                                                          │
+│                                                                                                  │
+│ Note:                                                                                            │
+│ Host addresses use 127.0.0.1. With IPv6 enabled in Docker, localhost can reach a service's IPv6  │
+│ address, and services that listen on IPv4 only reset the connection. localhost works when        │
+│ Docker's IPv6 is off.                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"""
+
+EXPLAIN_VALKEY_OUTPUT = """\
+╭────────────────────────────────── 🔍 Profile Inspector: valkey ──────────────────────────────────╮
+│ Parent Stack: streaming                                                                          │
+│ Compose File: compose-cache.yml                                                                  │
+│                                                                                                  │
+│ Description:                                                                                     │
+│ An in-memory cache.                                                                              │
+│                                                                                                  │
+│ Requires Dependencies:                                                                           │
+│   base, kafka-lite                                                                               │
+│                                                                                                  │
+│ Persistent Volumes:                                                                              │
+│   None                                                                                           │
+│                                                                                                  │
+│ Containers (Images):                                                                             │
+│   📦 valkey                 (valkey/valkey:8)                                                    │
+│       ↳ In-Memory Cache & Vector DB                                                              │
+│                                                                                                  │
+│ Network Mapping (Host → Docker):                                                                 │
+│   🔌 Host 16379 → Container valkey:6380/udp                                                      │
+│   🔌 Host 6379  → Container valkey:6379                                                          │
+│ Note:                                                                                            │
+│ Host addresses use 127.0.0.1. With IPv6 enabled in Docker, localhost can reach a service's IPv6  │
+│ address, and services that listen on IPv4 only reset the connection. localhost works when        │
+│ Docker's IPv6 is off.                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"""
+
+PS_ALL_OUTPUT = """\
+🌟 Active Profiles: base, kafka-lite
+
+┏━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Container ┃ Service   ┃ State      ┃ Health    ┃ Ports           ┃
+┡━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ init-base │ init-base │ exited     │ -         │ -               │
+│ kafka     │ kafka     │ running    │ starting  │ 9092 → 9092/tcp │
+│ kafka-ui  │ kafka-ui  │ running    │ healthy   │ 8086 → 8080/tcp │
+│ odd       │ -         │ restarting │ unhealthy │ -               │
+└───────────┴───────────┴────────────┴───────────┴─────────────────┘
+"""
 
 
-def test_explain_command(monkeypatch):
-    result = runner.invoke(app, ["explain", "kafka-lite"])
+def _invoke_in_fixed_workspace(monkeypatch, tmp_path, args):
+    """Run a command in the fixed workspace, at the width the expected text has."""
+    write_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    return runner.invoke(app, args, env={"COLUMNS": "100"})
+
+
+def test_list_command(monkeypatch, tmp_path):
+    """The tables of list and list -d print the fixed workspace's profiles."""
+    plain = _invoke_in_fixed_workspace(monkeypatch, tmp_path, ["list"])
+    assert plain.exit_code == 0
+    assert plain.stdout == LIST_OUTPUT
+
+    detailed = runner.invoke(app, ["list", "-d"], env={"COLUMNS": "100"})
+    assert detailed.exit_code == 0
+    assert detailed.stdout == LIST_DETAILS_OUTPUT
+
+
+def test_explain_command(monkeypatch, tmp_path):
+    """The panel prints a profile with a role, volumes, usage and a dependency chain, and one without."""
+    full = _invoke_in_fixed_workspace(monkeypatch, tmp_path, ["explain", "kafka-lite"])
+    assert full.exit_code == 0
+    assert full.stdout == EXPLAIN_KAFKA_LITE_OUTPUT
+
+    bare = runner.invoke(app, ["explain", "valkey"], env={"COLUMNS": "100"})
+    assert bare.exit_code == 0
+    assert bare.stdout == EXPLAIN_VALKEY_OUTPUT
+
+
+def test_ps_command(monkeypatch, tmp_path):
+    """The container table prints sorted rows, the active profiles and a dash for what Docker leaves out."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.docker.get_managed_containers", lambda plan: fake_containers()
+    )
+
+    result = _invoke_in_fixed_workspace(monkeypatch, tmp_path, ["ps", "--all"])
+
     assert result.exit_code == 0
+    assert result.stdout == PS_ALL_OUTPUT
 
 
 def test_explain_prints_the_host_address_note_once(monkeypatch, tmp_path):

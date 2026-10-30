@@ -28,7 +28,7 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 | `odctl up` | Launch Open Data profiles. |
 | `odctl down` | Stop and remove profile containers and networks. |
 | `odctl ps` | List Docker containers managed by the Open Data Stack. |
-| `odctl info` | Show the installed odctl version and whether Docker is reachable. |
+| `odctl info` | Show the odctl version, whether Docker is reachable and, with `--json`, the image tag, the workspace and odctl's own images. |
 | `odctl logs` | Fetch the logs of containers managed by specific profiles. |
 | `odctl restart` | Restart one or more specific profiles. |
 | `odctl recreate` | Replace one or more profiles' containers, applying compose file changes. |
@@ -42,6 +42,8 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | global | `--verbose` | Enable debug-level logging across all commands. |
 | global | `--workspace, -w` | Path to the odctl workspace directory (default: ./.odctl). |
 | `odctl list` | `--details, -d` | Inspect docker-compose files to show exact services and exposed host ports. |
+| `odctl list` | `--json` | Print the output as JSON, for scripts and AI assistants. |
+| `odctl explain` | `--json` | Print the output as JSON, for scripts and AI assistants. |
 | `odctl init` | `--force, -f` | Wipe out the existing workspace and recreate it from scratch. |
 | `odctl init` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
 | `odctl pull` | `--all, -a` | Pull images for ALL available profiles in the registry. |
@@ -52,6 +54,8 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | `odctl down` | `--dry-run` | Preview the teardown plan without actually stopping anything. |
 | `odctl down` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
 | `odctl ps` | `--all, -a` | Show all containers managed by odctl. |
+| `odctl ps` | `--json` | Print the output as JSON, for scripts and AI assistants. |
+| `odctl info` | `--json` | Print the output as JSON, for scripts and AI assistants. |
 | `odctl logs` | `--service, -s` | Filter to a specific compose service (Use 'odctl ps' to find names). |
 | `odctl logs` | `--follow, -f` | Follow log output in real-time. |
 | `odctl logs` | `--tail, -n` | Number of lines to show from the end of the logs. |

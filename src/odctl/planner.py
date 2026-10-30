@@ -4,6 +4,7 @@ import typer
 import yaml
 from rich.console import Console
 
+from odctl import ui
 from odctl.config import get_compose_path
 from odctl.registry import load_registry
 
@@ -92,9 +93,7 @@ def validate_profiles(profiles: List[str], profile_map: Dict[str, dict]):
     """
     invalid = [p for p in profiles if p not in profile_map]
     if invalid:
-        console.print(
-            f"[bold red]Error:[/bold red] Unknown profiles: {', '.join(invalid)}"
-        )
+        ui.print_error(f"Unknown profiles: {', '.join(invalid)}")
         raise typer.Exit(1)
 
 
@@ -161,9 +160,7 @@ def build_execution_plan(
         return execution_plan
 
     if not profiles:
-        console.print(
-            "[bold red]Error:[/bold red] Please specify profile names or use --all"
-        )
+        ui.print_error("Please specify profile names or use --all")
         raise typer.Exit(1)
 
     validate_profiles(profiles, profile_map)

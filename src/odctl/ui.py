@@ -1,26 +1,67 @@
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
+import typer
+from pydantic import BaseModel, TypeAdapter
 from rich.console import Console
 from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from odctl import workspace
-from odctl.docker import is_docker_running
+from odctl.models import Info, ProfileDetails, ProfileInfo, PsReport
 
 console = Console()
+error_console = Console(stderr=True)
+
+_json_output = False
 
 
-def print_profile_table(registry: Any, details: bool, get_details_func: Any):
+def set_json_output(enabled: bool) -> None:
+    """
+    Choose where warnings and errors go.
+
+    With JSON output, stdout holds one JSON document, so `print_error` and `print_info`
+    write to stderr. Without it, they write to stdout.
+
+    Args:
+        enabled (bool): True when the command was given `--json`.
+    """
+    global _json_output
+    _json_output = enabled
+
+
+def _message_console() -> Console:
+    """
+    Return the console that warnings and errors print to.
+
+    Returns:
+        Console: The stderr console under `--json`, otherwise the stdout console.
+    """
+    return error_console if _json_output else console
+
+
+def print_json(output: BaseModel | List[ProfileInfo]) -> None:
+    """
+    Print a model, or the list of profiles, as one JSON document on stdout.
+
+    Args:
+        output (BaseModel | List[ProfileInfo]): The model or the profiles to print.
+    """
+    if isinstance(output, BaseModel):
+        typer.echo(output.model_dump_json())
+    else:
+        typer.echo(TypeAdapter(List[ProfileInfo]).dump_json(output).decode())
+
+
+def print_profile_table(profiles: List[ProfileInfo], details: bool):
     """
     Format and print the list of available profiles to the console.
 
     Args:
-        registry (Any): The loaded Registry model containing all stack configurations.
-        details (bool): If True, inspects docker-compose files to show underlying services
-                     and exposed host ports.
-        get_details_func (Any): A callable (usually `get_stack_details`) to parse the
-                                compose files for deep inspection.
+        profiles (List[ProfileInfo]): The profiles in registry order. The profiles of one
+            registry stack are one group: only the first row of a group shows the stack
+            and description.
+        details (bool): If True, also shows each profile's services and published ports,
+            which need `ProfileInfo.services` to be filled.
     """
     table = Table(header_style="bold")
     table.add_column("Profile", style="green", no_wrap=True, vertical="middle")
@@ -31,21 +72,27 @@ def print_profile_table(registry: Any, details: bool, get_details_func: Any):
         table.add_column("Services", style="magenta", max_width=45, vertical="middle")
         table.add_column("Port Mappings", style="blue", max_width=55, vertical="middle")
 
-    for stack_id, config in registry.stacks.items():
-        display_group_name = config.parent if config.parent else stack_id
+    previous_stack_id = None
+    for info in profiles:
+        starts_group = info.stack_id != previous_stack_id
+        if starts_group and previous_stack_id is not None:
+            table.add_section()
+        previous_stack_id = info.stack_id
 
-        for i, profile in enumerate(config.profiles):
-            display_stack = display_group_name if i == 0 else ""
-            display_desc = config.description if i == 0 else ""
-            row = [profile, display_stack, display_desc]
+        row = [
+            info.profile,
+            info.stack if starts_group else "",
+            info.description if starts_group else "",
+        ]
 
-            if details:
-                # Absorb the newly returned volumes with an underscore
-                services, ports, _, _ = get_details_func(config.file, [profile])
-                row.append(", ".join(services) if services else "N/A")
-                row.append(", ".join(ports) if ports else "N/A")
+        if details:
+            services = [s.name for s in info.services]
+            row.append(", ".join(services) if services else "N/A")
+            row.append(", ".join(info.port_specs) if info.port_specs else "N/A")
 
-            table.add_row(*row)
+        table.add_row(*row)
+
+    if profiles:
         table.add_section()
     console.print(table)
 
@@ -60,37 +107,22 @@ HOST_ADDRESS_NOTE = (
 )
 
 
-def print_explain_panel(
-    profile: str,
-    stack_id: str,
-    stack_file: str,
-    description: str,
-    deps: List[str],
-    services: List[str],
-    ports: List[str],
-    images: List[str],
-    volumes: List[str],
-    role: Optional[str] = None,
-    usage: Optional[str] = None,
-):
+def print_explain_panel(details: ProfileDetails):
     """
     Format and print the detailed Profile Inspector panel.
 
     Args:
-        profile (str): The target profile name.
-        stack_id (str): The ID of the parent stack.
-        stack_file (str): The associated compose file.
-        description (str): A brief description of the stack.
-        deps (List[str]): Required upstream dependencies.
-        services (List[str]): Associated compose service names.
-        ports (List[str]): Formatted port mapping strings.
-        images (List[str]): Formatted container image strings.
-        volumes (List[str]): Associated named volumes.
-        role (Optional[str], optional): The architectural role. Defaults to None.
-        usage (Optional[str], optional): Usage instructions. Defaults to None.
+        details (ProfileDetails): The profile to describe.
     """
-
+    profile = details.profile
+    deps = [p for p in details.starts if p != profile] or ["None"]
     deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
+    services = details.services
+    volumes = details.volumes
+    usage = details.usage
+    if details.usage_missing:
+        usage = f"• No specific usage guide for profile: {profile}"
+    role = details.role
 
     # Container Context (Substring matching)
     container_roles = {
@@ -121,10 +153,11 @@ def print_explain_panel(
         "metabase": "BI Dashboard",
     }
 
-    if images and " -> " in images[0]:
+    with_images = [svc for svc in services if svc.image]
+    if with_images:
         services_list = []
-        for item in images:
-            name, img = item.split(" -> ")
+        for svc in with_images:
+            img = svc.image or ""
             role_desc = "Service Container"
             for key, desc in container_roles.items():
                 if key in img:
@@ -132,12 +165,12 @@ def print_explain_panel(
                     break
 
             services_list.append(
-                f"  📦 [magenta]{name.ljust(22, ' ')}[/magenta] ([green]{img}[/green])\n      ↳ [dim]{role_desc}[/dim]"
+                f"  📦 [magenta]{svc.name.ljust(22, ' ')}[/magenta] ([green]{img}[/green])\n      ↳ [dim]{role_desc}[/dim]"
             )
         services_str = "\n".join(services_list)
     else:
         services_str = (
-            "\n".join(f"  📦 [magenta]{s}[/magenta]" for s in services)
+            "\n".join(f"  📦 [magenta]{svc.name}[/magenta]" for svc in services)
             if services
             else "  None"
         )
@@ -153,8 +186,8 @@ def print_explain_panel(
 
     # Port Context (Host vs Internal Routing)
     ports_list = []
-    for p in ports:
-        parts = p.split(":")
+    for spec in details.port_specs:
+        parts = spec.split(":")
         svc_name = parts[0]
 
         # Parse Host vs Container mapping (for example, flink-sql-gateway:127.0.0.1:8084:8083)
@@ -181,12 +214,12 @@ def print_explain_panel(
         else ""
     )
 
-    details = f"""
-[bold]Parent Stack:[/bold] {stack_id}
-[bold]Compose File:[/bold] {stack_file}
+    body = f"""
+[bold]Parent Stack:[/bold] {details.stack}
+[bold]Compose File:[/bold] {details.compose_file}
 
 [bold]Description:[/bold]
-{description}
+{details.description}
 {role_section}
 [bold]Requires Dependencies:[/bold]
   {deps_str}
@@ -204,7 +237,7 @@ def print_explain_panel(
 
     console.print(
         Panel(
-            details.strip(),
+            body.strip(),
             title=f"🔍 Profile Inspector: [bold cyan]{profile}[/bold cyan]",
             border_style="cyan",
         )
@@ -271,21 +304,22 @@ def format_docker_error(exc: Exception, max_lines: int = 10) -> str:
 
 def print_error(message: str, details: Optional[str] = None, show_tip: bool = False):
     """
-    Print a standardized error message to the console.
+    Print a standardized error message to stdout, or to stderr under `--json`.
 
     Args:
         message (str): The primary error message.
         details (Optional[str], optional): Additional technical details or exceptions. Defaults to None.
         show_tip (bool, optional): If True, appends a troubleshooting tip regarding Docker logs. Defaults to False.
     """
-    console.print(f"[bold red]Error:[/bold red] {message}")
+    out = _message_console()
+    out.print(f"[bold red]Error:[/bold red] {message}")
     if details:
-        console.print(f"[red]Details:[/red] {details}")
+        out.print(f"[red]Details:[/red] {details}")
     if show_tip:
-        console.print(
+        out.print(
             "\n[yellow]Tip:[/yellow] Docker's own message is printed above this error."
         )
-        console.print(
+        out.print(
             "A pull failure names the image and leaves no container behind. "
             "For a container that started and then failed, "
             "run [cyan]docker ps -a[/cyan] and [cyan]docker logs <name>[/cyan]."
@@ -314,29 +348,28 @@ def print_step(message: str):
 
 def print_info(message: str, style: str = "cyan"):
     """
-    Print general information to the console with a specific style.
+    Print general information to stdout, or to stderr under `--json`, with a specific style.
 
     Args:
         message (str): The info message to display.
         style (str, optional): The Rich formatting style to apply. Defaults to "cyan".
     """
-    console.print(f"[{style}]{message}[/{style}]")
+    _message_console().print(f"[{style}]{message}[/{style}]")
 
 
-def print_ps_table(containers: List[Any], running_profiles: Optional[List[str]] = None):
+def print_ps_table(report: PsReport):
     """
     Format and print the list of running containers as a status table.
 
     Args:
-        containers (List[Any]): A list of python-on-whales Container objects.
-        running_profiles (Optional[List[str]]): A list of active profiles to display.
+        report (PsReport): The active profiles and the containers to show.
     """
-    if running_profiles:
+    if report.active_profiles:
         console.print(
-            f"🌟 [bold]Active Profiles:[/bold] [green]{', '.join(running_profiles)}[/green]\n"
+            f"🌟 [bold]Active Profiles:[/bold] [green]{', '.join(report.active_profiles)}[/green]\n"
         )
 
-    if not containers:
+    if not report.containers:
         print_info(
             "No containers found for the requested profiles. Are they running?",
             style="yellow",
@@ -350,69 +383,49 @@ def print_ps_table(containers: List[Any], running_profiles: Optional[List[str]] 
     table.add_column("Health")
     table.add_column("Ports", style="blue")
 
-    sorted_containers = sorted(containers, key=lambda c: c.name)
-
-    for c in sorted_containers:
-        # Extract the exact Compose Service name
-        labels = c.config.labels if c.config and c.config.labels else {}
-        svc_name = labels.get("com.docker.compose.service", "-")
-
-        # Format State
-        state = c.state.status
+    for c in report.containers:
         state_color = (
             "green"
-            if state == "running"
+            if c.state == "running"
             else "red"
-            if state in ["exited", "dead"]
+            if c.state in ["exited", "dead"]
             else "yellow"
         )
-        state_str = f"[{state_color}]{state}[/{state_color}]"
+        state_str = f"[{state_color}]{c.state}[/{state_color}]"
 
-        # Format Health
         health_str = "-"
-        if c.state.health:
-            h_status = c.state.health.status
+        if c.health:
             h_color = (
                 "green"
-                if h_status == "healthy"
+                if c.health == "healthy"
                 else "red"
-                if h_status == "unhealthy"
+                if c.health == "unhealthy"
                 else "yellow"
             )
-            health_str = f"[{h_color}]{h_status}[/{h_color}]"
+            health_str = f"[{h_color}]{c.health}[/{h_color}]"
 
-        # Format Ports
-        ports_list = []
-        if c.network_settings and c.network_settings.ports:
-            for c_port, bindings in c.network_settings.ports.items():
-                if bindings:
-                    for b in bindings:
-                        host_port = b.get("HostPort")
-                        if host_port:
-                            mapping = f"{host_port} → {c_port}"
-                            if mapping not in ports_list:
-                                ports_list.append(mapping)
+        ports_str = (
+            ", ".join(f"{p.host} → {p.container}/{p.protocol}" for p in c.ports) or "-"
+        )
 
-        ports_str = ", ".join(ports_list) if ports_list else "-"
-
-        table.add_row(c.name, svc_name, state_str, health_str, ports_str)
+        table.add_row(c.name, c.service or "-", state_str, health_str, ports_str)
 
     console.print(table)
 
 
-def print_package_info():
+def print_package_info(info: Info):
     """
     Display system-wide ODCTL configuration and Docker daemon health status.
-    """
-    # Call the workspace function so the monkeypatch intercepts it
-    cli_version = workspace.get_cli_version()
 
+    Args:
+        info (Info): The version and Docker state to show.
+    """
     docker_status = (
         "[green]✅ Reachable[/green]"
-        if is_docker_running()
+        if info.docker.reachable
         else "[red]❌ Not Reachable[/red]"
     )
 
     console.print("\n[bold cyan]Open Data Stack (ODCTL)[/bold cyan]")
-    console.print(f"CLI Version:   {cli_version}")
+    console.print(f"CLI Version:   {info.cli_version}")
     console.print(f"Docker Daemon: {docker_status}\n")

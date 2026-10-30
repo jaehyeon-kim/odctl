@@ -28,6 +28,10 @@ _UNTAUGHT = {
     "profile kafka-full": "runs the Kafka guide's commands with the container kafka-1; the e2e kafka-full case runs them",
     "profile flink-full": "runs the same SQL as flink-lite; the e2e flink-full case runs it",
     "profile spark-full": "runs the same jobs as spark-lite; the e2e spark-full case runs them",
+    "option list --json": "taught by Getting Started in the next batch of 1.5.0, which removes this entry",
+    "option explain --json": "taught by Getting Started in the next batch of 1.5.0, which removes this entry",
+    "option ps --json": "taught by Getting Started in the next batch of 1.5.0, which removes this entry",
+    "option info --json": "taught by Getting Started in the next batch of 1.5.0, which removes this entry",
 }
 
 
