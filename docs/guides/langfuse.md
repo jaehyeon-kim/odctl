@@ -85,7 +85,7 @@ def send_trace(question):
 print(send_trace("What does Langfuse store?"))
 ```
 
-Run it. `uv run` installs the two OpenTelemetry packages for this run only:
+Run it. The commands use `uv run --with`, which needs uv; with pip, install the two packages with `pip install` and run the script with `python`. `uv run` installs the two OpenTelemetry packages for this run only:
 
 ```bash title="docs/snippets/langfuse/commands.sh:run"
 uv run --with "opentelemetry-sdk>=1.45,<2" --with "opentelemetry-exporter-otlp-proto-http>=1.45,<2" python send.py

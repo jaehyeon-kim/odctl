@@ -2,9 +2,11 @@ name: odctl-aieng
 
 # Langfuse, which traces and evaluates LLM and agent applications. Its web and
 # worker services run on odctl's own PostgreSQL, ClickHouse (ch-lite), Valkey
-# and SeaweedFS, so none of those is started here. The langfuse database comes
-# from postgres/01-init-databases.sh and clickhouse/init.sql, and the langfuse
-# bucket from seaweed-init.
+# and SeaweedFS, so none of those is started here. The langfuse ClickHouse
+# database comes from clickhouse/init.sql. The PostgreSQL one comes from
+# postgres/01-init-databases.sh on a new data folder, and Langfuse's migration
+# creates it on a PostgreSQL from before 1.7.0. The langfuse bucket comes from
+# seaweed-init.
 
 # The settings that web and worker share.
 x-langfuse-env: &langfuse-env

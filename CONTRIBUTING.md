@@ -87,7 +87,7 @@ For a group name with a colon, such as `metadata:deps`, the e2e job starts the p
 
 ## Add a Profile
 
-1. Add the services to the compose file of their area in `src/odctl/resources/`, following the Rules: a pinned image, a `container_name`, and ports bound to `127.0.0.1`.
+1. Add the services to the compose file of their area in `src/odctl/resources/`, following the Rules: a pinned image, a `container_name`, and ports bound to `127.0.0.1`. A new area needs its entry in `TECH_GROUPS` in `scripts/gen_pages.py`. A dependency whose name sorts after the profile needs a weight in `order_weights` in `src/odctl/planner.py`.
 2. Add the profile to `src/odctl/resources/registry.yml`: its compose file, description, profiles, dependencies, role and usage text. `scripts/gen_pages.py` builds its page from this entry and the compose file.
 3. Add its checks to `.github/scripts/smoke.sh`, and its group to `GROUPS` in `.github/scripts/select-profiles.py`.
 4. Add the technology to the README diagram, `image/diagram.drawio`, then export it. `test_readme_diagram_names_every_technology` fails until you do.
