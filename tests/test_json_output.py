@@ -304,6 +304,7 @@ services:
       - "${VK_PORT:-6379}:6379"
       - "7000-7001:7000-7001"
       - "6380:6380/tcp"
+      - "9000"
     profiles: [valkey]
 """,
     )
@@ -313,6 +314,7 @@ services:
     assert "valkey:${VK_PORT:-6379}:6379" in listed
     assert "valkey:7000-7001:7000-7001" in listed
     assert "valkey:6380:6380/tcp" in listed
+    assert "valkey:9000" in listed
     assert "Host -6379} → Container valkey:6379" in explained
     assert "Container valkey:6379" in explained
     assert "Container valkey:7000-7001" in explained

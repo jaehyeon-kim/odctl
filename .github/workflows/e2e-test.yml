@@ -76,7 +76,7 @@ jobs:
         run: uv tool install .
 
       - name: Initialize odctl workspace
-        run: yes | odctl init --force
+        run: odctl init --force --yes
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
@@ -121,11 +121,11 @@ jobs:
             # project with "depends on undefined service" and only the named
             # form could catch it. Naming the profile is also what a user runs.
             echo "🧹 Tearing down $base by name..."
-            yes | odctl down "$base" --volumes
+            odctl down "$base" --volumes --yes
 
             # Sweep afterwards so a failure above cannot leak state into the
             # next profile in the group. This is a no-op when the named
             # teardown succeeded.
-            yes | odctl down --all --volumes
+            odctl down --all --volumes --yes
             echo "::endgroup::"
           done

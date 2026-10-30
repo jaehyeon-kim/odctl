@@ -71,9 +71,9 @@ Most services keep their data inside their containers. PostgreSQL, SeaweedFS, Cl
 | `odctl restart` | kept | kept |
 | `odctl recreate` | replaced | lost, except in PostgreSQL, SeaweedFS, ClickHouse and ZooKeeper, which keep their volumes |
 | `odctl down` | removed | lost; the unnamed volumes stay on disk, unused |
-| `odctl down --volumes` | removed, with the unnamed volumes and the `odctl-shared-deps` volume | lost |
+| `odctl down --volumes` | removed, with the unnamed volumes and the profile's named volumes such as `spark-events-data`. The `odctl-shared-deps` volume is removed too once no other profile has a container | lost |
 
-A database, a bucket, a topic or an Iceberg table therefore lasts until its profile is stopped, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
+A database, a bucket, a topic or an Iceberg table therefore lasts until its profile is stopped, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster. The Spark containers (`spark-master`, the workers and `spark-history`) share the `spark-events-data` volume, which holds Spark's event logs and is stored in memory, so it holds nothing once the stack is down.
 
 Three profiles read their code from a SeaweedFS bucket, so uploading a file deploys it, and the upload lasts as long as the bucket does. The `storage` profile creates the buckets.
 
@@ -186,6 +186,8 @@ docker port trino
 
 The last command prints `8080/tcp -> 127.0.0.1:8180`.
 
+The shipped `trino/rules.json` grants every identity full table privileges and denies `analyst` schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.
+
 Install extra Python packages in the Airflow container, for DAGs that import them:
 
 ```bash title="docs/snippets/how-it-works/commands.sh:airflow-deps"
@@ -257,10 +259,6 @@ PY
 
 Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile. An upgrade needs `odctl init --force`, which removes that edit.
 
-### Trino Access Rules
-
-The shipped `trino/rules.json` grants every identity full table privileges and denies `analyst` schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.
-
 ### Start Again
 
 `odctl init --force` deletes `.odctl` and copies the bundled files again, with `TAG` set to the current CLI version. Your edits are lost, so it asks for confirmation first. In a script, `--yes` answers the prompt:
@@ -268,3 +266,16 @@ The shipped `trino/rules.json` grants every identity full table privileges and d
 ```bash title="docs/snippets/how-it-works/commands.sh:init-force"
 odctl init --force --yes
 ```
+
+## What Stays Stable in 1.x
+
+A project that pins `odctl>=1.0,<2` keeps working, because every 1.x release keeps what a script or a project reads from odctl. These six things stay the same:
+
+- The profile names, such as `kafka-lite` ([Profiles](#profiles)).
+- The host ports that the services publish ([How You Reach a Service](#how-you-reach-a-service)).
+- The keys of `.odctl/.env` that `odctl init` writes ([Customise It](#customise-it)).
+- The names of the named volumes, `odctl-shared-deps` and `spark-events-data`, and which services keep their data in a volume ([Where Data Lives](#where-data-lives)).
+- The files `odctl init` copies into `.odctl` ([Workspace](#workspace)).
+- The keys of the `--json` output of `list`, `explain`, `ps` and `info` ([JSON Output](json-output.md)).
+
+Removing or renaming a profile, an `.env` key, a named volume, a workspace file or a JSON key, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key or a JSON key breaks nothing. Any other change of behaviour gets a line under Upgrading in the [Changelog](about/changelog.md).

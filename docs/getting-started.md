@@ -45,13 +45,157 @@ Add `-d` to list each profile's services and host ports as well:
 odctl list -d
 ```
 
+Add `--json` to print the profiles as JSON, which a script or an AI assistant reads more easily than a table. odctl prints the JSON on standard output and every warning, such as the one for a stale workspace, on standard error, so a pipe receives only the JSON. The full output lists every profile, and this keeps only `kafka-lite`:
+
+```bash title="docs/snippets/getting-started/commands.sh:list-json"
+# Print only kafka-lite; the full output lists every profile.
+odctl list --json | python3 -c 'import json, sys; profiles = {p["profile"]: p for p in json.load(sys.stdin)}; print(json.dumps(profiles["kafka-lite"], indent=4))'
+```
+
+```text
+{
+    "profile": "kafka-lite",
+    "stack": "kafka",
+    "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+    "compose_file": "compose-kafka.yml",
+    "depends_on": [
+        "deps"
+    ],
+    "starts": [
+        "deps",
+        "kafka-lite"
+    ],
+    "services": [
+        {
+            "name": "connect",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 8083,
+                    "container": 8083,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 9092,
+                    "container": 9092,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka-ui",
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "ports": [
+                {
+                    "host": 8086,
+                    "container": 8080,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "karapace",
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "ports": [
+                {
+                    "host": 8081,
+                    "container": 8081,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ]
+}
+```
+
+Each profile is one object, and `starts` lists the profiles that `odctl up kafka-lite` starts. [JSON Output](json-output.md) lists the keys of every command that takes `--json`.
+
 This shows what one profile runs:
 
 ```bash title="docs/snippets/getting-started/commands.sh:explain"
 odctl explain kafka-lite
 ```
 
-It prints a panel for `kafka-lite`: the parent stack `kafka`, the compose file, the profile it requires (`deps`), the containers `connect`, `kafka`, `kafka-ui` and `karapace` with their images, the host ports and how to reach each service. This shows the profiles `kafka-lite` would start, in order, without starting anything:
+It prints a panel for `kafka-lite`: the parent stack `kafka`, the compose file, the profile it requires (`deps`), the containers `connect`, `kafka`, `kafka-ui` and `karapace` with their images, the host ports and how to reach each service.
+
+`--json` prints the same details as one object, with `usage`, `role` and `volumes` added to the keys of `list`:
+
+```bash title="docs/snippets/getting-started/commands.sh:explain-json"
+odctl explain kafka-lite --json | python3 -m json.tool
+```
+
+```text
+{
+    "profile": "kafka-lite",
+    "stack": "kafka",
+    "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+    "compose_file": "compose-kafka.yml",
+    "depends_on": [
+        "deps"
+    ],
+    "starts": [
+        "deps",
+        "kafka-lite"
+    ],
+    "services": [
+        {
+            "name": "connect",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 8083,
+                    "container": 8083,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 9092,
+                    "container": 9092,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka-ui",
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "ports": [
+                {
+                    "host": 8086,
+                    "container": 8080,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "karapace",
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "ports": [
+                {
+                    "host": 8081,
+                    "container": 8081,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ],
+    "usage": "\u2022 Kafka UI:\n  - External (host): http://127.0.0.1:8086\n  - Internal (Docker): http://kafka-ui:8080\n\u2022 Schema Registry & Connect:\n  - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083\n\u2022 Bootstrap Servers (1-Node Lite):\n  - External (host): 127.0.0.1:9092\n  - Internal (Docker): broker-1:19092\n",
+    "role": "KRaft broker(s) with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion.",
+    "volumes": []
+}
+```
+
+This shows the profiles `kafka-lite` would start, in order, without starting anything:
 
 ```bash title="docs/snippets/getting-started/commands.sh:dry-run"
 odctl up kafka-lite --dry-run
@@ -77,15 +221,62 @@ This prints the installed CLI version and whether Docker is reachable:
 odctl info
 ```
 
-The output has two lines: `CLI Version:` with the version, and `Docker Daemon: ✅ Reachable`. This lists the containers of a profile, with their state, health and ports:
+The output has a title line, `Open Data Stack (ODCTL)`, then `CLI Version:` with the version and `Docker Daemon: ✅ Reachable`. With `--json`, it also prints the image tag, the workspace and odctl's own images, and whether each image is already on your machine. `workspace.path` is the `.odctl` folder in the folder where you run odctl; the output below shortens it to `/home/you/project/.odctl`:
+
+```bash title="docs/snippets/getting-started/commands.sh:info-json"
+odctl info --json | python3 -m json.tool
+```
+
+```text
+{
+    "cli_version": "1.3.0",
+    "tag": "1.3.0",
+    "workspace": {
+        "path": "/home/you/project/.odctl",
+        "exists": true,
+        "stale_tag": null
+    },
+    "docker": {
+        "reachable": true
+    },
+    "images": [
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.3.0",
+            "local": true
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.3.0",
+            "local": true
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.3.0",
+            "local": false
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.3.0",
+            "local": true
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.3.0",
+            "local": false
+        }
+    ]
+}
+```
+
+`stale_tag` is `null` unless the workspace's `TAG` differs from the CLI version and no `TAG` is set in the shell; then it shows the workspace's `TAG`.
+
+This lists the containers of a profile, with their state, health and ports:
 
 ```bash title="docs/snippets/getting-started/commands.sh:ps"
 odctl ps kafka-lite
 ```
 
-It prints a table with one row per container:
+It prints the active profiles, then a table with one row per container:
 
 ```text
+🌟 Active Profiles: kafka-lite
+
 ┏━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
 ┃ Container ┃ Service  ┃ State   ┃ Health  ┃ Ports           ┃
 ┡━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
@@ -96,7 +287,77 @@ It prints a table with one row per container:
 └───────────┴──────────┴─────────┴─────────┴─────────────────┘
 ```
 
-A dash under Health means the service has no health check. This lists every container odctl manages, from every profile, including one-shot containers that have finished, such as `odctl-init-deps`:
+A dash under Health means the service has no health check.
+
+`--json` prints the same containers as one object: each published port's host and container port as numbers, a missing health check as `null`, and, in `active_profiles`, the profiles you named whose services are all running, with their prerequisites from the same compose file. The list never holds `deps`, and it leaves out a profile whose services all belong to another listed profile, such as `spark-lite` beside `spark-full`:
+
+```bash title="docs/snippets/getting-started/commands.sh:ps-json"
+odctl ps kafka-lite --json | python3 -m json.tool
+```
+
+```text
+{
+    "active_profiles": [
+        "kafka-lite"
+    ],
+    "containers": [
+        {
+            "name": "connect",
+            "service": "connect",
+            "state": "running",
+            "health": null,
+            "ports": [
+                {
+                    "host": 8083,
+                    "container": 8083,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka",
+            "service": "kafka",
+            "state": "running",
+            "health": null,
+            "ports": [
+                {
+                    "host": 9092,
+                    "container": 9092,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka-ui",
+            "service": "kafka-ui",
+            "state": "running",
+            "health": null,
+            "ports": [
+                {
+                    "host": 8086,
+                    "container": 8080,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "karapace",
+            "service": "karapace",
+            "state": "running",
+            "health": "healthy",
+            "ports": [
+                {
+                    "host": 8081,
+                    "container": 8081,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ]
+}
+```
+
+This lists every container odctl manages, from every profile, including one-shot containers that have finished, such as `odctl-init-deps`:
 
 ```bash title="docs/snippets/getting-started/commands.sh:ps-all"
 odctl ps --all

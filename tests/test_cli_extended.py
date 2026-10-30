@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import MagicMock
 from typer.testing import CliRunner
 from odctl.main import app
@@ -418,3 +419,29 @@ def test_init_force_yes_replaces_the_workspace_without_a_prompt(tmp_path, monkey
 
     assert result.exit_code == 0
     mock_init.assert_called_once_with(force=True)
+
+
+@pytest.mark.parametrize(
+    "args, workspace_exists",
+    [
+        pytest.param(["init", "--force"], True, id="init"),
+        pytest.param(["down", "--all", "--volumes"], False, id="down"),
+    ],
+)
+def test_confirmation_with_no_input_aborts(
+    args, workspace_exists, tmp_path, monkeypatch
+):
+    """With no terminal and no `--yes`, the prompt reads end of input and aborts."""
+    mock_stop = _down_all_mocks(monkeypatch)
+    mock_init = MagicMock()
+    monkeypatch.setattr("odctl.main.init_workspace", mock_init)
+    workspace = tmp_path / ".odctl"
+    if workspace_exists:
+        workspace.mkdir()
+    monkeypatch.setattr("odctl.main.get_workspace_dir", lambda: workspace)
+
+    result = runner.invoke(app, args, input="")
+
+    assert result.exit_code == 1
+    mock_init.assert_not_called()
+    mock_stop.assert_not_called()

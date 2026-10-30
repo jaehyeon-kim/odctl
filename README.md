@@ -43,10 +43,10 @@ Each command has its own section in the CLI reference, with its options and exam
 
 | Command | Use it to | Example |
 | --- | --- | --- |
-| [`odctl list`](https://jaehyeon.me/odctl/latest/cli/#odctl-list) | See every profile and what it runs | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
-| [`odctl explain`](https://jaehyeon.me/odctl/latest/cli/#odctl-explain) | See a profile's services, images, ports and the profiles it depends on | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
-| [`odctl ps`](https://jaehyeon.me/odctl/latest/cli/#odctl-ps) | See the running containers, their health and their ports | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl info`](https://jaehyeon.me/odctl/latest/cli/#odctl-info) | Check the installed odctl version and whether Docker is reachable | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
+| [`odctl list`](https://jaehyeon.me/odctl/latest/cli/#odctl-list) | See every profile and what it runs, as a table or, with `--json`, as JSON | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
+| [`odctl explain`](https://jaehyeon.me/odctl/latest/cli/#odctl-explain) | See a profile's services, images, ports and the profiles it depends on, as a panel or, with `--json`, as JSON | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
+| [`odctl ps`](https://jaehyeon.me/odctl/latest/cli/#odctl-ps) | See the running containers, their health and their ports, as a table or, with `--json`, as JSON | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
+| [`odctl info`](https://jaehyeon.me/odctl/latest/cli/#odctl-info) | Check the installed odctl version and whether Docker is reachable; with `--json`, also the image tag, the workspace and odctl's own images | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
 | [`odctl init`](https://jaehyeon.me/odctl/latest/cli/#odctl-init) | Copy the compose files and settings into `.odctl`, so you can edit them | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#create-a-workspace) |
 | [`odctl pull`](https://jaehyeon.me/odctl/latest/cli/#odctl-pull) | Download a profile's images before you start it | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#which-images-run) |
 | [`odctl up`](https://jaehyeon.me/odctl/latest/cli/#odctl-up) | Start profiles and the profiles they depend on | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
@@ -57,7 +57,7 @@ Each command has its own section in the CLI reference, with its options and exam
 
 ## Roadmap
 
-odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`. The next releases add a written list of what 1.x keeps stable with JSON output, an MCP server for AI agents, a Langfuse profile, and lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
+odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`; [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what that covers. The next releases add an MCP server for AI agents, a Langfuse profile, and lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
 
 ## Related Reading
 

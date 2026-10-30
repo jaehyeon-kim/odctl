@@ -14,10 +14,10 @@ Each command has its own section in the CLI reference, with its options and exam
 
 | Command | Use it to | Example |
 | --- | --- | --- |
-| [`odctl list`](cli.md#odctl-list) | See every profile and what it runs | [Getting Started](getting-started.md#start-a-profile) |
-| [`odctl explain`](cli.md#odctl-explain) | See a profile's services, images, ports and the profiles it depends on | [Getting Started](getting-started.md#start-a-profile) |
-| [`odctl ps`](cli.md#odctl-ps) | See the running containers, their health and their ports | [Getting Started](getting-started.md#see-what-is-running) |
-| [`odctl info`](cli.md#odctl-info) | Check the installed odctl version and whether Docker is reachable | [Getting Started](getting-started.md#see-what-is-running) |
+| [`odctl list`](cli.md#odctl-list) | See every profile and what it runs, as a table or, with `--json`, as JSON | [Getting Started](getting-started.md#start-a-profile) |
+| [`odctl explain`](cli.md#odctl-explain) | See a profile's services, images, ports and the profiles it depends on, as a panel or, with `--json`, as JSON | [Getting Started](getting-started.md#start-a-profile) |
+| [`odctl ps`](cli.md#odctl-ps) | See the running containers, their health and their ports, as a table or, with `--json`, as JSON | [Getting Started](getting-started.md#see-what-is-running) |
+| [`odctl info`](cli.md#odctl-info) | Check the installed odctl version and whether Docker is reachable; with `--json`, also the image tag, the workspace and odctl's own images | [Getting Started](getting-started.md#see-what-is-running) |
 | [`odctl init`](cli.md#odctl-init) | Copy the compose files and settings into `.odctl`, so you can edit them | [Getting Started](getting-started.md#create-a-workspace) |
 | [`odctl pull`](cli.md#odctl-pull) | Download a profile's images before you start it | [How It Works](how-it-works.md#which-images-run) |
 | [`odctl up`](cli.md#odctl-up) | Start profiles and the profiles they depend on | [Getting Started](getting-started.md#start-a-profile) |

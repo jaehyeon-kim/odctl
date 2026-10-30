@@ -1,5 +1,6 @@
 """The generated documentation pages cover every profile and every command."""
 
+import json
 import re
 
 import pytest
@@ -80,6 +81,73 @@ def test_cli_reference_covers_every_visible_command(gen_pages):
     # Help is captured as plain text, so no terminal colour codes reach the page.
     assert "\x1b" not in reference
     assert "[bold" not in reference
+
+
+def test_json_output_page_covers_every_json_command(gen_pages):
+    page = gen_pages.json_output_page()
+    commands = [c for c, flags, _ in gen_pages.command_options() if flags == "--json"]
+    assert sorted(commands) == ["explain", "info", "list", "ps"]
+    for command in commands:
+        assert f"\n## odctl {command}\n" in page, (
+            f"{command} has no JSON Output section"
+        )
+
+
+def test_json_output_page_leaves_out_the_fields_the_json_excludes(gen_pages):
+    import inspect
+
+    from pydantic import BaseModel
+
+    import odctl.models
+
+    page = gen_pages.json_output_page()
+    excluded = {
+        name
+        for _, model in inspect.getmembers(odctl.models, inspect.isclass)
+        if issubclass(model, BaseModel)
+        for name, field in model.model_fields.items()
+        if field.exclude
+    }
+    assert sorted(excluded) == ["port_specs", "stack_id", "usage_missing"]
+    for name in excluded:
+        assert name not in page, f"{name} is excluded from the JSON but on the page"
+
+
+def _json_output_schemas(gen_pages):
+    """Return the schema of each JSON block on the JSON Output page."""
+    page = gen_pages.json_output_page()
+    blocks = re.findall(r"```json\n(.*?)\n```", page, re.DOTALL)
+    assert len(blocks) == len(gen_pages.JSON_OUTPUTS)
+    return [json.loads(block) for block in blocks]
+
+
+def _schema_objects(node):
+    """Yield every JSON Schema object that has properties, at any depth."""
+    if isinstance(node, dict):
+        if "properties" in node:
+            yield node
+        for value in node.values():
+            yield from _schema_objects(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _schema_objects(value)
+
+
+def test_json_output_schemas_require_every_key_the_json_always_writes(gen_pages):
+    for schema in _json_output_schemas(gen_pages):
+        objects = list(_schema_objects(schema))
+        assert objects
+        for obj in objects:
+            assert sorted(obj["required"]) == sorted(obj["properties"])
+
+
+def test_json_output_schemas_describe_each_key_for_a_script_author(gen_pages):
+    for schema in _json_output_schemas(gen_pages):
+        assert "description" not in schema
+        for obj in _schema_objects(schema):
+            assert "description" not in obj
+            for name, prop in obj["properties"].items():
+                assert prop.get("description"), f"{name} has no description"
 
 
 def test_docs_only_changes_select_no_e2e_groups():

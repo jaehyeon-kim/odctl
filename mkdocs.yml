@@ -37,7 +37,7 @@ plugins:
   - search
   - mike:
       canonical_version: latest
-  # Writes the profile pages, the CLI reference and the diagram at build time.
+  # Writes the profile pages, the CLI reference, the JSON Output page and the diagram at build time.
   - gen-files:
       scripts:
         - scripts/gen_pages.py
@@ -122,6 +122,7 @@ nav:
           - OpenMetadata: guides/openmetadata.md
           - Telemetry: guides/telemetry.md
   - CLI Reference: cli.md
+  - JSON Output: json-output.md
   - Troubleshooting: troubleshooting.md
   - About:
       - Why odctl: about/why-odctl.md

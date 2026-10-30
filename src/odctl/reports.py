@@ -47,13 +47,15 @@ def _parse_port(spec: str) -> Optional[Port]:
 
     Returns:
         Optional[Port]: The port, or None when it is not made of plain numbers, as with
-        a range.
+        a range, or has no host part, which compose publishes on a random host port.
     """
     numbers, _, protocol = spec.partition("/")
     parts = numbers.split(":")
+    if len(parts) < 2:
+        return None
     try:
         container = int(parts[-1])
-        host = int(parts[-2]) if len(parts) >= 2 else container
+        host = int(parts[-2])
     except ValueError:
         return None
     return Port(host=host, container=container, protocol=protocol or "tcp")

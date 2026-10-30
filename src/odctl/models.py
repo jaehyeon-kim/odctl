@@ -1,64 +1,63 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
-class Port(BaseModel):
+class _JsonModel(BaseModel):
     """
-    A published port: the host port that reaches a container port.
+    Base of every model that `--json` prints.
 
-    Attributes:
-        host (int): The port on the host.
-        container (int): The port inside the container.
-        protocol (str): The transport protocol, `tcp` unless the source says otherwise.
+    `--json` always writes every field, so the schema marks every field as required.
     """
 
-    host: int
-    container: int
-    protocol: str = "tcp"
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
-class ServiceInfo(BaseModel):
-    """
-    A compose service that a profile starts.
+class Port(_JsonModel):
+    """A published port: the host port that reaches a container port."""
 
-    Attributes:
-        name (str): The compose service name.
-        image (Optional[str]): The image as it will run, with `TAG` resolved, or None
-            when the service builds or inherits its image.
-        ports (List[Port]): The ports the service publishes on the host that are plain
-            numbers once compose variables are expanded, sorted by host port.
-    """
-
-    name: str
-    image: Optional[str] = None
-    ports: List[Port] = Field(default_factory=list)
+    host: int = Field(description="The port on the host, a number.")
+    container: int = Field(description="The port inside the container, a number.")
+    protocol: str = Field(
+        default="tcp",
+        description="The transport protocol, `tcp` or `udp`, as Docker or the compose file gives it.",
+    )
 
 
-class ProfileInfo(BaseModel):
-    """
-    One profile of the registry, as `odctl list` shows it.
+class ServiceInfo(_JsonModel):
+    """A compose service that a profile starts."""
 
-    Attributes:
-        profile (str): The profile name.
-        stack (str): The stack the profile belongs to: the registry entry's `parent`,
-            or its own id when it has none.
-        description (str): What the stack provides.
-        compose_file (str): The compose file that defines the profile's services.
-        depends_on (List[str]): The profiles the registry lists as direct prerequisites.
-        starts (List[str]): Every profile `odctl up` starts for this one, the profile
-            itself and all its prerequisites.
-        services (List[ServiceInfo]): The services the profile starts, sorted by name.
-            Empty when the compose files were not read.
-    """
+    name: str = Field(description="The compose service name.")
+    image: Optional[str] = Field(
+        default=None,
+        description="The image as it will run, with `TAG` resolved. `null` when the compose file gives the service no `image`, as for a service that is built.",
+    )
+    ports: List[Port] = Field(
+        default_factory=list,
+        description="The ports the service publishes on the host, sorted by host port. Compose variables are expanded first, as compose does. A port range is left out, and so is a port with no host part, which compose publishes on a random host port. Empty when the service publishes none.",
+    )
 
-    profile: str
-    stack: str
-    description: str
-    compose_file: str
-    depends_on: List[str]
-    starts: List[str]
-    services: List[ServiceInfo]
+
+class ProfileInfo(_JsonModel):
+    """One profile of the registry, as `odctl list` shows it."""
+
+    profile: str = Field(description="The profile name, which `odctl up` takes.")
+    stack: str = Field(
+        description="The stack the profile belongs to, such as `kafka` for `kafka-lite`. When the registry gives the stack a `parent` group, the value is that group instead, such as `infra` for `postgres`, `storage` and `catalog`."
+    )
+    description: str = Field(description="What the stack provides.")
+    compose_file: str = Field(
+        description="The compose file that defines the profile's services."
+    )
+    depends_on: List[str] = Field(
+        description="The profiles the registry lists as direct prerequisites, sorted by name. Empty when there are none."
+    )
+    starts: List[str] = Field(
+        description="Every profile `odctl up` starts for this one: the profile itself and all its prerequisites, sorted by name."
+    )
+    services: List[ServiceInfo] = Field(
+        description="The services the profile starts, sorted by name."
+    )
     # The registry's id of the stack, which the tables group by; not in the JSON.
     stack_id: str = Field(default="", exclude=True)
     # Every port as the compose file wrote it, as `service:port`, sorted, which the
@@ -67,45 +66,44 @@ class ProfileInfo(BaseModel):
 
 
 class ProfileDetails(ProfileInfo):
-    """
-    One profile with everything `odctl explain` shows.
+    """One profile with everything `odctl explain` shows."""
 
-    Attributes:
-        usage (Optional[str]): The usage text for this profile, or None when the
-            registry has none for it.
-        role (Optional[str]): The architectural role of the profile's stack.
-        volumes (List[str]): The named volumes the profile's services mount.
-    """
-
-    usage: Optional[str] = None
-    role: Optional[str] = None
-    volumes: List[str] = Field(default_factory=list)
+    usage: Optional[str] = Field(
+        default=None,
+        description="The text that says how to reach the profile's services. `null` when the registry has none for this profile.",
+    )
+    role: Optional[str] = Field(
+        default=None,
+        description="What the profile's stack does in a data platform. `null` when the registry gives none.",
+    )
+    volumes: List[str] = Field(
+        default_factory=list,
+        description="The named volumes the profile's services mount, sorted by name. Bind mounts are left out, and so are volumes the compose file declares as `external`, so `odctl-shared-deps` appears only for the `deps` profile. Empty when there are none.",
+    )
     # Whether the registry gives usage text for other profiles of the stack but not
     # this one, which the panel shows as a placeholder; not in the JSON.
     usage_missing: bool = Field(default=False, exclude=True)
 
 
-class ContainerInfo(BaseModel):
-    """
-    A container that odctl manages.
+class ContainerInfo(_JsonModel):
+    """A container that odctl manages."""
 
-    Attributes:
-        name (str): The container name.
-        service (Optional[str]): The compose service, or None when the container has no
-            compose service label.
-        state (str): The state as Docker reports it, for example `running` or `exited`.
-        health (Optional[str]): The health status as Docker reports it, or None when
-            the container has no health check.
-        ports (List[Port]): The ports published on the host. The attribute keeps
-            Docker's order, which the table shows; the JSON sorts them by host port,
-            then container port and protocol.
-    """
-
-    name: str
-    service: Optional[str] = None
-    state: str
-    health: Optional[str] = None
-    ports: List[Port] = Field(default_factory=list)
+    name: str = Field(description="The container name.")
+    service: Optional[str] = Field(
+        default=None,
+        description="The compose service. `null` when the container has no compose service label.",
+    )
+    state: str = Field(
+        description="The state as Docker reports it, for example `running` or `exited`."
+    )
+    health: Optional[str] = Field(
+        default=None,
+        description="The health status as Docker reports it, for example `healthy`. `null` when the container has no health check.",
+    )
+    ports: List[Port] = Field(
+        default_factory=list,
+        description="The ports published on the host, sorted by host port, then container port and protocol. Empty when the container publishes none.",
+    )
 
     @field_serializer("ports")
     def _sorted_ports(self, ports: List[Port]) -> List[Port]:
@@ -113,7 +111,7 @@ class ContainerInfo(BaseModel):
         Sort the ports for the JSON.
 
         Args:
-            ports (List[Port]): The ports in Docker's order.
+            ports (List[Port]): The ports in Docker's order, which the table shows.
 
         Returns:
             List[Port]: The ports sorted by host port, then container port and protocol.
@@ -121,76 +119,52 @@ class ContainerInfo(BaseModel):
         return sorted(ports, key=lambda p: (p.host, p.container, p.protocol))
 
 
-class PsReport(BaseModel):
-    """
-    The containers `odctl ps` shows and the profiles they make active.
+class PsReport(_JsonModel):
+    """The containers `odctl ps` shows and the profiles they make active."""
 
-    Attributes:
-        active_profiles (List[str]): Profiles whose services are all running, sorted.
-        containers (List[ContainerInfo]): The matching containers, sorted by name.
-    """
-
-    active_profiles: List[str]
-    containers: List[ContainerInfo]
+    active_profiles: List[str] = Field(
+        description="The profiles whose services are all running, sorted. Only the profiles the command names are considered, with their prerequisites in the same compose file, such as `postgres` and `storage` for `catalog`. With `--all`, every profile is considered. `deps` is never listed. A profile whose services are a strict subset of another listed profile's is left out, so `spark-lite` is not listed beside `spark-full`. Empty when no profile is fully running."
+    )
+    containers: List[ContainerInfo] = Field(
+        description="The matching containers, sorted by name. Empty when none match."
+    )
 
 
-class WorkspaceInfo(BaseModel):
-    """
-    The workspace folder odctl reads.
+class WorkspaceInfo(_JsonModel):
+    """The workspace folder odctl reads."""
 
-    Attributes:
-        path (str): The workspace path.
-        exists (bool): Whether the folder exists. When it does not, odctl reads the
-            files bundled with the CLI.
-        stale_tag (Optional[str]): The workspace's `TAG` when it differs from the CLI
-            version, otherwise None.
-    """
-
-    path: str
-    exists: bool
-    stale_tag: Optional[str] = None
+    path: str = Field(description="The workspace path, an absolute path.")
+    exists: bool = Field(
+        description="Whether the folder exists. When it does not, odctl reads the files bundled with the CLI."
+    )
+    stale_tag: Optional[str] = Field(
+        default=None,
+        description="The workspace's `TAG` when it differs from the CLI version and no `TAG` is set in the shell. Otherwise `null`.",
+    )
 
 
-class DockerInfo(BaseModel):
-    """
-    The Docker daemon odctl talks to.
+class DockerInfo(_JsonModel):
+    """The Docker daemon odctl talks to."""
 
-    Attributes:
-        reachable (bool): Whether the daemon answers.
-    """
-
-    reachable: bool
+    reachable: bool = Field(description="Whether the daemon answers.")
 
 
-class ImageInfo(BaseModel):
-    """
-    One of odctl's own images at the current tag.
+class ImageInfo(_JsonModel):
+    """One of odctl's own images at the current tag."""
 
-    Attributes:
-        reference (str): The full image reference.
-        local (bool): Whether the image is on the Docker host. False when Docker is
-            not reachable.
-    """
-
-    reference: str
-    local: bool
+    reference: str = Field(description="The full image reference, with its tag.")
+    local: bool = Field(
+        description="Whether the image is already on the Docker host. `false` when Docker is not reachable."
+    )
 
 
-class Info(BaseModel):
-    """
-    What `odctl info` shows.
+class Info(_JsonModel):
+    """What `odctl info` shows."""
 
-    Attributes:
-        cli_version (str): The installed odctl version.
-        tag (str): `TAG` as Docker Compose resolves it.
-        workspace (WorkspaceInfo): The workspace folder.
-        docker (DockerInfo): The Docker daemon.
-        images (List[ImageInfo]): odctl's own images at `tag` for every profile, sorted
-            by reference.
-    """
-
-    cli_version: str
-    tag: str
-    workspace: WorkspaceInfo
-    docker: DockerInfo
-    images: List[ImageInfo]
+    cli_version: str = Field(description="The installed odctl version.")
+    tag: str = Field(description="`TAG` as Docker Compose resolves it.")
+    workspace: WorkspaceInfo = Field(description="The workspace folder.")
+    docker: DockerInfo = Field(description="The Docker daemon.")
+    images: List[ImageInfo] = Field(
+        description="odctl's own images at `tag` for every profile, sorted by reference."
+    )
