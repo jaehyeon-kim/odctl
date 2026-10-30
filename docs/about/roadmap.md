@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.4.0: Feast'
-  content: 'An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)'
-  icon: ':material-play:'
-  key: now
 - title: '1.5.0: Stable interface and JSON output'
   content: 'A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.6.0: MCP server'
   content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. [#141](https://github.com/jaehyeon-kim/odctl/issues/141)'
   icon: ':material-clock-outline:'
@@ -96,6 +92,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.4.0: Feast"
+
+    Feast's feature server serves an MCP endpoint for agents, the Feast guide pushes features over HTTP and from Flink SQL and materialises from an Airflow DAG, and a new guide retrieves the nearest documents from PostgreSQL with pgvector. The `metadata` e2e group is split into three that run in parallel. [#150](https://github.com/jaehyeon-kim/odctl/issues/150), [#168](https://github.com/jaehyeon-kim/odctl/issues/168)
 
 ??? note "1.3.0: OpenMetadata connectors"
 

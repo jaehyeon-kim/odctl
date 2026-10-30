@@ -2,6 +2,21 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.4.0
+
+Feast's MCP endpoint, pushing features over HTTP and from Flink, materialising from Airflow, and vector retrieval on PostgreSQL.
+
+- `feast-serve` serves an MCP endpoint at `http://127.0.0.1:6566/mcp`, and each route of the feature server is a tool. [Connect an MCP Client](../guides/feast-iceberg.md#connect-an-mcp-client) lists the tools and reads a feature with the `mcp` Python client.
+- [Push Features](../guides/feast-iceberg.md#push-features) pushes a value to the feature server [Over HTTP](../guides/feast-iceberg.md#over-http) and [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql), then reads it back.
+- [On a Schedule](../guides/feast-iceberg.md#on-a-schedule) materialises the feature view into Valkey from an Airflow DAG every hour.
+- [Vector Retrieval with Feast](../guides/feast-vector-retrieval.md) writes document embeddings to PostgreSQL with pgvector and retrieves the nearest rows.
+- The Feast guide's Iceberg source names no catalog address, so one registry entry works from your shell and from the Airflow container. `feast apply` in the guide therefore runs with `--skip-source-validation`.
+
+### Upgrading
+
+- A workspace made by `odctl init` before 1.4.0 keeps its `feast/feature_store.yaml` without the MCP endpoint, and its `registry.yml` without the MCP line in `odctl explain feast`. Run `odctl init --force` to copy the new files (it replaces your edits), or add the `feature_server` block yourself. Then run `odctl recreate feast`.
+- If you applied the guide's definitions before 1.4.0, their Iceberg source stores `endpoint`, the catalog address of your shell, which the Airflow container cannot reach. Remove `endpoint` from the source and run `feast apply --skip-source-validation` again before you run the DAG.
+
 ## Version 1.3.0
 
 Custom connectors for OpenMetadata, extra packages for its ingestion container, AutoPilot off by default, OpenMetadata 2.0.7, and newer Kafka and Metabase images.
