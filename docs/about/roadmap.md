@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.6.0: MCP server'
-  content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)'
-  icon: ':material-play:'
-  key: now
 - title: '1.7.0: Langfuse'
   content: 'A profile for tracing and evaluating LLM and agent applications, using odctl''s ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.8.0: Lineage and alerts'
   content: 'Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)'
   icon: ':material-clock-outline:'
@@ -88,6 +84,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.6.0: MCP server"
+
+    `odctl mcp` gives an AI agent `list`, `explain`, `ps`, `info` and `logs` as MCP tools, and `up` and `down` with `--allow-changes` ([MCP Server](../guides/mcp-server.md)). The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)
 
 ??? note "1.5.0: JSON output and what stays stable in 1.x"
 

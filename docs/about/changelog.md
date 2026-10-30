@@ -2,6 +2,14 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.6.0
+
+An MCP server that gives AI agents odctl's profiles, containers and logs, and a dry run of `odctl down --volumes` that names the volumes.
+
+- `odctl mcp` serves `list`, `explain`, `ps`, `info` and `logs` to an MCP client, such as Claude Code, as tools; all but `logs` return the same JSON as `--json`. The tool names and their parameter names stay the same in every 1.x release ([What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x)). Install it with `uv tool install "odctl[mcp]"`; [MCP Server](../guides/mcp-server.md) sets it up.
+- `odctl mcp --allow-changes` also serves `up` and `down`, so an agent can start and stop profiles.
+- `odctl down --volumes --dry-run` names the named volumes the real run would remove, gives the number of unnamed volumes of each container it stops, and includes the shared jar volume `odctl-shared-deps` once no other profile has a container. `odctl down --all --dry-run` reports that Docker is not reachable instead of ending with a traceback.
+
 ## Version 1.5.0
 
 JSON output from `list`, `explain`, `ps` and `info`, a written list of what 1.x keeps stable, and newer SeaweedFS, Valkey and Spark images.

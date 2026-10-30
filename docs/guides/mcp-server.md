@@ -30,11 +30,11 @@ The server needs the `mcp` extra of odctl. This installs odctl with it:
 uv tool install "odctl[mcp]"
 ```
 
-Without the extra, `odctl mcp` exits with an error that names this command. `uv tool install` keeps odctl in an environment of its own, so the client script below needs the `mcp` package in yours: `pip install "mcp>=2.3.0,<3"`. Keep it out of an environment that holds the client of the [Feast guide](feast-iceberg.md#connect-an-mcp-client), which needs `mcp` below 2.
+Without the extra, `odctl mcp` exits with an error that names this command. `uv tool install` keeps odctl in an environment of its own, so the client scripts below need the `mcp` package in an environment of their own. This makes one in the current folder: `python -m venv .venv`, then `source .venv/bin/activate` and `pip install "mcp>=2.3.0,<3"`. Keep it out of an environment that holds the client of the [Feast guide](feast-iceberg.md#connect-an-mcp-client), which needs `mcp` below 2.
 
 ## Add It to an MCP Client
 
-Claude Code is Anthropic's command-line coding agent, and it is an MCP client. Run this in the folder of your project to add odctl to the project:
+Claude Code is Anthropic's command-line coding agent, and it is an MCP client. The scripts in the next sections start the server themselves and need no client set up, so skip this section if you use only them. Run this in the folder of your project to add odctl to the project:
 
 ```bash title="docs/snippets/mcp-server/commands.sh:claude-code"
 # Writes .mcp.json in this folder.
@@ -117,7 +117,7 @@ down: Stop the named profiles. With `volumes`, also remove their volumes, and th
 
 ## Runnable Example
 
-Save this file as `example.py` and run it with `python example.py` in the folder that holds your `.odctl` workspace, in the environment that has `mcp`. It starts the server with `--allow-changes`, starts `kafka-lite`, reads `info`, the containers of `kafka-lite` and the last five lines of the `connect` service, then stops `kafka-lite`:
+Save this file as `example.py` and run it with `python example.py` in the folder that holds your `.odctl` workspace, made by `odctl init` as [Getting Started](../getting-started.md) shows, in the environment that has `mcp`. It starts the server with `--allow-changes`, starts `kafka-lite`, reads `info`, the containers of `kafka-lite` and the last five lines of the `connect` service, then stops `kafka-lite`:
 
 ```python title="docs/snippets/mcp-server/example.py"
 import os
@@ -158,8 +158,8 @@ It prints the result of each tool under a line with the tool's name. The output 
 ✓ All requested profiles successfully started!
 --- info
 {
-  "cli_version": "1.5.0",
-  "tag": "1.5.0",
+  "cli_version": "1.6.0",
+  "tag": "1.6.0",
   "workspace": {
     "path": "/home/you/project/.odctl",
     "exists": true,
@@ -170,23 +170,23 @@ It prints the result of each tool under a line with the tool's name. The output 
   },
   "images": [
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.5.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.6.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.5.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.6.0",
       "local": true
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.5.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.6.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.5.0",
-      "local": true
+      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.6.0",
+      "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.5.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.6.0",
       "local": false
     }
   ]
@@ -252,11 +252,11 @@ It prints the result of each tool under a line with the tool's name. The output 
   ]
 }
 --- logs
-connect  | [2026-10-30 17:53:43,681] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Herder started (org.apache.kafka.connect.runtime.distributed.DistributedHerder:388)
-connect  | [2026-10-30 17:53:43,681] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Starting connectors and tasks using config offset -1 (org.apache.kafka.connect.runtime.distributed.DistributedHerder:1960)
-connect  | [2026-10-30 17:53:43,682] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Finished starting connectors and tasks (org.apache.kafka.connect.runtime.distributed.DistributedHerder:1989)
-connect  | [2026-10-30 17:53:43,718] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Session key updated (org.apache.kafka.connect.runtime.distributed.DistributedHerder:2490)
-connect  | [2026-10-30 17:54:07,279] INFO 192.168.107.5 - - [30/Oct/2026:17:54:07 +0000] "GET /connectors?expand=info&expand=status HTTP/1.1" 200 2 "" "ReactorNetty/1.2.16" 38 (org.apache.kafka.connect.runtime.rest.RestServer:57)
+connect  | [2026-10-30 21:50:24,917] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Cluster ID: 42RglGpZQwy9D5VzTVpCWA (org.apache.kafka.clients.Metadata:365)
+connect  | [2026-10-30 21:50:24,919] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Discovered group coordinator broker-1:19092 (id: 2147483646 rack: null isFenced: false) (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:943)
+connect  | [2026-10-30 21:50:24,920] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Rebalance started (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:239)
+connect  | [2026-10-30 21:50:24,920] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] (Re-)joining group (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:611)
+connect  | [2026-10-30 21:50:24,923] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] (Re-)joining group (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:611)
 --- down
 🛑 Stopping kafka-lite...
 ✓ Teardown complete.
