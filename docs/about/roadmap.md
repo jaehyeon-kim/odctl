@@ -50,7 +50,7 @@ The work comes in the order shown, without dates: a release ships when it is rea
   icon: ':material-clock-outline:'
   key: planned
 - title: '1.12.0: Label Studio'
-  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides.'
+  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
   icon: ':material-clock-outline:'
   key: planned
 ::/timeline::
