@@ -1958,6 +1958,10 @@ smoke_langfuse() {
   retry 24 5 langfuse_has_both "$id" || fail "Langfuse never returned the trace's two observations"
   pass "a trace sent over OTLP came back as two observations, one a generation"
 
+  snippet_says langfuse/commands.sh container -qx '200' \
+    || fail "the guide's container command got no 200 from langfuse-web:3000"
+  pass "a container on the odctl network reaches the OTLP endpoint"
+
   # One trace to both Langfuse and the collector, which hands it to Tempo.
   odctl up telemetry >/dev/null 2>&1 || fail "could not start telemetry for the Langfuse check"
   id=$(langfuse_send send telemetry | tail -1)

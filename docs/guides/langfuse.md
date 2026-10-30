@@ -147,6 +147,21 @@ The read command above returns the same two observations for this ID, so the tra
 
 Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), send OTLP to `http://langfuse-web:3000/api/public/otel`, with the same keys and header. The container sends to port 3000, which `langfuse-web` listens on, and not to the host port 3005.
 
+This command sends an empty batch from a container on the network:
+
+```bash title="docs/snippets/langfuse/commands.sh:container"
+# An empty batch is enough to check the address, the keys and the header.
+# Langfuse answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -u pk-lf-odctl:sk-lf-odctl -H "x-langfuse-ingestion-version: 4" \
+  -H "Content-Type: application/json" -d '{"resourceSpans":[]}' \
+  http://langfuse-web:3000/api/public/otel/v1/traces
+```
+
+```text
+200
+```
+
 ## Runnable Example
 
 Save this file as `example.py`. It sends one trace and asks the observations API until both observations are there. Start the profile first, then run it with the same `uv run` command as above, ending in `python example.py`:

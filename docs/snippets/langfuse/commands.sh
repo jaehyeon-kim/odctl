@@ -1,5 +1,5 @@
 # Commands from docs/guides/langfuse.md. .github/scripts/smoke.sh runs the run,
-# read and tempo sections.
+# read, tempo and container sections.
 
 # smoke.sh does not run the up section, because the e2e workflow starts each
 # profile itself; it is the command as the page shows it.
@@ -23,3 +23,12 @@ curl -s -u pk-lf-odctl:sk-lf-odctl -G http://127.0.0.1:3005/api/public/v2/observ
 # holds the trace and 404 when it does not.
 docker exec otel-lgtm curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:3200/api/traces/$TRACE_ID"
 # --8<-- [end:tempo]
+
+# --8<-- [start:container]
+# An empty batch is enough to check the address, the keys and the header.
+# Langfuse answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -u pk-lf-odctl:sk-lf-odctl -H "x-langfuse-ingestion-version: 4" \
+  -H "Content-Type: application/json" -d '{"resourceSpans":[]}' \
+  http://langfuse-web:3000/api/public/otel/v1/traces
+# --8<-- [end:container]
