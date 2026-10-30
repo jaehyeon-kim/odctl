@@ -45,3 +45,22 @@ jobs:
       #   with:
       #     token: ${{ secrets.CODECOV_TOKEN }}
       #     file: ./coverage.xml
+
+  lowest:
+    # The suite at the lowest version of each dependency that pyproject.toml allows.
+    # The locked versions pass while an older one that pip may install can break,
+    # as Typer below 0.18.0 did with newer Click releases.
+    name: Lowest dependency versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.2
+
+      - name: Set up Python 3.10
+        run: uv python install 3.10
+
+      - name: Run Tests
+        run: uv run --python 3.10 --isolated --resolution lowest-direct --with pytest pytest tests/
