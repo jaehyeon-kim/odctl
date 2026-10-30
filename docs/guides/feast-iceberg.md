@@ -114,7 +114,7 @@ feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
 
 ### On a Schedule
 
-Materialising by hand copies only the values that exist at that moment. An Airflow DAG can run `materialize_incremental` on a schedule. `materialize_incremental` is the method behind `feast materialize-incremental`. It copies the rows whose `event_timestamp` falls between the end of the previous materialisation and `end_date`, so a row written later with an older timestamp is not copied. The `airflow` image already has the Feast client, so the DAG installs nothing. It builds the feature store in code from three settings: the registry address in `FEAST_REGISTRY`, which the Airflow container sets; the DuckDB offline store; and the Valkey online store at the container address `valkey:6379`. Save it as `feast_materialize.py`:
+The DAG uses the table and the feature view from the steps above, so run them first. Materialising by hand copies only the values that exist at that moment. An Airflow DAG can run `materialize_incremental` on a schedule. `materialize_incremental` is the method behind `feast materialize-incremental`. It copies the rows whose `event_timestamp` falls between the end of the previous materialisation and `end_date`, so a row written later with an older timestamp is not copied. The `airflow` image already has the Feast client, so the DAG installs nothing. It builds the feature store in code from three settings: the registry address in `FEAST_REGISTRY`, which the Airflow container sets; the DuckDB offline store; and the Valkey online store at the container address `valkey:6379`. Save it as `feast_materialize.py`:
 
 ```python title="docs/snippets/feast-iceberg/feast_materialize.py"
 from datetime import datetime, timezone
@@ -326,7 +326,7 @@ MCP, the Model Context Protocol, lets an AI agent discover and call the tools of
 pip install "mcp>=1.24,<2"
 ```
 
-Save this code as `mcp_client.py` and run it with `python mcp_client.py`. It lists the tools, then calls the tool for `/get-online-features` to read `driver_pushed:conv_rate`, the value pushed above:
+Save this code as `mcp_client.py` and run it with `python mcp_client.py`. It lists the tools, then calls the tool for `/get-online-features` to read `driver_pushed:conv_rate`, the value pushed above. Run [Push Features](#push-features) first: without `driver_pushed`, the call fails and the script prints Feast's error, which names the missing feature view.
 
 ```python title="docs/snippets/feast-iceberg/mcp_client.py"
 import asyncio
@@ -346,12 +346,16 @@ async def main():
                 "get_online_features_get_online_features_post",
                 {"features": ["driver_pushed:conv_rate"], "entities": {"driver_id": [1001]}},
             )
+            if result.isError:
+                return result.content[0].text
             reply = json.loads(result.content[0].text)
             names = reply["metadata"]["feature_names"]
             print(reply["results"][names.index("conv_rate")]["values"])
 
 
-asyncio.run(main())
+error = asyncio.run(main())
+if error:
+    raise SystemExit(error)
 ```
 
 It prints the name of each tool, such as `push_push_post`, which is the route function, its path and its HTTP method, and then the value as `[0.8999999761581421]`. It prints `[0.699999988079071]` if you pushed over HTTP only.
@@ -528,12 +532,16 @@ async def main():
                 "get_online_features_get_online_features_post",
                 {"features": ["driver_pushed:conv_rate"], "entities": {"driver_id": [1001]}},
             )
+            if result.isError:
+                return result.content[0].text
             reply = json.loads(result.content[0].text)
             names = reply["metadata"]["feature_names"]
             print(reply["results"][names.index("conv_rate")]["values"])
 
 
-asyncio.run(main())
+error = asyncio.run(main())
+if error:
+    raise SystemExit(error)
 PY
 ```
 

@@ -161,10 +161,14 @@ async def main():
                 "get_online_features_get_online_features_post",
                 {"features": ["driver_pushed:conv_rate"], "entities": {"driver_id": [1001]}},
             )
+            if result.isError:
+                return result.content[0].text
             reply = json.loads(result.content[0].text)
             names = reply["metadata"]["feature_names"]
             print(reply["results"][names.index("conv_rate")]["values"])
 
 
-asyncio.run(main())
+error = asyncio.run(main())
+if error:
+    raise SystemExit(error)
 PY
