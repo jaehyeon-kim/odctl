@@ -140,6 +140,11 @@
       "groupName": "Observability Stack"
     },
     {
+      "description": "Group the Langfuse web and worker images, because the two must run the same release",
+      "matchPackageNames": ["langfuse/langfuse", "langfuse/langfuse-worker"],
+      "groupName": "Langfuse"
+    },
+    {
       "description": "Group ClickHouse Server and Keeper to maintain cluster consensus",
       "matchPackageNames": [
         "clickhouse/clickhouse-server",

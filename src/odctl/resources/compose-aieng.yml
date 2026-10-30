@@ -1,0 +1,102 @@
+name: odctl-aieng
+
+# Langfuse, which traces and evaluates LLM and agent applications. Its web and
+# worker services run on odctl's own PostgreSQL, ClickHouse (ch-lite), Valkey
+# and SeaweedFS, so none of those is started here. The langfuse database comes
+# from postgres/01-init-databases.sh and clickhouse/init.sql, and the langfuse
+# bucket from seaweed-init.
+
+# The settings that web and worker share.
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: http://127.0.0.1:3005
+  # Docker sets HOSTNAME to the container ID. The worker binds to HOSTNAME, so
+  # it would not listen on 127.0.0.1, where its health check connects. 0.0.0.0
+  # makes both services listen on every interface.
+  HOSTNAME: 0.0.0.0
+  DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres:5432/langfuse
+  # Langfuse's cluster mode needs a cluster named default, which ch-lite lacks.
+  CLICKHOUSE_URL: http://ch-11:8123
+  CLICKHOUSE_MIGRATION_URL: clickhouse://ch-11:9000
+  CLICKHOUSE_USER: default
+  CLICKHOUSE_PASSWORD: password
+  CLICKHOUSE_DB: langfuse
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  # Valkey turns its default user off and creates `user`.
+  REDIS_HOST: valkey
+  REDIS_PORT: "6379"
+  REDIS_USERNAME: user
+  REDIS_AUTH: password
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://seaweed:8333
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: user
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: password
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  # Fixed values for a local stack only. A Langfuse that other people can reach
+  # needs its own.
+  SALT: odctl-local-salt
+  ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  # Langfuse sends usage statistics unless this is false.
+  TELEMETRY_ENABLED: "false"
+  # Node's default heap limit is smaller than mem_limit. Three quarters of
+  # mem_limit leaves the rest for memory outside the heap.
+  NODE_OPTIONS: --max-old-space-size=1536
+
+services:
+  # ==========================================
+  # [PROFILE: langfuse] Langfuse
+  # ==========================================
+  langfuse-web:
+    image: langfuse/langfuse:4.72.0
+    container_name: langfuse-web
+    ports:
+      - "127.0.0.1:3005:3000"
+    networks:
+      - odctl
+    profiles:
+      - langfuse
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: odctl-local-secret
+      # Creates the organisation, project, keys and user on the first start.
+      LANGFUSE_INIT_ORG_ID: odctl
+      LANGFUSE_INIT_ORG_NAME: odctl
+      LANGFUSE_INIT_PROJECT_ID: odctl
+      LANGFUSE_INIT_PROJECT_NAME: odctl
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-odctl
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-odctl
+      LANGFUSE_INIT_USER_EMAIL: user@odctl.io
+      LANGFUSE_INIT_USER_NAME: user
+      LANGFUSE_INIT_USER_PASSWORD: password
+    mem_limit: 2g
+    # The start period covers the first start, which runs the PostgreSQL and
+    # ClickHouse migrations.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:4.72.0
+    container_name: langfuse-worker
+    networks:
+      - odctl
+    profiles:
+      - langfuse
+    environment:
+      <<: *langfuse-env
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3030/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+
+networks:
+  odctl:
+    name: odctl
+    external: true

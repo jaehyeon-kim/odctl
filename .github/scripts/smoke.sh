@@ -1906,6 +1906,67 @@ smoke_mcp_server() {
   pass "the MCP Server example started, read and stopped kafka-lite through the tools"
 }
 
+# The versions the guide installs for the OpenTelemetry clients, as the runner
+# that run_example takes.
+langfuse_runner() {
+  local withs
+  withs=$(snippet langfuse/commands.sh run | grep -oE -- '--with "[^"]+"' | tr -d '"' | tr '\n' ' ')
+  echo "uv run --no-project --quiet $withs python"
+}
+
+# Run the named sections of the guide's steps.py as send.py, with the guide's run
+# command, in a new folder. It prints the trace IDs, one on each line.
+langfuse_send() {
+  local dir section
+  dir=$(mktemp -d)
+  for section in "$@"; do snippet langfuse/steps.py "$section"; done >"$dir/send.py"
+  (cd "$dir" && run_snippet langfuse/commands.sh run)
+}
+
+# Print what the guide's read command returns for a trace ID.
+langfuse_read() { TRACE_ID="$1" run_snippet langfuse/commands.sh read 2>/dev/null; }
+
+# Succeed when the guide's tempo command prints 200 for a trace ID.
+langfuse_in_tempo() { [ "$(TRACE_ID="$1" run_snippet langfuse/commands.sh tempo 2>/dev/null)" = "200" ]; }
+
+langfuse_has_both() { [ "$(langfuse_read "$1" | sort | tr '\n' ' ')" = "answer-question SPAN model-call GENERATION " ]; }
+
+# A healthy langfuse-web and langfuse-worker do not show that a trace is stored:
+# the worker's health check tests only PostgreSQL and Valkey, so it stays healthy
+# when it cannot read from SeaweedFS or write to ClickHouse. So this sends the
+# guide's trace and reads its two observations back through the v2 API. The
+# guide's telemetry step then sends one trace to Langfuse and to Tempo.
+smoke_langfuse() {
+  retry 60 5 http_ok "http://127.0.0.1:3005/api/public/health" || fail "no HTTP response from :3005"
+  pass "langfuse-web answering"
+
+  # The ClickHouse migrations create their tables in the langfuse database, and
+  # Langfuse needs the server in UTC.
+  [ "$(ch ch-11 'SELECT timezone()')" = "UTC" ] || fail "ch-11 does not run in UTC"
+  [ "$(ch ch-11 "SELECT count() > 0 FROM system.tables WHERE database = 'langfuse'")" = "1" ] \
+    || fail "Langfuse's migrations created no table in the langfuse database on ch-11"
+  pass "ch-11 runs in UTC and holds Langfuse's tables"
+
+  local users
+  users=$(docker exec postgres psql -U user -d langfuse -tAc 'SELECT email FROM users' 2>&1)
+  grep -qx 'user@odctl.io' <<<"$users" || fail "the langfuse database has no user user@odctl.io"
+  pass "the langfuse database holds the initial user"
+
+  local id
+  id=$(langfuse_send send | tail -1)
+  [[ "$id" =~ ^[0-9a-f]{32}$ ]] || fail "the guide's send step printed no trace ID"
+  retry 24 5 langfuse_has_both "$id" || fail "Langfuse never returned the trace's two observations"
+  pass "a trace sent over OTLP came back as two observations, one a generation"
+
+  # One trace to both Langfuse and the collector, which hands it to Tempo.
+  odctl up telemetry >/dev/null 2>&1 || fail "could not start telemetry for the Langfuse check"
+  id=$(langfuse_send send telemetry | tail -1)
+  [[ "$id" =~ ^[0-9a-f]{32}$ ]] || fail "the guide's telemetry step printed no trace ID"
+  retry 24 5 langfuse_has_both "$id" || fail "Langfuse never returned the trace sent to both"
+  retry 24 5 langfuse_in_tempo "$id" || fail "Tempo never returned the trace sent to both"
+  pass "one trace reached Langfuse and Tempo"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -1986,6 +2047,7 @@ case "$PROFILE" in
     rm -rf feature_repo vector_repo push_definitions.py
     rm -rf "${TMPDIR:-/tmp}/odctl-feast-smoke" ;;
   evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
+  langfuse)   smoke_langfuse; run_example langfuse 'has 2 observations' "$(langfuse_runner)" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"
     [ "$(docker ps -q | wc -l)" -ge 1 ] || fail "no containers running"

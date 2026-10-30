@@ -24,7 +24,7 @@ Exporting the diagrams also needs draw.io, Chrome and ffmpeg.
 | `src/odctl/models.py`, `reports.py` | the models of the `--json` output of `list`, `explain`, `ps` and `info`, and the functions that build them; `ui.py` renders the same models as tables and panels |
 | `src/odctl/registry.py`, `resources/registry.yml` | profiles, the services in each, dependencies, ports and usage text |
 | `src/odctl/planner.py`, `docker.py`, `projects.py`, `logs.py`, `workspace.py`, `config.py`, `ui.py` | startup order, Docker Compose calls, `restart` and `recreate`, and `logs`, each with one Compose project per file as `up` runs them, the `.odctl` workspace, settings, terminal output |
-| `src/odctl/resources/compose-*.yml` | one compose file per area (kafka, flink, spark, store, analytics, mlops, orch, obsv, metadata, infra, deps) |
+| `src/odctl/resources/compose-*.yml` | one compose file per area (kafka, flink, spark, store, analytics, mlops, orch, obsv, metadata, aieng, infra, deps) |
 | `src/odctl/resources/docker/` | odctl's own images (postgres, mlflow, airflow, spark), published to `ghcr.io/jaehyeon-kim/odctl/<name>:<version>` |
 | `src/odctl/resources/deps/` | the `deps` image: connector and engine jars built or downloaded into the `odctl-shared-deps` volume; versions in `versions.env` |
 | `scripts/gen_pages.py` | builds a page per technology, the CLI reference and the JSON Output page at docs build time, from `registry.yml`, the compose files, `--help` and the models in `src/odctl/models.py`; run directly, it writes `skills/odctl/SKILL.md`, with every command, option and `.env` key, which a test keeps in step |

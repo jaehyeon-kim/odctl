@@ -70,7 +70,7 @@ def test_postgres_creates_the_evidently_database():
     script = (RESOURCES / "postgres" / "01-init-databases.sh").read_text()
     assert 'CREATE DATABASE evidently OWNER "$POSTGRES_USER";' in script
     loop = next(line for line in script.splitlines() if line.startswith("for db in"))
-    assert " evidently;" in loop
+    assert " evidently" in loop
 
 
 def test_odctl_builds_no_evidently_image():

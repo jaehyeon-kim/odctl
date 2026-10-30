@@ -334,3 +334,22 @@ stacks:
         15 seconds and copied into the ingestion container when they change.
       • AutoPilot (default agents for a service added in the UI) is off unless
         METADATA_AUTOPILOT="true" is set in .odctl/.env.
+
+  aieng:
+    file: "compose-aieng.yml"
+    description: "Tracing and evaluation of LLM and agent applications."
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse: ["postgres", "storage", "ch-lite", "valkey"]
+    role: "Traces and evaluates LLM and agent applications. Applications send traces over OTLP to langfuse-web, which stores each event in SeaweedFS and queues it in Valkey; langfuse-worker then writes it to ClickHouse. Users, projects and keys are kept on Postgres."
+    usage: |
+      • Langfuse UI (Credentials: user@odctl.io / password):
+        - External (host): http://127.0.0.1:3005
+        - Internal (Docker): http://langfuse-web:3000
+      • OTLP endpoint for traces, over HTTP:
+        - External (host): http://127.0.0.1:3005/api/public/otel
+        - Internal (Docker): http://langfuse-web:3000/api/public/otel
+      • Project keys: public key pk-lf-odctl, secret key sk-lf-odctl, sent as
+        HTTP Basic auth. Send the header x-langfuse-ingestion-version: 4 so
+        Langfuse shows a trace at once, not up to 10 minutes later.
+      • Starts ch-lite, so it cannot run beside ch-full.
