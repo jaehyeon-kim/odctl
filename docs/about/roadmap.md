@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.5.0: Stable interface and JSON output'
-  content: 'A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
-  icon: ':material-play:'
-  key: now
 - title: '1.6.0: MCP server'
   content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.7.0: Langfuse'
   content: 'A profile for tracing and evaluating LLM and agent applications, using odctl''s ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)'
   icon: ':material-clock-outline:'
@@ -88,6 +84,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.5.0: JSON output and what stays stable in 1.x"
+
+    `odctl list`, `explain`, `ps` and `info` print JSON with `--json`, and [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) lists what every 1.x release keeps. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)
 
 ??? note "1.4.0: Feast"
 

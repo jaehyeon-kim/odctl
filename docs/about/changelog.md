@@ -2,6 +2,16 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.5.0
+
+JSON output from `list`, `explain`, `ps` and `info`, and a written list of what 1.x keeps stable.
+
+- `odctl list`, `odctl explain`, `odctl ps` and `odctl info` take `--json` and print one JSON document, for scripts and AI assistants; warnings and errors then go to stderr. [JSON Output](../json-output.md) shows each command's keys, and [Getting Started](../getting-started.md) runs each command with it.
+- `odctl explain` names a dependency the registry lists but no stack defines, instead of ending with a traceback; it still exits 1.
+- `odctl info --json` also shows the image tag, the workspace and which of odctl's own images are on your machine.
+- [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) lists what every 1.x release keeps: profile names, published ports, `.env` keys, volumes, the workspace files and the `--json` keys.
+- odctl now needs Typer 0.18.0 or later. Older Typer releases misread odctl's options with newer Click releases, and pip could install those pairs. With Typer 0.12 and Click 8.3 or later, every flag was read as set, so `odctl init` replaced an existing workspace without asking. With Typer 0.13 to 0.15.3 and Click 8.2 or later, `--help` failed. With Typer 0.16 to 0.17.4 and Click 8.3 or later, `odctl explain` with no profile ran instead of reporting the missing argument.
+
 ## Version 1.4.0
 
 Feast's MCP endpoint, pushing features over HTTP and from Flink, materialising from Airflow, and vector retrieval on PostgreSQL.

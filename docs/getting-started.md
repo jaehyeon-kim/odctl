@@ -45,7 +45,7 @@ Add `-d` to list each profile's services and host ports as well:
 odctl list -d
 ```
 
-Add `--json` to print the profiles as JSON, which a script or an AI assistant reads more easily than a table. odctl prints the JSON on standard output and every warning, such as the one for a stale workspace, on standard error, so a pipe receives only the JSON. The full output lists every profile, and this keeps only `kafka-lite`:
+Add `--json` to print the profiles as JSON, which a script or an AI assistant reads more easily than a table. odctl prints the JSON on standard output and every warning, such as the one for a stale workspace, on standard error, so a pipe receives only the JSON. The full output is an array with one object for each profile, and this keeps only `kafka-lite`:
 
 ```bash title="docs/snippets/getting-started/commands.sh:list-json"
 # Print only kafka-lite; the full output lists every profile.
@@ -124,7 +124,7 @@ odctl explain kafka-lite
 
 It prints a panel for `kafka-lite`: the parent stack `kafka`, the compose file, the profile it requires (`deps`), the containers `connect`, `kafka`, `kafka-ui` and `karapace` with their images, the host ports and how to reach each service.
 
-`--json` prints the same details as one object, with `usage`, `role` and `volumes` added to the keys of `list`:
+`--json` prints the same details as one object, with `usage`, `role` and `volumes` added to the keys of `list`. `usage` is text for people to read, not a value to parse:
 
 ```bash title="docs/snippets/getting-started/commands.sh:explain-json"
 odctl explain kafka-lite --json | python3 -m json.tool
@@ -229,8 +229,8 @@ odctl info --json | python3 -m json.tool
 
 ```text
 {
-    "cli_version": "1.3.0",
-    "tag": "1.3.0",
+    "cli_version": "1.5.0",
+    "tag": "1.5.0",
     "workspace": {
         "path": "/home/you/project/.odctl",
         "exists": true,
@@ -241,23 +241,23 @@ odctl info --json | python3 -m json.tool
     },
     "images": [
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.3.0",
-            "local": true
-        },
-        {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.3.0",
-            "local": true
-        },
-        {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.3.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.5.0",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.3.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.5.0",
             "local": true
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.3.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.5.0",
+            "local": false
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.5.0",
+            "local": false
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.5.0",
             "local": false
         }
     ]
@@ -289,7 +289,7 @@ It prints the active profiles, then a table with one row per container:
 
 A dash under Health means the service has no health check.
 
-`--json` prints the same containers as one object. Each published port gives its host and container port as numbers, and a missing health check is `null`. `active_profiles` lists the profiles you named whose services are all running, with their prerequisites from the same compose file. It never holds `deps`, and it leaves out a profile whose services all belong to another listed profile, such as `spark-lite` beside `spark-full`:
+`--json` prints the same containers as one object. Like the table, it needs profile names or `--all`. Each published port gives its host and container port as numbers, and a missing health check is `null`. `active_profiles` lists the profiles you named whose services are all running, with their prerequisites from the same compose file. It never holds `deps`, and it leaves out a profile whose services all belong to another listed profile, such as `spark-lite` beside `spark-full`:
 
 ```bash title="docs/snippets/getting-started/commands.sh:ps-json"
 odctl ps kafka-lite --json | python3 -m json.tool
