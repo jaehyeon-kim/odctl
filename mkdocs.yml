@@ -67,6 +67,9 @@ exclude_docs: |
 # A link to a heading that does not exist is a warning, which --strict fails.
 validation:
   anchors: warn
+  nav:
+    omitted_files: warn
+    not_found: warn
 
 extra_css:
   - stylesheets/extra.css
