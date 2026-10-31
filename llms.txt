@@ -40,6 +40,7 @@
 - [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md)
 - [Temporal Workers](https://jaehyeon.me/odctl/latest/guides/temporal-workers/index.md)
 - [Feast with Iceberg](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/index.md)
+- [Feast Vector Retrieval](https://jaehyeon.me/odctl/latest/guides/feast-vector-retrieval/index.md)
 - [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)
 - [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)
 - [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
