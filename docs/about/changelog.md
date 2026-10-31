@@ -6,11 +6,11 @@ Each release, newest first: what changed, then under Upgrading what to change in
 
 Feast's MCP endpoint, pushing features over HTTP and from Flink, materialising from Airflow, and vector retrieval on PostgreSQL.
 
-- `feast-serve` serves an MCP endpoint at `http://127.0.0.1:6566/mcp`, and each route of the feature server is a tool. [Connect an MCP Client](../guides/feast-iceberg.md#connect-an-mcp-client) lists the tools and reads a feature with the `mcp` Python client.
+- `feast-serve` serves an MCP endpoint at `http://127.0.0.1:6566/mcp` with each route of the feature server as a tool ([Connect an MCP Client](../guides/feast-iceberg.md#connect-an-mcp-client)).
 - [Push Features](../guides/feast-iceberg.md#push-features) pushes a value to the feature server [Over HTTP](../guides/feast-iceberg.md#over-http) and [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql), then reads it back.
 - [On a Schedule](../guides/feast-iceberg.md#on-a-schedule) materialises the feature view into Valkey from an Airflow DAG every hour.
 - [Vector Retrieval with Feast](../guides/feast-vector-retrieval.md) writes document embeddings to PostgreSQL with pgvector and retrieves the nearest rows.
-- The Feast guide's Iceberg source names no catalog address, so one registry entry works from your shell and from the Airflow container. `feast apply` in the guide therefore runs with `--skip-source-validation`.
+- `feast apply` in the Feast guide now runs with `--skip-source-validation`, so the same definitions work from your shell and from the Airflow container.
 
 ### Upgrading
 

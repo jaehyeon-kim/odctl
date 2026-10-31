@@ -114,7 +114,17 @@ feast -c feature_repo materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"
 
 ### On a Schedule
 
-The DAG uses the table and the feature view from the steps above, so run them first. Materialising by hand copies only the values that exist at that moment. An Airflow DAG can run `materialize_incremental` on a schedule. `materialize_incremental` is the method behind `feast materialize-incremental`. It copies the rows whose `event_timestamp` falls between the end of the previous materialisation and `end_date`, so a row written later with an older timestamp is not copied. The `airflow` image already has the Feast client, so the DAG installs nothing. It builds the feature store in code from three settings: the registry address in `FEAST_REGISTRY`, which the Airflow container sets; the DuckDB offline store; and the Valkey online store at the container address `valkey:6379`. Save it as `feast_materialize.py`:
+The DAG uses the table and the feature view from the steps above, so run them first.
+
+Materialising by hand copies only the values that exist at that moment. An Airflow DAG can run `materialize_incremental` on a schedule. That method is the one behind `feast materialize-incremental`. It copies the rows whose `event_timestamp` falls between the end of the previous materialisation and `end_date`. A row written later with an older timestamp is therefore not copied.
+
+The `airflow` image already has the Feast client, so the DAG installs nothing. It builds the feature store in code from three settings:
+
+- the registry address in `FEAST_REGISTRY`, which the Airflow container sets;
+- the DuckDB offline store;
+- the Valkey online store at the container address `valkey:6379`.
+
+Save it as `feast_materialize.py`:
 
 ```python title="docs/snippets/feast-iceberg/feast_materialize.py"
 from datetime import datetime, timezone
@@ -129,8 +139,11 @@ from airflow.sdk import dag, task
     catchup=False,
 )
 def feast_materialize():
+    """Copy the latest feature values to Valkey every hour."""
+
     @task
     def materialize():
+        """Materialise the feature views up to now."""
         # Imported here so that parsing the file does not load Feast.
         import os
 
@@ -225,9 +238,11 @@ Once the repository is uploaded, the UI lists the project and its feature views:
 
 ## Push Features
 
-A push source lets a client write a feature value straight to the online store, through the feature server's `/push` endpoint, instead of materialising it. A client can be `curl`, a Flink SQL job, or a small Python process that reads Kafka and calls `FeatureStore.push` with `PushMode.ONLINE`. That mode writes to the online store only, as `"to": "online"` does over HTTP. [Keep Messages Longer](kafka.md#keep-messages-longer) says how long Kafka keeps a stream for such a process to replay. The slower route writes the stream to Iceberg with Flink and runs `feast materialize-incremental` on a schedule, as [On a Schedule](#on-a-schedule) shows, so a value reaches the online store only after the next run.
+A push source lets a client write a feature value straight to the online store through the feature server's `/push` endpoint, instead of materialising it. A client can be `curl`, a Flink SQL job, or a small Python process that reads Kafka and calls `FeatureStore.push` with `PushMode.ONLINE`. That mode writes to the online store only, as `"to": "online"` does over HTTP. [Keep Messages Longer](kafka.md#keep-messages-longer) says how long Kafka keeps a stream for such a process to replay.
 
-Feast needs a push source before it accepts a push. The feature server serves the project `odctl`, which its own `feature_store.yaml` names, so the definitions are applied from inside the `feast-serve` container. Save these definitions as `push_definitions.py`. They declare the push source `driver_push` and the feature view `driver_pushed`:
+The slower route writes the stream to Iceberg with Flink and runs `feast materialize-incremental` on a schedule, as [On a Schedule](#on-a-schedule) shows. A value then reaches the online store only after the next run.
+
+Feast needs a push source before it accepts a push. The feature server serves the project that its own `feature_store.yaml` names, `odctl`. You therefore apply the definitions from inside the `feast-serve` container. Save these definitions as `push_definitions.py`. They declare the push source `driver_push` and the feature view `driver_pushed`:
 
 ```python title="docs/snippets/feast-iceberg/push_definitions.py"
 from datetime import timedelta
@@ -314,9 +329,15 @@ CREATE TABLE feast_push (
 INSERT INTO feast_push SELECT 'driver_push', ROW(ARRAY[CAST(1001 AS BIGINT)], ARRAY[CAST(0.9 AS DOUBLE)], ARRAY[CURRENT_TIMESTAMP]), FALSE;
 ```
 
-The connector is `http-async-sink`. Its default sends rows in batches as one JSON array. Feast's `/push` takes one JSON object, so `http.sink.writer.request.mode` is `single`, which sends one request for each row. The sink sends no `Content-Type` header, and Feast answers 422 without one, so `http.sink.header.Content-Type` sets it. The column names are the field names of the request body, and each field of `df` holds an array, as under Over HTTP. `allow_registry_cache` is `FALSE` so that the push reads the registry again, as under Over HTTP. The statement uses `CURRENT_TIMESTAMP` so that the timestamp is newer than the one the HTTP push stored.
+The connector is `http-async-sink`. Each setting of the table has a reason:
 
-The Flink job finishes and prints `Complete execution of the SQL update statement.` even when Feast rejects the request. The failure is only in the TaskManager log as `Http Sink failed to write`. Run the read from Over HTTP again to check the push. The answer now holds `0.8999999761581421` for `conv_rate`, which is 0.9 as a 32-bit float.
+- `http.sink.writer.request.mode` is `single`, one request for each row, because Feast's `/push` takes one JSON object and the connector's default sends a batch as one array.
+- `http.sink.header.Content-Type` sets the header, because the sink sends none and Feast answers 422 without it.
+- The column names are the field names of the request body, and each field of `df` holds an array, as under Over HTTP.
+- `allow_registry_cache` is `FALSE` so that the push reads the registry again, as under Over HTTP.
+- The statement uses `CURRENT_TIMESTAMP` so that the timestamp is newer than the one the HTTP push stored.
+
+The Flink job finishes and prints `Complete execution of the SQL update statement.` whether or not Feast accepts the request. A rejected request shows only in the TaskManager log, as `Http Sink failed to write`. Run the read from Over HTTP again to check the push. The answer now holds `0.8999999761581421` for `conv_rate`, which is 0.9 as a 32-bit float.
 
 ## Connect an MCP Client
 
@@ -337,6 +358,11 @@ from mcp.client.streamable_http import streamable_http_client
 
 
 async def main():
+    """List Feast's tools and read one feature through them.
+
+    Returns:
+        The error text when the tool call fails, otherwise None.
+    """
     async with streamable_http_client("http://127.0.0.1:6566/mcp") as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()

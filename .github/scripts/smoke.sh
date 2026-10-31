@@ -884,7 +884,7 @@ if bad:
   smoke_airflow_materialize
 }
 
-# The Feast guide's On a Schedule section: a DAG that builds a FeatureStore from
+# Feast guide's On a Schedule section: a DAG that builds a FeatureStore from
 # FEAST_REGISTRY and calls materialize_incremental. It needs the registry entry and
 # the Iceberg table the guide's earlier steps make, so this runs those from the
 # host as the guide does, then uploads the DAG, runs it and reads the value it
@@ -1914,7 +1914,7 @@ case "$PROFILE" in
   metadata)
     smoke_metadata
     smoke_metadata_example ;;
-  # The two How It Works examples that recreate metadata, each in a group of its own
+  # Two How It Works examples that recreate metadata, each in a group of its own
   # so that they run in parallel with the checks above and with each other. Each
   # recreates metadata twice, once for the example and once to restore it.
   metadata:deps)

@@ -10,8 +10,11 @@ from airflow.sdk import dag, task
     catchup=False,
 )
 def feast_materialize():
+    """Copy the latest feature values to Valkey every hour."""
+
     @task
     def materialize():
+        """Materialise the feature views up to now."""
         # Imported here so that parsing the file does not load Feast.
         import os
 

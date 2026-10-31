@@ -6,6 +6,11 @@ from mcp.client.streamable_http import streamable_http_client
 
 
 async def main():
+    """List Feast's tools and read one feature through them.
+
+    Returns:
+        The error text when the tool call fails, otherwise None.
+    """
     async with streamable_http_client("http://127.0.0.1:6566/mcp") as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()

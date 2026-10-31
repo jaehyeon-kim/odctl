@@ -20,7 +20,9 @@ pip install "feast[duckdb,postgres]==0.66.0"
 
 ## Define a Second Repository
 
-A feature repository has one online store. Feast's Redis online store, which the default repository of the `feast` profile uses for Valkey, has no document retrieval method, so vectors go in a second repository whose online store is PostgreSQL. The `valkey` profile also has a 512 MB memory limit, so the vectors of a large corpus belong in PostgreSQL too. The limit is set today as `mem_limit` of `valkey` in `.odctl/compose-store.yml`, where an edit can change it.
+A feature repository has one online store. The default repository of the `feast` profile uses Feast's Redis online store for Valkey, and that store has no document retrieval method. Vectors therefore go in a second repository whose online store is PostgreSQL.
+
+The `valkey` profile also has a 512 MB memory limit, set by `mem_limit` of `valkey` in `.odctl/compose-store.yml`, so the vectors of a large corpus belong in PostgreSQL too.
 
 Save this file as `vector_repo/feature_store.yaml`. `vector_enabled: true` makes the online store keep vectors in pgvector columns. `sslmode: disable` is needed because Feast asks for SSL by default and odctl's PostgreSQL does not serve it:
 
@@ -111,7 +113,7 @@ result = fs.retrieve_online_documents_v2(
 print(result["title"])
 ```
 
-It prints `['Feast', 'Iceberg']`. `Feast` is stored as `[1, 0, 0]`, the query itself, and `Iceberg` as `[0.9, 0.1, 0]`, the next nearest. `Flink`, stored as `[0, 1, 0]`, is farthest and is left out by `top_k=2`.
+It prints `['Feast', 'Iceberg']`. The query is `[1, 0, 0]`, the same vector as `Feast`. `Iceberg` at `[0.9, 0.1, 0]` is the next nearest. `Flink` at `[0, 1, 0]` is the farthest, and `top_k=2` leaves it out.
 
 ## From Another Container
 
