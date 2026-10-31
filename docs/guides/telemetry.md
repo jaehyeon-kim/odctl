@@ -201,13 +201,13 @@ A rule of your own is another file in the same folder. Copy it in and restart `t
 The query counts each series in one of two ways:
 
 - A series that began within the last hour counts by its last value, which is all its tokens since it began. This also holds when the application stopped sending more than 5 minutes ago.
-- A series that is more than an hour old counts by its increase over the hour.
+- A series that is more than an hour old counts by its increase over the hour, while the application exports at least every 5 minutes, as the OpenTelemetry SDKs do by default.
 
-`increase()` needs two samples, so alone it would miss an application that exports once. When `telemetry` starts while the application is already running, the first hour counts all tokens since the application started.
+`increase()` counts only the change after a series' first sample. Alone, it would miss the tokens in that first sample, and every token of an application that exports once. When `telemetry` starts while the application is already running, the first hour counts all tokens since the application started.
 
 Save it as `token_budget.yaml`:
 
-```yaml title="docs/snippets/telemetry/token_budget.yaml" hl_lines="50"
+```yaml title="docs/snippets/telemetry/token_budget.yaml" hl_lines="52"
 # A sample alert rule: it fires when the model calls of the last hour have used more
 # tokens than the budget set below. Copy it into .odctl/grafana/alerting/ and run
 # odctl restart telemetry to load it.
@@ -227,10 +227,12 @@ groups:
           # and output together. Prometheus keeps the histogram's sum in the series
           # gen_ai_client_token_usage_sum. A series that began within the last hour
           # counts by its last value, which is all its tokens since it began, also
-          # when the application stopped sending more than 5 minutes ago. A series
-          # more than an hour old counts by its increase over the hour. When
-          # `telemetry` starts while the application is already running, the first
-          # hour counts all tokens since the application started.
+          # when the application stopped sending more than 5 minutes ago, because
+          # increase() counts only the change after a series' first sample. A series
+          # more than an hour old counts by its increase over the hour, while the
+          # application exports at least every 5 minutes. When `telemetry` starts
+          # while the application is already running, the first hour counts all
+          # tokens since the application started.
           - refId: A
             relativeTimeRange:
               from: 3600
