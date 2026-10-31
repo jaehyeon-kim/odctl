@@ -11,6 +11,7 @@ JSON output from `list`, `explain`, `ps` and `info`, and a written list of what 
 - `odctl info --json` also shows the image tag, the workspace and which of odctl's own images are on your machine.
 - [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) lists what every 1.x release keeps: profile names, published ports, `.env` keys, volumes, the workspace files and the `--json` keys.
 - odctl now needs Typer 0.18.0 or later, because older Typer releases misread odctl's options with newer Click releases; with some pairs `odctl init` replaced an existing workspace without asking.
+- The base of odctl's `postgres` image, `postgres:18-trixie`, is pinned by digest, so a release that does not change the image no longer gives it new layers to download.
 
 ## Version 1.4.0
 

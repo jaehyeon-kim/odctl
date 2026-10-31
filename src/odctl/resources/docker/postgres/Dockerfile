@@ -1,4 +1,6 @@
-FROM postgres:18-trixie
+# The base is pinned by digest, so a release rebuilds this image on the same
+# layers until Renovate raises a pull request for a new postgres:18-trixie.
+FROM postgres:18-trixie@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81
 
 # Metadata Bindings for GHCR
 LABEL org.opencontainers.image.source="https://github.com/jaehyeon-kim/odctl"
