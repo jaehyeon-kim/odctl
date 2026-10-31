@@ -8,7 +8,7 @@ name: odctl-aieng
 # creates it on a PostgreSQL from before 1.7.0. The langfuse bucket comes from
 # seaweed-init.
 
-# The settings that web and worker share.
+# Settings that web and worker share.
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://127.0.0.1:3005
   # Docker sets HOSTNAME to the container ID. The worker binds to HOSTNAME, so

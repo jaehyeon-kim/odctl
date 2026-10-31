@@ -19,9 +19,11 @@ odctl up langfuse
 
 Three facts about the profile:
 
-- It starts `ch-lite`, whose two ClickHouse servers have a limit of 4 GB each. `mem_limit` in `.odctl/compose-analytics.yml` sets it today, and an edit there can change it.
-- Langfuse needs its databases in UTC, so keep `TZ` in `.odctl/.env` at its default, `UTC`. PostgreSQL reads `TZ` only when it creates its data folder, as [How It Works](../how-it-works.md#examples) explains.
-- `ch-lite` and `ch-full` use the same container names, so `odctl up langfuse` fails while `ch-full` runs. Stop it first with `odctl down ch-full`.
+- It starts `ch-lite`, whose two ClickHouse servers have a limit of 4 GB each, set by `mem_limit` in `.odctl/compose-analytics.yml`.
+- Langfuse needs its databases in UTC, so keep `TZ` in `.odctl/.env` at its default, `UTC`.
+- `ch-lite` and `ch-full` use the same container names, so stop `ch-full` with `odctl down ch-full` before `odctl up langfuse`.
+
+PostgreSQL reads `TZ` only when it creates its data folder, as [How It Works](../how-it-works.md#examples) explains.
 
 A trace takes this path. `langfuse-web` writes each event it receives to SeaweedFS and puts a reference on a Valkey queue. `langfuse-worker` takes the reference, reads the event and writes it to ClickHouse:
 
@@ -119,7 +121,7 @@ The trace has two observations. The root `answer-question` is a span, and `model
 
 ## Send to Telemetry Too
 
-With `odctl up telemetry` running, the same application can send each trace to Langfuse and to the telemetry collector. Add these lines to the end of `send.py`. They add a second span processor, whose exporter sends to the collector, and then send another trace:
+With `odctl up telemetry` running, the same application can send each trace to Langfuse and to the telemetry collector. Add these lines to the end of `send.py`. They add a second span processor with an exporter that sends to the collector, and then send another trace:
 
 ```python title="docs/snippets/langfuse/steps.py:telemetry"
 # The collector from `odctl up telemetry` receives OTLP over HTTP on port 4318.
