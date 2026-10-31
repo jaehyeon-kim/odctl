@@ -599,7 +599,8 @@ def down(
     """
     # `--all` needs Docker to know which profiles have containers, so its dry run
     # does too.
-    if (not dry_run or all) and not is_docker_running():
+    needs_docker = not dry_run or all
+    if needs_docker and not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 

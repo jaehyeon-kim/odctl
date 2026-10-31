@@ -1,24 +1,28 @@
 # Connect an AI Agent with MCP
 
-MCP, the Model Context Protocol, lets an AI agent discover and call the tools of a server. A tool is a function with a name and named parameters. `odctl mcp` starts an MCP server that offers odctl's commands as tools. The client, such as an AI assistant, starts `odctl mcp` as a process and exchanges messages with it over stdio, the process's standard input and output. The agent calls a tool and odctl runs the command.
+MCP, the Model Context Protocol, lets an AI agent discover and call the tools of a server. A tool is a function with a name and named parameters.
+
+`odctl mcp` starts an MCP server that offers odctl's commands as tools. An MCP client, such as an AI assistant, starts `odctl mcp` as a process. It exchanges messages with the process over its standard input and output, which MCP calls stdio. The agent calls a tool and odctl runs the command.
 
 The server offers five tools that only read, each running the command of the same name:
 
 - `list` returns every profile with its services and ports.
-- `explain` returns one profile's services, images, ports, volumes and usage. It takes `profile`.
-- `ps` returns the containers odctl manages and the active profiles. It takes `profiles`, and without it returns every container.
+- `explain` takes `profile` and returns that profile's services, images, ports, volumes and usage.
+- `ps` takes `profiles` and returns their containers and the active profiles, or every container odctl manages when `profiles` is left out.
 - `info` returns the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's own images.
-- `logs` returns the logs of the containers of some profiles. It takes `profiles`, `service`, `tail`, `timestamps`, `since` and `until`. `tail` defaults to 100 lines, where `odctl logs` prints all of them, so one call cannot fill the agent's context with a long log. A call can pass another number.
+- `logs` takes `profiles`, `service`, `tail`, `timestamps`, `since` and `until`, and returns the logs of the containers of those profiles.
+
+`tail` defaults to 100 lines, so one call cannot fill the agent's context with a long log. `odctl logs` prints all lines, and a call can pass another number.
 
 Results and errors:
 
-- `list`, `explain`, `ps` and `info` return the documents on the [JSON Output](../json-output.md) page. A structured result of a tool is an object, so the array of `list` arrives under the key `result`.
+- `list`, `explain`, `ps` and `info` return the documents on the [JSON Output](../json-output.md) page, and `list`'s array arrives under the key `result` because a tool's structured result is an object.
 - `info` reports Docker as not reachable with `reachable: false`, not as an error.
 - `logs` returns the lines that `odctl logs` prints.
 - A tool that fails returns the error message of the command.
 - Tools run one at a time.
 
-The tools `up` and `down` are served only when you start the server with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) says.
+The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) says.
 
 This guide builds on [Getting Started](../getting-started.md) and [JSON Output](../json-output.md).
 
@@ -72,6 +76,11 @@ from mcp import Client, StdioServerParameters
 
 
 async def main(command):
+    """Print the name and description of each tool the server offers.
+
+    Args:
+        command: The command that starts the server, as a list of words.
+    """
     server = StdioServerParameters(command=command[0], args=command[1:])
     async with Client(server) as client:
         for tool in (await client.list_tools()).tools:
@@ -113,7 +122,7 @@ up: Start profiles and their dependencies, as `odctl up` does.
 down: Stop the named profiles. With `volumes`, also remove their volumes, and the shared jar volume `odctl-shared-deps` once no other profile has a container, as `odctl down --volumes` does.
 ```
 
-`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. `up` and `down` are marked as destructive, which a client can use to ask before it runs them: `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only: `odctl down --all --volumes` asks before it removes the data of every profile, and a server cannot ask, so no tool removes everything in one call.
+`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and a server cannot ask, so no tool removes everything in one call.
 
 ## Runnable Example
 
@@ -127,12 +136,20 @@ from mcp import Client, StdioServerParameters
 
 
 async def call(client, name, arguments):
+    """Call one tool and print its name and its text result.
+
+    Args:
+        client: The connected MCP client.
+        name: The tool to call.
+        arguments: The tool's parameters.
+    """
     result = await client.call_tool(name, arguments)
     print(f"--- {name}")
     print(result.content[0].text)
 
 
 async def main():
+    """Start kafka-lite, read it through four tools, then stop it."""
     # Docker reads variables such as DOCKER_HOST, which a client passes to the
     # server only when asked.
     server = StdioServerParameters(

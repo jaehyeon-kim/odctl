@@ -1866,7 +1866,7 @@ PYEOF
   pass "pushed a drift report and read it back, and a dataset round-tripped"
 }
 
-# The MCP Server guide. The client runs in its own environment, as the guide
+# MCP Server guide. The client runs in its own environment, as the guide
 # says, because odctl's extra needs mcp 2.3.0 or later and other clients pin mcp
 # below 2. The server that the last two checks start is the one that the guide's
 # mcp.json names, which `claude mcp add` wrote. The example ends with `down

@@ -6,9 +6,11 @@ Each release, newest first: what changed, then under Upgrading what to change in
 
 An MCP server that gives AI agents odctl's profiles, containers and logs, and a dry run of `odctl down --volumes` that names the volumes.
 
-- `odctl mcp` serves `list`, `explain`, `ps`, `info` and `logs` to an MCP client, such as Claude Code, as tools; all but `logs` return the same JSON as `--json`. The tool names and their parameter names stay the same in every 1.x release ([What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x)). Install it with `uv tool install "odctl[mcp]"`; [MCP Server](../guides/mcp-server.md) sets it up.
+- `odctl mcp` serves `list`, `explain`, `ps`, `info` and `logs` as tools to an MCP client, such as Claude Code, after `uv tool install "odctl[mcp]"` ([MCP Server](../guides/mcp-server.md)).
+- All tools but `logs` return the same JSON as `--json`, and their names and parameter names stay the same in every 1.x release ([What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x)).
 - `odctl mcp --allow-changes` also serves `up` and `down`, so an agent can start and stop profiles.
-- `odctl down --volumes --dry-run` names the named volumes the real run would remove, gives the number of unnamed volumes of each container it stops, and includes the shared jar volume `odctl-shared-deps` once no other profile has a container. `odctl down --all --dry-run` reports that Docker is not reachable instead of ending with a traceback.
+- `odctl down --volumes --dry-run` names the volumes the real run would remove: the named volumes, the number of unnamed volumes of each container, and `odctl-shared-deps` once no other profile has a container.
+- `odctl down --all --dry-run` reports that Docker is not reachable instead of ending with a traceback.
 
 ## Version 1.5.0
 

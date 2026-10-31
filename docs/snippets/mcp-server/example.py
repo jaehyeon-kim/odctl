@@ -5,12 +5,20 @@ from mcp import Client, StdioServerParameters
 
 
 async def call(client, name, arguments):
+    """Call one tool and print its name and its text result.
+
+    Args:
+        client: The connected MCP client.
+        name: The tool to call.
+        arguments: The tool's parameters.
+    """
     result = await client.call_tool(name, arguments)
     print(f"--- {name}")
     print(result.content[0].text)
 
 
 async def main():
+    """Start kafka-lite, read it through four tools, then stop it."""
     # Docker reads variables such as DOCKER_HOST, which a client passes to the
     # server only when asked.
     server = StdioServerParameters(

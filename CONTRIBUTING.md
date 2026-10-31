@@ -60,7 +60,7 @@ Run the unit suite in full once before each commit. While fixing, run only the f
 A pull request runs these checks:
 
 - pre-commit;
-- the unit tests on each supported Python version and at the lowest dependency versions `pyproject.toml` allows, once without the `mcp` extra and once with it;
+- the unit tests on each supported Python version, and at the lowest dependency versions `pyproject.toml` allows, once without the `mcp` extra and once with it;
 - the strict docs build;
 - the image builds, when an image input changed.
 
