@@ -140,7 +140,7 @@ odctl --workspace ./.odctl ps catalog
 
 ### Customise It
 
-`odctl init` copies everything odctl runs into `.odctl`. It copies only files that are missing, so running it again keeps your edits.
+`odctl init` copies everything odctl runs into `.odctl`. It copies each top-level file or folder that is missing. A folder that exists gets no new files, and `.env` is written only when it is missing or with `--force`. Running it again therefore keeps your edits.
 
 | File | What to change |
 | --- | --- |
@@ -148,6 +148,7 @@ odctl --workspace ./.odctl ps catalog
 | `registry.yml` | The profiles, their compose files and their dependencies |
 | `.env` | `TAG`, the time zone of the services that read it (`TZ`, `UTC` by default), extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`), the MLflow services (`_MLOPS_PIP_DEPS`), the OpenMetadata ingestion container (`_METADATA_PIP_DEPS`), where Airflow sends its OpenLineage events (`AIRFLOW_OPENLINEAGE_TRANSPORT`, empty by default, so Airflow sends none; [Lineage from Airflow](guides/lineage.md#lineage-from-airflow) sets it), whether OpenMetadata's AutoPilot creates default agents for a service added in its UI (`METADATA_AUTOPILOT`, off by default), and the model the MLflow model server serves (`MODEL_URI`) |
 | `grafana/dashboards/` | The Grafana dashboard for each service |
+| `grafana/alerting/` | Grafana alert rules, contact points and notification policies, loaded at start |
 | `trino/rules.json` | Trino's file-based access control |
 | `evidently/config.yaml` | The Evidently server's settings |
 | `openmetadata/connector_sync.py` | How the ingestion container copies custom connectors from S3 |
@@ -161,7 +162,7 @@ A restart keeps the container, so it does not apply an edited compose file or `.
 odctl recreate catalog --pull
 ```
 
-Recreating discards the data inside those containers, with the exceptions that [Where Data Lives](#where-data-lives) lists. `odctl restart <profile>` is enough for files a service reads when it starts, such as `trino/rules.json` and the Grafana dashboards.
+Recreating discards the data inside those containers, with the exceptions that [Where Data Lives](#where-data-lives) lists. `odctl restart <profile>` is enough for files a service reads when it starts, such as `trino/rules.json`, the Grafana dashboards and the Grafana alert rules.
 
 ### Examples
 

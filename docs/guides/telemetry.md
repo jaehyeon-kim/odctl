@@ -53,7 +53,7 @@ The collector answers `{"partialSuccess":{}}`. The collector passes metrics on i
 
 An alert rule is a query that Grafana runs against Prometheus every minute, and a limit it compares the result with. The rule fires when the result passes the limit. Grafana then shows one alert for each DAG, or other label set, that the query returns. odctl ships one rule, which fires when an Airflow DAG run fails. This section builds on [Airflow DAGs from S3](airflow-dags.md), which explains how to upload and run a DAG, and on [Evidently Reports](evidently-reports.md), which explains drift.
 
-The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/main/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when the container starts. Grafana marks these rules Provisioned and does not let you edit them in its UI. To change one, edit the file and run `odctl restart telemetry`. This lists the rules that Grafana loaded:
+The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/main/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
 
 ```bash title="docs/snippets/telemetry/commands.sh:alert-rules"
 # The title of each alert rule that Grafana loaded.
@@ -69,6 +69,8 @@ Airflow DAG run failed
 ```
 
 The rule counts the DAG runs that failed in the last 5 minutes for each DAG, from the metric `airflow_dagrun_duration_failed_milliseconds` that Airflow sends, and fires for each DAG with at least one. The 5 minutes, the evaluation every minute and the labels are set in the file and can change. The rule has no waiting period, so it fires on the first evaluation that sees a failure.
+
+When `telemetry` starts while Airflow is already running, Prometheus has no earlier sample of each series, so the rule also fires, for 5 minutes, for each DAG that has failed since Airflow started. A restart keeps Prometheus's samples, so it does not do this.
 
 To see it fire, run a DAG that fails. This DAG checks for [data drift](evidently-reports.md): it compares a column of current data with a reference dataset and fails when the column has drifted.
 
@@ -167,7 +169,12 @@ The destination is `empty`, Grafana's default contact point, which sends nothing
 
 The summary under the rule's title is the template, because one rule covers every DAG. Each alert has it filled in with its DAG, which the instance's details and the alerts API show.
 
-To be told when an alert fires, you need a contact point and a notification policy that routes alerts to it. Grafana's database lives inside the `otel-lgtm` container and has no volume, so a contact point made in the UI is lost at `odctl down`. A contact point and a notification policy kept as a file in `.odctl/grafana/alerting/` load at each start, as Grafana's file provisioning does for the rule. Run `odctl restart telemetry` after adding one. Deleting the file and restarting leaves the contact point and policy in Grafana; `odctl down telemetry` and `odctl up telemetry` remove them. Add a runbook text to the rule's annotations as well: the steps for whoever receives the alert.
+To be told when an alert fires, you need a contact point and a notification policy that routes alerts to it. Grafana's database lives inside the `otel-lgtm` container and has no volume, so a contact point made in the UI is lost at `odctl down`. Keep them in a file instead:
+
+- Grafana loads a contact point and a notification policy from a file in `.odctl/grafana/alerting/` at each start, in the format of [Grafana's file provisioning](https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/). Add the file and restart `telemetry`, as above.
+- Deleting a file and restarting leaves its rule, contact point or policy in Grafana. `odctl down telemetry` and then `odctl up telemetry` remove them.
+
+To tell whoever receives the alert what to do, add a `runbook_url` annotation to the rule in its file.
 
 The alert clears when the failed run is more than 5 minutes old. A run below the threshold raises none. This triggers a run named `steady` with `shift` 0 and prints the new run in state `queued`. The second command prints the distance of each run from its task log:
 
@@ -187,9 +194,20 @@ run_id=steady/task_id=check_drift/attempt=1.log:Wasserstein distance of x: 0.16,
 
 Both runs draw their samples from fixed seeds, so the distances repeat on every run. The drifted run is above the threshold and fails, and the steady run is below it and succeeds.
 
-A rule of your own is another file in the same folder. Grafana reads the folder when it starts, so copy the file in and restart `telemetry`. This sample fires when the model calls of the last hour have used more tokens than a budget. `gen_ai.client.token.usage` is the OpenTelemetry metric for the tokens that one model call used. Prometheus writes its name with `_` in place of `.`. For a histogram with explicit buckets, as the OpenTelemetry SDKs send by default, Prometheus keeps the sum in the series that ends in `_sum`. An exponential histogram arrives as one native series with no `_sum`, as Airflow's does. The query therefore sums `gen_ai_client_token_usage_sum`. It counts a series that began within the last hour by its value, and an older series by its increase over the hour, because `increase()` ignores the first sample of a new series, so an application that exports once would never be counted. odctl does not provision the sample, because the budget is yours: change the highlighted limit. Save it as `token_budget.yaml`:
+A rule of your own is another file in the same folder. Copy it in and restart `telemetry`, as above. This sample fires when the model calls of the last hour have used more tokens than a budget. odctl does not provision it, because the budget is yours: change the highlighted limit.
 
-```yaml title="docs/snippets/telemetry/token_budget.yaml" hl_lines="48"
+`gen_ai.client.token.usage` is the OpenTelemetry metric for the tokens that one model call used. Prometheus writes its name with `_` in place of `.`. For a histogram with explicit buckets, as the OpenTelemetry SDKs send by default, Prometheus keeps the sum in the series that ends in `_sum`. The query therefore sums `gen_ai_client_token_usage_sum`. An SDK set to exponential histograms sends one native histogram series with no `_sum`, as Airflow's does, and this query then returns nothing.
+
+The query counts each series in one of two ways:
+
+- A series that began within the last hour counts by its last value, which is all its tokens since it began. This also holds when the application stopped sending more than 5 minutes ago.
+- A series that is more than an hour old counts by its increase over the hour.
+
+`increase()` needs two samples, so alone it would miss an application that exports once. When `telemetry` starts while the application is already running, the first hour counts all tokens since the application started.
+
+Save it as `token_budget.yaml`:
+
+```yaml title="docs/snippets/telemetry/token_budget.yaml" hl_lines="50"
 # A sample alert rule: it fires when the model calls of the last hour have used more
 # tokens than the budget set below. Copy it into .odctl/grafana/alerting/ and run
 # odctl restart telemetry to load it.
@@ -208,9 +226,11 @@ groups:
           # The tokens that gen_ai.client.token.usage recorded in the last hour, input
           # and output together. Prometheus keeps the histogram's sum in the series
           # gen_ai_client_token_usage_sum. A series that began within the last hour
-          # counts by its value, because increase() ignores the first sample of a new
-          # series and would miss an application that exports once. An older series
-          # counts by its increase over the hour.
+          # counts by its last value, which is all its tokens since it began, also
+          # when the application stopped sending more than 5 minutes ago. A series
+          # more than an hour old counts by its increase over the hour. When
+          # `telemetry` starts while the application is already running, the first
+          # hour counts all tokens since the application started.
           - refId: A
             relativeTimeRange:
               from: 3600
@@ -219,7 +239,7 @@ groups:
             model:
               refId: A
               instant: true
-              expr: sum((gen_ai_client_token_usage_sum unless gen_ai_client_token_usage_sum offset 1h) or increase(gen_ai_client_token_usage_sum[1h]))
+              expr: sum((last_over_time(gen_ai_client_token_usage_sum[1h]) unless gen_ai_client_token_usage_sum offset 1h) or increase(gen_ai_client_token_usage_sum[1h]))
           - refId: B
             datasourceUid: __expr__
             model:

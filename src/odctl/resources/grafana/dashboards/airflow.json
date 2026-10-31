@@ -821,7 +821,7 @@
       "id": 14,
       "type": "timeseries",
       "title": "Dag runs finished per minute",
-      "description": "Dag runs that finished, by DAG and final state, from the scheduler's run duration histograms.",
+      "description": "Dag runs that finished, by DAG and final state, from the scheduler's run duration histograms. A DAG's first run of a state after Prometheus first sees its series is not counted, because rate() needs two samples.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -902,7 +902,7 @@
       "id": 15,
       "type": "bargauge",
       "title": "Average successful dag run duration in range",
-      "description": "Average duration of the successful dag runs of each DAG that finished in the selected time range.",
+      "description": "Average duration of the successful dag runs of each DAG that finished in the selected time range. A DAG's first successful run after Prometheus first sees its series is not counted, because increase() needs two samples.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

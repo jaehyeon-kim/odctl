@@ -16,9 +16,11 @@ groups:
           # The tokens that gen_ai.client.token.usage recorded in the last hour, input
           # and output together. Prometheus keeps the histogram's sum in the series
           # gen_ai_client_token_usage_sum. A series that began within the last hour
-          # counts by its value, because increase() ignores the first sample of a new
-          # series and would miss an application that exports once. An older series
-          # counts by its increase over the hour.
+          # counts by its last value, which is all its tokens since it began, also
+          # when the application stopped sending more than 5 minutes ago. A series
+          # more than an hour old counts by its increase over the hour. When
+          # `telemetry` starts while the application is already running, the first
+          # hour counts all tokens since the application started.
           - refId: A
             relativeTimeRange:
               from: 3600
@@ -27,7 +29,7 @@ groups:
             model:
               refId: A
               instant: true
-              expr: sum((gen_ai_client_token_usage_sum unless gen_ai_client_token_usage_sum offset 1h) or increase(gen_ai_client_token_usage_sum[1h]))
+              expr: sum((last_over_time(gen_ai_client_token_usage_sum[1h]) unless gen_ai_client_token_usage_sum offset 1h) or increase(gen_ai_client_token_usage_sum[1h]))
           - refId: B
             datasourceUid: __expr__
             model:

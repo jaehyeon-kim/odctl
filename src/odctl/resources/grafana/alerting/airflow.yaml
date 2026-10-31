@@ -23,6 +23,9 @@ groups:
           # series starts at its first failed run, with no earlier sample, so
           # increase() reports 0 for that run. The second line counts a series that
           # did not exist 5 minutes ago, which catches the first failure.
+          # When `telemetry` starts while Airflow is already running, Prometheus has
+          # no earlier sample of each series, so the rule also fires, for 5 minutes,
+          # for each DAG that has failed since Airflow started.
           - refId: A
             relativeTimeRange:
               from: 300

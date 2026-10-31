@@ -918,7 +918,7 @@ smoke_airflow_materialize() {
 
   local work="${TMPDIR:-/tmp}/odctl-airflow-feast-smoke"
   rm -rf "$work"; mkdir -p "$work"
-  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
+  uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
     "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
     || fail "could not install the feast client"
@@ -1767,7 +1767,7 @@ smoke_feast() {
 
   # The offline half runs in the caller's environment, not in the container:
   # the published image carries feast[minimal], which has no iceberg or duckdb.
-  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
+  uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
     "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" "mcp>=1.24,<2" >/dev/null 2>&1 \
     || fail "could not install the feast and mcp clients"
@@ -1911,7 +1911,7 @@ smoke_temporal() {
 
   local work="${TMPDIR:-/tmp}/odctl-temporal-smoke"
   rm -rf "$work"; mkdir -p "$work"
-  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the temporal client"
+  uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the temporal client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q "temporalio==1.34.0" >/dev/null 2>&1 \
     || fail "could not install the temporalio SDK"
 
@@ -2089,7 +2089,7 @@ PYEOF
 smoke_mcp_server() {
   local work="${TMPDIR:-/tmp}/odctl-mcp-smoke" client out command arguments
   rm -rf "$work"; mkdir -p "$work"
-  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the MCP client"
+  uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the MCP client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q "mcp>=2.3.0,<3" >/dev/null 2>&1 \
     || fail "could not install the MCP client"
   client="$work/.venv/bin"
