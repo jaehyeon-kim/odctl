@@ -9,10 +9,10 @@
 # committed nothing while its checkpoints succeeded. Each assertion below exists
 # because something shipped broken past a liveness check.
 #
-# Usage: smoke.sh <profile>
+# Usage: smoke.sh <profile or group name, such as metadata:deps>
 set -uo pipefail
 
-PROFILE="${1:?usage: smoke.sh <profile>}"
+PROFILE="${1:?usage: smoke.sh <profile or group name, such as metadata:deps>}"
 MB_USER="smoke@example.com"
 MB_PASS="Smoke-test-1234"
 
@@ -880,6 +880,104 @@ if bad:
 
   # Airflow pushes OTLP to the telemetry collector rather than being scraped.
   assert_pushed_metrics 'airflow_.+' Airflow
+
+  smoke_airflow_materialize
+}
+
+# Feast guide's On a Schedule section: a DAG that builds a FeatureStore from
+# FEAST_REGISTRY and calls materialize_incremental. It needs the registry entry and
+# the Iceberg table the guide's earlier steps make, so this runs those from the
+# host as the guide does, then uploads the DAG, runs it and reads the value it
+# copied into Valkey. The feature view source has no catalog address, so the
+# registry entry works from the host here and from the Airflow container in the DAG.
+# Its own project, so that the guide's Runnable Example can still register demo.
+smoke_airflow_materialize() {
+  odctl up feast >/dev/null 2>&1 || fail "could not start feast for the materialise DAG"
+  retry 30 5 http_ok "http://127.0.0.1:6566/health" || fail "Feast never answered on :6566"
+
+  local work="${TMPDIR:-/tmp}/odctl-airflow-feast-smoke"
+  rm -rf "$work"; mkdir -p "$work"
+  uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
+  VIRTUAL_ENV="$work/.venv" uv pip install -q \
+    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
+    || fail "could not install the feast client"
+
+  cp -r "$SNIPPETS/feast-iceberg/feature_repo" "$work/"
+  sed 's/^project: demo$/project: airflow_smoke/' "$work/feature_repo/feature_store.yaml" \
+    > "$work/feature_store.yaml" && mv "$work/feature_store.yaml" "$work/feature_repo/feature_store.yaml"
+  sed 's/project="demo"/project="airflow_smoke"/' "$SNIPPETS/feast-iceberg/feast_materialize.py" \
+    > "$work/feast_materialize.py"
+  snippet feast-iceberg/steps.py create-table > "$work/build.py"
+  snippet feast-iceberg/steps.py append > "$work/append.py"
+  snippet feast-iceberg/steps.py read > "$work/read.py"
+
+  local py="$work/.venv/bin/python" log="$work/step.log"
+  run_step() {
+    local what="$1"; shift
+    if ! (cd "$work" && "$@") >"$log" 2>&1; then
+      echo "---- $what ----"
+      tail -25 "$log"
+      fail "$what"
+    fi
+  }
+
+  # A table left by the Runnable Example would make the guide's create step fail.
+  local code
+  code=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true")
+  case "$code" in 204|404) ;; *) fail "could not delete demo.driver_stats before the guide's create step (HTTP $code)";; esac
+  eval "$(snippet feast-iceberg/commands.sh catalog-env)"
+  run_step "could not create the Iceberg table through the catalog" "$py" build.py
+  # Delete the view, so that materialise starts again and the check reads this run's values.
+  (cd "$work" && "$work/.venv/bin/feast" -c feature_repo delete driver_stats) >/dev/null 2>&1 || true
+  run_step "feast apply or materialize failed without a catalog address in the source" \
+    env PATH="$work/.venv/bin:$PATH" bash -e -o pipefail -c "$(snippet feast-iceberg/commands.sh apply-materialize)"
+  pass "the guide's source, with no catalog address, applied and materialised from the host"
+
+  run_step "could not upload the materialise DAG to s3://airflow/dags" \
+    run_snippet feast-iceberg/commands.sh dag-upload
+  retry 30 10 bash -c \
+    "docker exec airflow airflow dags list 2>/dev/null | grep -q feast_materialize" \
+    || fail "the S3 DAG bundle never delivered the materialise DAG, or it was never parsed"
+
+  # The new row is newer than the host's materialise, so only the DAG can copy it.
+  run_step "could not append a row to the Iceberg table" "$py" append.py
+  run_step "the guide's unpause and trigger commands failed" \
+    run_snippet feast-iceberg/commands.sh dag-run
+
+  # Unpausing also starts a scheduled run, so wait until every run has finished.
+  local states=""
+  for _ in $(seq 1 30); do
+    states=$(docker exec airflow airflow dags list-runs feast_materialize -o plain 2>/dev/null \
+      | grep -E "^feast_materialize" | tr -s ' ' | cut -d' ' -f3)
+    grep -qE 'queued|running' <<<"$states" || [ -z "$states" ] || break
+    sleep 10
+  done
+  [ -n "$states" ] && ! grep -qvx success <<<"$states" \
+    || fail "the materialise DAG runs ended in states: ${states:-none}"
+  pass "the materialise DAG ran to success inside the Airflow container"
+
+  local got
+  got=$(cd "$work" && "$py" read.py 2>"$log") || { tail -25 "$log"; fail "the online read failed"; }
+  [ "$got" = "{'driver_id': [1001, 1002], 'conv_rate': [0.6000000238418579, 0.75]}" ] \
+    || fail "Valkey holds $got, not the 0.6 the DAG should have copied"
+  pass "the DAG copied the new value from Iceberg into Valkey"
+
+  # Leave no hourly run behind: a DAG that stays unpaused fails on its next run once
+  # the table below is gone, and the next smoke run would read that failed run.
+  docker exec airflow airflow dags pause feast_materialize >/dev/null 2>&1 \
+    || fail "could not pause the materialise DAG"
+  docker exec airflow python -c '
+import boto3
+boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(
+    Bucket="airflow", Key="dags/feast_materialize.py")' >/dev/null 2>&1 \
+    || fail "could not delete the materialise DAG from s3://airflow/dags"
+
+  # No feast teardown: it leaves the view's row in feature_view_version_history, and
+  # a second run of this check would then fail to apply the view again.
+  curl -fsS --max-time 10 -X DELETE \
+    "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
+  curl -fsS --max-time 10 -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo" >/dev/null 2>&1 || true
+  rm -rf "$work"
 }
 
 # deps is a one-shot copy into a shared volume, so there is no container to
@@ -1427,7 +1525,9 @@ om_step() {
 # Feast keeps no feature values of its own, so liveness proves nothing here.
 # This builds a real Iceberg table through the catalog, registers a feature view
 # over it, takes a point-in-time join, materializes to Valkey and reads it back.
-# A failure in any of those is a broken profile even when both containers are up.
+# It also retrieves the nearest rows from a second repository on PostgreSQL with
+# pgvector. A failure in any of those is a broken profile even when both
+# containers are up.
 smoke_feast() {
   retry 60 5 http_ok "http://127.0.0.1:8890/api/v1/projects" || fail "no HTTP response from the feast UI on :8890"
   pass "feast UI answering, registry reachable"
@@ -1442,17 +1542,16 @@ smoke_feast() {
   # the published image carries feast[minimal], which has no iceberg or duckdb.
   uv venv "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
-    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
-    || fail "could not install the feast client"
+    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" "mcp>=1.24,<2" >/dev/null 2>&1 \
+    || fail "could not install the feast and mcp clients"
 
-  # Repository from the guide, with warehouse="" in its source. Feast's REST client
-  # puts warehouse into the URL path as a prefix for Polaris and Nessie style
-  # catalogs, and Iceberg's REST fixture server serves the spec with no prefix,
-  # so a real warehouse gives HTTP 400 "Ambiguous URI empty segment".
+  # Repository from the guide, whose source passes warehouse="" so that PyIceberg
+  # takes the warehouse from PYICEBERG_CATALOG__ODCTL__WAREHOUSE.
   cp "$SNIPPETS/feast-iceberg/feature_repo/"* "$work/feature_repo/"
-  # Its own project, because the guide's Runnable Example registers the same
-  # feature view in demo afterwards. feast teardown leaves the view's row in
-  # feature_view_version_history, so a second apply in demo fails on its key.
+  # Its own project, so that the guide's Runnable Example can still register demo.
+  # No feast teardown: it deletes every project in the registry, and it leaves each
+  # view's row in feature_view_version_history, so the next apply of that view fails
+  # on its key. feast delete removes one view and its online values, and the view applies again.
   sed 's/^project: demo$/project: smoke/' "$work/feature_repo/feature_store.yaml" \
     > "$work/feature_store.yaml" && mv "$work/feature_store.yaml" "$work/feature_repo/feature_store.yaml"
 
@@ -1503,11 +1602,17 @@ PYONLINE
     fi
   }
 
+  # A table left by the Runnable Example or by a reader would make the guide's create step fail.
+  local code
+  code=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true")
+  case "$code" in 204|404) ;; *) fail "could not delete demo.driver_stats before the guide's create step (HTTP $code)";; esac
   run_step "could not create the Iceberg table through the catalog" "$py" build.py
   pass "Iceberg table created through the REST catalog on SeaweedFS"
 
+  # Delete the view, so that materialise starts again and the check reads this run's values.
+  (cd "$work" && "$feast_bin" -c feature_repo delete driver_stats) >/dev/null 2>&1 || true
   run_step "feast apply or materialize failed" \
-    env PATH="$work/.venv/bin:$PATH" bash -o pipefail -c "$(snippet feast-iceberg/commands.sh apply-materialize)"
+    env PATH="$work/.venv/bin:$PATH" bash -e -o pipefail -c "$(snippet feast-iceberg/commands.sh apply-materialize)"
   pass "feast apply registered the feature view, and materialize wrote to valkey"
 
   run_step "the point-in-time join returned the wrong values" "$py" check.py
@@ -1516,12 +1621,55 @@ PYONLINE
   run_step "the online read from valkey returned the wrong values" "$py" online.py
   pass "get_online_features read the materialised values from valkey"
 
-  (cd "$work" && "$feast_bin" -c feature_repo teardown) >/dev/null 2>&1 || true
+  # Vector retrieval, from the vector page: a second repository, with
+  # PostgreSQL and pgvector as its online store. Its own project, because the
+  # Runnable Example registers vector_demo afterwards.
+  mkdir -p "$work/vector_repo"
+  cp "$SNIPPETS/feast-vector-retrieval/vector_repo/"* "$work/vector_repo/"
+  sed 's/^project: vector_demo$/project: vector_smoke/' "$work/vector_repo/feature_store.yaml" \
+    > "$work/feature_store.yaml" && mv "$work/feature_store.yaml" "$work/vector_repo/feature_store.yaml"
+  snippet feast-vector-retrieval/steps.py write > "$work/vector_write.py"
+  snippet feast-vector-retrieval/steps.py retrieve > "$work/vector_retrieve.py"
+  run_step "feast apply failed on the vector repository" \
+    env PATH="$work/.venv/bin:$PATH" bash -o pipefail -c "$(snippet feast-vector-retrieval/commands.sh apply)"
+  run_step "writing the documents to the PostgreSQL online store failed" "$py" vector_write.py
+  local nearest
+  nearest=$(cd "$work" && "$py" vector_retrieve.py 2>"$log") \
+    || { tail -25 "$log"; fail "retrieve_online_documents_v2 failed"; }
+  [ "$nearest" = "['Feast', 'Iceberg']" ] \
+    || fail "retrieve_online_documents_v2 returned $nearest, not the two nearest documents"
+  pass "retrieve_online_documents_v2 returned the nearest rows from pgvector"
+
   curl -fsS --max-time 10 -X DELETE \
     "http://127.0.0.1:8181/v1/namespaces/demo/tables/driver_stats?purgeRequested=true" >/dev/null 2>&1 || true
   curl -fsS --max-time 10 -X DELETE "http://127.0.0.1:8181/v1/namespaces/demo" >/dev/null 2>&1 || true
   # The venv stays: the guide's Runnable Example runs with it next, and the feast
   # case removes $work after that.
+}
+
+# The checks run after the guide's Runnable Example, so they reuse its push
+# definitions in feast-serve; the HTTP push then stores a newer value than the
+# example's Flink push. Read it back until the feature server's cached registry
+# knows the feature view, then read it through the MCP endpoint.
+smoke_feast_push_and_mcp() {
+  local work="${TMPDIR:-/tmp}/odctl-feast-smoke"
+  local out
+  out=$(cd "$work" && run_snippet feast-iceberg/commands.sh push-http 2>&1) \
+    || { echo "$out" | tail -20; fail "the HTTP push to /push failed"; }
+  [ "$out" = "200" ] || { echo "$out" | tail -20; fail "the HTTP push to /push answered '$out', not 200"; }
+  retry 24 5 snippet_says feast-iceberg/commands.sh push-read -F 0.699999988079071 \
+    || fail "the value pushed over HTTP was not read back from /get-online-features"
+  pass "a value pushed over HTTP was read back from the feature server"
+
+  cp "$SNIPPETS/feast-iceberg/mcp_client.py" "$work/"
+  out=$(cd "$work" && "$work/.venv/bin/python" mcp_client.py 2>&1) \
+    || { echo "$out" | tail -20; fail "the MCP client failed"; }
+  grep -qx 'get_online_features_get_online_features_post' <<<"$out" \
+    && grep -qx 'push_push_post' <<<"$out" \
+    || { echo "$out" | tail -20; fail "the MCP endpoint did not list Feast's tools"; }
+  grep -qxF '[0.699999988079071]' <<<"$out" \
+    || { echo "$out" | tail -20; fail "the MCP tool did not return the pushed value"; }
+  pass "an MCP client listed Feast's tools and read the pushed value"
 }
 
 # Temporal: a healthy server proves only that it answers. Workflows run in the
@@ -1765,8 +1913,13 @@ case "$PROFILE" in
   telemetry)  smoke_telemetry; run_example telemetry '"42"' ;;
   metadata)
     smoke_metadata
-    smoke_metadata_example
-    how_it_works_edit metadata-deps .odctl/.env metadata '^1\.4\.3$'
+    smoke_metadata_example ;;
+  # Two How It Works examples that recreate metadata, each in a group of its own
+  # so that they run in parallel with the checks above and with each other. Each
+  # recreates metadata twice, once for the example and once to restore it.
+  metadata:deps)
+    how_it_works_edit metadata-deps .odctl/.env metadata '^1\.4\.3$' ;;
+  metadata:autopilot)
     how_it_works_autopilot
     retry 60 5 http_ok "http://127.0.0.1:8087/api/v2/monitor/health" \
       || fail "ingestion Airflow did not answer after the package was put back" ;;
@@ -1774,6 +1927,10 @@ case "$PROFILE" in
   feast)
     smoke_feast
     run_example feast-iceberg '0.8999999761581421' "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash"
+    smoke_feast_push_and_mcp
+    run_example feast-vector-retrieval "\['Feast', 'Iceberg'\]" "env PATH=${TMPDIR:-/tmp}/odctl-feast-smoke/.venv/bin:$PATH bash"
+    # The two examples write their repositories into the current folder, as a reader's would.
+    rm -rf feature_repo vector_repo push_definitions.py
     rm -rf "${TMPDIR:-/tmp}/odctl-feast-smoke" ;;
   evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
   *)

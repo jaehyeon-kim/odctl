@@ -8,11 +8,8 @@
 # half runs in the caller's process and the published image has feast[minimal].
 #
 # On an IcebergSource against the catalog profile, pass warehouse="" and
-# catalog_name="odctl". Feast's REST client puts warehouse into the URL path as
-# a prefix for Polaris and Nessie style catalogs, and Iceberg's REST fixture server
-# serves the specification with no prefix, so a real warehouse returns
-# HTTP 400 "Ambiguous URI empty segment". PyIceberg still gets the real
-# warehouse, from the PYICEBERG_CATALOG__ODCTL__* variables in compose-mlops.yml.
+# catalog_name="odctl", so that PyIceberg takes the catalog address and the
+# warehouse from the PYICEBERG_CATALOG__ODCTL__* variables in compose-mlops.yml.
 project: odctl
 provider: local
 
@@ -32,5 +29,13 @@ online_store:
   type: redis
   connection_string: "valkey:6379,username=user,password=password"
   key_ttl_seconds: 604800
+
+# MCP endpoint at /mcp on the feature server, so an agent can list Feast's tools
+# and read features. http is Streamable HTTP, which the MCP specification of
+# 2025-03-26 put in place of the older HTTP with SSE transport (sse).
+feature_server:
+  type: mcp
+  mcp_enabled: true
+  mcp_transport: http
 
 entity_key_serialization_version: 3

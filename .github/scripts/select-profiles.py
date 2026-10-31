@@ -45,6 +45,11 @@ GROUPS = [
     "lineage",
     "telemetry",
     "metadata",
+    # The part before the colon is the profile to start. metadata:deps and
+    # metadata:autopilot start the same profile as metadata. Each examples group
+    # recreates metadata twice, which is why each runs alone, in parallel with the others.
+    "metadata:deps",
+    "metadata:autopilot",
     "airflow",
     "temporal",
     "postgres",
@@ -70,13 +75,14 @@ REGISTRY = Path("src/odctl/resources/registry.yml")
 
 # smoke.sh starts some profiles from another group's case: the kafka case starts
 # catalog, the flink case starts kafka-lite and feast, the spark case starts
-# kafka-lite, and the fluss and feast cases start flink-lite. A change to that
-# compose file needs these groups as well as the ones the registry maps to it.
+# kafka-lite, the fluss and feast cases start flink-lite, and the airflow case
+# starts feast. A change to that compose file needs these groups as well as the
+# ones the registry maps to it.
 ALSO_RUNS = {
     "compose-infra.yml": ["kafka-lite kafka-full"],
     "compose-kafka.yml": ["flink-lite flink-full", "spark-lite spark-full"],
     "compose-flink.yml": ["fluss", "feast"],
-    "compose-mlops.yml": ["flink-lite flink-full"],
+    "compose-mlops.yml": ["flink-lite flink-full", "airflow"],
 }
 
 # smoke.sh runs the guide commands in docs/snippets/<guide>/, so a change there
@@ -85,7 +91,15 @@ ALSO_RUNS = {
 SNIPPET_PREFIX = "docs/snippets/"
 SNIPPET_GROUPS = {
     "getting-started": ["kafka-lite kafka-full"],
-    "how-it-works": ["storage", "catalog", "trino", "airflow", "metadata"],
+    "how-it-works": [
+        "storage",
+        "catalog",
+        "trino",
+        "airflow",
+        "mlflow",
+        "metadata:deps",
+        "metadata:autopilot",
+    ],
     "kafka": ["kafka-lite kafka-full"],
     "kafka-connect": ["kafka-lite kafka-full"],
     "iceberg-ingestion": ["kafka-lite kafka-full", "flink-lite flink-full"],
@@ -100,10 +114,11 @@ SNIPPET_GROUPS = {
     "airflow-dags": ["airflow"],
     "temporal-workers": ["temporal"],
     "mlflow": ["mlflow"],
-    "feast-iceberg": ["feast", "flink-lite flink-full", "mlflow"],
+    "feast-iceberg": ["feast", "flink-lite flink-full", "mlflow", "airflow"],
+    "feast-vector-retrieval": ["feast"],
     "evidently-reports": ["evidently"],
     "lineage": ["lineage"],
-    "openmetadata": ["metadata"],
+    "openmetadata": ["metadata", "metadata:autopilot"],
     "telemetry": ["telemetry"],
 }
 
@@ -174,7 +189,8 @@ def select(changed: list, registry_path: Path = REGISTRY) -> list:
 
     selected = []
     for group in GROUPS:
-        files = {mapping.get(p) for p in group.split()}
+        # A group name may carry a suffix after a colon, as metadata:deps does.
+        files = {mapping.get(p.split(":")[0]) for p in group.split()}
         also = any(group in ALSO_RUNS.get(name, []) for name in touched_files)
         if files & touched_files or group in snippet_groups or also:
             selected.append(group)

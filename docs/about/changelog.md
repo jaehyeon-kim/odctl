@@ -2,6 +2,21 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.4.0
+
+Feast's MCP endpoint, pushing features over HTTP and from Flink, materialising from Airflow, and vector retrieval on PostgreSQL.
+
+- `feast-serve` serves an MCP endpoint at `http://127.0.0.1:6566/mcp` with each route of the feature server as a tool ([Connect an MCP Client](../guides/feast-iceberg.md#connect-an-mcp-client)).
+- [Push Features](../guides/feast-iceberg.md#push-features) pushes a value to the feature server [Over HTTP](../guides/feast-iceberg.md#over-http) and [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql), then reads it back.
+- [On a Schedule](../guides/feast-iceberg.md#on-a-schedule) materialises the feature view into Valkey from an Airflow DAG every hour.
+- [Vector Retrieval with Feast](../guides/feast-vector-retrieval.md) writes document embeddings to PostgreSQL with pgvector and retrieves the nearest rows.
+- `feast apply` in the Feast guide now runs with `--skip-source-validation`, so the same definitions work from your shell and from the Airflow container.
+
+### Upgrading
+
+- A workspace made by `odctl init` before 1.4.0 keeps its `feast/feature_store.yaml` without the MCP endpoint, and its `registry.yml` without the MCP line in `odctl explain feast`. Run `odctl init --force` to copy the new files (it replaces your edits), or add the `feature_server` block yourself. Then run `odctl recreate feast`.
+- If you applied the guide's definitions before 1.4.0, their Iceberg source stores `endpoint`, the catalog address of your shell, which the Airflow container cannot reach. Remove `endpoint` from the source and run `feast apply --skip-source-validation` again before you run the DAG.
+
 ## Version 1.3.0
 
 Custom connectors for OpenMetadata, extra packages for its ingestion container, AutoPilot off by default, OpenMetadata 2.0.7, and newer Kafka and Metabase images.
@@ -43,7 +58,7 @@ Newer images for Trino, Metabase and the observability stack.
 - `odctl recreate`, `odctl restart` and `odctl logs` work on profiles from more than one compose file, such as `odctl recreate storage kafka-lite`. They ran every file as one project, so `recreate` failed with `Conflict. The container name "/seaweed" is already in use`, and `restart` and `logs` left out the containers of all but one file. Each file now runs as its own project, as with `odctl up`. [Apply a Change](../how-it-works.md#apply-a-change) uses `odctl recreate`.
 - `odctl init --force --yes` and `odctl down --all --volumes --yes` run without asking `Are you sure?`, for scripts and CI. `-y` is the short form. See [Stop a Profile](../getting-started.md#stop-a-profile) and [Start Again](../how-it-works.md#start-again).
 - [Getting Started](../getting-started.md) runs every command on `kafka-lite`, with its output, and the [home page](../index.md#commands) lists each command with a link to its example.
-- Every guide ends with a Runnable Example that names the files to run. [Rolling Windows](../guides/rolling-windows.md) is a page of its own, and the Flink push to Feast moved to [Push Features from Flink SQL](../guides/feast-iceberg.md#push-features-from-flink-sql).
+- Every guide ends with a Runnable Example that names the files to run. [Rolling Windows](../guides/rolling-windows.md) is a page of its own, and the Flink push to Feast moved to [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql) on the Feast guide.
 - The animation on [How It Works](../how-it-works.md#what-odctl-up-does) shows its four steps again. Since 1.1.0 it showed steps 1 to 3 for a moment each and then stayed on step 4, because one step was exported 2 pixels narrower and ffmpeg stopped at the change in size.
 - The Labs page is hidden until its first lab is published.
 
@@ -51,7 +66,7 @@ Newer images for Trino, Metabase and the observability stack.
 
 Flink can send rows to an HTTP API, Spark reads Kafka with no extra options, SeaweedFS survives uploads of large models, and the guides cover cases that real projects met.
 
-- Flink's SQL client has the HTTP connector. [Push Features from Flink SQL](../guides/feast-iceberg.md#push-features-from-flink-sql) pushes a feature value to Feast.
+- Flink's SQL client has the HTTP connector. [From Flink SQL](../guides/feast-iceberg.md#from-flink-sql) on the Feast guide pushes a feature value to Feast.
 - Spark has the Kafka connector and the Avro module, so a job reads a topic, including Avro records written with the schema registry, with no `--packages` option. See [Read a Kafka Topic](../guides/spark.md#read-a-kafka-topic) and [Read Avro Records Written with the Schema Registry](../guides/spark.md#read-avro-records-written-with-the-schema-registry).
 - [Keep Messages Longer](../guides/kafka.md#keep-messages-longer) shows the broker's one-day and 500 MB retention and how to turn both off for a topic. [Troubleshooting](../troubleshooting.md#older-messages-are-missing) lists the symptom.
 - `seaweed` sets `GOMEMLIMIT` to three quarters of its memory limit, so uploads of a model of a few hundred MB no longer end with HTTP 500 and a killed container. [Troubleshooting](../troubleshooting.md#uploads-fail-with-http-500-and-seaweed-exited-with-code-137) says what to do when the limit is still reached, and [How It Works](../how-it-works.md#examples) changes both values together.

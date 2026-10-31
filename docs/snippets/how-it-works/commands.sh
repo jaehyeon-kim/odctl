@@ -2,8 +2,8 @@
 # reach, pull, up-pull, tag-override, workspace-flag and recreate-pull in the
 # catalog case, seaweed-memory and create-bucket in the storage case,
 # trino-port in the trino case, airflow-deps in the airflow case,
-# mlops-deps and timezone in the mlflow case, and metadata-deps and
-# metadata-autopilot in the metadata case.
+# mlops-deps and timezone in the mlflow case, metadata-deps in the
+# metadata:deps case, and metadata-autopilot in the metadata:autopilot case.
 
 # --8<-- [start:dry-run]
 odctl up flink-lite --dry-run

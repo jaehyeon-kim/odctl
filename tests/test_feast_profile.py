@@ -69,3 +69,14 @@ def test_feast_ui_waits_for_a_healthy_feast_serve():
     assert services["feast-ui"]["depends_on"] == {
         "feast-serve": {"condition": "service_healthy"}
     }
+
+
+def test_the_bundled_repository_serves_mcp_and_defines_no_features():
+    repo = get_internal_resources_dir() / "feast"
+    config = yaml.safe_load((repo / "feature_store.yaml").read_text())
+    assert config["feature_server"] == {
+        "type": "mcp",
+        "mcp_enabled": True,
+        "mcp_transport": "http",
+    }
+    assert [p.name for p in repo.iterdir()] == ["feature_store.yaml"]

@@ -5,35 +5,27 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.4.0: Feast'
-  content: 'An MCP endpoint for agents, pushing streaming features and materialising from Airflow, and vector retrieval on PostgreSQL. [#150](https://github.com/jaehyeon-kim/odctl/issues/150)'
-  icon: ':material-play:'
-  key: now
 - title: '1.5.0: Stable interface and JSON output'
   content: 'A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.6.0: MCP server'
-  content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. [#141](https://github.com/jaehyeon-kim/odctl/issues/141)'
+  content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)'
   icon: ':material-clock-outline:'
   key: planned
 - title: '1.7.0: Langfuse'
   content: 'A profile for tracing and evaluating LLM and agent applications, using odctl''s ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.8.0: Snapshot and restore'
-  content: '`odctl snapshot` and `odctl restore` save a profile''s data and bring it back, so a lab or an agent can start again from a known state. [#142](https://github.com/jaehyeon-kim/odctl/issues/142)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: '1.9.0: Lineage and alerts'
+- title: '1.8.0: Lineage and alerts'
   content: 'Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.10.0: Kafka Connect transforms'
+- title: '1.9.0: Kafka Connect transforms'
   content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.11.0: Memory check and models on the host'
+- title: '1.10.0: Memory check and models on the host'
   content: '`odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. The guide also covers the Ollama embeddings route, batch embedding in Airflow and a hand-run rerank server. [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)'
   icon: ':material-clock-outline:'
   key: planned
@@ -49,7 +41,7 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: 'Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.12.0: Label Studio'
+- title: '1.11.0: Label Studio'
   content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
   icon: ':material-clock-outline:'
   key: planned
@@ -73,7 +65,7 @@ Work that does not wait for a release, published as it is ready.
 
     ---
 
-    It lands between 1.10.0 and 1.11.0. It changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.11.0.
+    It lands between 1.9.0 and 1.10.0. It changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.10.0.
 
     [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
 
@@ -96,6 +88,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.4.0: Feast"
+
+    Feast's feature server serves an MCP endpoint for agents, the Feast guide pushes features over HTTP and from Flink SQL and materialises from an Airflow DAG, and a new guide retrieves the nearest documents from PostgreSQL with pgvector. The `metadata` e2e group is split into three that run in parallel. [#150](https://github.com/jaehyeon-kim/odctl/issues/150), [#168](https://github.com/jaehyeon-kim/odctl/issues/168)
 
 ??? note "1.3.0: OpenMetadata connectors"
 

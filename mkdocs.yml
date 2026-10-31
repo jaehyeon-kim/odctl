@@ -112,6 +112,7 @@ nav:
           - Temporal Workers: guides/temporal-workers.md
       - ML and AI:
           - Feast with Iceberg: guides/feast-iceberg.md
+          - Feast Vector Retrieval: guides/feast-vector-retrieval.md
           - MLflow: guides/mlflow.md
           - Evidently Reports: guides/evidently-reports.md
           - Hybrid Search: guides/hybrid-search.md

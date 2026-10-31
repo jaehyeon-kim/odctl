@@ -285,8 +285,8 @@ def test_snippet_changes_select_the_groups_that_run_them():
     assert "spark-lite spark-full" in selector.select(
         ["src/odctl/resources/compose-kafka.yml"], registry
     )
-    assert "flink-lite flink-full" in selector.select(
-        ["src/odctl/resources/compose-mlops.yml"], registry
+    assert {"flink-lite flink-full", "airflow"} <= set(
+        selector.select(["src/odctl/resources/compose-mlops.yml"], registry)
     )
     assert "flink-lite flink-full" in selector.select(
         ["src/odctl/resources/compose-kafka.yml"], registry
@@ -305,7 +305,7 @@ def test_snippet_changes_select_the_groups_that_run_them():
     ]
     assert set(
         selector.select(["docs/snippets/feast-iceberg/steps.sql"], registry)
-    ) == {"feast", "flink-lite flink-full", "mlflow"}
+    ) == {"feast", "flink-lite flink-full", "mlflow", "airflow"}
 
 
 def test_pages_keep_within_the_heading_limits():
@@ -328,3 +328,35 @@ def test_pages_keep_within_the_heading_limits():
                 f"{page.relative_to(REPO)}: {len(second)} ##, {len(headings)} in all"
             )
     assert not over, over
+
+
+def test_metadata_example_groups_are_selected_wherever_metadata_is():
+    selector = load(
+        "select_profiles", REPO / ".github" / "scripts" / "select-profiles.py"
+    )
+    registry = INTERNAL_RESOURCES_DIR / "registry.yml"
+    groups = ["metadata", "metadata:deps", "metadata:autopilot"]
+    # The two snippet folders the metadata cases read select exactly the metadata
+    # groups whose smoke.sh case runs them; how-it-works also selects mlflow.
+    for changed, runs_it in (
+        ("docs/snippets/openmetadata/commands.sh", {"metadata", "metadata:autopilot"}),
+        (
+            "docs/snippets/how-it-works/commands.sh",
+            {"metadata:deps", "metadata:autopilot", "mlflow"},
+        ),
+    ):
+        selected = set(selector.select([changed], registry))
+        assert runs_it <= selected, changed
+        assert not (set(groups) - runs_it) & selected, changed
+    assert (
+        selector.select(["src/odctl/resources/compose-metadata.yml"], registry)
+        == groups
+    )
+    for group in ("metadata:deps", "metadata:autopilot"):
+        assert group not in selector.select(
+            ["src/odctl/resources/compose-orch.yml"], registry
+        )
+    # Without a case, smoke.sh falls through to its default and passes silently.
+    smoke = (REPO / ".github" / "scripts" / "smoke.sh").read_text()
+    for group in groups:
+        assert re.search(rf"^  {group}\)", smoke, re.M), group

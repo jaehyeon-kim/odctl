@@ -2,7 +2,7 @@
 
 The `mlflow` profile runs two containers. `mlflow` is the tracking server and model registry, with runs on PostgreSQL and artifacts on SeaweedFS under `s3://mlflow`. `mlflow-serve` scores a registered model over HTTP. The end-to-end tests run the commands below on every release.
 
-This guide builds on [Getting Started](../getting-started.md). Its last section reads features from [Feast with Iceberg](feast-iceberg.md#push-features-from-flink-sql).
+This guide builds on [Getting Started](../getting-started.md). Its last section reads features from [Feast with Iceberg](feast-iceberg.md#push-features).
 
 Your code logs runs and models to the tracking server, and `mlflow-serve` loads a registered model from it:
 
@@ -131,7 +131,7 @@ The output is a listing of the model files that includes `MLmodel`. `mlflow-serv
 
 ## Serve a Model That Reads Online Features
 
-The MLflow image has no Feast client. A model can still read online features from `feast-serve` over HTTP, with an `mlflow.pyfunc.PythonModel` whose `predict` method sends the request. This one reads `conv_rate` of the `driver_pushed` feature view from [Push Features from Flink SQL](feast-iceberg.md#push-features-from-flink-sql) and scores a driver 1 when it is above 0.5. Run that section first, so the online store holds `conv_rate` 0.9 for driver 1001, then save the model class as `driver_score.py`:
+The MLflow image has no Feast client. A model can still read online features from `feast-serve` over HTTP, with an `mlflow.pyfunc.PythonModel` whose `predict` method sends the request. This one reads `conv_rate` of the `driver_pushed` feature view and scores a driver 1 when it is above 0.5. Apply the push definitions as [Push Features](feast-iceberg.md#push-features) shows, then run [From Flink SQL](feast-iceberg.md#from-flink-sql), so the online store holds `conv_rate` 0.9 for driver 1001, then save the model class as `driver_score.py`:
 
 ```python title="docs/snippets/mlflow/driver_score.py"
 import mlflow
@@ -197,7 +197,7 @@ curl -X POST http://127.0.0.1:5003/invocations \
   -d '{"dataframe_split": {"columns": ["driver_id"], "data": [[1001]]}}'
 ```
 
-The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Push Features from Flink SQL](feast-iceberg.md#push-features-from-flink-sql)), and the reply is an error. Run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach. The limit is set today by `mem_limit` in the `mlflow-serve` service of `.odctl/compose-mlops.yml`, where an edit can change it.
+The reply is `{"predictions": [1]}`. Right after `apply`, `feast-serve` may not know the feature view yet (see [Over HTTP](feast-iceberg.md#over-http)), and the reply is an error. Run the command again after a minute. The model costs one HTTP request to `feast-serve` for each prediction request, and `mlflow-serve` keeps its 1,500 MB memory limit, which a model with large libraries can reach. The limit is set today by `mem_limit` in the `mlflow-serve` service of `.odctl/compose-mlops.yml`, where an edit can change it.
 
 ## From Another Container
 
