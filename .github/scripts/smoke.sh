@@ -1148,6 +1148,115 @@ sys.exit(0 if d.get(\"status\") == \"success\" and d[\"data\"][\"result\"] else 
 sys.exit(0 if sum(d.get(\"folderTitle\") == \"odctl\" for d in json.load(sys.stdin)) == $want else 1)'
   " || fail "grafana did not load all $want dashboards into the odctl folder"
   pass "grafana loaded all $want dashboards into the odctl folder"
+
+  smoke_telemetry_alerts
+}
+
+# Wait for a DAG run to end, and print its state: telemetry_run_state drift_check drifted.
+telemetry_run_state() {
+  local state=""
+  for _ in $(seq 1 30); do
+    state=$(docker exec airflow airflow dags list-runs "$1" -o plain 2>/dev/null \
+      | grep -F "$2" | head -1 | tr -s ' ' | cut -d' ' -f3)
+    case "$state" in success|failed) break ;; esac
+    sleep 10
+  done
+  printf '%s' "$state"
+}
+
+# The telemetry guide's Add an Alert Rule section. It starts airflow itself, as the
+# guide does, and stops it before the last check, which restarts telemetry.
+smoke_telemetry_alerts() {
+  retry 12 5 snippet_says telemetry/commands.sh alert-rules -F 'Airflow DAG run failed' \
+    || fail "grafana's API does not list the shipped alert rule"
+  pass "grafana lists the shipped alert rule"
+
+  # Compose reads a shell variable before .env, and odctl runs docker compose with its
+  # own environment, so setting the key in this shell has the effect of the guide's
+  # .env line without editing the workspace. The version is the Evidently server's.
+  local evidently
+  evidently=$(grep -oE 'evidently/evidently-service:[0-9.]+' \
+    "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2)
+  _AIRFLOW_PIP_DEPS="evidently==$evidently" odctl up airflow >/dev/null 2>&1 \
+    || fail "could not start airflow with Evidently installed"
+  retry 60 5 http_ok "http://127.0.0.1:8085/api/v2/monitor/health" || fail "airflow never answered on :8085"
+  docker exec airflow python -c 'import evidently' >/dev/null 2>&1 \
+    || fail "the key set in the shell did not install Evidently in the Airflow container"
+
+  # A DAG that always fails, as the first failed run of a DAG the rule has not seen.
+  local work="${TMPDIR:-/tmp}/odctl-telemetry-smoke"
+  rm -rf "$work"; mkdir -p "$work"
+  cat > "$work/always_fails.py" <<'PY'
+import pendulum
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.sdk import DAG
+
+with DAG(
+    dag_id="always_fails",
+    start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
+    schedule=None,
+    catchup=False,
+):
+    BashOperator(task_id="fail", bash_command="exit 1")
+PY
+  docker cp "$work/always_fails.py" airflow:/tmp/always_fails.py >/dev/null 2>&1 \
+    && docker exec airflow python -c '
+import boto3
+boto3.client("s3", endpoint_url="http://seaweed:8333").upload_file(
+    "/tmp/always_fails.py", "airflow", "dags/always_fails.py")' >/dev/null 2>&1 \
+    || { rm -rf "$work"; fail "could not upload the failing DAG to s3://airflow/dags"; }
+  rm -rf "$work"
+  retry 30 10 bash -c "docker exec airflow airflow dags list 2>/dev/null | grep -q always_fails" \
+    || fail "the S3 DAG bundle never delivered the failing DAG, or it was never parsed"
+  docker exec airflow airflow dags unpause always_fails >/dev/null 2>&1 \
+    && docker exec airflow airflow dags trigger always_fails --run-id failing >/dev/null 2>&1 \
+    || fail "could not trigger the failing DAG"
+  [ "$(telemetry_run_state always_fails failing)" = "failed" ] || fail "the failing DAG's run did not end in state failed"
+  # Airflow exports metrics every 15 seconds and Grafana evaluates the rule every minute.
+  retry 48 5 snippet_says telemetry/commands.sh alert-state -F 'Airflow DAG run failed always_fails Alerting' \
+    || fail "the shipped rule never fired after a DAG run failed"
+  pass "the shipped rule fired after the first failed run of a DAG"
+
+  # The guide's drift DAG, above and below its threshold.
+  (cd "$SNIPPETS/telemetry" && run_snippet telemetry/commands.sh drift-upload >/dev/null 2>&1) \
+    || fail "could not upload the drift DAG to s3://airflow/dags"
+  retry 30 10 bash -c "docker exec airflow airflow dags list 2>/dev/null | grep -q drift_check" \
+    || fail "the S3 DAG bundle never delivered the drift DAG, or it was never parsed"
+  run_snippet telemetry/commands.sh drift-run >/dev/null 2>&1 \
+    || fail "the guide's unpause and trigger commands failed for the drift DAG"
+  [ "$(telemetry_run_state drift_check drifted)" = "failed" ] \
+    || fail "the drift DAG did not fail with the data shifted by 3 standard deviations"
+  retry 48 5 snippet_says telemetry/commands.sh alert-state -F 'Airflow DAG run failed drift_check Alerting' \
+    || fail "the shipped rule never fired after the drift DAG failed"
+  run_snippet telemetry/commands.sh drift-steady >/dev/null 2>&1 \
+    || fail "the guide's command failed to trigger the drift DAG with no shift"
+  [ "$(telemetry_run_state drift_check steady)" = "success" ] \
+    || fail "the drift DAG failed with the data not shifted"
+  snippet_says telemetry/commands.sh drift-score -E 'run_id=drifted.*Wasserstein distance of x: [0-9.]+, threshold 0.5' \
+    || fail "the drifted run's log has no distance"
+  snippet_says telemetry/commands.sh drift-score -E 'run_id=steady.*Wasserstein distance of x: [0-9.]+, threshold 0.5' \
+    || fail "the steady run's log has no distance"
+  pass "the drift DAG failed above its threshold, raised the shipped rule, and passed below it"
+
+  docker exec airflow python -c '
+import boto3
+s3 = boto3.client("s3", endpoint_url="http://seaweed:8333")
+for name in ("always_fails", "drift_check"):
+    s3.delete_object(Bucket="airflow", Key=f"dags/{name}.py")' >/dev/null 2>&1 \
+    || fail "could not delete the DAGs from s3://airflow/dags"
+  odctl down airflow >/dev/null 2>&1 || fail "could not stop airflow after the alert checks"
+
+  # The budget sample is not provisioned. Grafana reads the alerting folder when it
+  # starts, so the guide copies the file in and restarts telemetry.
+  cp "$SNIPPETS/telemetry/token_budget.yaml" token_budget.yaml
+  run_snippet telemetry/commands.sh add-rule >/dev/null 2>&1 \
+    || { rm -f token_budget.yaml; fail "the guide's copy and restart commands failed"; }
+  rm -f token_budget.yaml
+  retry 30 5 http_ok "http://127.0.0.1:3004/api/health" || fail "grafana never answered after the restart"
+  retry 12 5 snippet_says telemetry/commands.sh alert-rules -F 'Model call tokens over budget' \
+    || fail "grafana's API does not list the budget sample after the restart"
+  rm -f .odctl/grafana/alerting/token_budget.yaml
+  pass "grafana listed the budget sample copied into the alerting folder"
 }
 
 # Marquez: the namespaces endpoint answers on an empty database, so it proves

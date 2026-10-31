@@ -1,0 +1,56 @@
+# A sample alert rule: it fires when the model calls of the last hour have used more
+# tokens than the budget set below. Copy it into .odctl/grafana/alerting/ and run
+# odctl restart telemetry to load it.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: model-calls
+    folder: odctl
+    interval: 1m
+    rules:
+      - uid: odctl-token-budget
+        title: Model call tokens over budget
+        condition: C
+        data:
+          # The tokens that gen_ai.client.token.usage recorded in the last hour, input
+          # and output together. Prometheus keeps the histogram's sum in the series
+          # gen_ai_client_token_usage_sum. A series that began within the last hour
+          # counts by its value, because increase() ignores the first sample of a new
+          # series and would miss an application that exports once. An older series
+          # counts by its increase over the hour.
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum((gen_ai_client_token_usage_sum unless gen_ai_client_token_usage_sum offset 1h) or increase(gen_ai_client_token_usage_sum[1h]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    # The budget: change this number to your own limit.
+                    params: [1000000]
+        # No model calls in the last hour is under budget, not an alert.
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Model calls used more tokens in the last hour than the budget"

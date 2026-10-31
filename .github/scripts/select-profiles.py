@@ -79,16 +79,17 @@ REGISTRY = Path("src/odctl/resources/registry.yml")
 # smoke.sh starts some profiles from another group's case: the kafka case starts
 # catalog, the flink case starts kafka-lite and feast, the spark case starts
 # kafka-lite, the fluss and feast cases start flink-lite, the airflow case starts
-# feast, the langfuse case starts telemetry, and the lineage case starts airflow
-# and spark-lite. A change to that compose file needs these groups as well as
-# the ones the registry maps to it.
+# feast, the langfuse case starts telemetry, the lineage case starts airflow and
+# spark-lite, and the telemetry case starts airflow and installs the Evidently
+# version that compose-mlops.yml sets. A change to that compose file needs these
+# groups as well as the ones the registry maps to it.
 ALSO_RUNS = {
     "compose-infra.yml": ["kafka-lite kafka-full"],
     "compose-kafka.yml": ["flink-lite flink-full", "spark-lite spark-full"],
     "compose-flink.yml": ["fluss", "feast"],
-    "compose-mlops.yml": ["flink-lite flink-full", "airflow"],
+    "compose-mlops.yml": ["flink-lite flink-full", "airflow", "telemetry"],
     "compose-obsv.yml": ["langfuse"],
-    "compose-orch.yml": ["lineage"],
+    "compose-orch.yml": ["lineage", "telemetry"],
     "compose-spark.yml": ["lineage"],
 }
 

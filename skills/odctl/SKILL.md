@@ -473,6 +473,9 @@ Telemetry (grafana/otel-lgtm): System telemetry, monitoring, and data lineage. `
   * Internal (Docker): http://grafana:3000
   * A dashboard per service in the odctl folder, which fills in once
     that service's profile is up.
+  * Alert rules from .odctl/grafana/alerting, loaded when telemetry
+    starts: one fires after a failed Airflow DAG run. No contact point
+    is configured, so a firing rule shows only on the Alerting page.
 • OTLP Receiver (metrics, traces and logs):
   * External (host): 127.0.0.1:4317 (gRPC), http://127.0.0.1:4318 (HTTP)
   * Internal (Docker): otel-lgtm:4317 (gRPC), http://otel-lgtm:4318 (HTTP)

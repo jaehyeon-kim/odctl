@@ -1,0 +1,63 @@
+# Alert rules that Grafana in grafana/otel-lgtm loads from its provisioning
+# directory, next to the dashboards. Grafana evaluates each rule against the
+# Prometheus data source, uid prometheus. odctl configures no contact point, so a
+# firing rule shows only on Grafana's Alerting page and sends no notification.
+# Grafana marks these rules Provisioned and does not let you edit them in its UI.
+# To change one, edit this file and run odctl restart telemetry.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: airflow
+    folder: odctl
+    # How often Grafana evaluates the rules of the group.
+    interval: 1m
+    rules:
+      - uid: odctl-airflow-dag-run-failed
+        title: Airflow DAG run failed
+        condition: C
+        data:
+          # The number of DAG runs that failed in the last 5 minutes, for each DAG.
+          # Airflow sends the duration as a native histogram, so histogram_count
+          # takes the number of runs from it, as the Airflow dashboard does. A DAG's
+          # series starts at its first failed run, with no earlier sample, so
+          # increase() reports 0 for that run. The second line counts a series that
+          # did not exist 5 minutes ago, which catches the first failure.
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: |-
+                histogram_count(sum by (dag_id) (increase(airflow_dagrun_duration_failed_milliseconds{job="airflow"}[5m]))) > 0
+                or
+                histogram_count(sum by (dag_id) (airflow_dagrun_duration_failed_milliseconds{job="airflow"} unless airflow_dagrun_duration_failed_milliseconds{job="airflow"} offset 5m))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        # A DAG that has never failed has no series, which is not an alert.
+        noDataState: OK
+        execErrState: Error
+        # No waiting period: the rule fires on the first evaluation that sees a failure.
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "A run of the DAG {{ $labels.dag_id }} failed in the last 5 minutes"

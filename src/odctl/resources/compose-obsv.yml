@@ -63,8 +63,9 @@ services:
   # ==========================================
   # One container: OpenTelemetry Collector, Prometheus, Tempo, Loki, Pyroscope and
   # Grafana. It replaces separate Prometheus, Alertmanager and Grafana services;
-  # odctl defines no alert rules, so Alertmanager did no work. The aliases keep
-  # http://prometheus:9090 and http://grafana:3000 resolving on the network.
+  # odctl's alert rule is a Grafana alert rule, which Grafana evaluates itself, so
+  # Alertmanager did no work. The aliases keep http://prometheus:9090 and
+  # http://grafana:3000 resolving on the network.
   otel-lgtm:
     image: grafana/otel-lgtm:0.40.0
     container_name: otel-lgtm
@@ -99,6 +100,9 @@ services:
       # A dashboard per service, loaded through Grafana's provisioning directory.
       - ./grafana/odctl-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/odctl.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/odctl:ro
+      # The alert rules, loaded the same way. odctl never writes the folder.
+      # Grafana reads it at start, so odctl restart telemetry loads a new file.
+      - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
     healthcheck:
       # run-all.sh writes /tmp/ready once every component answers its /ready.
       test: ["CMD-SHELL", "test -f /tmp/ready && curl -fsS http://localhost:9090/-/ready"]
