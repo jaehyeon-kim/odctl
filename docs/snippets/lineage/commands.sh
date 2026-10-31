@@ -58,7 +58,7 @@ docker exec airflow airflow dags trigger lineage_orders
 # --8<-- [end:airflow-run]
 
 # --8<-- [start:airflow-read]
-# The jobs of the namespace default, with the datasets each read and wrote.
+# Jobs of the namespace default, with the datasets each read and wrote.
 curl -s http://127.0.0.1:5002/api/v1/namespaces/default/jobs | python3 -c '
 import json, sys
 for job in json.load(sys.stdin)["jobs"]:
@@ -83,7 +83,7 @@ docker exec spark-master /opt/spark/bin/spark-submit \
 # --8<-- [end:spark-submit]
 
 # --8<-- [start:spark-read]
-# The jobs of the namespace odctl, with the datasets each read and wrote.
+# Jobs of the namespace odctl, with the datasets each read and wrote.
 curl -s http://127.0.0.1:5002/api/v1/namespaces/odctl/jobs | python3 -c '
 import json, sys
 for job in json.load(sys.stdin)["jobs"]:
@@ -99,7 +99,7 @@ docker exec airflow feast -c /tmp/lineage_repo apply --skip-source-validation
 # --8<-- [end:feast-apply]
 
 # --8<-- [start:feast-read]
-# The jobs of the namespace lineage_demo, the name of the Feast project, with the datasets each read and wrote.
+# Jobs of the namespace lineage_demo, the name of the Feast project, with the datasets each read and wrote.
 curl -s http://127.0.0.1:5002/api/v1/namespaces/lineage_demo/jobs | python3 -c '
 import json, sys
 for job in json.load(sys.stdin)["jobs"]:

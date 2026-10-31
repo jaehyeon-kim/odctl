@@ -100,7 +100,7 @@ services:
       # A dashboard per service, loaded through Grafana's provisioning directory.
       - ./grafana/odctl-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/odctl.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/odctl:ro
-      # The alert rules, loaded the same way. odctl never writes the folder.
+      # Alert rules, loaded the same way. odctl never writes the folder.
       # Grafana reads it at start, so odctl restart telemetry loads a new file.
       - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
     healthcheck:

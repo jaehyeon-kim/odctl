@@ -28,7 +28,7 @@ docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{htt
 # --8<-- [end:container]
 
 # --8<-- [start:alert-rules]
-# The title of each alert rule that Grafana loaded.
+# Title of each alert rule that Grafana loaded.
 curl -s -u user:password http://127.0.0.1:3004/api/v1/provisioning/alert-rules \
   | python3 -c '
 import json, sys
@@ -59,12 +59,12 @@ docker exec airflow airflow dags trigger drift_check --run-id drifted
 # --8<-- [end:drift-run]
 
 # --8<-- [start:drift-score]
-# The distance each run printed, from its task log.
+# Distance each run printed, from its task log.
 docker exec airflow sh -c 'cd /opt/airflow/logs/dag_id=drift_check && grep -o "Wasserstein distance[^\"]*" run_id=*/task_id=check_drift/attempt=1.log'
 # --8<-- [end:drift-score]
 
 # --8<-- [start:alert-state]
-# The alerts that are firing, with the DAG each names.
+# Alerts that are firing, with the DAG each names.
 curl -s -u user:password http://127.0.0.1:3004/api/prometheus/grafana/api/v1/alerts \
   | python3 -c '
 import json, sys

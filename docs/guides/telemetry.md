@@ -56,7 +56,7 @@ An alert rule is a query that Grafana runs against Prometheus every minute, and 
 The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/main/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
 
 ```bash title="docs/snippets/telemetry/commands.sh:alert-rules"
-# The title of each alert rule that Grafana loaded.
+# Title of each alert rule that Grafana loaded.
 curl -s -u user:password http://127.0.0.1:3004/api/v1/provisioning/alert-rules \
   | python3 -c '
 import json, sys
@@ -68,9 +68,9 @@ for rule in json.load(sys.stdin):
 Airflow DAG run failed
 ```
 
-The rule counts the DAG runs that failed in the last 5 minutes for each DAG, from the metric `airflow_dagrun_duration_failed_milliseconds` that Airflow sends, and fires for each DAG with at least one. The 5 minutes, the evaluation every minute and the labels are set in the file and can change. The rule has no waiting period, so it fires on the first evaluation that sees a failure.
+The rule counts the DAG runs that failed in the last 5 minutes for each DAG, from the metric `airflow_dagrun_duration_failed_milliseconds` that Airflow sends, and fires for each DAG with at least one. These 5 minutes are the rule's window. The window, the evaluation every minute and the labels are set in the file and can change. The rule has no waiting period, so it fires on the first evaluation that sees a failure.
 
-When `telemetry` starts while Airflow is already running, Prometheus has no earlier sample of each series, so the rule also fires, for 5 minutes, for each DAG that has failed since Airflow started. A restart keeps Prometheus's samples, so it does not do this.
+When `telemetry` starts while Airflow is already running, Prometheus has no earlier sample of each series, so the rule also fires, for one window, for each DAG that has failed since Airflow started. A restart keeps Prometheus's samples, so it does not do this.
 
 To see it fire, run a DAG that fails. This DAG checks for [data drift](evidently-reports.md): it compares a column of current data with a reference dataset and fails when the column has drifted.
 
@@ -78,7 +78,7 @@ It measures the change with Evidently's `ValueDrift` metric and the method `wass
 
 The parameter `shift` moves the mean of the current data away from the reference's, in standard deviations, so the default run drifts and a run with `shift` 0 does not. Save it as `drift_check.py`:
 
-```python title="docs/snippets/telemetry/drift_check.py" hl_lines="10 27 31 32"
+```python title="docs/snippets/telemetry/drift_check.py" hl_lines="10 35 39 40"
 import numpy as np
 import pandas as pd
 import pendulum
@@ -101,6 +101,14 @@ with DAG(
 
     @task
     def check_drift(params=None):
+        """Fail the run when column x of the current data has drifted from the reference.
+
+        Args:
+            params: The run's parameters. `shift` moves the current data's mean.
+
+        Raises:
+            ValueError: When the Wasserstein distance is above DRIFT_THRESHOLD.
+        """
         reference = pd.DataFrame({"x": np.random.default_rng(7).normal(0, 1, 500)})
         current = pd.DataFrame(
             {"x": np.random.default_rng(8).normal(params["shift"], 1, 500)}
@@ -148,7 +156,7 @@ docker exec airflow airflow dags trigger drift_check --run-id drifted
 The last command prints the new run in state `queued`. The task fails after a few seconds, so list the runs with `docker exec airflow airflow dags list-runs drift_check` until `drifted` has the state `failed`. Airflow sends its metrics to the collector every 15 seconds, set by `OTEL_METRIC_EXPORT_INTERVAL` in `.odctl/compose-orch.yml`. Grafana evaluates the rule every minute, so the alert appears within about 2 minutes. This lists the alerts that are firing:
 
 ```bash title="docs/snippets/telemetry/commands.sh:alert-state"
-# The alerts that are firing, with the DAG each names.
+# Alerts that are firing, with the DAG each names.
 curl -s -u user:password http://127.0.0.1:3004/api/prometheus/grafana/api/v1/alerts \
   | python3 -c '
 import json, sys
@@ -165,25 +173,24 @@ The alert carries the label `dag_id` with the DAG that failed. Grafana calls the
 
 ![Grafana alert instance of the rule Airflow DAG run failed, in state Alerting with the label dag_id drift_check and the destination empty](../images/grafana-alert.png){ .screenshot }
 
-The destination is `empty`, Grafana's default contact point, which sends nothing, because odctl configures no contact point of its own. A contact point is where Grafana sends a notification, such as an email address or a chat channel. A firing alert therefore shows only in Grafana.
+The destination is `empty`, Grafana's default contact point. It sends nothing, because odctl configures no contact point of its own. A contact point is where Grafana sends a notification, such as an email address or a chat channel. A firing alert therefore shows only in Grafana.
 
 The summary under the rule's title is the template, because one rule covers every DAG. Each alert has it filled in with its DAG, which the instance's details and the alerts API show.
 
-To be told when an alert fires, you need a contact point and a notification policy that routes alerts to it. Grafana's database lives inside the `otel-lgtm` container and has no volume, so a contact point made in the UI is lost at `odctl down`. Keep them in a file instead:
+To be told when an alert fires, you need a contact point and a notification policy that routes alerts to it. Grafana's database lives inside the `otel-lgtm` container and has no volume, so `odctl down` deletes a contact point made in the UI. Keep them in a file instead. Grafana loads a contact point and a notification policy from a file in `.odctl/grafana/alerting/` at each start, in the format of [Grafana's file provisioning](https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/). Add the file and restart `telemetry`, as above.
 
-- Grafana loads a contact point and a notification policy from a file in `.odctl/grafana/alerting/` at each start, in the format of [Grafana's file provisioning](https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/). Add the file and restart `telemetry`, as above.
-- Deleting a file and restarting leaves its rule, contact point or policy in Grafana. `odctl down telemetry` and then `odctl up telemetry` remove them.
+Deleting a file and restarting leaves its rule, contact point or policy in Grafana. `odctl down telemetry` and then `odctl up telemetry` remove them.
 
 To tell whoever receives the alert what to do, add a `runbook_url` annotation to the rule in its file.
 
-The alert clears when the failed run is more than 5 minutes old. A run below the threshold raises none. This triggers a run named `steady` with `shift` 0 and prints the new run in state `queued`. The second command prints the distance of each run from its task log:
+The alert clears when the failed run falls out of the window. A run below the threshold raises none. This triggers a run named `steady` with `shift` 0 and prints the new run in state `queued`. The second command prints the distance of each run from its task log:
 
 ```bash title="docs/snippets/telemetry/commands.sh:drift-steady"
 docker exec airflow airflow dags trigger drift_check --run-id steady --conf '{"shift": 0}'
 ```
 
 ```bash title="docs/snippets/telemetry/commands.sh:drift-score"
-# The distance each run printed, from its task log.
+# Distance each run printed, from its task log.
 docker exec airflow sh -c 'cd /opt/airflow/logs/dag_id=drift_check && grep -o "Wasserstein distance[^\"]*" run_id=*/task_id=check_drift/attempt=1.log'
 ```
 
@@ -200,7 +207,7 @@ A rule of your own is another file in the same folder. Copy it in and restart `t
 
 The query counts each series in one of two ways:
 
-- A series that began within the last hour counts by its last value, which is all its tokens since it began. This also holds when the application stopped sending more than 5 minutes ago.
+- A series that began within the last hour counts by its last value, which is all its tokens since it began, even after the application stops sending.
 - A series that is more than an hour old counts by its increase over the hour, while the application exports at least every 5 minutes, as the OpenTelemetry SDKs do by default.
 
 `increase()` counts only the change after a series' first sample. Alone, it would miss the tokens in that first sample, and every token of an application that exports once. When `telemetry` starts while the application is already running, the first hour counts all tokens since the application started.
@@ -223,7 +230,7 @@ groups:
         title: Model call tokens over budget
         condition: C
         data:
-          # The tokens that gen_ai.client.token.usage recorded in the last hour, input
+          # Tokens that gen_ai.client.token.usage recorded in the last hour, input
           # and output together. Prometheus keeps the histogram's sum in the series
           # gen_ai_client_token_usage_sum. A series that began within the last hour
           # counts by its last value, which is all its tokens since it began, also

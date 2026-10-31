@@ -1,6 +1,10 @@
 # OpenLineage and Marquez
 
-The `lineage` profile runs Marquez: an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. OpenLineage is an open standard for events that say which job read and wrote which datasets in each run. Anything that sends OpenLineage events over HTTP can report to Marquez. Airflow, a Spark job and `feast apply` can each send them, and a section below sets up each one. The end-to-end tests run the commands below on every release, except the `up` commands and the `.env` edit: the workflow starts each profile itself and sets the transport in its shell.
+The `lineage` profile runs Marquez. Marquez has an API that receives OpenLineage events and keeps jobs, runs and datasets on PostgreSQL, and a web UI that draws the lineage graph. OpenLineage is an open standard for events that say which job read and wrote which datasets in each run.
+
+Anything that sends OpenLineage events over HTTP can report to Marquez. A section below sets up each of Airflow, a Spark job and `feast apply`.
+
+The end-to-end tests run the commands below on every release. They skip the `up` commands and the `.env` edit, because the workflow starts each profile itself and sets the transport in its shell.
 
 This guide builds on [Getting Started](../getting-started.md).
 
@@ -60,7 +64,7 @@ The UI draws the job between the datasets it read and wrote:
 
 ## Lineage from Airflow
 
-Airflow's OpenLineage provider is installed in the `airflow` image. It sends a `START` event and a `COMPLETE` event for each DAG run and each task, and for a SQL task it reads the tables from the SQL. It sends events only when it has a transport, which is the setting that says where to send them. odctl leaves the transport empty, so with no change Airflow sends nothing and logs no error. This section builds on [Airflow DAGs from S3](airflow-dags.md), which explains how to upload and run a DAG.
+The `airflow` image includes Airflow's OpenLineage provider. It sends a `START` event and a `COMPLETE` event for each DAG run and each task, and for a SQL task it reads the tables from the SQL. It sends events only when it has a transport, which is the setting that says where to send them. odctl leaves the transport empty, so with no change Airflow sends nothing and logs no error. This section builds on [Airflow DAGs from S3](airflow-dags.md), which explains how to upload and run a DAG.
 
 Set the transport in the `.env` key `AIRFLOW_OPENLINEAGE_TRANSPORT`. Its value is JSON: `type` is `http`, and `url` is the address of `marquez-api` inside the `odctl` network, from the table at the top of this page. `sed -i.bak` works with both GNU and macOS `sed`, and keeps the original as `.env.bak`. Run this in the folder that holds your `.odctl` workspace, then start Airflow:
 
@@ -116,7 +120,7 @@ docker exec airflow airflow connections add odctl_postgres \
   --conn-schema odctl --conn-port 5432
 ```
 
-The command prints a few `SyntaxWarning` lines, which do not affect the result, then ``Successfully added `conn_id`=odctl_postgres`` and a table with the connection. Copy the DAG into the Airflow container and upload it to `s3://airflow/dags`, as [Airflow DAGs from S3](airflow-dags.md#upload-a-dag) does:
+The command prints a few `SyntaxWarning` lines, then ``Successfully added `conn_id`=odctl_postgres`` and a table with the connection. The warnings do not affect the result. Copy the DAG into the Airflow container and upload it to `s3://airflow/dags`, as [Airflow DAGs from S3](airflow-dags.md#upload-a-dag) does:
 
 ```bash title="docs/snippets/lineage/commands.sh:airflow-upload"
 docker cp lineage_orders.py airflow:/tmp/lineage_orders.py
@@ -137,7 +141,7 @@ docker exec airflow airflow dags trigger lineage_orders
 The last command prints the new run in state `queued`. Airflow sends the events while the run executes, and the run takes a few seconds, so list the runs until the state is `success` with `docker exec airflow airflow dags list-runs lineage_orders`. Then read the jobs back. A namespace groups jobs and datasets in Marquez. This lists the jobs of one namespace from the same API that [Read the Lineage Back](#read-the-lineage-back) uses, cut to each job's name and the datasets it read and wrote:
 
 ```bash title="docs/snippets/lineage/commands.sh:airflow-read"
-# The jobs of the namespace default, with the datasets each read and wrote.
+# Jobs of the namespace default, with the datasets each read and wrote.
 curl -s http://127.0.0.1:5002/api/v1/namespaces/default/jobs | python3 -c '
 import json, sys
 for job in json.load(sys.stdin)["jobs"]:
@@ -150,9 +154,10 @@ lineage_orders.build_daily_orders ['odctl.dev.raw_orders'] ['odctl.dev.daily_ord
 lineage_orders.seed_raw_orders [] ['odctl.dev.raw_orders']
 ```
 
-Airflow's provider names each job after the DAG and the task, and each dataset after the database, the schema and the table. Three more facts explain the output:
+Airflow's provider names each job after the DAG and the task, and each dataset after the database, the schema and the table. Four more facts explain the output:
 
-- Airflow puts its jobs in the namespace `default`. To change it, set `AIRFLOW__OPENLINEAGE__NAMESPACE` in `.odctl/compose-orch.yml` and run `odctl recreate airflow`. Airflow gives each table the namespace `postgres://postgres:5432`, the address of the database.
+- Airflow puts its jobs in the namespace `default`, which `AIRFLOW__OPENLINEAGE__NAMESPACE` in `.odctl/compose-orch.yml` changes after `odctl recreate airflow`.
+- Airflow gives each table the namespace `postgres://postgres:5432`, the address of the database.
 - The DAG is a third job, `lineage_orders`, with no datasets, so the read-back leaves it out.
 - The first task writes `raw_orders` and the second reads it, so the graph joins the two jobs through that table.
 
@@ -164,7 +169,7 @@ The graph runs from `seed_raw_orders` through the table `raw_orders` to `build_d
 
 ## Lineage from Spark
 
-The OpenLineage Spark listener is a Spark listener, a class that Spark calls as a job runs. It sends the events with the datasets each statement read and wrote. Its jar, `openlineage.jar`, is in `/mnt/shared-deps/spark`, which the Spark containers already put on the classpath, so the job needs no `--packages` option. This section builds on [Spark](spark.md). Start the profile:
+The OpenLineage Spark listener is a Spark listener, a class that Spark calls as a job runs. It sends the events with the datasets each statement read and wrote. The listener's jar is `openlineage.jar` in `/mnt/shared-deps/spark`. The Spark containers already put that folder on the classpath, so the job needs no `--packages` option. This section builds on [Spark](spark.md). Start the profile:
 
 ```bash title="docs/snippets/lineage/commands.sh:spark-up"
 odctl up spark-lite
@@ -209,15 +214,17 @@ docker exec spark-master /opt/spark/bin/spark-submit \
 
 Each setting does one thing:
 
-- `--driver-class-path` puts `openlineage.jar` first on the driver's classpath, ahead of the other jars of the shared volume. The OpenMetadata agent jar in that folder holds a second copy of the listener's classes, and with Spark's default classpath the driver loads that copy: the listener fails with `NoSuchMethodError`, Spark stops the session, and the job fails. The value repeats the classpath from `spark/spark-defaults.conf` in the workspace, with the jar in front.
+- `--driver-class-path` puts `openlineage.jar` first on the driver's classpath, ahead of the other jars of the shared volume.
 - `spark.extraListeners` names the listener class, so Spark calls it for every statement.
 - `spark.openlineage.transport.type` and `spark.openlineage.transport.url` send the events over HTTP to `marquez-api`.
 - `spark.openlineage.namespace` is the namespace of the jobs in Marquez.
 
+The jar comes first because the OpenMetadata agent jar in the same folder holds a second copy of the listener's classes. With Spark's default classpath the driver loads that copy. The listener then fails with `NoSuchMethodError`, Spark stops the session, and the job fails. The `--driver-class-path` value repeats the classpath from `spark/spark-defaults.conf` in the workspace, with the jar in front.
+
 The job prints Spark's usual log, with some OpenLineage warnings and one `ContextFactory` error line, and the events still reach Marquez. Spark sends them as each statement ends, so read the jobs of the namespace `odctl` back a few seconds after the job ends:
 
 ```bash title="docs/snippets/lineage/commands.sh:spark-read"
-# The jobs of the namespace odctl, with the datasets each read and wrote.
+# Jobs of the namespace odctl, with the datasets each read and wrote.
 curl -s http://127.0.0.1:5002/api/v1/namespaces/odctl/jobs | python3 -c '
 import json, sys
 for job in json.load(sys.stdin)["jobs"]:
@@ -279,7 +286,7 @@ Deploying infrastructure for driver_stats
 The first line shows that the OpenLineage client is on. Read the jobs of the namespace `lineage_demo`, the project name, back:
 
 ```bash title="docs/snippets/lineage/commands.sh:feast-read"
-# The jobs of the namespace lineage_demo, the name of the Feast project, with the datasets each read and wrote.
+# Jobs of the namespace lineage_demo, the name of the Feast project, with the datasets each read and wrote.
 curl -s http://127.0.0.1:5002/api/v1/namespaces/lineage_demo/jobs | python3 -c '
 import json, sys
 for job in json.load(sys.stdin)["jobs"]:

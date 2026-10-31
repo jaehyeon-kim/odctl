@@ -20,6 +20,14 @@ with DAG(
 
     @task
     def check_drift(params=None):
+        """Fail the run when column x of the current data has drifted from the reference.
+
+        Args:
+            params: The run's parameters. `shift` moves the current data's mean.
+
+        Raises:
+            ValueError: When the Wasserstein distance is above DRIFT_THRESHOLD.
+        """
         reference = pd.DataFrame({"x": np.random.default_rng(7).normal(0, 1, 500)})
         current = pd.DataFrame(
             {"x": np.random.default_rng(8).normal(params["shift"], 1, 500)}

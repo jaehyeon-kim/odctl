@@ -162,7 +162,7 @@ A restart keeps the container, so it does not apply an edited compose file or `.
 odctl recreate catalog --pull
 ```
 
-Recreating discards the data inside those containers, with the exceptions that [Where Data Lives](#where-data-lives) lists. `odctl restart <profile>` is enough for files a service reads when it starts, such as `trino/rules.json`, the Grafana dashboards and the Grafana alert rules, though a deleted alerting file needs `odctl down telemetry` and `odctl up telemetry`, as [Add an Alert Rule](guides/telemetry.md#add-an-alert-rule) explains.
+Recreating discards the data inside those containers, with the exceptions that [Where Data Lives](#where-data-lives) lists. `odctl restart <profile>` is enough for files a service reads when it starts, such as `trino/rules.json`, the Grafana dashboards and the Grafana alert rules. Removing an alerting file needs `odctl down telemetry` and then `odctl up telemetry`, as [Add an Alert Rule](guides/telemetry.md#add-an-alert-rule) explains.
 
 ### Examples
 

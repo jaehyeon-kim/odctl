@@ -13,7 +13,7 @@ groups:
         title: Model call tokens over budget
         condition: C
         data:
-          # The tokens that gen_ai.client.token.usage recorded in the last hour, input
+          # Tokens that gen_ai.client.token.usage recorded in the last hour, input
           # and output together. Prometheus keeps the histogram's sum in the series
           # gen_ai_client_token_usage_sum. A series that began within the last hour
           # counts by its last value, which is all its tokens since it began, also

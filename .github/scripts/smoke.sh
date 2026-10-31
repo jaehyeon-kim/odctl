@@ -1338,7 +1338,7 @@ boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(
   odctl down airflow >/dev/null 2>&1 || fail "could not stop airflow after the lineage check"
 }
 
-# The Spark section: a job that writes two Iceberg tables, with the listener set.
+# Spark section: a job that writes two Iceberg tables, with the listener set.
 smoke_lineage_spark() {
   odctl up spark-lite >/dev/null 2>&1 || fail "could not start spark-lite for the lineage check"
   retry 30 5 http_ok "http://127.0.0.1:9080" || fail "Spark master never answered on :9080"
@@ -1351,7 +1351,7 @@ smoke_lineage_spark() {
   odctl down spark-lite >/dev/null 2>&1 || fail "could not stop spark-lite after the lineage check"
 }
 
-# The Feast section: feast apply from the airflow container, which has the extra.
+# Feast section: feast apply from the airflow container, which has the extra.
 # The registry is PostgreSQL's feast database, so only airflow has to run.
 smoke_lineage_feast() {
   odctl up airflow >/dev/null 2>&1 || fail "could not start airflow for the Feast lineage check"

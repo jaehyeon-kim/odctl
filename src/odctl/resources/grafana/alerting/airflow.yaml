@@ -17,7 +17,7 @@ groups:
         title: Airflow DAG run failed
         condition: C
         data:
-          # The number of DAG runs that failed in the last 5 minutes, for each DAG.
+          # Number of DAG runs that failed in the last 5 minutes, for each DAG.
           # Airflow sends the duration as a native histogram, so histogram_count
           # takes the number of runs from it, as the Airflow dashboard does. A DAG's
           # series starts at its first failed run, with no earlier sample, so
