@@ -29,7 +29,7 @@ RUN_ID=a1b2c3d4-0000-4000-8000-000000000001
 NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 
 for event in START COMPLETE; do
-  curl -X POST http://127.0.0.1:5002/api/v1/lineage \
+  curl -s -X POST http://127.0.0.1:5002/api/v1/lineage \
     -H 'Content-Type: application/json' \
     -d "{\"eventType\":\"$event\",\"eventTime\":\"$NOW\",
          \"producer\":\"demo\",
@@ -116,7 +116,7 @@ docker exec airflow airflow connections add odctl_postgres \
   --conn-schema odctl --conn-port 5432
 ```
 
-The command prints ``Successfully added `conn_id`=odctl_postgres`` and a table with the connection. Copy the DAG into the Airflow container and upload it to `s3://airflow/dags`, as [Airflow DAGs from S3](airflow-dags.md#upload-a-dag) does:
+The command prints a few `SyntaxWarning` lines, which do not affect the result, then ``Successfully added `conn_id`=odctl_postgres`` and a table with the connection. Copy the DAG into the Airflow container and upload it to `s3://airflow/dags`, as [Airflow DAGs from S3](airflow-dags.md#upload-a-dag) does:
 
 ```bash title="docs/snippets/lineage/commands.sh:airflow-upload"
 docker cp lineage_orders.py airflow:/tmp/lineage_orders.py

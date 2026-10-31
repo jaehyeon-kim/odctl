@@ -194,7 +194,7 @@ run_id=steady/task_id=check_drift/attempt=1.log:Wasserstein distance of x: 0.16,
 
 Both runs draw their samples from fixed seeds, so the distances repeat on every run. The drifted run is above the threshold and fails, and the steady run is below it and succeeds.
 
-A rule of your own is another file in the same folder. Copy it in and restart `telemetry`, as above. This sample fires when the model calls of the last hour have used more tokens than a budget. odctl does not provision it, because the budget is yours: change the highlighted limit.
+A rule of your own is another file in the same folder. Copy it in and restart `telemetry`, as above. To write one, start from the sample below and change its `uid`, `title`, query and limit. This sample fires when the model calls of the last hour have used more tokens than a budget. odctl does not provision it, because the budget is yours: change the highlighted limit.
 
 `gen_ai.client.token.usage` is the OpenTelemetry metric for the tokens that one model call used. Prometheus writes its name with `_` in place of `.`. For a histogram with explicit buckets, as the OpenTelemetry SDKs send by default, Prometheus keeps the sum in the series that ends in `_sum`. The query therefore sums `gen_ai_client_token_usage_sum`. An SDK set to exponential histograms sends one native histogram series with no `_sum`, as Airflow's does, and this query then returns nothing.
 
@@ -275,7 +275,7 @@ cp token_budget.yaml .odctl/grafana/alerting/
 odctl restart telemetry
 ```
 
-The copy prints nothing, and the restart ends with `Restart complete.` Grafana takes a few seconds to answer after the restart. Run the listing command from the start of this section again until it prints both rules:
+The copy prints nothing, and the restart ends with `Restart complete.` Grafana and the collector take a few seconds to answer after the restart. Run the listing command from the start of this section again until it prints both rules:
 
 ```text
 Airflow DAG run failed
