@@ -57,7 +57,7 @@ Each command has its own section in the CLI reference, with its options and exam
 
 ## Roadmap
 
-odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`. The next releases add a written list of what 1.x keeps stable with JSON output, an MCP server for AI agents, a Langfuse profile, and snapshot and restore of a profile's data. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
+odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`. The next releases add a written list of what 1.x keeps stable with JSON output, an MCP server for AI agents, a Langfuse profile, and lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
 
 ## Related Reading
 
