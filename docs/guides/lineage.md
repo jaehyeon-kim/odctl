@@ -108,7 +108,7 @@ with DAG(
     seed_raw_orders >> build_daily_orders
 ```
 
-The provider parses each statement. The highlighted one gives the task its datasets: it reads `dev.raw_orders` and writes `dev.daily_orders`. The tasks reach PostgreSQL through an Airflow connection, a stored address and login that a task names with `conn_id`. This adds the connection `odctl_postgres`, with the user and password of odctl's PostgreSQL:
+The provider parses each statement. The highlighted one gives `build_daily_orders` its datasets: it reads `dev.raw_orders` and writes `dev.daily_orders`. The tasks reach PostgreSQL through an Airflow connection, a stored address and login that a task names with `conn_id`. This adds the connection `odctl_postgres`, with the user and password of odctl's PostgreSQL:
 
 ```bash title="docs/snippets/lineage/commands.sh:airflow-connection"
 docker exec airflow airflow connections add odctl_postgres \
@@ -152,7 +152,7 @@ lineage_orders.seed_raw_orders [] ['odctl.dev.raw_orders']
 
 Airflow's provider names each job after the DAG and the task, and each dataset after the database, the schema and the table. Three more facts explain the output:
 
-- Airflow puts its jobs in the namespace `default`, which changes only if you set `AIRFLOW__OPENLINEAGE__NAMESPACE` in `.odctl/compose-orch.yml`, and gives each table the namespace `postgres://postgres:5432`, the address of the database.
+- Airflow puts its jobs in the namespace `default`. To change it, set `AIRFLOW__OPENLINEAGE__NAMESPACE` in `.odctl/compose-orch.yml` and run `odctl recreate airflow`. Airflow gives each table the namespace `postgres://postgres:5432`, the address of the database.
 - The DAG is a third job, `lineage_orders`, with no datasets, so the read-back leaves it out.
 - The first task writes `raw_orders` and the second reads it, so the graph joins the two jobs through that table.
 
@@ -209,7 +209,7 @@ docker exec spark-master /opt/spark/bin/spark-submit \
 
 Each setting does one thing:
 
-- `--driver-class-path` puts `openlineage.jar` first on the driver's classpath, ahead of the other jars of the shared volume. The OpenMetadata agent jar in that folder holds a second copy of the listener's classes, and with Spark's default classpath the listener can load that copy and fail with `NoSuchMethodError`. The value repeats the classpath from `spark/spark-defaults.conf` in the workspace, with the jar in front.
+- `--driver-class-path` puts `openlineage.jar` first on the driver's classpath, ahead of the other jars of the shared volume. The OpenMetadata agent jar in that folder holds a second copy of the listener's classes, and with Spark's default classpath the driver loads that copy: the listener fails with `NoSuchMethodError`, Spark stops the session, and the job fails. The value repeats the classpath from `spark/spark-defaults.conf` in the workspace, with the jar in front.
 - `spark.extraListeners` names the listener class, so Spark calls it for every statement.
 - `spark.openlineage.transport.type` and `spark.openlineage.transport.url` send the events over HTTP to `marquez-api`.
 - `spark.openlineage.namespace` is the namespace of the jobs in Marquez.
@@ -232,7 +232,7 @@ spark_orders.append_data.iceberg_demo_raw_orders [] ['demo/raw_orders']
 spark_orders.atomic_replace_table.demo_raw_orders [] ['demo/raw_orders']
 ```
 
-Spark reports one job for each statement that writes a table. The listener names each job after the application name, with `-` turned into `_` (`spark_orders`), the kind of write and the table. The first line is the job that read `raw_orders` and wrote `daily_orders`. The listener names an Iceberg table by its place in the warehouse bucket, so the datasets are `demo/raw_orders` and `demo/daily_orders` in the namespace `s3://warehouse`. The application is a fifth job, `spark_orders`, with no datasets, so the read-back leaves it out. The graph looks like the one above, with the jobs of this namespace.
+Spark reports one job for each statement that writes a table. The listener names each job after the application name, with `-` turned into `_` (`spark_orders`), the kind of write and the table. The first line is the job that read `raw_orders` and wrote `daily_orders`. The listener names an Iceberg table by its place in the warehouse bucket, so the datasets are `demo/raw_orders` and `demo/daily_orders` in the namespace `s3://warehouse`. The application is a fifth job, `spark_orders`, with no datasets, so the read-back leaves it out.
 
 ## Lineage from Feast
 
