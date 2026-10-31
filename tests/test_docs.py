@@ -373,7 +373,7 @@ def test_snippet_changes_select_the_groups_that_run_them():
     ]
     assert set(
         selector.select(["docs/snippets/feast-iceberg/steps.sql"], registry)
-    ) == {"feast", "flink-lite flink-full", "mlflow", "airflow"}
+    ) == {"feast", "flink-lite flink-full", "mlflow", "airflow", "lineage"}
 
 
 def test_pages_keep_within_the_heading_limits():

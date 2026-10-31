@@ -890,6 +890,15 @@ if bad:
   [ "$state" = "success" ] || fail "DAG run finished in state ${state:-none}, not success"
   pass "DAG run reached success, so a task really executed"
 
+  # With AIRFLOW_OPENLINEAGE_TRANSPORT empty, as init writes it, Airflow's OpenLineage
+  # provider turns itself off. A transport error would show in the scheduler's log or
+  # in the log of the run's task, so look in both.
+  local ol_logs
+  ol_logs=$( { docker logs airflow 2>&1; docker exec airflow sh -c 'find /opt/airflow/logs -name "*.log" -exec cat {} +' 2>&1; } | grep -i openlineage || true)
+  ! grep -qiE 'error|exception' <<<"$ol_logs" \
+    || { echo "$ol_logs" | tail -10; fail "airflow logged an OpenLineage error with no transport set"; }
+  pass "no OpenLineage error in the scheduler or task logs with no transport set"
+
   # Airflow pushes OTLP to the telemetry collector rather than being scraped.
   assert_pushed_metrics 'airflow_.+' Airflow
 
@@ -1154,12 +1163,102 @@ smoke_lineage() {
   retry 12 5 lineage_read_back || fail "the job or the dataset never read back from Marquez"
   pass "dataset and job both read back from Marquez"
   assert_metrics http://marquez-api:5000/metrics
+
+  smoke_lineage_airflow
+  smoke_lineage_spark
+  smoke_lineage_feast
 }
 
 lineage_read_back() {
   local out
   out=$(run_snippet lineage/commands.sh read 2>/dev/null)
   grep -q '"name":"demo-job"' <<<"$out" && grep -q '"name":"demo-dataset"' <<<"$out"
+}
+
+# Run one of the guide's read-back sections and check that its output holds every
+# string given: lineage_says airflow-read 'a.b' "['x']". A sender reports to Marquez
+# after its own run ends, so the callers retry this.
+lineage_says() {
+  local section="$1" out want
+  shift
+  out=$(run_snippet "lineage/commands.sh" "$section" 2>/dev/null) || return 1
+  for want in "$@"; do grep -qF -- "$want" <<<"$out" || return 1; done
+}
+
+# The lineage guide's Airflow section. Compose reads a shell variable before .env,
+# and odctl runs docker compose with its own environment, so setting the key in this
+# shell has the effect of the guide's .env line without editing the workspace.
+smoke_lineage_airflow() {
+  AIRFLOW_OPENLINEAGE_TRANSPORT='{"type": "http", "url": "http://marquez-api:5000"}' \
+    odctl up airflow >/dev/null 2>&1 || fail "could not start airflow with the OpenLineage transport"
+  retry 60 5 http_ok "http://127.0.0.1:8085/api/v2/monitor/health" || fail "airflow never answered on :8085"
+  docker exec airflow printenv AIRFLOW__OPENLINEAGE__TRANSPORT | grep -qF '"url": "http://marquez-api:5000"' \
+    || fail "the transport set in the shell did not reach the Airflow container"
+
+  # An earlier run leaves the connection in Airflow's database, and add refuses a duplicate.
+  docker exec airflow airflow connections delete odctl_postgres >/dev/null 2>&1 || true
+  (cd "$SNIPPETS/lineage" && run_snippet lineage/commands.sh airflow-connection >/dev/null 2>&1) \
+    || fail "could not add the odctl_postgres connection"
+  (cd "$SNIPPETS/lineage" && run_snippet lineage/commands.sh airflow-upload >/dev/null 2>&1) \
+    || fail "could not upload the lineage DAG to s3://airflow/dags"
+  retry 30 10 bash -c \
+    "docker exec airflow airflow dags list 2>/dev/null | grep -q lineage_orders" \
+    || fail "the S3 DAG bundle never delivered the lineage DAG, or it was never parsed"
+  run_snippet lineage/commands.sh airflow-run >/dev/null 2>&1 \
+    || fail "the guide's list, unpause and trigger commands failed for the lineage DAG"
+
+  local state=""
+  for _ in $(seq 1 30); do
+    state=$(docker exec airflow airflow dags list-runs lineage_orders -o plain 2>/dev/null \
+      | grep -E "^lineage_orders" | head -1 | tr -s ' ' | cut -d' ' -f3)
+    case "$state" in success|failed) break ;; esac
+    sleep 10
+  done
+  [ "$state" = "success" ] || fail "the lineage DAG run finished in state ${state:-none}, not success"
+
+  retry 24 5 lineage_says airflow-read \
+    "lineage_orders.build_daily_orders ['odctl.dev.raw_orders'] ['odctl.dev.daily_orders']" \
+    || { run_snippet lineage/commands.sh airflow-read 2>&1 | tail -10; fail "Marquez has no job for the lineage DAG's task with its input and output tables"; }
+  pass "Airflow reported the lineage DAG's job, its input table and its output table to Marquez"
+
+  docker exec airflow python -c '
+import boto3
+boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(
+    Bucket="airflow", Key="dags/lineage_orders.py")' >/dev/null 2>&1 \
+    || fail "could not delete the lineage DAG from s3://airflow/dags"
+  odctl down airflow >/dev/null 2>&1 || fail "could not stop airflow after the lineage check"
+}
+
+# The Spark section: a job that writes two Iceberg tables, with the listener set.
+smoke_lineage_spark() {
+  odctl up spark-lite >/dev/null 2>&1 || fail "could not start spark-lite for the lineage check"
+  retry 30 5 http_ok "http://127.0.0.1:9080" || fail "Spark master never answered on :9080"
+  (cd "$SNIPPETS/lineage" && run_snippet lineage/commands.sh spark-submit >/dev/null 2>&1) \
+    || fail "the Spark job with the OpenLineage listener failed"
+  retry 24 5 lineage_says spark-read \
+    "spark_orders.append_data.iceberg_demo_daily_orders ['demo/raw_orders'] ['demo/daily_orders']" \
+    || { run_snippet lineage/commands.sh spark-read 2>&1 | tail -10; fail "Marquez has no job for the Spark job with its input and output tables"; }
+  pass "Spark reported the job's input table and output table to Marquez"
+  odctl down spark-lite >/dev/null 2>&1 || fail "could not stop spark-lite after the lineage check"
+}
+
+# The Feast section: feast apply from the airflow container, which has the extra.
+# The registry is PostgreSQL's feast database, so only airflow has to run.
+smoke_lineage_feast() {
+  odctl up airflow >/dev/null 2>&1 || fail "could not start airflow for the Feast lineage check"
+  retry 60 5 http_ok "http://127.0.0.1:8085/api/v2/monitor/health" || fail "airflow never answered on :8085"
+  local work="${TMPDIR:-/tmp}/odctl-lineage-feast-smoke"
+  rm -rf "$work"; mkdir -p "$work/lineage_repo" "$work/feature_repo"
+  cp "$SNIPPETS/lineage/lineage_repo/feature_store.yaml" "$work/lineage_repo/"
+  cp "$SNIPPETS/feast-iceberg/feature_repo/definitions.py" "$work/feature_repo/"
+  (cd "$work" && run_snippet lineage/commands.sh feast-apply >/dev/null 2>&1) \
+    || { rm -rf "$work"; fail "feast apply with the openlineage block failed in the airflow container"; }
+  rm -rf "$work"
+  retry 24 5 lineage_says feast-read \
+    "feast_feature_views_lineage_demo ['driver', '.demo.driver_stats'] ['driver_stats']" \
+    || { run_snippet lineage/commands.sh feast-read 2>&1 | tail -10; fail "Marquez has no job for the Feast feature views"; }
+  pass "feast apply reported the feature views' job, its entity and source, and the feature view to Marquez"
+  odctl down airflow >/dev/null 2>&1 || fail "could not stop airflow after the Feast lineage check"
 }
 
 # Fluss: both containers ran while the cluster did nothing at all. The

@@ -278,6 +278,17 @@ def test_every_named_selection_yields_a_valid_project():
     )
 
 
+def test_airflow_takes_its_lineage_transport_from_the_env_key_with_an_empty_default():
+    """An empty transport turns Airflow's OpenLineage provider off, so Airflow
+    sends no lineage until `.env` sets AIRFLOW_OPENLINEAGE_TRANSPORT."""
+    env = _services(get_internal_resources_dir() / "compose-orch.yml")["airflow"][
+        "environment"
+    ]
+    assert (
+        env["AIRFLOW__OPENLINEAGE__TRANSPORT"] == "${AIRFLOW_OPENLINEAGE_TRANSPORT:-}"
+    )
+
+
 def test_valkey_user_can_use_pubsub_channels():
     """Channels are a separate ACL class from keys, and Valkey defaults to
     resetchannels. Without an explicit channel grant, PUBLISH and SUBSCRIBE return

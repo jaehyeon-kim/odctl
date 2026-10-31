@@ -79,4 +79,7 @@ def test_the_bundled_repository_serves_mcp_and_defines_no_features():
         "mcp_enabled": True,
         "mcp_transport": "http",
     }
+    assert "openlineage" not in config, (
+        "Feast sends no lineage until a user adds the block"
+    )
     assert [p.name for p in repo.iterdir()] == ["feature_store.yaml"]

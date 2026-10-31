@@ -114,6 +114,16 @@ def init_workspace(force: bool = False):
             f.write('# _MLOPS_PIP_DEPS="pyod river"\n')
             f.write('_MLOPS_PIP_DEPS=""\n\n')
 
+            f.write(
+                "# Airflow lineage: where Airflow sends OpenLineage events. Empty\n"
+            )
+            f.write("# means Airflow sends none. Marquez is the lineage profile.\n")
+            f.write(
+                "# AIRFLOW_OPENLINEAGE_TRANSPORT='"
+                '{"type": "http", "url": "http://marquez-api:5000"}\'\n'
+            )
+            f.write('AIRFLOW_OPENLINEAGE_TRANSPORT=""\n\n')
+
             f.write("# OpenMetadata Ingestion Additional Dependencies\n")
             f.write('# _METADATA_PIP_DEPS="faker"\n')
             f.write('_METADATA_PIP_DEPS=""\n\n')

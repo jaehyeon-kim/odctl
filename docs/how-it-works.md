@@ -146,7 +146,7 @@ odctl --workspace ./.odctl ps catalog
 | --- | --- |
 | `compose-*.yml` | Host ports, memory limits and environment variables of each service |
 | `registry.yml` | The profiles, their compose files and their dependencies |
-| `.env` | `TAG`, the time zone of the services that read it (`TZ`, `UTC` by default), extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`), the MLflow services (`_MLOPS_PIP_DEPS`), the OpenMetadata ingestion container (`_METADATA_PIP_DEPS`), whether OpenMetadata's AutoPilot creates default agents for a service added in its UI (`METADATA_AUTOPILOT`, off by default), and the model the MLflow model server serves (`MODEL_URI`) |
+| `.env` | `TAG`, the time zone of the services that read it (`TZ`, `UTC` by default), extra Python packages for Airflow (`_AIRFLOW_PIP_DEPS`), the MLflow services (`_MLOPS_PIP_DEPS`), the OpenMetadata ingestion container (`_METADATA_PIP_DEPS`), where Airflow sends its OpenLineage events (`AIRFLOW_OPENLINEAGE_TRANSPORT`, empty by default, so Airflow sends none; [Lineage from Airflow](guides/lineage.md#lineage-from-airflow) sets it), whether OpenMetadata's AutoPilot creates default agents for a service added in its UI (`METADATA_AUTOPILOT`, off by default), and the model the MLflow model server serves (`MODEL_URI`) |
 | `grafana/dashboards/` | The Grafana dashboard for each service |
 | `trino/rules.json` | Trino's file-based access control |
 | `evidently/config.yaml` | The Evidently server's settings |
