@@ -73,7 +73,9 @@ Most services keep their data inside their containers. PostgreSQL, SeaweedFS, Cl
 | `odctl down` | removed | lost; the unnamed volumes stay on disk, unused |
 | `odctl down --volumes` | removed, with the unnamed volumes and the profile's named volumes such as `spark-events-data`. The `odctl-shared-deps` volume is removed too once no other profile has a container | lost |
 
-A database, a bucket, a topic or an Iceberg table therefore lasts until its profile is stopped, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster. The Spark containers (`spark-master`, the workers and `spark-history`) share the `spark-events-data` volume, which holds Spark's event logs and is stored in memory, so it holds nothing once the stack is down.
+A database, a bucket, a topic or an Iceberg table therefore lasts until its profile stops, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
+
+The Spark containers (`spark-master`, the workers and `spark-history`) share the `spark-events-data` volume for Spark's event logs. Docker keeps that volume in memory, so it holds nothing once the stack is down.
 
 Three profiles read their code from a SeaweedFS bucket, so uploading a file deploys it, and the upload lasts as long as the bucket does. The `storage` profile creates the buckets.
 

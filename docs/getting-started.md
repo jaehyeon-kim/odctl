@@ -45,7 +45,7 @@ Add `-d` to list each profile's services and host ports as well:
 odctl list -d
 ```
 
-Add `--json` to print the profiles as JSON, which a script or an AI assistant reads more easily than a table. odctl prints the JSON on standard output and every warning, such as the one for a stale workspace, on standard error, so a pipe receives only the JSON. The full output is an array with one object for each profile, and this keeps only `kafka-lite`:
+Add `--json` to print the profiles as JSON, which a script or an AI assistant reads more easily than a table. odctl prints the JSON on standard output and every warning on standard error, so a pipe receives only the JSON. The warning for a stale workspace is one example. The full output is an array with one object for each profile, and this keeps only `kafka-lite`:
 
 ```bash title="docs/snippets/getting-started/commands.sh:list-json"
 # Print only kafka-lite; the full output lists every profile.

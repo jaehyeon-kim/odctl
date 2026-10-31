@@ -56,7 +56,23 @@ Each layer checks one thing:
 
 Run the unit suite in full once before each commit. While fixing, run only the failed tests (`pytest --lf`) and the tests of the files you changed. Run the strict build when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed: `registry.yml`, a compose file, a command's `--help` text, or `src/odctl/models.py`.
 
-A pull request runs pre-commit, the unit tests on each supported Python version and once at the lowest dependency versions `pyproject.toml` allows, the strict docs build, and the image builds when an image input changed. e2e runs only on a tag and on a manual run, because odctl runs images tagged with its own version, and the images of an unreleased version do not exist yet. To check a profile on your machine, do what the e2e job does: install the CLI with `uv tool install .`, run `odctl init`, start the profile with `odctl up <profile>`, then run `.github/scripts/smoke.sh <profile>`. For a group name with a colon, such as `metadata:deps`, the e2e job starts the profile before the colon (`odctl up metadata`) and passes the whole name to `smoke.sh` (`smoke.sh metadata:deps`). Run one `odctl up` at a time. When no image definition changed since the last release, you can give the last release's images the new version's tag for the test, and remove those tags afterwards.
+A pull request runs these checks:
+
+- pre-commit;
+- the unit tests on each supported Python version, and once at the lowest dependency versions `pyproject.toml` allows;
+- the strict docs build;
+- the image builds, when an image input changed.
+
+e2e runs only on a tag and on a manual run. odctl runs images tagged with its own version, and the images of an unreleased version do not exist yet.
+
+To check a profile on your machine, do what the e2e job does:
+
+1. Install the CLI with `uv tool install .`.
+2. Run `odctl init`.
+3. Start the profile with `odctl up <profile>`. Run one `odctl up` at a time.
+4. Run `.github/scripts/smoke.sh <profile>`.
+
+For a group name with a colon, such as `metadata:deps`, the e2e job starts the profile before the colon (`odctl up metadata`) and passes the whole name to `smoke.sh` (`smoke.sh metadata:deps`). When no image definition changed since the last release, you can give the last release's images the new version's tag for the test, and remove those tags afterwards.
 
 ## Rules
 

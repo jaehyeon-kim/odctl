@@ -58,7 +58,7 @@ class ProfileInfo(_JsonModel):
     services: List[ServiceInfo] = Field(
         description="The services the profile starts, sorted by name."
     )
-    # The registry's id of the stack, which the tables group by; not in the JSON.
+    # Stack id from the registry, which the tables group by; not in the JSON.
     stack_id: str = Field(default="", exclude=True)
     # Every port as the compose file wrote it, as `service:port`, sorted, which the
     # tables print; not in the JSON.

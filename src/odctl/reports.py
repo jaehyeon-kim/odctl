@@ -32,7 +32,8 @@ def _compose_unreadable(compose_file: str, services: List[str]) -> Optional[str]
         Optional[str]: A message when the services are the error marker that
         `get_stack_details` returns for a missing or unparseable file, otherwise None.
     """
-    if services and (services[0] == "File Error" or services[0].startswith("Err: ")):
+    unreadable = services and (services[0] == "File Error" or services[0].startswith("Err: "))
+    if unreadable:
         return f"Cannot read {compose_file}: {services[0]}"
     return None
 
