@@ -17,8 +17,8 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: 'Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.9.0: Kafka Connect transforms'
-  content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
+- title: '1.9.0: Label Studio'
+  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
   icon: ':material-clock-outline:'
   key: planned
 - title: '1.10.0: Memory check and models on the host'
@@ -37,8 +37,8 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: 'Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.11.0: Label Studio'
-  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
+- title: '1.11.0: Kafka Connect transforms'
+  content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
   icon: ':material-clock-outline:'
   key: planned
 ::/timeline::
