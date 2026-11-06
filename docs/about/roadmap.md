@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.7.0: Langfuse'
-  content: 'A profile for tracing and evaluating LLM and agent applications, using odctl''s ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)'
-  icon: ':material-play:'
-  key: now
 - title: '1.8.0: Lineage and alerts'
   content: 'Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.9.0: Label Studio'
   content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
   icon: ':material-clock-outline:'
@@ -84,6 +80,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.7.0: Langfuse"
+
+    The `langfuse` profile traces LLM and agent applications in Langfuse, on odctl's PostgreSQL, ClickHouse, Valkey and SeaweedFS ([Langfuse](../guides/langfuse.md)). [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
 
 ??? note "1.6.0: MCP server"
 

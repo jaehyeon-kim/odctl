@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 CONFIRMED = {
-    "docs/about/why-odctl.md": "cb4b85c270cecb45d7ad0cb74317a992f05f05014a3a06fc06eecc0eb2433401",
+    "docs/about/why-odctl.md": "9f81315125fe88e95f6419e65ae470a07a57ff635c1cde1c5fbacc01770a57d8",
 }
 
 

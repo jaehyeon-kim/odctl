@@ -2,6 +2,18 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.7.0
+
+A Langfuse profile for tracing LLM and agent applications, and Valkey starting earlier.
+
+- The `langfuse` profile runs Langfuse in a new AI Engineering area, with its UI and OTLP endpoint on host port 3005 ([Langfuse](../guides/langfuse.md)).
+- The `storage` profile also creates a `langfuse` bucket.
+- `valkey` now starts before the other profiles that sort after it, so `odctl up` and its `--dry-run` list it earlier ([Dependencies and the Start Order](../how-it-works.md#dependencies-and-the-start-order)).
+
+### Upgrading
+
+- A workspace made by `odctl init` before 1.7.0 does not have the `langfuse` profile. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. If `ch-lite` is running from an earlier release, create the database first: `docker exec ch-11 clickhouse-client --password password --query "CREATE DATABASE IF NOT EXISTS langfuse"`. Then run `odctl up langfuse`: `seaweed-init` creates the `langfuse` bucket, and Langfuse creates its PostgreSQL database.
+
 ## Version 1.6.0
 
 An MCP server that gives AI agents odctl's profiles, containers and logs, and a dry run of `odctl down --volumes` that names the volumes.

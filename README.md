@@ -58,7 +58,7 @@ Each command has its own section in the CLI reference, with its options and exam
 
 ## Roadmap
 
-odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`; [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what that covers. The next releases add a Langfuse profile, then lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
+odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`; [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what that covers. The next release adds lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
 
 ## Related Reading
 
