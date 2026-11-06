@@ -95,7 +95,7 @@ def get_stack_details(
                 if "image" in svc_data:
                     # Shown as it will run: `${TAG:-latest}` resolves the way compose
                     # resolves it, which is the CLI version without a workspace.
-                    image = _expand(svc_data["image"], _interpolation_env())
+                    image = expand(svc_data["image"], interpolation_env())
                     images.append(f"{svc_name} -> {image}")
 
                 if "ports" in svc_data:
@@ -104,7 +104,10 @@ def get_stack_details(
                             ports.append(f"{svc_name}:{p}")
                         elif isinstance(p, dict) and "published" in p:
                             target = p.get("target", p["published"])
-                            ports.append(f"{svc_name}:{p['published']}:{target}")
+                            protocol = f"/{p['protocol']}" if p.get("protocol") else ""
+                            ports.append(
+                                f"{svc_name}:{p['published']}:{target}{protocol}"
+                            )
 
                 if "volumes" in svc_data:
                     for v in svc_data["volumes"]:
@@ -185,7 +188,7 @@ def _read_env_file(path: Path) -> Dict[str, str]:
     return values
 
 
-def _interpolation_env() -> Dict[str, str]:
+def interpolation_env() -> Dict[str, str]:
     """
     Build the variable mapping compose uses to interpolate the compose files.
 
@@ -201,7 +204,7 @@ def _interpolation_env() -> Dict[str, str]:
     return env
 
 
-def _expand(value: str, env: Dict[str, str]) -> str:
+def expand(value: str, env: Dict[str, str]) -> str:
     """
     Substitute compose variables in a string.
 
@@ -241,7 +244,7 @@ def resolve_image_tag() -> str:
     Returns:
         str: The value of TAG as compose resolves it, or 'latest' when unset.
     """
-    return _expand("${TAG:-latest}", _interpolation_env())
+    return expand("${TAG:-latest}", interpolation_env())
 
 
 def get_versioned_images(execution_plan: Dict[str, List[str]]) -> List[str]:
@@ -255,21 +258,21 @@ def get_versioned_images(execution_plan: Dict[str, List[str]]) -> List[str]:
         List[str]: Sorted, deduplicated references to images built by this
         project, with their variables already substituted.
     """
-    env = _interpolation_env()
+    env = interpolation_env()
     references = set()
 
     for file, profiles in execution_plan.items():
         _, _, images, _ = get_stack_details(file, profiles)
         for entry in images:
             _, _, raw = entry.partition(" -> ")
-            reference = _expand(raw, env)
+            reference = expand(raw, env)
             if reference.startswith(ODCTL_IMAGE_PREFIX):
                 references.add(reference)
 
     return sorted(references)
 
 
-def _image_is_local(reference: str) -> bool:
+def image_is_local(reference: str) -> bool:
     """
     Report whether an image is already on the Docker host.
 
@@ -326,7 +329,7 @@ def find_unpublished_images(execution_plan: Dict[str, List[str]]) -> List[str]:
     candidates = [
         reference
         for reference in get_versioned_images(execution_plan)
-        if not _image_is_local(reference)
+        if not image_is_local(reference)
     ]
     if not candidates:
         return []

@@ -20,12 +20,13 @@ Exporting the diagrams also needs draw.io, Chrome and ffmpeg.
 | Path | Contents |
 |---|---|
 | `src/odctl/main.py` | the Typer CLI (`list`, `explain`, `ps`, `info`, `init`, `pull`, `up`, `down`, `logs`, `restart`, `recreate`) |
+| `src/odctl/models.py`, `reports.py` | the models of the `--json` output of `list`, `explain`, `ps` and `info`, and the functions that build them; `ui.py` renders the same models as tables and panels |
 | `src/odctl/registry.py`, `resources/registry.yml` | profiles, the services in each, dependencies, ports and usage text |
 | `src/odctl/planner.py`, `docker.py`, `projects.py`, `logs.py`, `workspace.py`, `config.py`, `ui.py` | startup order, Docker Compose calls, `restart` and `recreate`, and `logs`, each with one Compose project per file as `up` runs them, the `.odctl` workspace, settings, terminal output |
 | `src/odctl/resources/compose-*.yml` | one compose file per area (kafka, flink, spark, store, analytics, mlops, orch, obsv, metadata, infra, deps) |
 | `src/odctl/resources/docker/` | odctl's own images (postgres, mlflow, airflow, spark), published to `ghcr.io/jaehyeon-kim/odctl/<name>:<version>` |
 | `src/odctl/resources/deps/` | the `deps` image: connector and engine jars built or downloaded into the `odctl-shared-deps` volume; versions in `versions.env` |
-| `scripts/gen_pages.py` | builds a page per technology and the CLI reference at docs build time, from `registry.yml`, the compose files and `--help`; run directly, it writes `skills/odctl/SKILL.md`, with every command, option and `.env` key, which a test keeps in step |
+| `scripts/gen_pages.py` | builds a page per technology, the CLI reference and the JSON Output page at docs build time, from `registry.yml`, the compose files, `--help` and the models in `src/odctl/models.py`; run directly, it writes `skills/odctl/SKILL.md`, with every command, option and `.env` key, which a test keeps in step |
 | `scripts/local_links.py`, `scripts/llmstxt_sections.py`, `scripts/release_links.py` | MkDocs hooks: clickable local addresses, the `llms.txt` sections from the nav, and links to files on `main` pointed at the release tag `v<version>` |
 | `scripts/diagrams.py`, `docs/assets/diagrams/*.drawio` | exports each draw.io diagram to the PNG, or GIF for steps, that the docs use, and writes a still PNG of each GIF's last frame beside it; `_legend.drawio` holds the shared shapes; `tests/test_diagrams.py` checks the exports and the stills |
 | `docs/images/` | screenshots of the services' web UIs and the terminal |
@@ -53,9 +54,25 @@ Each layer checks one thing:
 - The strict docs build fails on a broken link or anchor.
 - The e2e tests start each profile group and run `.github/scripts/smoke.sh` on it. A running container is not enough: the script checks that the profile does its job, such as a Kafka consumer reading a message or a Flink job committing to Iceberg. It also runs each guide's snippets and Runnable Example.
 
-Run the unit suite in full once before each commit. While fixing, run only the failed tests (`pytest --lf`) and the tests of the files you changed. Run the strict build when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed: `registry.yml`, a compose file, or a command's `--help` text.
+Run the unit suite in full once before each commit. While fixing, run only the failed tests (`pytest --lf`) and the tests of the files you changed. Run the strict build when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed: `registry.yml`, a compose file, a command's `--help` text, or `src/odctl/models.py`.
 
-A pull request runs pre-commit, the unit tests on each supported Python version, the strict docs build, and the image builds when an image input changed. e2e runs only on a tag and on a manual run, because odctl runs images tagged with its own version, and the images of an unreleased version do not exist yet. To check a profile on your machine, do what the e2e job does: install the CLI with `uv tool install .`, run `odctl init`, start the profile with `odctl up <profile>`, then run `.github/scripts/smoke.sh <profile>`. For a group name with a colon, such as `metadata:deps`, the e2e job starts the profile before the colon (`odctl up metadata`) and passes the whole name to `smoke.sh` (`smoke.sh metadata:deps`). Run one `odctl up` at a time. When no image definition changed since the last release, you can give the last release's images the new version's tag for the test, and remove those tags afterwards.
+A pull request runs these checks:
+
+- pre-commit;
+- the unit tests on each supported Python version, and once at the lowest dependency versions `pyproject.toml` allows;
+- the strict docs build;
+- the image builds, when an image input changed.
+
+e2e runs only on a tag and on a manual run. odctl runs images tagged with its own version, and the images of an unreleased version do not exist yet.
+
+To check a profile on your machine, do what the e2e job does:
+
+1. Install the CLI with `uv tool install .`.
+2. Run `odctl init`.
+3. Start the profile with `odctl up <profile>`. Run one `odctl up` at a time.
+4. Run `.github/scripts/smoke.sh <profile>`.
+
+For a group name with a colon, such as `metadata:deps`, the e2e job starts the profile before the colon (`odctl up metadata`) and passes the whole name to `smoke.sh` (`smoke.sh metadata:deps`). When no image definition changed since the last release, you can give the last release's images the new version's tag for the test, and remove those tags afterwards.
 
 ## Rules
 
@@ -64,6 +81,7 @@ A pull request runs pre-commit, the unit tests on each supported Python version,
 - **One profile per tool**, with `-lite` and `-full` variants where a tool has a small and a clustered form (`kafka-lite`, `kafka-full`).
 - **Fixed container names.** Every service has a `container_name`, so `odctl up` cannot scale a service; several copies are separate named services (Flink's `taskmanager-a` and `taskmanager-b`).
 - **A feature merges only with its docs.** Each command, option, profile and `.env` key needs a tested example on a guide, Getting Started or How It Works, a reference entry (the CLI reference, a profile page or How It Works), and a place in the skill; a command also needs a line in the README's Commands section. `test_every_feature_has_its_docs` checks this, and its short list of exceptions gives a reason for each.
+- **What stays stable in 1.x.** [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what every 1.x release keeps. Removing or renaming a profile, an `.env` key, a named volume, a workspace file or a JSON key, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key or a JSON key breaks nothing. Any other change of behaviour gets an Upgrading line in the Changelog.
 - **Renovate** opens its pull requests on Mondays, with image updates grouped by compose file. Agree a change to its configuration (`.github/renovate.json`) with the maintainer first.
 
 ## Add a Profile
@@ -80,7 +98,7 @@ Add it to `src/odctl/main.py` with its `--help` text, which the CLI reference is
 
 ## Write the Docs
 
-- **Generated pages.** The profile pages and the CLI reference are generated by `scripts/gen_pages.py` during the build, from `registry.yml`, the compose files and the commands. Change those, not the pages, and do not copy versions or ports into hand-written guides.
+- **Generated pages.** The profile pages, the CLI reference and the JSON Output page are generated by `scripts/gen_pages.py` during the build, from `registry.yml`, the compose files, the commands and the models in `src/odctl/models.py`. Change those, not the pages, and do not copy versions or ports into hand-written guides.
 - **Code blocks are copies.** Guide code lives in `docs/snippets/<guide>/`, one section per step (`# --8<-- [start:name]`), and Getting Started and How It Works follow the same rule. A block labelled `title="path:section"` or `title="path"` is a copy of that section or file, checked by `tests/test_docs.py`. Pages use copies, not `--8<--` includes, so the Markdown reads correctly on GitHub. Every guide ends with a Runnable Example, `example.sh` or `example.py` in its folder. `smoke.sh` runs the same sections and examples, and `select-profiles.py` maps each snippet folder to the e2e groups that run it.
 - **Guides.** Each guide says which pages it builds on, the output of every step, and where a value it quotes is set. A page has at most 10 `##` headings and 15 in all.
 - **Writing.** Plain English for readers whose first language is not English. Headings use title case, keeping product names such as `odctl` as they are, and do not start with "The". No em or en dashes. Each Markdown paragraph is one line, never hard-wrapped.
@@ -96,4 +114,4 @@ The maintainer releases. These steps are written down so that each release is th
 
 1. Bump `version` in `pyproject.toml`, run `uv lock`, and add the release to `docs/about/changelog.md`, with an Upgrading line for any change to ports, profiles, `.env` keys, volumes or workspace files. The same commit updates the public roadmap, `docs/about/roadmap.md`: the release moves from Next Releases to Released, the next release becomes the current entry (`key: now`), and every planned entry names all the issues planned for it; `tests/test_roadmap.py` fails otherwise. When it reaches `main`, the docs deploy as that version, aliased `latest`.
 2. Once the `main` pipeline for that commit is green, push tag `vX.Y.Z` on it. A tag on a commit whose checks fail builds no images and cannot be released until it is moved. The tag pipeline builds and pushes the `X.Y.Z` images, then runs e2e for every profile group (about an hour).
-3. Publish the GitHub release with that version's Changelog section as its text, so the two never differ: `python scripts/release_notes.py X.Y.Z > /tmp/notes.md`, then `gh release create vX.Y.Z --title vX.Y.Z --notes-file /tmp/notes.md`. `publish.yml` waits for a green tag pipeline and checks that every `X.Y.Z` image is in ghcr, then uploads to PyPI.
+3. Publish the GitHub release with that version's Changelog section as its text, so the two never differ: `python scripts/release_notes.py X.Y.Z > /tmp/notes.md`, then `gh release create vX.Y.Z --title vX.Y.Z --notes-file /tmp/notes.md`. `publish.yml` waits for the tag pipeline and uploads to PyPI only when every unit test job and every e2e job in it passed and every `X.Y.Z` image is in ghcr; neither check can be skipped.

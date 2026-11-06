@@ -39,7 +39,7 @@ This runs a query with no table:
 docker exec trino trino --execute "SELECT 1"
 ```
 
-It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Trino Access Rules](../how-it-works.md#trino-access-rules) explains the rules in `trino/rules.json`.
+It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Examples](../how-it-works.md#examples) on How It Works explains the rules in `trino/rules.json`.
 
 The Trino UI at `http://127.0.0.1:8080` asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.
 

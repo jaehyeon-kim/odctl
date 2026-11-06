@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.5.0: Stable interface and JSON output'
-  content: 'A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)'
-  icon: ':material-play:'
-  key: now
 - title: '1.6.0: MCP server'
   content: 'Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.7.0: Langfuse'
   content: 'A profile for tracing and evaluating LLM and agent applications, using odctl''s ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)'
   icon: ':material-clock-outline:'
@@ -21,8 +17,8 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: 'Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.9.0: Kafka Connect transforms'
-  content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
+- title: '1.9.0: Label Studio'
+  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
   icon: ':material-clock-outline:'
   key: planned
 - title: '1.10.0: Memory check and models on the host'
@@ -41,8 +37,8 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: 'Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.'
   icon: ':material-clock-outline:'
   key: planned
-- title: '1.11.0: Label Studio'
-  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
+- title: '1.11.0: Kafka Connect transforms'
+  content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
   icon: ':material-clock-outline:'
   key: planned
 ::/timeline::
@@ -88,6 +84,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.5.0: JSON output and what stays stable in 1.x"
+
+    `odctl list`, `explain`, `ps` and `info` print JSON with `--json`, and [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) lists what every 1.x release keeps. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)
 
 ??? note "1.4.0: Feast"
 

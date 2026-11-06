@@ -11,7 +11,8 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 
 - Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.
 - `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.
-- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove named volumes: the shared jar volume `odctl-shared-deps` and Spark's `spark-events-data`. `odctl down --all --volumes` removes everything.
+- `odctl ps --json` and `odctl list --json` print what is running and every profile as JSON, which is easier to read than the tables; the keys stay the same in every 1.x release ([What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x)).
+- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove the profile's named volumes, such as Spark's `spark-events-data`, and the shared jar volume `odctl-shared-deps` once no other profile has a container. `odctl down --all --volumes` removes everything.
 - Every port is published on `127.0.0.1` only, so other machines cannot reach it. From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.
 - Logins are in each profile's notes below. Most services use the user `user` and the password `password`; some have no login.
 - `odctl init` copies the compose files, `registry.yml` and `.env` into `.odctl/` in the current directory, so they can be edited. Run `odctl recreate <profile>` after editing a compose file or `.env`.
@@ -28,7 +29,7 @@ odctl starts open source data services as Docker Compose profiles. Install it wi
 | `odctl up` | Launch Open Data profiles. |
 | `odctl down` | Stop and remove profile containers and networks. |
 | `odctl ps` | List Docker containers managed by the Open Data Stack. |
-| `odctl info` | Show the installed odctl version and whether Docker is reachable. |
+| `odctl info` | Show the odctl version, whether Docker is reachable and, with `--json`, the image tag, the workspace and odctl's own images. |
 | `odctl logs` | Fetch the logs of containers managed by specific profiles. |
 | `odctl restart` | Restart one or more specific profiles. |
 | `odctl recreate` | Replace one or more profiles' containers, applying compose file changes. |
@@ -42,6 +43,8 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | global | `--verbose` | Enable debug-level logging across all commands. |
 | global | `--workspace, -w` | Path to the odctl workspace directory (default: ./.odctl). |
 | `odctl list` | `--details, -d` | Inspect docker-compose files to show exact services and exposed host ports. |
+| `odctl list` | `--json` | Print the output as JSON, for scripts and AI assistants. |
+| `odctl explain` | `--json` | Print the output as JSON, for scripts and AI assistants. |
 | `odctl init` | `--force, -f` | Wipe out the existing workspace and recreate it from scratch. |
 | `odctl init` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
 | `odctl pull` | `--all, -a` | Pull images for ALL available profiles in the registry. |
@@ -52,6 +55,8 @@ Global options go before the command, as in `odctl --workspace ../shared/.odctl 
 | `odctl down` | `--dry-run` | Preview the teardown plan without actually stopping anything. |
 | `odctl down` | `--yes, -y` | Answer yes to the confirmation prompt, for scripts and CI. |
 | `odctl ps` | `--all, -a` | Show all containers managed by odctl. |
+| `odctl ps` | `--json` | Print the output as JSON, for scripts and AI assistants. |
+| `odctl info` | `--json` | Print the output as JSON, for scripts and AI assistants. |
 | `odctl logs` | `--service, -s` | Filter to a specific compose service (Use 'odctl ps' to find names). |
 | `odctl logs` | `--follow, -f` | Follow log output in real-time. |
 | `odctl logs` | `--tail, -n` | Number of lines to show from the end of the logs. |
@@ -93,10 +98,10 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka` | `apache/kafka:4.3.2` | `9092:9092` | `1500m` |
-| `connect` | `apache/kafka:4.3.2` | `8083:8083` | `2g` |
-| `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
-| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
+| `kafka` | `apache/kafka` | `9092:9092` | `1500m` |
+| `connect` | `apache/kafka` | `8083:8083` | `2g` |
+| `karapace` | `ghcr.io/aiven-open/karapace` | `8081:8081` | `512m` |
+| `kafka-ui` | `ghcr.io/kafbat/kafka-ui` | `8086:8080` | `512m` |
 
 ### kafka-full
 
@@ -115,12 +120,12 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `kafka-1` | `apache/kafka:4.3.2` | `9092:9092` | `1500m` |
-| `kafka-2` | `apache/kafka:4.3.2` | `9093:9093` | `1500m` |
-| `kafka-3` | `apache/kafka:4.3.2` | `9094:9094` | `1500m` |
-| `connect` | `apache/kafka:4.3.2` | `8083:8083` | `2g` |
-| `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081` | `512m` |
-| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | `8086:8080` | `512m` |
+| `kafka-1` | `apache/kafka` | `9092:9092` | `1500m` |
+| `kafka-2` | `apache/kafka` | `9093:9093` | `1500m` |
+| `kafka-3` | `apache/kafka` | `9094:9094` | `1500m` |
+| `connect` | `apache/kafka` | `8083:8083` | `2g` |
+| `karapace` | `ghcr.io/aiven-open/karapace` | `8081:8081` | `512m` |
+| `kafka-ui` | `ghcr.io/kafbat/kafka-ui` | `8086:8080` | `512m` |
 
 ## Stream and Batch Processing
 
@@ -139,9 +144,9 @@ Apache Flink: Stateful, real-time stream processing engine. Lite uses 1 TaskMana
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `jobmanager` | `flink:2.2-java17` | `8082:8081` | `1500m` |
-| `taskmanager-a` | `flink:2.2-java17` | none | `3500m` |
-| `sql-gateway` | `flink:2.2-java17` | `8084:8083` | `1g` |
+| `jobmanager` | `flink` | `8082:8081` | `1500m` |
+| `taskmanager-a` | `flink` | none | `3500m` |
+| `sql-gateway` | `flink` | `8084:8083` | `1g` |
 
 ### flink-full
 
@@ -158,11 +163,11 @@ Apache Flink: Stateful, real-time stream processing engine. Lite uses 1 TaskMana
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `jobmanager` | `flink:2.2-java17` | `8082:8081` | `1500m` |
-| `taskmanager-a` | `flink:2.2-java17` | none | `3500m` |
-| `taskmanager-b` | `flink:2.2-java17` | none | `3500m` |
-| `taskmanager-c` | `flink:2.2-java17` | none | `3500m` |
-| `sql-gateway` | `flink:2.2-java17` | `8084:8083` | `1g` |
+| `jobmanager` | `flink` | `8082:8081` | `1500m` |
+| `taskmanager-a` | `flink` | none | `3500m` |
+| `taskmanager-b` | `flink` | none | `3500m` |
+| `taskmanager-c` | `flink` | none | `3500m` |
+| `sql-gateway` | `flink` | `8084:8083` | `1g` |
 
 ### spark-lite
 
@@ -182,9 +187,9 @@ Apache Spark: Distributed batch and micro-batch data processing. Lite uses 1 Wor
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `spark-master` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9080:8080`, `7077:7077` | `1g` |
-| `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9081:8081` | `2g` |
-| `spark-history` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `18080:18080` | `1g` |
+| `spark-master` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9080:8080`, `7077:7077` | `1g` |
+| `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9081:8081` | `2g` |
+| `spark-history` | `ghcr.io/jaehyeon-kim/odctl/spark` | `18080:18080` | `1g` |
 
 ### spark-full
 
@@ -204,11 +209,11 @@ Apache Spark: Distributed batch and micro-batch data processing. Lite uses 1 Wor
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `spark-master` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9080:8080`, `7077:7077` | `1g` |
-| `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9081:8081` | `2g` |
-| `spark-worker-2` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9082:8081` | `2g` |
-| `spark-worker-3` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9083:8081` | `2g` |
-| `spark-history` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `18080:18080` | `1g` |
+| `spark-master` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9080:8080`, `7077:7077` | `1g` |
+| `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9081:8081` | `2g` |
+| `spark-worker-2` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9082:8081` | `2g` |
+| `spark-worker-3` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9083:8081` | `2g` |
+| `spark-history` | `ghcr.io/jaehyeon-kim/odctl/spark` | `18080:18080` | `1g` |
 
 ## Analytics
 
@@ -224,10 +229,10 @@ ClickHouse: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), 
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `ch-keeper` | `clickhouse/clickhouse-keeper:25.12-alpine` | `9181:9181` | `512m` |
-| `ch-shard2-stub` | `alpine:3.24` | none | `64m` |
-| `ch-11` | `clickhouse/clickhouse-server:25.12-alpine` | `8123:8123`, `9000:9000` | `4g` |
-| `ch-12` | `clickhouse/clickhouse-server:25.12-alpine` | `8124:8123`, `9001:9000` | `4g` |
+| `ch-keeper` | `clickhouse/clickhouse-keeper` | `9181:9181` | `512m` |
+| `ch-shard2-stub` | `alpine` | none | `64m` |
+| `ch-11` | `clickhouse/clickhouse-server` | `8123:8123`, `9000:9000` | `4g` |
+| `ch-12` | `clickhouse/clickhouse-server` | `8124:8123`, `9001:9000` | `4g` |
 
 ### ch-full
 
@@ -241,11 +246,11 @@ ClickHouse: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), 
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `ch-keeper` | `clickhouse/clickhouse-keeper:25.12-alpine` | `9181:9181` | `512m` |
-| `ch-11-full` | `clickhouse/clickhouse-server:25.12-alpine` | `8123:8123`, `9000:9000` | `4g` |
-| `ch-12-full` | `clickhouse/clickhouse-server:25.12-alpine` | `8124:8123`, `9001:9000` | `4g` |
-| `ch-21` | `clickhouse/clickhouse-server:25.12-alpine` | `8125:8123`, `9002:9000` | `4g` |
-| `ch-22` | `clickhouse/clickhouse-server:25.12-alpine` | `8126:8123`, `9003:9000` | `4g` |
+| `ch-keeper` | `clickhouse/clickhouse-keeper` | `9181:9181` | `512m` |
+| `ch-11-full` | `clickhouse/clickhouse-server` | `8123:8123`, `9000:9000` | `4g` |
+| `ch-12-full` | `clickhouse/clickhouse-server` | `8124:8123`, `9001:9000` | `4g` |
+| `ch-21` | `clickhouse/clickhouse-server` | `8125:8123`, `9002:9000` | `4g` |
+| `ch-22` | `clickhouse/clickhouse-server` | `8126:8123`, `9003:9000` | `4g` |
 
 ### trino
 
@@ -268,7 +273,7 @@ Trino: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and B
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `trino` | `trinodb/trino:484` | `8080:8080` | `4g` |
+| `trino` | `trinodb/trino` | `8080:8080` | `4g` |
 
 ### metabase
 
@@ -282,7 +287,7 @@ Metabase: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), an
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `metabase` | `metabase/metabase:v0.64.3.5` | `3000:3000` | `1500m` |
+| `metabase` | `metabase/metabase` | `3000:3000` | `1500m` |
 
 ## Orchestration
 
@@ -301,7 +306,7 @@ Apache Airflow: Workflow orchestration and pipeline scheduling (Airflow), and du
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `airflow` | `ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>` | `8085:8080` | `3g` |
+| `airflow` | `ghcr.io/jaehyeon-kim/odctl/airflow` | `8085:8080` | `3g` |
 
 ### temporal
 
@@ -325,7 +330,7 @@ Temporal: Workflow orchestration and pipeline scheduling (Airflow), and durable 
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `temporal` | `temporalio/temporal:1.9.1` | `7233:7233`, `8233:8233` | `1g` |
+| `temporal` | `temporalio/temporal` | `7233:7233`, `8233:8233` | `1g` |
 
 ## MLOps
 
@@ -348,8 +353,8 @@ MLflow: Experiment tracking, model registry and model serving (MLflow), the feat
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `mlflow` | `ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>` | `5004:5000` | `2500m` |
-| `mlflow-serve` | `ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>` | `5003:5003` | `1500m` |
+| `mlflow` | `ghcr.io/jaehyeon-kim/odctl/mlflow` | `5004:5000` | `2500m` |
+| `mlflow-serve` | `ghcr.io/jaehyeon-kim/odctl/mlflow` | `5003:5003` | `1500m` |
 
 ### feast
 
@@ -376,8 +381,8 @@ Feast: Experiment tracking, model registry and model serving (MLflow), the featu
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `feast-ui` | `quay.io/feastdev/feature-server:0.66.0` | `8890:8888` | `1g` |
-| `feast-serve` | `quay.io/feastdev/feature-server:0.66.0` | `6566:6566` | `1g` |
+| `feast-ui` | `quay.io/feastdev/feature-server` | `8890:8888` | `1g` |
+| `feast-serve` | `quay.io/feastdev/feature-server` | `6566:6566` | `1g` |
 
 ### evidently
 
@@ -398,7 +403,7 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `evidently` | `evidently/evidently-service:0.7.23` | `8089:8000` | `1g` |
+| `evidently` | `evidently/evidently-service` | `8089:8000` | `1g` |
 
 ## Metadata and Lineage
 
@@ -424,11 +429,11 @@ OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metada
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `openmetadata-es` | `docker.elastic.co/elasticsearch/elasticsearch:9.3.0` | `9200:9200`, `9300:9300` | `2g` |
-| `openmetadata-migrate` | `docker.getcollate.io/openmetadata/server:2.0.7` | none | `1g` |
-| `openmetadata-server` | `docker.getcollate.io/openmetadata/server:2.0.7` | `8585:8585`, `8586:8586` | `2g` |
-| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.7` | `8087:8080` | `1500m` |
-| `openmetadata-init` | `docker.getcollate.io/openmetadata/ingestion:2.0.7` | none | `64m` |
+| `openmetadata-es` | `docker.elastic.co/elasticsearch/elasticsearch` | `9200:9200`, `9300:9300` | `2g` |
+| `openmetadata-migrate` | `docker.getcollate.io/openmetadata/server` | none | `1g` |
+| `openmetadata-server` | `docker.getcollate.io/openmetadata/server` | `8585:8585`, `8586:8586` | `2g` |
+| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion` | `8087:8080` | `1500m` |
+| `openmetadata-init` | `docker.getcollate.io/openmetadata/ingestion` | none | `64m` |
 
 ### lineage
 
@@ -445,8 +450,8 @@ Marquez: System telemetry, monitoring, and data lineage. `odctl up lineage` also
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `marquez-api` | `marquezproject/marquez:0.51.1` | `5002:5000`, `5001:5001` | `1g` |
-| `marquez-web` | `marquezproject/marquez-web:0.51.1` | `3003:3000` | `512m` |
+| `marquez-api` | `marquezproject/marquez` | `5002:5000`, `5001:5001` | `1g` |
+| `marquez-web` | `marquezproject/marquez-web` | `3003:3000` | `512m` |
 
 ## Observability
 
@@ -470,7 +475,7 @@ Telemetry (grafana/otel-lgtm): System telemetry, monitoring, and data lineage. `
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `otel-lgtm` | `grafana/otel-lgtm:0.37.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g` |
+| `otel-lgtm` | `grafana/otel-lgtm` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g` |
 
 ## Storage and Catalog
 
@@ -492,7 +497,7 @@ PostgreSQL: PostgreSQL metadata backend. `odctl up postgres` also starts: `deps`
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `postgres` | `ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>` | `5432:5432` | `1g` |
+| `postgres` | `ghcr.io/jaehyeon-kim/odctl/postgres` | `5432:5432` | `1g` |
 
 ### storage
 
@@ -510,8 +515,8 @@ SeaweedFS: SeaweedFS S3-compatible object storage. `odctl up storage` also start
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `seaweed` | `chrislusf/seaweedfs:4.48` | `8333:8333`, `8889:8888`, `9333:9333` | `512m` |
-| `seaweed-init` | `chrislusf/seaweedfs:4.48` | none | not set |
+| `seaweed` | `chrislusf/seaweedfs` | `8333:8333`, `8889:8888`, `9333:9333` | `512m` |
+| `seaweed-init` | `chrislusf/seaweedfs` | none | not set |
 
 ### catalog
 
@@ -525,7 +530,7 @@ Iceberg REST Catalog: Iceberg REST Catalog. `odctl up catalog` also starts: `dep
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `catalog` | `azul/zulu-openjdk:17-jre-headless` | `8181:8181` | `512m` |
+| `catalog` | `azul/zulu-openjdk` | `8181:8181` | `512m` |
 
 ### valkey
 
@@ -540,7 +545,7 @@ Valkey: Stream storage (Fluss) and multi-model data store (Valkey Bundle). Valke
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `valkey` | `valkey/valkey-bundle:9.1.3-alpine` | `6379:6379` | `512m` |
+| `valkey` | `valkey/valkey-bundle` | `6379:6379` | `512m` |
 
 ### fluss
 
@@ -557,9 +562,9 @@ Apache Fluss: Stream storage (Fluss) and multi-model data store (Valkey Bundle).
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `fluss-zookeeper` | `zookeeper:3.9.6` | none | `512m` |
-| `fluss-coordinator` | `apache/fluss:1.0.0` | `9123:9123` | `1g` |
-| `fluss-tablet-1` | `apache/fluss:1.0.0` | `9124:9123` | `2g` |
+| `fluss-zookeeper` | `zookeeper` | none | `512m` |
+| `fluss-coordinator` | `apache/fluss` | `9123:9123` | `1g` |
+| `fluss-tablet-1` | `apache/fluss` | `9124:9123` | `2g` |
 
 ### deps
 
@@ -572,4 +577,4 @@ Shared Dependencies: Shared dependencies, JARs, connectors, and Docker network `
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `init-deps` | `ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>` | none | not set |
+| `init-deps` | `ghcr.io/jaehyeon-kim/odctl/deps` | none | not set |

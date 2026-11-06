@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
+from typer.core import TyperGroup
 
-from odctl import config, ui
+from odctl import config, reports, ui
 from odctl.docker import (
     find_unpublished_images,
     get_managed_containers,
-    get_stack_details,
     is_docker_running,
     launch_stack,
     pull_stack_images,
@@ -20,11 +20,8 @@ from odctl.projects import recreate_managed_containers, restart_managed_containe
 from odctl.planner import (
     build_execution_plan,
     expand_plan_dependencies,
-    get_profile_map,
-    resolve_dependencies,
     warn_unreachable_profiles,
 )
-from odctl.registry import load_registry
 from odctl.workspace import (
     get_cli_version,
     get_workspace_dir,
@@ -33,7 +30,36 @@ from odctl.workspace import (
     stale_workspace_tag,
 )
 
+_JSON_HELP = "Print the output as JSON, for scripts and AI assistants."
+
+
+class _OdctlGroup(TyperGroup):
+    """
+    The command group of odctl.
+
+    The `main` callback prints the stale-workspace warning before Click parses a
+    command's own options, so the group looks for `--json` in the command's arguments
+    first and sends warnings and errors to stderr when it finds it.
+    """
+
+    def resolve_command(self, ctx, args):
+        """
+        Choose where warnings and errors go, then resolve the command.
+
+        Args:
+            ctx (click.Context): The context of the group.
+            args (List[str]): The arguments that follow the group's own options.
+
+        Returns:
+            The command name, the command and the arguments left for the command.
+        """
+        ui.set_json_output("--json" in args)
+        ctx.call_on_close(lambda: ui.set_json_output(False))
+        return super().resolve_command(ctx, args)
+
+
 app = typer.Typer(
+    cls=_OdctlGroup,
     name="odctl",
     help="""
 [bold cyan]odctl[/bold cyan]: run an open data stack on your machine, with its services
@@ -127,6 +153,7 @@ def list_profiles(
         "-d",
         help="Inspect docker-compose files to show exact services and exposed host ports.",
     ),
+    json_output: bool = typer.Option(False, "--json", help=_JSON_HELP),
 ):
     """
     List all available profiles and their capabilities.
@@ -136,13 +163,20 @@ def list_profiles(
     \f
     Args:
         details (bool): Also read the compose files to show each profile's services and host ports.
+        json_output (bool): Print the profiles as JSON, always with their services and ports.
 
     Raises:
-        typer.Exit: With code 1 when the registry or a compose file cannot be read.
+        typer.Exit: With code 1 when the registry cannot be read, or, with `--json`, when
+            a compose file cannot be read or the registry lists an unknown dependency.
     """
     try:
-        registry = load_registry()
-        ui.print_profile_table(registry, details, get_stack_details)
+        profiles = reports.build_profiles(
+            for_json=json_output, with_services=details or json_output
+        )
+        if json_output:
+            ui.print_json(sorted(profiles, key=lambda p: p.profile))
+        else:
+            ui.print_profile_table(profiles, details)
     except Exception as e:
         ui.print_error(str(e))
         raise typer.Exit(1)
@@ -161,6 +195,7 @@ def explain(
         ...,
         help="The target profile to inspect (for example, 'airflow', 'kafka-lite').",
     ),
+    json_output: bool = typer.Option(False, "--json", help=_JSON_HELP),
 ):
     """
     Explain the details, services, images, and dependencies of a profile.
@@ -170,47 +205,25 @@ def explain(
     \f
     Args:
         profile (str): The profile to describe.
+        json_output (bool): Print the details as JSON.
 
     Raises:
-        typer.Exit: With code 1 when the registry has no such profile.
+        typer.Exit: With code 1 when the registry has no such profile or lists an unknown
+            dependency, or, with `--json`, when the compose file cannot be read.
     """
-    registry = load_registry()
-    profile_map = get_profile_map()
-
-    if profile not in profile_map:
+    try:
+        details = reports.build_profile_details(profile, for_json=json_output)
+    except reports.UnknownProfileError:
         ui.print_error(f"Profile '{profile}' not found in registry.")
         raise typer.Exit(1)
+    except ValueError as e:
+        ui.print_error(str(e))
+        raise typer.Exit(1)
 
-    stack_id = profile_map[profile]["stack_id"]
-    stack = registry.stacks[stack_id]
-
-    # Extract all 4 values returned by the updated get_stack_details
-    services, ports, images, volumes = get_stack_details(stack.file, [profile])
-
-    usage_text = stack.usage
-    if isinstance(usage_text, dict):
-        usage_text = usage_text.get(
-            profile, f"• No specific usage guide for profile: {profile}"
-        )
-
-    # The registry lists only direct prerequisites; show everything that starts.
-    resolved_deps = sorted(
-        resolve_dependencies([profile], profile_map, registry) - {profile}
-    )
-
-    ui.print_explain_panel(
-        profile,
-        stack.parent or stack_id,
-        stack.file,
-        stack.description,
-        resolved_deps or ["None"],
-        services,
-        ports,
-        images,
-        volumes,
-        stack.role,
-        usage_text,
-    )
+    if json_output:
+        ui.print_json(details)
+    else:
+        ui.print_explain_panel(details)
 
 
 @app.command(
@@ -584,6 +597,7 @@ def ps(
     all: bool = typer.Option(
         False, "--all", "-a", help="Show all containers managed by odctl."
     ),
+    json_output: bool = typer.Option(False, "--json", help=_JSON_HELP),
 ):
     """
     List Docker containers managed by the Open Data Stack.
@@ -593,6 +607,7 @@ def ps(
     Args:
         profiles (Optional[List[str]]): The profiles whose containers to show.
         all (bool): Show every container that odctl manages.
+        json_output (bool): Print the containers and active profiles as JSON.
 
     Raises:
         typer.Exit: With code 1 when Docker is not reachable.
@@ -601,50 +616,35 @@ def ps(
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    # Use resolve_deps=False so we ONLY see what was explicitly requested,
-    # widened just enough that compose accepts the project.
-    plan = expand_plan_dependencies(
-        build_execution_plan(profiles, all, resolve_deps=False)
-    )
-
-    containers = get_managed_containers(plan)
-
-    from odctl.docker import get_stack_details
-
-    running_profiles = set()
-    running_services = set()
-    for c in containers:
-        labels = c.config.labels if c.config and c.config.labels else {}
-        svc = labels.get("com.docker.compose.service", "")
-        if svc:
-            running_services.add(svc)
-
-    active_profile_services = {}
-    for file, profs in plan.items():
-        for p in profs:
-            services, _, _, _ = get_stack_details(file, [p])
-            import builtins
-
-            if services and builtins.all(s in running_services for s in services):
-                active_profile_services[p] = set(services)
-
-    for p, p_services in active_profile_services.items():
-        is_strict_subset = False
-        for other_p, other_services in active_profile_services.items():
-            if p != other_p and p_services < other_services:
-                is_strict_subset = True
-                break
-        if not is_strict_subset:
-            running_profiles.add(p)
-
-    running_profiles.discard("deps")
-    ui.print_ps_table(containers, running_profiles=sorted(list(running_profiles)))
+    report = reports.build_ps(profiles, all)
+    if json_output:
+        ui.print_json(report)
+    else:
+        ui.print_ps_table(report)
 
 
 @app.command(name="info", rich_help_panel="Inspection & Info")
-def info():
-    """Show the installed odctl version and whether Docker is reachable."""
-    ui.print_package_info()
+def info(
+    json_output: bool = typer.Option(False, "--json", help=_JSON_HELP),
+):
+    """
+    Show the odctl version, whether Docker is reachable and, with `--json`, the image tag, the workspace and odctl's own images.
+    \f
+    Args:
+        json_output (bool): Print the report as JSON, with the tag, the workspace and the images.
+
+    Raises:
+        typer.Exit: With code 1 when `--json` is set and the workspace has no `registry.yml`.
+    """
+    try:
+        report = reports.build_info(include_images=json_output)
+    except FileNotFoundError as e:
+        ui.print_error(str(e))
+        raise typer.Exit(1)
+    if json_output:
+        ui.print_json(report)
+    else:
+        ui.print_package_info(report)
 
 
 @app.command(

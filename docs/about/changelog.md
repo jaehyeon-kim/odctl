@@ -2,6 +2,23 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.5.0
+
+JSON output from `list`, `explain`, `ps` and `info`, a written list of what 1.x keeps stable, and newer SeaweedFS, Valkey and Spark images.
+
+- `odctl list`, `odctl explain`, `odctl ps` and `odctl info` take `--json` and print one JSON document for scripts and AI assistants, with warnings and errors on stderr ([JSON Output](../json-output.md), [Getting Started](../getting-started.md)).
+- `odctl explain` names a dependency the registry lists but no stack defines, instead of ending with a traceback; it still exits 1.
+- `odctl info --json` also shows the image tag, the workspace and which of odctl's own images are on your machine.
+- [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) lists what every 1.x release keeps: profile names, published ports, `.env` keys, volumes, the workspace files and the `--json` keys.
+- odctl now needs Typer 0.18.0 or later, because older Typer releases misread odctl's options with newer Click releases; with some pairs `odctl init` replaced an existing workspace without asking.
+- The base of odctl's `postgres` image, `postgres:18-trixie`, is pinned by digest, so a release that does not change the image no longer gives it new layers to download.
+- SeaweedFS runs `chrislusf/seaweedfs:4.52`, up from 4.48. Valkey runs `valkey/valkey-bundle:9.1.4-alpine`, up from 9.1.3. odctl's Spark image is built on `apache/spark:4.1.4`, up from 4.1.3, and the deps image has the Spark Kafka connector 4.1.4.
+- The odctl skill (`skills/odctl/SKILL.md`) names each image without its tag; `odctl explain <profile>` shows the tag.
+
+### Upgrading
+
+- A workspace made by `odctl init` with an earlier release keeps its old `compose-infra.yml` and `compose-store.yml`, and so the old SeaweedFS and Valkey images. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate` for the profiles you use, such as `odctl recreate storage valkey`.
+
 ## Version 1.4.0
 
 Feast's MCP endpoint, pushing features over HTTP and from Flink, materialising from Airflow, and vector retrieval on PostgreSQL.

@@ -6,6 +6,7 @@ script creates all three extensions, so the compose command, the init script and
 the image have to agree. Nothing here needs Docker.
 """
 
+import re
 from pathlib import Path
 
 import yaml
@@ -47,7 +48,7 @@ def test_init_script_creates_the_three_extensions_in_the_vector_database():
 
 def test_image_builds_on_the_official_postgres_18_image():
     dockerfile = (RESOURCES / "docker" / "postgres" / "Dockerfile").read_text()
-    assert dockerfile.startswith("FROM postgres:18-trixie\n")
+    assert re.search(r"^FROM postgres:18-trixie@sha256:[0-9a-f]{64}$", dockerfile, re.M)
     for arg in ("ARG PGVECTOR_V=", "ARG PG_TEXTSEARCH_V=", "ARG TARGETARCH"):
         assert arg in dockerfile
     assert "postgresql-${PG_MAJOR}-postgis-3" in dockerfile

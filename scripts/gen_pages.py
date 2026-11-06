@@ -2,23 +2,27 @@
 Generate the documentation pages that must match what odctl runs.
 
 mkdocs-gen-files runs this file during every build. It writes one page per technology
-in registry.yml, built from the registry and the compose files, and a CLI
-reference built from the `--help` output of each command. Neither is kept in
+in registry.yml, built from the registry and the compose files, a CLI
+reference built from the `--help` output of each command, and a JSON Output page
+built from the models of each `--json` document. None is kept in
 the repository, so a change to the registry, a compose file or a command shows
 up in the next build.
 
 The page builders are plain functions so the tests can call them directly.
 """
 
+import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from unittest import mock
 
 import yaml
+from pydantic import TypeAdapter
 
 from odctl.config import INTERNAL_RESOURCES_DIR
+from odctl.models import Info, ProfileDetails, ProfileInfo, PsReport
 from odctl.planner import resolve_dependencies
 from odctl.registry import Registry, StackConfig
 
@@ -56,6 +60,15 @@ def _image(raw: str) -> str:
     return _TAG_PATTERN.sub(CLI_VERSION_TEXT, raw)
 
 
+def _untagged(image: str) -> str:
+    # The skill names images without their tag or digest, so a Renovate image
+    # update does not change the committed SKILL.md and fail its test.
+    image = image.split("@", 1)[0]
+    repository, _, name = image.rpartition("/")
+    name = name.split(":", 1)[0]
+    return f"{repository}/{name}" if repository else name
+
+
 def _ports(service: dict) -> str:
     published = []
     for port in service.get("ports") or []:
@@ -79,7 +92,7 @@ def _memory(service: dict) -> str:
     return f"`{limit}`" if limit is not None else "not set"
 
 
-def _services_table(compose: dict, profile: str) -> List[str]:
+def _services_table(compose: dict, profile: str, tags: bool = True) -> List[str]:
     rows = [
         "| Service | Image | Host:container ports | Memory limit |",
         "| --- | --- | --- | --- |",
@@ -88,6 +101,8 @@ def _services_table(compose: dict, profile: str) -> List[str]:
         if profile not in (service.get("profiles") or []):
             continue
         image = _image(str(service.get("image", "built locally")))
+        if not tags:
+            image = _untagged(image)
         rows.append(
             f"| `{name}` | `{image}` | {_ports(service)} | {_memory(service)} |"
         )
@@ -356,6 +371,62 @@ def cli_reference() -> str:
     return "\n".join(lines)
 
 
+# Each command with `--json`, what it prints and the type of that document.
+JSON_OUTPUTS: List[Tuple[str, str, Any]] = [
+    (
+        "list",
+        "an array with one object for each profile, sorted by profile name",
+        List[ProfileInfo],
+    ),
+    ("explain", "one object for the profile you name", ProfileDetails),
+    (
+        "ps",
+        "one object with the active profiles and the matching containers",
+        PsReport,
+    ),
+    (
+        "info",
+        "one object with the CLI version, the image tag, the workspace, Docker and odctl's own images",
+        Info,
+    ),
+]
+
+
+def json_output_page() -> str:
+    """
+    Render the JSON Output page from the models of each `--json` document.
+
+    The schemas come from `model_json_schema(mode="serialization")`, so a field
+    the model leaves out of its JSON is not on the page. Each schema keeps the
+    description of its fields and drops the docstring of its model, which is
+    written for the code's readers.
+
+    Returns:
+        str: The Markdown of the JSON Output page.
+    """
+    lines = [
+        "# JSON Output",
+        "",
+        "`odctl list`, `odctl explain`, `odctl ps` and `odctl info` print one JSON document with `--json`, for scripts and AI assistants. This page holds the JSON Schema of each document, captured when the site was built. A JSON Schema lists the keys of a document, the type of each value and which keys are always present. Standard output holds only the JSON document. Warnings and errors go to standard error. A usage error, such as an unknown option, exits with code 2. Any other failure exits with code 1 and prints nothing on standard output. [What Stays Stable in 1.x](how-it-works.md#what-stays-stable-in-1x) says which changes to these keys wait for 2.0.",
+        "",
+    ]
+    for command, shape, model in JSON_OUTPUTS:
+        schema = TypeAdapter(model).json_schema(mode="serialization")
+        for described in [schema, *schema.get("$defs", {}).values()]:
+            described.pop("description", None)
+        lines += [
+            f"## odctl {command}",
+            "",
+            f"`odctl {command} --json` prints {shape}. Its schema:",
+            "",
+            "```json",
+            json.dumps(schema, indent=2),
+            "```",
+            "",
+        ]
+    return "\n".join(lines)
+
+
 SKILL_PATH = REPO / "skills" / "odctl" / "SKILL.md"
 
 
@@ -500,7 +571,8 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
         "",
         "- Start what the task needs with `odctl up <profile> [<profile> ...]`. Each profile also starts the profiles it depends on, listed below, and `odctl up` returns once every service is running, and healthy where it has a health check.",
         "- `odctl up <profile> --dry-run` prints the plan without starting anything. `odctl explain <profile>` shows its services, images and dependencies.",
-        "- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove named volumes: the shared jar volume `odctl-shared-deps` and Spark's `spark-events-data`. `odctl down --all --volumes` removes everything.",
+        "- `odctl ps --json` and `odctl list --json` print what is running and every profile as JSON, which is easier to read than the tables; the keys stay the same in every 1.x release ([What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x)).",
+        "- `odctl down <profile>` stops only the profiles named, not their dependencies. Services keep their data inside their containers, so `down` deletes it. Add `--volumes` to also remove the profile's named volumes, such as Spark's `spark-events-data`, and the shared jar volume `odctl-shared-deps` once no other profile has a container. `odctl down --all --volumes` removes everything.",
         "- Every port is published on `127.0.0.1` only, so other machines cannot reach it. From the host, use `127.0.0.1` and the host port. From a container, join the `odctl` Docker network and use the container name and container port, for example `broker-1:19092` or `http://catalog:8181`.",
         "- Logins are in each profile's notes below. Most services use the user `user` and the password `password`; some have no login.",
         "- `odctl init` copies the compose files, `registry.yml` and `.env` into `.odctl/` in the current directory, so they can be edited. Run `odctl recreate <profile>` after editing a compose file or `.env`.",
@@ -526,7 +598,7 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
                 usage = _usage(stack, profile).rstrip()
                 if usage:
                     lines += ["```text", usage, "```", ""]
-                lines += _services_table(compose, profile) + [""]
+                lines += _services_table(compose, profile, tags=False) + [""]
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -570,6 +642,9 @@ def _write_site_files() -> None:
 
     with mkdocs_gen_files.open("cli.md", "w") as f:
         f.write(cli_reference())
+
+    with mkdocs_gen_files.open("json-output.md", "w") as f:
+        f.write(json_output_page())
 
     # The README and the site share one diagram and one recording, kept where
     # the README links them.

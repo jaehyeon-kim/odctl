@@ -1,7 +1,8 @@
 # Commands from docs/getting-started.md. .github/scripts/smoke.sh runs list,
-# list-details, explain, info, ps, ps-all, logs, logs-time, restart and
-# down-dry-run in the kafka-lite case. The e2e workflow itself starts each
-# profile with up and stops it with down and down-all.
+# list-details, list-json, explain, explain-json, info, info-json, ps, ps-json,
+# ps-all, logs, logs-time, restart and down-dry-run in the kafka-lite case. The
+# e2e workflow itself starts each profile with up and stops it with down and
+# down-all.
 
 # --8<-- [start:install]
 uv tool install odctl
@@ -21,9 +22,18 @@ odctl list
 odctl list -d
 # --8<-- [end:list-details]
 
+# --8<-- [start:list-json]
+# Print only kafka-lite; the full output lists every profile.
+odctl list --json | python3 -c 'import json, sys; profiles = {p["profile"]: p for p in json.load(sys.stdin)}; print(json.dumps(profiles["kafka-lite"], indent=4))'
+# --8<-- [end:list-json]
+
 # --8<-- [start:explain]
 odctl explain kafka-lite
 # --8<-- [end:explain]
+
+# --8<-- [start:explain-json]
+odctl explain kafka-lite --json | python3 -m json.tool
+# --8<-- [end:explain-json]
 
 # --8<-- [start:dry-run]
 odctl up kafka-lite --dry-run
@@ -37,9 +47,17 @@ odctl up kafka-lite
 odctl info
 # --8<-- [end:info]
 
+# --8<-- [start:info-json]
+odctl info --json | python3 -m json.tool
+# --8<-- [end:info-json]
+
 # --8<-- [start:ps]
 odctl ps kafka-lite
 # --8<-- [end:ps]
+
+# --8<-- [start:ps-json]
+odctl ps kafka-lite --json | python3 -m json.tool
+# --8<-- [end:ps-json]
 
 # --8<-- [start:ps-all]
 odctl ps --all

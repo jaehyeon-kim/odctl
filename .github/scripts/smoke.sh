@@ -252,19 +252,28 @@ connect_datagen() {
   pass "the data generator wrote records to customers, and was checked and removed"
 }
 
-# Getting Started runs each read-only command on kafka-lite, then restarts it.
+# Getting Started runs each read-only command on kafka-lite, with and without
+# --json, then restarts it.
 getting_started() {
   local out
   out=$(run_snippet getting-started/commands.sh list 2>&1) || fail "odctl list failed"
   grep -q "kafka-lite" <<<"$out" || fail "odctl list does not name kafka-lite"
   out=$(run_snippet getting-started/commands.sh list-details 2>&1) || fail "odctl list -d failed"
   grep -q "kafka-ui" <<<"$out" || fail "odctl list -d does not name the kafka-ui service"
+  out=$(run_snippet getting-started/commands.sh list-json 2>&1) || fail "odctl list --json failed"
+  grep -q '"profile": "kafka-lite"' <<<"$out" || fail "odctl list --json does not give the kafka-lite profile"
   out=$(run_snippet getting-started/commands.sh explain 2>&1) || fail "odctl explain failed"
   grep -q "karapace" <<<"$out" || fail "odctl explain kafka-lite does not name karapace"
+  out=$(run_snippet getting-started/commands.sh explain-json 2>&1) || fail "odctl explain --json failed"
+  grep -q '"usage"' <<<"$out" || fail "odctl explain kafka-lite --json has no usage key"
   out=$(run_snippet getting-started/commands.sh info 2>&1) || fail "odctl info failed"
   grep -q "Reachable" <<<"$out" || fail "odctl info does not say Docker is reachable"
+  out=$(run_snippet getting-started/commands.sh info-json 2>&1) || fail "odctl info --json failed"
+  grep -q '"reachable": true' <<<"$out" || fail "odctl info --json does not say Docker is reachable"
   out=$(run_snippet getting-started/commands.sh ps 2>&1) || fail "odctl ps failed"
   grep -q "connect" <<<"$out" || fail "odctl ps kafka-lite does not list connect"
+  out=$(run_snippet getting-started/commands.sh ps-json 2>&1) || fail "odctl ps --json failed"
+  grep -q '"service": "connect"' <<<"$out" || fail "odctl ps kafka-lite --json does not list connect"
   out=$(run_snippet getting-started/commands.sh ps-all 2>&1) || fail "odctl ps --all failed"
   grep -q "karapace" <<<"$out" || fail "odctl ps --all does not list karapace"
   out=$(run_snippet getting-started/commands.sh logs 2>&1) || fail "odctl logs failed"
@@ -276,7 +285,7 @@ getting_started() {
   out=$(run_snippet getting-started/commands.sh restart 2>&1) || fail "odctl restart failed"
   grep -q "Restart complete" <<<"$out" || fail "odctl restart did not complete"
   retry 40 5 http_ok "http://127.0.0.1:8083/connectors" || fail "Connect never answered after the restart"
-  pass "Getting Started's list, explain, info, ps, logs, restart and down --dry-run ran on kafka-lite"
+  pass "Getting Started's list, explain, info, ps (each also with --json), logs, restart and down --dry-run ran on kafka-lite"
 }
 
 # The Iceberg sink is built from source, so prove it commits a snapshot rather
