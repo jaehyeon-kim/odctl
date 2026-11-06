@@ -20,7 +20,11 @@ Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, start
 
 A `label-studio` profile for labelling data by hand, on odctl's PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)
 
-1.10.0: Memory check and models on the host
+1.10.0: Agent skill
+
+The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)
+
+1.11.0: Memory check and models on the host
 
 `odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. The guide also covers the Ollama embeddings route, batch embedding in Airflow and a hand-run rerank server. [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
 
@@ -36,7 +40,7 @@ Retrieval guides
 
 Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.
 
-1.11.0: Kafka Connect transforms
+Kafka Connect transforms
 
 Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
