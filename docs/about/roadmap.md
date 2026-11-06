@@ -29,22 +29,6 @@ The work comes in the order shown, without dates: a release ships when it is rea
   content: '`odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. The guide also covers the Ollama embeddings route, batch embedding in Airflow and a hand-run rerank server. [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)'
   icon: ':material-clock-outline:'
   key: planned
-- title: 'MLOps guides'
-  content: 'Guides for a prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables. No new service and no new version: the guides are published when they reach `main`.'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Agents guides'
-  content: 'Guides for traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL. No new service and no new version.'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Retrieval guides'
-  content: 'Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Kafka Connect transforms'
-  content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
-  icon: ':material-clock-outline:'
-  key: planned
 ::/timeline::
 
 ## Alongside
@@ -59,7 +43,23 @@ Work that does not wait for a release, published as it is ready.
 
     Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.
 
+    MLOps guides: a prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.
+
+    Agents guides: traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.
+
+    Retrieval guides: hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.
+
+    No new service and no new version: each guide is published when it reaches `main`.
+
     [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
+
+-   __Kafka Connect transforms__
+
+    ---
+
+    Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.
+
+    [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
 -   __Testing and CI__
 
