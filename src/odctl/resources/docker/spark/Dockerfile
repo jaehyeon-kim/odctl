@@ -7,7 +7,7 @@
 # the Iceberg runtime, HADOOP_AWS_V, the airflow pyspark pin and SPARK_V in
 # deps/versions.env, and only once Iceberg ships a runtime for the newer minor.
 # See PR #29.
-FROM apache/spark:4.1.3
+FROM apache/spark:4.1.4
 
 # Switch to root to install system-wide packages
 USER root

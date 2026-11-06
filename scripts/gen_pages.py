@@ -60,6 +60,15 @@ def _image(raw: str) -> str:
     return _TAG_PATTERN.sub(CLI_VERSION_TEXT, raw)
 
 
+def _untagged(image: str) -> str:
+    # The skill names images without their tag or digest, so a Renovate image
+    # update does not change the committed SKILL.md and fail its test.
+    image = image.split("@", 1)[0]
+    repository, _, name = image.rpartition("/")
+    name = name.split(":", 1)[0]
+    return f"{repository}/{name}" if repository else name
+
+
 def _ports(service: dict) -> str:
     published = []
     for port in service.get("ports") or []:
@@ -83,7 +92,7 @@ def _memory(service: dict) -> str:
     return f"`{limit}`" if limit is not None else "not set"
 
 
-def _services_table(compose: dict, profile: str) -> List[str]:
+def _services_table(compose: dict, profile: str, tags: bool = True) -> List[str]:
     rows = [
         "| Service | Image | Host:container ports | Memory limit |",
         "| --- | --- | --- | --- |",
@@ -92,6 +101,8 @@ def _services_table(compose: dict, profile: str) -> List[str]:
         if profile not in (service.get("profiles") or []):
             continue
         image = _image(str(service.get("image", "built locally")))
+        if not tags:
+            image = _untagged(image)
         rows.append(
             f"| `{name}` | `{image}` | {_ports(service)} | {_memory(service)} |"
         )
@@ -587,7 +598,7 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
                 usage = _usage(stack, profile).rstrip()
                 if usage:
                     lines += ["```text", usage, "```", ""]
-                lines += _services_table(compose, profile) + [""]
+                lines += _services_table(compose, profile, tags=False) + [""]
     return "\n".join(lines).rstrip() + "\n"
 
 
