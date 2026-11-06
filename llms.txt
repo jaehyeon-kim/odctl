@@ -53,6 +53,10 @@
 
 - [CLI Reference](https://jaehyeon.me/odctl/latest/cli/index.md)
 
+## JSON Output
+
+- [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md)
+
 ## Troubleshooting
 
 - [Troubleshooting](https://jaehyeon.me/odctl/latest/troubleshooting/index.md)

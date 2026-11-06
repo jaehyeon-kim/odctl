@@ -16,19 +16,19 @@ A Compose file of your own is enough for one small project. [Why odctl](https://
 
 Each command has its own section in the CLI reference, with its options and examples. The Example column links to a page that runs the command and shows its output, and [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) runs them in order on one profile.
 
-| Command                                                                  | Use it to                                                                    | Example                                                                                  |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| [`odctl list`](https://jaehyeon.me/odctl/latest/cli/#odctl-list)         | See every profile and what it runs                                           | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile)     |
-| [`odctl explain`](https://jaehyeon.me/odctl/latest/cli/#odctl-explain)   | See a profile's services, images, ports and the profiles it depends on       | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile)     |
-| [`odctl ps`](https://jaehyeon.me/odctl/latest/cli/#odctl-ps)             | See the running containers, their health and their ports                     | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl info`](https://jaehyeon.me/odctl/latest/cli/#odctl-info)         | Check the installed odctl version and whether Docker is reachable            | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl init`](https://jaehyeon.me/odctl/latest/cli/#odctl-init)         | Copy the compose files and settings into `.odctl`, so you can edit them      | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#create-a-workspace)  |
-| [`odctl pull`](https://jaehyeon.me/odctl/latest/cli/#odctl-pull)         | Download a profile's images before you start it                              | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#which-images-run)          |
-| [`odctl up`](https://jaehyeon.me/odctl/latest/cli/#odctl-up)             | Start profiles and the profiles they depend on                               | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile)     |
-| [`odctl down`](https://jaehyeon.me/odctl/latest/cli/#odctl-down)         | Stop profiles and remove their containers                                    | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#stop-a-profile)      |
-| [`odctl logs`](https://jaehyeon.me/odctl/latest/cli/#odctl-logs)         | Read the logs of a profile's containers                                      | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl restart`](https://jaehyeon.me/odctl/latest/cli/#odctl-restart)   | Restart a profile's containers and keep them                                 | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#restart-a-profile)   |
-| [`odctl recreate`](https://jaehyeon.me/odctl/latest/cli/#odctl-recreate) | Replace a profile's containers, to apply an edit to a compose file or `.env` | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples)                  |
+| Command                                                                  | Use it to                                                                                                                                  | Example                                                                                  |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| [`odctl list`](https://jaehyeon.me/odctl/latest/cli/#odctl-list)         | See every profile and what it runs, as a table or, with `--json`, as JSON                                                                  | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile)     |
+| [`odctl explain`](https://jaehyeon.me/odctl/latest/cli/#odctl-explain)   | See a profile's services, images, ports and the profiles it depends on, as a panel or, with `--json`, as JSON                              | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile)     |
+| [`odctl ps`](https://jaehyeon.me/odctl/latest/cli/#odctl-ps)             | See the running containers, their health and their ports, as a table or, with `--json`, as JSON                                            | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
+| [`odctl info`](https://jaehyeon.me/odctl/latest/cli/#odctl-info)         | Check the installed odctl version and whether Docker is reachable; with `--json`, also the image tag, the workspace and odctl's own images | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
+| [`odctl init`](https://jaehyeon.me/odctl/latest/cli/#odctl-init)         | Copy the compose files and settings into `.odctl`, so you can edit them                                                                    | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#create-a-workspace)  |
+| [`odctl pull`](https://jaehyeon.me/odctl/latest/cli/#odctl-pull)         | Download a profile's images before you start it                                                                                            | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#which-images-run)          |
+| [`odctl up`](https://jaehyeon.me/odctl/latest/cli/#odctl-up)             | Start profiles and the profiles they depend on                                                                                             | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile)     |
+| [`odctl down`](https://jaehyeon.me/odctl/latest/cli/#odctl-down)         | Stop profiles and remove their containers                                                                                                  | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#stop-a-profile)      |
+| [`odctl logs`](https://jaehyeon.me/odctl/latest/cli/#odctl-logs)         | Read the logs of a profile's containers                                                                                                    | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
+| [`odctl restart`](https://jaehyeon.me/odctl/latest/cli/#odctl-restart)   | Restart a profile's containers and keep them                                                                                               | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#restart-a-profile)   |
+| [`odctl recreate`](https://jaehyeon.me/odctl/latest/cli/#odctl-recreate) | Replace a profile's containers, to apply an edit to a compose file or `.env`                                                               | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples)                  |
 
 ## What It Runs
 
@@ -106,13 +106,157 @@ Add `-d` to list each profile's services and host ports as well:
 odctl list -d
 ```
 
+Add `--json` to print the profiles as JSON, which a script or an AI assistant reads more easily than a table. odctl prints the JSON on standard output and every warning on standard error, so a pipe receives only the JSON. The warning for a stale workspace is one example. The full output is an array with one object for each profile, and this keeps only `kafka-lite`:
+
+```bash
+# Print only kafka-lite; the full output lists every profile.
+odctl list --json | python3 -c 'import json, sys; profiles = {p["profile"]: p for p in json.load(sys.stdin)}; print(json.dumps(profiles["kafka-lite"], indent=4))'
+```
+
+```text
+{
+    "profile": "kafka-lite",
+    "stack": "kafka",
+    "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+    "compose_file": "compose-kafka.yml",
+    "depends_on": [
+        "deps"
+    ],
+    "starts": [
+        "deps",
+        "kafka-lite"
+    ],
+    "services": [
+        {
+            "name": "connect",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 8083,
+                    "container": 8083,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 9092,
+                    "container": 9092,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka-ui",
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "ports": [
+                {
+                    "host": 8086,
+                    "container": 8080,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "karapace",
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "ports": [
+                {
+                    "host": 8081,
+                    "container": 8081,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ]
+}
+```
+
+Each profile is one object, and `starts` lists the profiles that `odctl up kafka-lite` starts. [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md) lists the keys of every command that takes `--json`.
+
 This shows what one profile runs:
 
 ```bash
 odctl explain kafka-lite
 ```
 
-It prints a panel for `kafka-lite`: the parent stack `kafka`, the compose file, the profile it requires (`deps`), the containers `connect`, `kafka`, `kafka-ui` and `karapace` with their images, the host ports and how to reach each service. This shows the profiles `kafka-lite` would start, in order, without starting anything:
+It prints a panel for `kafka-lite`: the parent stack `kafka`, the compose file, the profile it requires (`deps`), the containers `connect`, `kafka`, `kafka-ui` and `karapace` with their images, the host ports and how to reach each service.
+
+`--json` prints the same details as one object, with `usage`, `role` and `volumes` added to the keys of `list`. `usage` is text for people to read, not a value to parse:
+
+```bash
+odctl explain kafka-lite --json | python3 -m json.tool
+```
+
+```text
+{
+    "profile": "kafka-lite",
+    "stack": "kafka",
+    "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+    "compose_file": "compose-kafka.yml",
+    "depends_on": [
+        "deps"
+    ],
+    "starts": [
+        "deps",
+        "kafka-lite"
+    ],
+    "services": [
+        {
+            "name": "connect",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 8083,
+                    "container": 8083,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka",
+            "image": "apache/kafka:4.3.2",
+            "ports": [
+                {
+                    "host": 9092,
+                    "container": 9092,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka-ui",
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "ports": [
+                {
+                    "host": 8086,
+                    "container": 8080,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "karapace",
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "ports": [
+                {
+                    "host": 8081,
+                    "container": 8081,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ],
+    "usage": "\u2022 Kafka UI:\n  - External (host): http://127.0.0.1:8086\n  - Internal (Docker): http://kafka-ui:8080\n\u2022 Schema Registry & Connect:\n  - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083\n\u2022 Bootstrap Servers (1-Node Lite):\n  - External (host): 127.0.0.1:9092\n  - Internal (Docker): broker-1:19092\n",
+    "role": "KRaft broker(s) with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion.",
+    "volumes": []
+}
+```
+
+This shows the profiles `kafka-lite` would start, in order, without starting anything:
 
 ```bash
 odctl up kafka-lite --dry-run
@@ -136,15 +280,62 @@ This prints the installed CLI version and whether Docker is reachable:
 odctl info
 ```
 
-The output has two lines: `CLI Version:` with the version, and `Docker Daemon: ✅ Reachable`. This lists the containers of a profile, with their state, health and ports:
+The output has a title line, `Open Data Stack (ODCTL)`, then `CLI Version:` with the version and `Docker Daemon: ✅ Reachable`. With `--json`, it also prints the image tag, the workspace and odctl's own images, and whether each image is already on your machine. `workspace.path` is the `.odctl` folder in the folder where you run odctl; the output below shortens it to `/home/you/project/.odctl`:
+
+```bash
+odctl info --json | python3 -m json.tool
+```
+
+```text
+{
+    "cli_version": "1.5.0",
+    "tag": "1.5.0",
+    "workspace": {
+        "path": "/home/you/project/.odctl",
+        "exists": true,
+        "stale_tag": null
+    },
+    "docker": {
+        "reachable": true
+    },
+    "images": [
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.5.0",
+            "local": false
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.5.0",
+            "local": true
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.5.0",
+            "local": false
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.5.0",
+            "local": false
+        },
+        {
+            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.5.0",
+            "local": false
+        }
+    ]
+}
+```
+
+`stale_tag` is `null` unless the workspace's `TAG` differs from the CLI version and no `TAG` is set in the shell; then it shows the workspace's `TAG`.
+
+This lists the containers of a profile, with their state, health and ports:
 
 ```bash
 odctl ps kafka-lite
 ```
 
-It prints a table with one row per container:
+It prints the active profiles, then a table with one row per container:
 
 ```text
+🌟 Active Profiles: kafka-lite
+
 ┏━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
 ┃ Container ┃ Service  ┃ State   ┃ Health  ┃ Ports           ┃
 ┡━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
@@ -155,7 +346,77 @@ It prints a table with one row per container:
 └───────────┴──────────┴─────────┴─────────┴─────────────────┘
 ```
 
-A dash under Health means the service has no health check. This lists every container odctl manages, from every profile, including one-shot containers that have finished, such as `odctl-init-deps`:
+A dash under Health means the service has no health check.
+
+`--json` prints the same containers as one object. Like the table, it needs profile names or `--all`. Each published port gives its host and container port as numbers, and a missing health check is `null`. `active_profiles` lists the profiles you named whose services are all running, with their prerequisites from the same compose file. It never holds `deps`, and it leaves out a profile whose services all belong to another listed profile, such as `spark-lite` beside `spark-full`:
+
+```bash
+odctl ps kafka-lite --json | python3 -m json.tool
+```
+
+```text
+{
+    "active_profiles": [
+        "kafka-lite"
+    ],
+    "containers": [
+        {
+            "name": "connect",
+            "service": "connect",
+            "state": "running",
+            "health": null,
+            "ports": [
+                {
+                    "host": 8083,
+                    "container": 8083,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka",
+            "service": "kafka",
+            "state": "running",
+            "health": null,
+            "ports": [
+                {
+                    "host": 9092,
+                    "container": 9092,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "kafka-ui",
+            "service": "kafka-ui",
+            "state": "running",
+            "health": null,
+            "ports": [
+                {
+                    "host": 8086,
+                    "container": 8080,
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "name": "karapace",
+            "service": "karapace",
+            "state": "running",
+            "health": "healthy",
+            "ports": [
+                {
+                    "host": 8081,
+                    "container": 8081,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ]
+}
+```
+
+This lists every container odctl manages, from every profile, including one-shot containers that have finished, such as `odctl-init-deps`:
 
 ```bash
 odctl ps --all
@@ -213,11 +474,11 @@ odctl down --all --volumes --yes
 
 ## Code in the Guides
 
-Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.4.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
+Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.5.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
 
 ## Use It with an AI Assistant
 
-The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.4.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.5.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`.
 # How It Works
 
 # How It Works
@@ -284,14 +545,16 @@ With the `catalog` profile running, it prints the catalog's configuration as JSO
 
 Most services keep their data inside their containers. PostgreSQL, SeaweedFS, ClickHouse and Fluss's ZooKeeper are the exception: their images declare a data volume, so Docker gives each of these containers an unnamed volume, which a recreate passes on to the new container.
 
-| Command                | Containers                                                           | Your data                                                                                 |
-| ---------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `odctl restart`        | kept                                                                 | kept                                                                                      |
-| `odctl recreate`       | replaced                                                             | lost, except in PostgreSQL, SeaweedFS, ClickHouse and ZooKeeper, which keep their volumes |
-| `odctl down`           | removed                                                              | lost; the unnamed volumes stay on disk, unused                                            |
-| `odctl down --volumes` | removed, with the unnamed volumes and the `odctl-shared-deps` volume | lost                                                                                      |
+| Command                | Containers                                                                                                                                                                         | Your data                                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `odctl restart`        | kept                                                                                                                                                                               | kept                                                                                      |
+| `odctl recreate`       | replaced                                                                                                                                                                           | lost, except in PostgreSQL, SeaweedFS, ClickHouse and ZooKeeper, which keep their volumes |
+| `odctl down`           | removed                                                                                                                                                                            | lost; the unnamed volumes stay on disk, unused                                            |
+| `odctl down --volumes` | removed, with the unnamed volumes and the profile's named volumes such as `spark-events-data`. The `odctl-shared-deps` volume is removed too once no other profile has a container | lost                                                                                      |
 
-A database, a bucket, a topic or an Iceberg table therefore lasts until its profile is stopped, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
+A database, a bucket, a topic or an Iceberg table therefore lasts until its profile stops, and every `odctl up` is a clean start. `odctl down --volumes` also frees the disk the unnamed volumes hold. The `odctl-shared-deps` volume holds only jars, so keeping it makes the next start faster.
+
+The Spark containers (`spark-master`, the workers and `spark-history`) share the `spark-events-data` volume for Spark's event logs. Docker keeps that volume in memory, so it holds nothing once the stack is down.
 
 Three profiles read their code from a SeaweedFS bucket, so uploading a file deploys it, and the upload lasts as long as the bucket does. The `storage` profile creates the buckets.
 
@@ -404,6 +667,8 @@ docker port trino
 
 The last command prints `8080/tcp -> 127.0.0.1:8180`.
 
+The shipped `trino/rules.json` grants every identity full table privileges and denies `analyst` schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.
+
 Install extra Python packages in the Airflow container, for DAGs that import them:
 
 ```bash
@@ -475,10 +740,6 @@ PY
 
 Two other ways exist. `weed shell` inside the `seaweed` container runs `s3.bucket.create -name desflow`, the command `seaweed-init` runs. Adding the name to `BUCKETS` in `.odctl/compose-infra.yml` creates it at every start of the `storage` profile. An upgrade needs `odctl init --force`, which removes that edit.
 
-### Trino Access Rules
-
-The shipped `trino/rules.json` grants every identity full table privileges and denies `analyst` schema ownership. Add your own table rules there for row filtering and column masking, then restart Trino.
-
 ### Start Again
 
 `odctl init --force` deletes `.odctl` and copies the bundled files again, with `TAG` set to the current CLI version. Your edits are lost, so it asks for confirmation first. In a script, `--yes` answers the prompt:
@@ -486,6 +747,19 @@ The shipped `trino/rules.json` grants every identity full table privileges and d
 ```bash
 odctl init --force --yes
 ```
+
+## What Stays Stable in 1.x
+
+A project that pins `odctl>=1.0,<2` keeps working, because every 1.x release keeps what a script or a project reads from odctl. These six things stay the same:
+
+- The profile names, such as `kafka-lite` ([Profiles](#profiles)).
+- The host ports that the services publish ([How You Reach a Service](#how-you-reach-a-service)).
+- The keys of `.odctl/.env` that `odctl init` writes ([Customise It](#customise-it)).
+- The names of the named volumes, `odctl-shared-deps` and `spark-events-data`, and which services keep their data in a volume ([Where Data Lives](#where-data-lives)).
+- The files `odctl init` copies into `.odctl` ([Workspace](#workspace)).
+- The keys of the `--json` output of `list`, `explain`, `ps` and `info` ([JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md)).
+
+Removing or renaming a profile, an `.env` key, a named volume, a workspace file or a JSON key, changing a published port's number, or changing the type of a JSON value, waits for 2.0. Adding a profile, a port, an `.env` key or a JSON key breaks nothing. Any other change of behaviour gets a line under Upgrading in the [Changelog](https://jaehyeon.me/odctl/latest/about/changelog/index.md).
 # Profiles
 
 # Profiles
@@ -960,8 +1234,8 @@ Depends on: `deps`. `odctl up storage` also starts: `deps`.
 
 | Service        | Image                      | Host:container ports                  | Memory limit |
 | -------------- | -------------------------- | ------------------------------------- | ------------ |
-| `seaweed`      | `chrislusf/seaweedfs:4.48` | `8333:8333`, `8889:8888`, `9333:9333` | `512m`       |
-| `seaweed-init` | `chrislusf/seaweedfs:4.48` | none                                  | not set      |
+| `seaweed`      | `chrislusf/seaweedfs:4.52` | `8333:8333`, `8889:8888`, `9333:9333` | `512m`       |
+| `seaweed-init` | `chrislusf/seaweedfs:4.52` | none                                  | not set      |
 
 ## Iceberg REST Catalog
 
@@ -998,7 +1272,7 @@ Depends on: `deps`. `odctl up valkey` also starts: `deps`.
 
 | Service  | Image                               | Host:container ports | Memory limit |
 | -------- | ----------------------------------- | -------------------- | ------------ |
-| `valkey` | `valkey/valkey-bundle:9.1.3-alpine` | `6379:6379`          | `512m`       |
+| `valkey` | `valkey/valkey-bundle:9.1.4-alpine` | `6379:6379`          | `512m`       |
 
 ## Apache Fluss
 
@@ -2271,7 +2545,7 @@ This runs a query with no table:
 docker exec trino trino --execute "SELECT 1"
 ```
 
-It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Trino Access Rules](https://jaehyeon.me/odctl/latest/how-it-works/#trino-access-rules) explains the rules in `trino/rules.json`.
+It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Examples](https://jaehyeon.me/odctl/latest/how-it-works/#examples) on How It Works explains the rules in `trino/rules.json`.
 
 The Trino UI at `http://127.0.0.1:8080` asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.
 
@@ -4443,7 +4717,12 @@ Usage: odctl [OPTIONS] COMMAND [ARGS]...
 │ explain   Explain the details, services, images, and dependencies of a       │
 │           profile.                                                           │
 │ ps        List Docker containers managed by the Open Data Stack.             │
-│ info      Show the installed odctl version and whether Docker is reachable.  │
+│ info      Show the odctl version, whether Docker is reachable and, with      │
+│           `--json`, the image tag, the workspace and odctl's own images.     │
+│                                                                              │
+│           Args:                                                              │
+│               json_output (bool): Print the report as JSON, with the tag,    │
+│           the workspace and the images.                                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Workspace ──────────────────────────────────────────────────────────────────╮
 │ init      Initialize a local .odctl workspace for custom configurations.     │
@@ -4497,6 +4776,8 @@ Usage: odctl list [OPTIONS]
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
 │ --details  -d        Inspect docker-compose files to show exact services and │
 │                      exposed host ports.                                     │
+│ --json               Print the output as JSON, for scripts and AI            │
+│                      assistants.                                             │
 │ --help               Show this message and exit.                             │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
@@ -4529,6 +4810,7 @@ Usage: odctl explain [OPTIONS] {profile}
 │                          [required]                                          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --json          Print the output as JSON, for scripts and AI assistants.     │
 │ --help          Show this message and exit.                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
@@ -4713,6 +4995,7 @@ Usage: odctl ps [OPTIONS] [profiles]...
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
 │ --all   -a        Show all containers managed by odctl.                      │
+│ --json            Print the output as JSON, for scripts and AI assistants.   │
 │ --help            Show this message and exit.                                │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
@@ -4733,9 +5016,11 @@ Usage: odctl ps [OPTIONS] [profiles]...
 ```text
 Usage: odctl info [OPTIONS]
 
- Show the installed odctl version and whether Docker is reachable.
+ Show the odctl version, whether Docker is reachable and, with `--json`, the
+ image tag, the workspace and odctl's own images.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --json          Print the output as JSON, for scripts and AI assistants.     │
 │ --help          Show this message and exit.                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
@@ -4811,6 +5096,553 @@ Usage: odctl recreate [OPTIONS] {profiles}...
 │ --help          Show this message and exit.                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
+# JSON Output
+
+# JSON Output
+
+`odctl list`, `odctl explain`, `odctl ps` and `odctl info` print one JSON document with `--json`, for scripts and AI assistants. This page holds the JSON Schema of each document, captured when the site was built. A JSON Schema lists the keys of a document, the type of each value and which keys are always present. Standard output holds only the JSON document. Warnings and errors go to standard error. A usage error, such as an unknown option, exits with code 2. Any other failure exits with code 1 and prints nothing on standard output. [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) says which changes to these keys wait for 2.0.
+
+## odctl list
+
+`odctl list --json` prints an array with one object for each profile, sorted by profile name. Its schema:
+
+```json
+{
+  "$defs": {
+    "Port": {
+      "properties": {
+        "host": {
+          "description": "The port on the host, a number.",
+          "title": "Host",
+          "type": "integer"
+        },
+        "container": {
+          "description": "The port inside the container, a number.",
+          "title": "Container",
+          "type": "integer"
+        },
+        "protocol": {
+          "default": "tcp",
+          "description": "The transport protocol, `tcp` or `udp`, as Docker or the compose file gives it.",
+          "title": "Protocol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "container",
+        "protocol"
+      ],
+      "title": "Port",
+      "type": "object"
+    },
+    "ProfileInfo": {
+      "properties": {
+        "profile": {
+          "description": "The profile name, which `odctl up` takes.",
+          "title": "Profile",
+          "type": "string"
+        },
+        "stack": {
+          "description": "The stack the profile belongs to, such as `kafka` for `kafka-lite`. When the registry gives the stack a `parent` group, the value is that group instead, such as `infra` for `postgres`, `storage` and `catalog`.",
+          "title": "Stack",
+          "type": "string"
+        },
+        "description": {
+          "description": "What the stack provides.",
+          "title": "Description",
+          "type": "string"
+        },
+        "compose_file": {
+          "description": "The compose file that defines the profile's services.",
+          "title": "Compose File",
+          "type": "string"
+        },
+        "depends_on": {
+          "description": "The profiles the registry lists as direct prerequisites, sorted by name. Empty when there are none.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "starts": {
+          "description": "Every profile `odctl up` starts for this one: the profile itself and all its prerequisites, sorted by name.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Starts",
+          "type": "array"
+        },
+        "services": {
+          "description": "The services the profile starts, sorted by name.",
+          "items": {
+            "$ref": "#/$defs/ServiceInfo"
+          },
+          "title": "Services",
+          "type": "array"
+        }
+      },
+      "required": [
+        "profile",
+        "stack",
+        "description",
+        "compose_file",
+        "depends_on",
+        "starts",
+        "services"
+      ],
+      "title": "ProfileInfo",
+      "type": "object"
+    },
+    "ServiceInfo": {
+      "properties": {
+        "name": {
+          "description": "The compose service name.",
+          "title": "Name",
+          "type": "string"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The image as it will run, with `TAG` resolved. `null` when the compose file gives the service no `image`, as for a service that is built.",
+          "title": "Image"
+        },
+        "ports": {
+          "description": "The ports the service publishes on the host, sorted by host port. Compose variables are expanded first, as compose does. A port range is left out, and so is a port with no host part, which compose publishes on a random host port. Empty when the service publishes none.",
+          "items": {
+            "$ref": "#/$defs/Port"
+          },
+          "title": "Ports",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "image",
+        "ports"
+      ],
+      "title": "ServiceInfo",
+      "type": "object"
+    }
+  },
+  "items": {
+    "$ref": "#/$defs/ProfileInfo"
+  },
+  "type": "array"
+}
+```
+
+## odctl explain
+
+`odctl explain --json` prints one object for the profile you name. Its schema:
+
+```json
+{
+  "$defs": {
+    "Port": {
+      "properties": {
+        "host": {
+          "description": "The port on the host, a number.",
+          "title": "Host",
+          "type": "integer"
+        },
+        "container": {
+          "description": "The port inside the container, a number.",
+          "title": "Container",
+          "type": "integer"
+        },
+        "protocol": {
+          "default": "tcp",
+          "description": "The transport protocol, `tcp` or `udp`, as Docker or the compose file gives it.",
+          "title": "Protocol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "container",
+        "protocol"
+      ],
+      "title": "Port",
+      "type": "object"
+    },
+    "ServiceInfo": {
+      "properties": {
+        "name": {
+          "description": "The compose service name.",
+          "title": "Name",
+          "type": "string"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The image as it will run, with `TAG` resolved. `null` when the compose file gives the service no `image`, as for a service that is built.",
+          "title": "Image"
+        },
+        "ports": {
+          "description": "The ports the service publishes on the host, sorted by host port. Compose variables are expanded first, as compose does. A port range is left out, and so is a port with no host part, which compose publishes on a random host port. Empty when the service publishes none.",
+          "items": {
+            "$ref": "#/$defs/Port"
+          },
+          "title": "Ports",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "image",
+        "ports"
+      ],
+      "title": "ServiceInfo",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "profile": {
+      "description": "The profile name, which `odctl up` takes.",
+      "title": "Profile",
+      "type": "string"
+    },
+    "stack": {
+      "description": "The stack the profile belongs to, such as `kafka` for `kafka-lite`. When the registry gives the stack a `parent` group, the value is that group instead, such as `infra` for `postgres`, `storage` and `catalog`.",
+      "title": "Stack",
+      "type": "string"
+    },
+    "description": {
+      "description": "What the stack provides.",
+      "title": "Description",
+      "type": "string"
+    },
+    "compose_file": {
+      "description": "The compose file that defines the profile's services.",
+      "title": "Compose File",
+      "type": "string"
+    },
+    "depends_on": {
+      "description": "The profiles the registry lists as direct prerequisites, sorted by name. Empty when there are none.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Depends On",
+      "type": "array"
+    },
+    "starts": {
+      "description": "Every profile `odctl up` starts for this one: the profile itself and all its prerequisites, sorted by name.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Starts",
+      "type": "array"
+    },
+    "services": {
+      "description": "The services the profile starts, sorted by name.",
+      "items": {
+        "$ref": "#/$defs/ServiceInfo"
+      },
+      "title": "Services",
+      "type": "array"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The text that says how to reach the profile's services. `null` when the registry has none for this profile.",
+      "title": "Usage"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "What the profile's stack does in a data platform. `null` when the registry gives none.",
+      "title": "Role"
+    },
+    "volumes": {
+      "description": "The named volumes the profile's services mount, sorted by name. Bind mounts are left out, and so are volumes the compose file declares as `external`, so `odctl-shared-deps` appears only for the `deps` profile. Empty when there are none.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Volumes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "profile",
+    "stack",
+    "description",
+    "compose_file",
+    "depends_on",
+    "starts",
+    "services",
+    "usage",
+    "role",
+    "volumes"
+  ],
+  "title": "ProfileDetails",
+  "type": "object"
+}
+```
+
+## odctl ps
+
+`odctl ps --json` prints one object with the active profiles and the matching containers. Its schema:
+
+```json
+{
+  "$defs": {
+    "ContainerInfo": {
+      "properties": {
+        "name": {
+          "description": "The container name.",
+          "title": "Name",
+          "type": "string"
+        },
+        "service": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The compose service. `null` when the container has no compose service label.",
+          "title": "Service"
+        },
+        "state": {
+          "description": "The state as Docker reports it, for example `running` or `exited`.",
+          "title": "State",
+          "type": "string"
+        },
+        "health": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The health status as Docker reports it, for example `healthy`. `null` when the container has no health check.",
+          "title": "Health"
+        },
+        "ports": {
+          "description": "The ports published on the host, sorted by host port, then container port and protocol. Empty when the container publishes none.",
+          "items": {
+            "$ref": "#/$defs/Port"
+          },
+          "title": "Ports",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "service",
+        "state",
+        "health",
+        "ports"
+      ],
+      "title": "ContainerInfo",
+      "type": "object"
+    },
+    "Port": {
+      "properties": {
+        "host": {
+          "description": "The port on the host, a number.",
+          "title": "Host",
+          "type": "integer"
+        },
+        "container": {
+          "description": "The port inside the container, a number.",
+          "title": "Container",
+          "type": "integer"
+        },
+        "protocol": {
+          "default": "tcp",
+          "description": "The transport protocol, `tcp` or `udp`, as Docker or the compose file gives it.",
+          "title": "Protocol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "container",
+        "protocol"
+      ],
+      "title": "Port",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "active_profiles": {
+      "description": "The profiles whose services are all running, sorted. Only the profiles the command names are considered, with their prerequisites in the same compose file, such as `postgres` and `storage` for `catalog`. With `--all`, every profile is considered. `deps` is never listed. A profile whose services are a strict subset of another listed profile's is left out, so `spark-lite` is not listed beside `spark-full`. Empty when no profile is fully running.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Active Profiles",
+      "type": "array"
+    },
+    "containers": {
+      "description": "The matching containers, sorted by name. Empty when none match.",
+      "items": {
+        "$ref": "#/$defs/ContainerInfo"
+      },
+      "title": "Containers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "active_profiles",
+    "containers"
+  ],
+  "title": "PsReport",
+  "type": "object"
+}
+```
+
+## odctl info
+
+`odctl info --json` prints one object with the CLI version, the image tag, the workspace, Docker and odctl's own images. Its schema:
+
+```json
+{
+  "$defs": {
+    "DockerInfo": {
+      "properties": {
+        "reachable": {
+          "description": "Whether the daemon answers.",
+          "title": "Reachable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reachable"
+      ],
+      "title": "DockerInfo",
+      "type": "object"
+    },
+    "ImageInfo": {
+      "properties": {
+        "reference": {
+          "description": "The full image reference, with its tag.",
+          "title": "Reference",
+          "type": "string"
+        },
+        "local": {
+          "description": "Whether the image is already on the Docker host. `false` when Docker is not reachable.",
+          "title": "Local",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reference",
+        "local"
+      ],
+      "title": "ImageInfo",
+      "type": "object"
+    },
+    "WorkspaceInfo": {
+      "properties": {
+        "path": {
+          "description": "The workspace path, an absolute path.",
+          "title": "Path",
+          "type": "string"
+        },
+        "exists": {
+          "description": "Whether the folder exists. When it does not, odctl reads the files bundled with the CLI.",
+          "title": "Exists",
+          "type": "boolean"
+        },
+        "stale_tag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The workspace's `TAG` when it differs from the CLI version and no `TAG` is set in the shell. Otherwise `null`.",
+          "title": "Stale Tag"
+        }
+      },
+      "required": [
+        "path",
+        "exists",
+        "stale_tag"
+      ],
+      "title": "WorkspaceInfo",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "cli_version": {
+      "description": "The installed odctl version.",
+      "title": "Cli Version",
+      "type": "string"
+    },
+    "tag": {
+      "description": "`TAG` as Docker Compose resolves it.",
+      "title": "Tag",
+      "type": "string"
+    },
+    "workspace": {
+      "$ref": "#/$defs/WorkspaceInfo",
+      "description": "The workspace folder."
+    },
+    "docker": {
+      "$ref": "#/$defs/DockerInfo",
+      "description": "The Docker daemon."
+    },
+    "images": {
+      "description": "odctl's own images at `tag` for every profile, sorted by reference.",
+      "items": {
+        "$ref": "#/$defs/ImageInfo"
+      },
+      "title": "Images",
+      "type": "array"
+    }
+  },
+  "required": [
+    "cli_version",
+    "tag",
+    "workspace",
+    "docker",
+    "images"
+  ],
+  "title": "Info",
+  "type": "object"
+}
+```
 # Troubleshooting
 
 # Troubleshooting
@@ -4883,10 +5715,6 @@ The work comes in the order shown, without dates: a release ships when it is rea
 
 ## Next Releases
 
-1.5.0: Stable interface and JSON output
-
-A written list of what 1.x keeps stable: profile names, ports, `.env` keys, volumes and the workspace files. `--json` on `list`, `explain`, `ps` and `info`, and `--yes` on `init` and `down` for scripts. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)
-
 1.6.0: MCP server
 
 Tools for AI agents that show the profiles and what is running, with `up` and `down` behind a setting. The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)
@@ -4899,9 +5727,9 @@ A profile for tracing and evaluating LLM and agent applications, using odctl's C
 
 Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
 
-1.9.0: Kafka Connect transforms
+1.9.0: Label Studio
 
-Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
+A `label-studio` profile for labelling data by hand, on odctl's PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)
 
 1.10.0: Memory check and models on the host
 
@@ -4919,9 +5747,9 @@ Retrieval guides
 
 Guides for hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs. No new service and no new version.
 
-1.11.0: Label Studio
+1.11.0: Kafka Connect transforms
 
-A `label-studio` profile for labelling data by hand, on odctl's PostgreSQL. Its guide loads the exported labels into the label table of the MLOps guides. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)
+Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
 ## Alongside
 
@@ -4956,6 +5784,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+1.5.0: JSON output and what stays stable in 1.x
+
+`odctl list`, `explain`, `ps` and `info` print JSON with `--json`, and [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what every 1.x release keeps. [#140](https://github.com/jaehyeon-kim/odctl/issues/140)
 
 1.4.0: Feast
 
@@ -4998,6 +5830,23 @@ What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.5.0
+
+JSON output from `list`, `explain`, `ps` and `info`, a written list of what 1.x keeps stable, and newer SeaweedFS, Valkey and Spark images.
+
+- `odctl list`, `odctl explain`, `odctl ps` and `odctl info` take `--json` and print one JSON document for scripts and AI assistants, with warnings and errors on stderr ([JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md), [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md)).
+- `odctl explain` names a dependency the registry lists but no stack defines, instead of ending with a traceback; it still exits 1.
+- `odctl info --json` also shows the image tag, the workspace and which of odctl's own images are on your machine.
+- [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what every 1.x release keeps: profile names, published ports, `.env` keys, volumes, the workspace files and the `--json` keys.
+- odctl now needs Typer 0.18.0 or later, because older Typer releases misread odctl's options with newer Click releases; with some pairs `odctl init` replaced an existing workspace without asking.
+- The base of odctl's `postgres` image, `postgres:18-trixie`, is pinned by digest, so a release that does not change the image no longer gives it new layers to download.
+- SeaweedFS runs `chrislusf/seaweedfs:4.52`, up from 4.48. Valkey runs `valkey/valkey-bundle:9.1.4-alpine`, up from 9.1.3. odctl's Spark image is built on `apache/spark:4.1.4`, up from 4.1.3, and the deps image has the Spark Kafka connector 4.1.4.
+- The odctl skill (`skills/odctl/SKILL.md`) names each image without its tag; `odctl explain <profile>` shows the tag.
+
+### Upgrading
+
+- A workspace made by `odctl init` with an earlier release keeps its old `compose-infra.yml` and `compose-store.yml`, and so the old SeaweedFS and Valkey images. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate` for the profiles you use, such as `odctl recreate storage valkey`.
 
 ## Version 1.4.0
 
