@@ -4,7 +4,8 @@ name: Publish to PyPI
 # trigger. Two gates run before the package is built. A release event fires
 # independently of CI, which is how v0.3.0 reached PyPI while the pipeline's e2e
 # job was failing, so the first gate waits for the tag's Main Pipeline run and
-# refuses to publish unless it succeeded. The second gate asks ghcr whether the
+# refuses to publish unless it succeeded and its unit test and e2e jobs all ran
+# and passed. Neither gate can be skipped. The second gate asks ghcr whether the
 # images for this version are actually there, because the CLI resolves every
 # image it builds at its own version and a package published ahead of its images
 # installs and then fails on the first `odctl up`.
@@ -16,10 +17,6 @@ on:
       tag:
         description: "Tag to publish, for example v0.3.1"
         required: true
-      skip_pipeline_check:
-        description: "Publish even if the tag's pipeline is not green"
-        type: boolean
-        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag }}
@@ -45,7 +42,6 @@ jobs:
           ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Require a green Main Pipeline for this tag
-        if: ${{ !inputs.skip_pipeline_check }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -68,6 +64,21 @@ jobs:
             url=$(jq    -r '.html_url'   <<<"$run")
             if [ "$status" = "completed" ]; then
               if [ "$concl" = "success" ]; then
+                # A run succeeds when a job is skipped, so a change to a job's
+                # condition could let a tag through without e2e. Require the unit
+                # test jobs (ci) and the e2e jobs to be present and all passed.
+                id=$(jq -r '.id' <<<"$run")
+                jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/jobs?per_page=100" \
+                         --jq '.jobs[] | [.name, .conclusion] | @tsv')
+                for prefix in "ci / " "e2e / "; do
+                  ran=$(grep -c "^${prefix}" <<<"$jobs" || true)
+                  passed=$(grep -c "^${prefix}.*"$'\t'"success$" <<<"$jobs" || true)
+                  if [ "$ran" -eq 0 ] || [ "$ran" -ne "$passed" ]; then
+                    echo "::error::Main Pipeline for ${TAG}: ${passed} of ${ran} '${prefix% / }' jobs passed, refusing to publish: $url"
+                    exit 1
+                  fi
+                  echo "✅ ${passed} '${prefix% / }' jobs passed"
+                done
                 echo "✅ Main Pipeline for ${TAG} succeeded: $url"
                 exit 0
               fi
@@ -125,7 +136,7 @@ jobs:
       - name: Install uv
         # Pinned to a full version on purpose: setup-uv stopped publishing
         # moving major tags at v8, so astral-sh/setup-uv@v10 does not exist.
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Set up Python
         run: uv python install 3.10
