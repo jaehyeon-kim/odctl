@@ -185,8 +185,8 @@ It prints the result of each tool under a line with the tool's name. The output 
 ✓ All requested profiles successfully started!
 --- info
 {
-  "cli_version": "1.7.0",
-  "tag": "1.7.0",
+  "cli_version": "1.8.0",
+  "tag": "1.8.0",
   "workspace": {
     "path": "/home/you/project/.odctl",
     "exists": true,
@@ -197,23 +197,23 @@ It prints the result of each tool under a line with the tool's name. The output 
   },
   "images": [
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.7.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.8.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.7.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.8.0",
       "local": true
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.7.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.8.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.7.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.8.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.7.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.8.0",
       "local": false
     }
   ]
