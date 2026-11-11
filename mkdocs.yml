@@ -117,6 +117,7 @@ nav:
           - Evidently Reports: guides/evidently-reports.md
           - Hybrid Search: guides/hybrid-search.md
           - Valkey: guides/valkey.md
+          - MCP Server: guides/mcp-server.md
       - Metadata and Operations:
           - OpenLineage and Marquez: guides/lineage.md
           - OpenMetadata: guides/openmetadata.md

@@ -54,10 +54,11 @@ Each command has its own section in the CLI reference, with its options and exam
 | [`odctl logs`](https://jaehyeon.me/odctl/latest/cli/#odctl-logs) | Read the logs of a profile's containers | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
 | [`odctl restart`](https://jaehyeon.me/odctl/latest/cli/#odctl-restart) | Restart a profile's containers and keep them | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#restart-a-profile) |
 | [`odctl recreate`](https://jaehyeon.me/odctl/latest/cli/#odctl-recreate) | Replace a profile's containers, to apply an edit to a compose file or `.env` | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) |
+| [`odctl mcp`](https://jaehyeon.me/odctl/latest/cli/#odctl-mcp) | Give an AI agent odctl's commands as MCP tools; needs the `mcp` extra | [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/) |
 
 ## Roadmap
 
-odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`; [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what that covers. The next releases add an MCP server for AI agents, a Langfuse profile, and lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
+odctl follows semantic versioning from 1.0, so a later 1.x release does not break a project that pins `odctl>=1.0,<2`; [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) lists what that covers. The next releases add a Langfuse profile, then lineage and alert rules. The [roadmap page](https://jaehyeon.me/odctl/latest/about/roadmap/) shows each step in order.
 
 ## Related Reading
 

@@ -1,8 +1,12 @@
+import sys
+from types import SimpleNamespace
+
 import pytest
 from unittest.mock import MagicMock
 from typer.testing import CliRunner
+from odctl.docker import get_stack_details
 from odctl.main import app
-from cli_workspace import fake_containers, write_workspace
+from cli_workspace import fake_container, fake_containers, write_workspace
 
 runner = CliRunner()
 
@@ -332,7 +336,10 @@ def test_down_named_profile_keeps_shared_deps_while_others_run(monkeypatch):
     mock_stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
-    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [MagicMock()])
+    other_profile = fake_container("spark-master", "spark-master", "running", None, {})
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers", lambda plan: [other_profile]
+    )
 
     result = runner.invoke(app, ["down", "kafka-lite", "-v"])
 
@@ -415,6 +422,207 @@ def test_down_all_volumes_answered_no_stops_nothing(monkeypatch):
     mock_stop.assert_not_called()
 
 
+NOT_CHECKED = (
+    ", only if no other profile has a container "
+    "(Docker is not reachable, so this was not checked)"
+)
+UNNAMED_NOT_CHECKED = (
+    "Remove Volume: the unnamed volumes of the stopped containers, if any "
+    "(Docker is not reachable, so this was not checked)"
+)
+# The mounts of a container: two unnamed volumes with Docker's random names, a named
+# volume and an external one that the spark file declares, and a bind mount.
+SPARK_MOUNTS = [
+    ("volume", "9f1c0a"),
+    ("volume", "b27d44"),
+    ("volume", "spark-events-data"),
+    ("volume", "odctl-shared-deps"),
+    ("bind", "/host/path"),
+]
+SPARK_VOLUMES = ["Remove Volume: spark-events-data", "Remove Volume: odctl-shared-deps"]
+
+
+@pytest.mark.parametrize(
+    "args, reachable, running, exit_code, named, not_named, in_order, missing",
+    [
+        pytest.param(
+            ["spark-lite", "--volumes"],
+            True,
+            {"spark-master": SPARK_MOUNTS, "spark-history": []},
+            0,
+            [*SPARK_VOLUMES, "Remove Volume: 2 unnamed volume(s) of spark-master"],
+            ["of spark-history", "9f1c0a"],
+            [
+                "compose-spark.yml",
+                "Remove Volume: spark-events-data",
+                "Remove Volume: 2 unnamed volume(s) of spark-master",
+                "compose-deps.yml",
+                "Remove Volume: odctl-shared-deps",
+            ],
+            set(),
+            id="shared volume when no other profile has a container",
+        ),
+        pytest.param(
+            ["spark-lite", "--volumes"],
+            True,
+            {"spark-master": SPARK_MOUNTS, "kafka": []},
+            0,
+            ["Remove Volume: spark-events-data", "of spark-master"],
+            ["odctl-shared-deps", "compose-deps.yml"],
+            [],
+            set(),
+            id="shared volume kept while another profile has a container",
+        ),
+        pytest.param(
+            ["spark-lite", "--volumes"],
+            False,
+            {},
+            0,
+            [
+                "Remove Volume: spark-events-data",
+                "Stop Profile: deps" + NOT_CHECKED,
+                "Remove Volume: odctl-shared-deps" + NOT_CHECKED,
+                UNNAMED_NOT_CHECKED,
+            ],
+            [],
+            [
+                "compose-spark.yml",
+                "Remove Volume: spark-events-data",
+                UNNAMED_NOT_CHECKED,
+                "compose-deps.yml",
+                "Stop Profile: deps",
+                "Remove Volume: odctl-shared-deps",
+            ],
+            set(),
+            id="shared volume and unnamed volumes not checked without Docker",
+        ),
+        pytest.param(
+            ["spark-lite", "--volumes"],
+            True,
+            {},
+            0,
+            SPARK_VOLUMES,
+            ["unnamed volume"],
+            [],
+            set(),
+            id="no unnamed line for a file with no container",
+        ),
+        pytest.param(
+            ["spark-lite", "--volumes"],
+            True,
+            {"spark-master": SPARK_MOUNTS},
+            0,
+            ["of spark-master"],
+            ["Remove Volume: spark-events-data"],
+            [],
+            {"spark-events-data"},
+            id="a named volume that does not exist is not listed",
+        ),
+        pytest.param(
+            ["--all", "--volumes"],
+            True,
+            {"kafka": [("volume", "5e5e5e")], "init-deps": [("volume", "aaaaaa")]},
+            0,
+            [
+                "Remove Volume: odctl-shared-deps",
+                "Remove Volume: 1 unnamed volume(s) of kafka",
+            ],
+            ["of init-deps"],
+            ["compose-deps.yml", "Remove Volume: odctl-shared-deps"],
+            set(),
+            id="all removes the shared volume and never lists unnamed volumes for deps",
+        ),
+        pytest.param(
+            ["--all"],
+            False,
+            {},
+            1,
+            ["Docker is not reachable."],
+            ["Dry Run"],
+            [],
+            set(),
+            id="all needs Docker",
+        ),
+        pytest.param(
+            ["spark-lite"],
+            False,
+            {},
+            0,
+            ["Stop Profile: spark-lite"],
+            ["Remove Volume"],
+            [],
+            set(),
+            id="no volumes without --volumes",
+        ),
+    ],
+)
+def test_down_dry_run_names_the_volumes(
+    monkeypatch,
+    args,
+    reachable,
+    running,
+    exit_code,
+    named,
+    not_named,
+    in_order,
+    missing,
+):
+    """The dry run names the named volumes the real run removes, by the rule it uses,
+    adds a line with the number of unnamed volumes for each container that has any,
+    read from the container's mounts, and stops nothing. A named teardown without
+    --volumes needs no Docker."""
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: reachable)
+    containers = [
+        fake_container(s, s, "running", None, {}, mounts)
+        for s, mounts in running.items()
+    ]
+
+    def containers_of(plan):
+        services = {
+            s for f, profs in plan.items() for s in get_stack_details(f, profs)[0]
+        }
+        return [
+            c
+            for c in containers
+            if c.config.labels["com.docker.compose.service"] in services
+        ]
+
+    monkeypatch.setattr("odctl.main.get_managed_containers", containers_of)
+    monkeypatch.setattr("odctl.docker.get_managed_containers", containers_of)
+    monkeypatch.setattr(
+        "odctl.main.get_volume_names",
+        lambda: {"spark-events-data", "odctl-shared-deps"} - missing,
+    )
+
+    result = runner.invoke(app, ["down", *args, "--dry-run"], env={"COLUMNS": "200"})
+
+    assert result.exit_code == exit_code
+    for text in named:
+        assert text in result.stdout
+    for text in not_named:
+        assert text not in result.stdout
+    positions = [result.stdout.index(text) for text in in_order]
+    assert positions == sorted(positions)
+    mock_stop.assert_not_called()
+
+
+def test_mcp_without_the_extra_names_the_install(monkeypatch):
+    """The CLI runs without the mcp package, and `odctl mcp` says how to install it, on
+    stderr like every message of `odctl mcp`."""
+    # A submodule of mcp that an earlier test imported would still import.
+    for name in [n for n in sys.modules if n == "mcp" or n.startswith("mcp.")]:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setitem(sys.modules, "mcp", None)
+    monkeypatch.delitem(sys.modules, "odctl.mcp_server", raising=False)
+
+    result = runner.invoke(app, ["mcp"])
+
+    assert result.exit_code == 1
+    assert 'uv tool install "odctl[mcp]"' in result.stderr
+
+
 def test_init_force_yes_replaces_the_workspace_without_a_prompt(tmp_path, monkeypatch):
     (tmp_path / ".odctl").mkdir()
     monkeypatch.setattr("odctl.main.get_workspace_dir", lambda: tmp_path / ".odctl")
@@ -466,3 +674,26 @@ def test_confirmation_with_no_input_aborts(
     assert result.exit_code == 1
     mock_init.assert_not_called()
     mock_stop.assert_not_called()
+
+
+def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
+    """A service mounts a volume by its key, and its `name:` can differ, so the dry run
+    lists the name Docker removes, and a mount of it is not counted as unnamed."""
+    from odctl import main
+
+    plan = {"compose-spark.yml": ["spark-lite"]}
+    monkeypatch.setattr(main, "is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        main, "get_stack_details", lambda f, p: (["spark"], [], [], ["events"])
+    )
+    monkeypatch.setattr(
+        main, "get_declared_volumes", lambda f: {"events": "custom-event-data"}
+    )
+    monkeypatch.setattr(main, "get_volume_names", lambda: {"custom-event-data"})
+    mount = SimpleNamespace(type="volume", name="custom-event-data")
+    container = SimpleNamespace(name="spark", mounts=[mount])
+    monkeypatch.setattr(main, "get_managed_containers", lambda p: [container])
+
+    assert main._dry_run_volumes(plan, all=True) == {
+        "compose-spark.yml": ["custom-event-data"]
+    }

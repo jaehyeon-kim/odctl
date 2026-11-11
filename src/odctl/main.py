@@ -3,12 +3,16 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
+from rich.markup import escape
 from typer.core import TyperGroup
 
 from odctl import config, reports, ui
 from odctl.docker import (
     find_unpublished_images,
+    get_declared_volumes,
     get_managed_containers,
+    get_stack_details,
+    get_volume_names,
     is_docker_running,
     launch_stack,
     pull_stack_images,
@@ -39,7 +43,9 @@ class _OdctlGroup(TyperGroup):
 
     The `main` callback prints the stale-workspace warning before Click parses a
     command's own options, so the group looks for `--json` in the command's arguments
-    first and sends warnings and errors to stderr when it finds it.
+    first and sends warnings and errors to stderr when it finds it. It does the same
+    for `mcp`, whose stdout carries the protocol: a warning printed there would reach
+    the client as a line that is not a message.
     """
 
     def resolve_command(self, ctx, args):
@@ -53,7 +59,7 @@ class _OdctlGroup(TyperGroup):
         Returns:
             The command name, the command and the arguments left for the command.
         """
-        ui.set_json_output("--json" in args)
+        ui.set_json_output("--json" in args or args[:1] == ["mcp"])
         ctx.call_on_close(lambda: ui.set_json_output(False))
         return super().resolve_command(ctx, args)
 
@@ -439,18 +445,163 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
     including exited ones, so a stopped-but-present service still counts as in
     use, and deps itself is excluded because its init container always exits.
 
+    The services of ``torn_down`` do not count, so the answer is the same before
+    their containers are removed, as in a dry run, and after.
+
     Args:
-        torn_down (dict): The plan just stopped, so its files are not consulted.
+        torn_down (dict): The plan being stopped, or just stopped. Its services are
+            not counted, and its files are not consulted.
 
     Returns:
-        bool: True when nothing outside deps remains.
+        bool: True when nothing outside deps and ``torn_down`` has a container.
     """
     if _DEPS_FILE in torn_down:
         return False
 
+    stopping = {
+        service
+        for file, profs in torn_down.items()
+        for service in get_stack_details(file, profs)[0]
+    }
     declared = build_execution_plan(None, True, resolve_deps=False)
     others = {file: profs for file, profs in declared.items() if file != _DEPS_FILE}
-    return not get_managed_containers(others)
+    for container in get_managed_containers(others):
+        labels = (
+            container.config.labels
+            if container.config and container.config.labels
+            else {}
+        )
+        if labels.get("com.docker.compose.service", "") not in stopping:
+            return False
+    return True
+
+
+def _teardown_of_all(plan: dict, volumes: bool) -> dict:
+    """Keep the profiles of an `--all` plan that a teardown has something to remove for.
+
+    Args:
+        plan (dict): The plan of every profile, compose file to profiles.
+        volumes (bool): The teardown also removes volumes, so a profile that declares
+            named volumes stays even with no container.
+
+    Returns:
+        dict: Compose file to the profiles that have a container, or named volumes
+            when `volumes` is set.
+    """
+    from odctl.docker import get_managed_containers, get_stack_details
+
+    existing_services = set()
+    for c in get_managed_containers(plan):
+        labels = c.config.labels if c.config and c.config.labels else {}
+        svc = labels.get("com.docker.compose.service", "")
+        if svc:
+            existing_services.add(svc)
+
+    active_plan = {}
+    for file, profs in plan.items():
+        active_profs = []
+        for p in profs:
+            services, _, _, named_vols = get_stack_details(file, [p])
+            if any(s in existing_services for s in services) or (
+                volumes and named_vols
+            ):
+                active_profs.append(p)
+        if active_profs:
+            active_plan[file] = active_profs
+    return active_plan
+
+
+def removes_everything(profiles: List[str]) -> bool:
+    """Tell whether a named teardown with `--volumes` removes all that `--all --volumes` does.
+
+    `odctl down --all --volumes` asks before it removes the data of every profile.
+    A caller that cannot ask, such as the MCP server, refuses a named teardown that
+    reaches the same result.
+
+    Args:
+        profiles (List[str]): The profiles the teardown names.
+
+    Returns:
+        bool: True when the named profiles, with their dependencies, include every
+            profile `--all --volumes` would stop, and that is at least one.
+
+    Raises:
+        typer.Exit: With code 1 when a profile is unknown.
+    """
+    every = _teardown_of_all(build_execution_plan(None, True, resolve_deps=False), True)
+    named = expand_plan_dependencies(
+        build_execution_plan(profiles, False, resolve_deps=False)
+    )
+    every_profile = {p for profs in every.values() for p in profs}
+    named_profiles = {p for profs in named.values() for p in profs}
+    return bool(every_profile) and every_profile <= named_profiles
+
+
+def _dry_run_volumes(plan: dict, all: bool) -> dict:
+    """List the volumes a teardown with `--volumes` removes, for the dry run.
+
+    These are the named volumes of the plan's services, which `stop_stack` removes
+    for each file, and the unnamed volumes of the containers it stops, which
+    `docker compose down --volumes` removes too. Docker names each container's
+    mounts, so a container with unnamed volumes gets one line with their number,
+    and the deps file never gets one. Only the named volumes that exist are listed.
+    A named teardown also removes the shared jar volume once no other profile has a
+    container, so the plan gains the deps file when that holds. When Docker is not
+    reachable the answer is not known, so the plan gains the deps file with that
+    said, since a dry run of a named teardown needs no Docker, and each other file
+    says its unnamed volumes were not checked.
+
+    Args:
+        plan (dict): The teardown plan. It gains the deps file when the real run
+            would stop it, or might.
+        all (bool): True for `--all`, whose plan already holds the deps file.
+
+    Returns:
+        dict: Compose file to the volumes to remove, each as the text printed after
+            `Remove Volume:`.
+    """
+    note = ""
+    if not all and _DEPS_FILE not in plan:
+        if not is_docker_running():
+            note = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
+            plan[_DEPS_FILE] = [f"deps{note}"]
+        elif _shared_deps_are_idle(plan):
+            plan[_DEPS_FILE] = ["deps"]
+
+    reachable = is_docker_running()
+    existing = get_volume_names() if reachable else None
+    removed = {}
+    for file, profs in plan.items():
+        # The unchecked deps entry names its profile with the note, so ask for deps.
+        suffix = note if file == _DEPS_FILE else ""
+        # Services mount a volume by its key, and Docker lists it by its name.
+        declared = get_declared_volumes(file)
+        keys = get_stack_details(file, ["deps"] if file == _DEPS_FILE else profs)[3]
+        names = [declared.get(key, key) for key in keys]
+        if existing is not None:
+            names = [name for name in names if name in existing]
+        lines = [f"{name}{suffix}" for name in names]
+        if not reachable:
+            if file != _DEPS_FILE:
+                lines.append(
+                    "the unnamed volumes of the stopped containers, if any "
+                    "(Docker is not reachable, so this was not checked)"
+                )
+        elif file != _DEPS_FILE:
+            for container in sorted(
+                get_managed_containers({file: profs}), key=lambda c: c.name
+            ):
+                unnamed = [
+                    m
+                    for m in container.mounts
+                    if m.type == "volume" and m.name not in declared.values()
+                ]
+                if unnamed:
+                    lines.append(
+                        f"{len(unnamed)} unnamed volume(s) of {container.name}"
+                    )
+        removed[file] = lines
+    return removed
 
 
 @app.command(
@@ -476,12 +627,12 @@ def down(
         False,
         "--volumes",
         "-v",
-        help="Also remove named volumes, including the shared jar volume once no other profile uses it.",
+        help="Also remove the volumes of the stopped containers, named and unnamed, and the shared jar volume once no other profile uses it.",
     ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Preview the teardown plan without actually stopping anything.",
+        help="Preview the teardown plan, with the volumes `--volumes` would remove, without stopping anything.",
     ),
     yes: bool = typer.Option(
         False,
@@ -501,13 +652,18 @@ def down(
         profiles (Optional[List[str]]): The profiles to stop.
         all (bool): Stop every running profile.
         volumes (bool): Also remove the volumes of the stopped services.
-        dry_run (bool): Print the teardown plan without stopping anything.
+        dry_run (bool): Print the teardown plan, with the volumes `--volumes`
+            would remove, without stopping anything.
         yes (bool): Skip the confirmation prompt of `--all --volumes`.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable or a compose file fails to stop.
+        typer.Exit: With code 1 when Docker is not reachable, except for a dry run of
+            named profiles, or a compose file fails to stop.
     """
-    if not dry_run and not is_docker_running():
+    # `--all` needs Docker to know which profiles have containers, so its dry run
+    # does too.
+    needs_docker = not dry_run or all
+    if needs_docker and not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
@@ -520,28 +676,7 @@ def down(
     plan = build_execution_plan(profiles, all, resolve_deps=False)
 
     if all:
-        from odctl.docker import get_managed_containers, get_stack_details
-
-        containers = get_managed_containers(plan)
-        existing_services = set()
-        for c in containers:
-            labels = c.config.labels if c.config and c.config.labels else {}
-            svc = labels.get("com.docker.compose.service", "")
-            if svc:
-                existing_services.add(svc)
-
-        active_plan = {}
-        for file, profs in plan.items():
-            active_profs = []
-            for p in profs:
-                services, _, _, named_vols = get_stack_details(file, [p])
-                if any(s in existing_services for s in services) or (
-                    volumes and named_vols
-                ):
-                    active_profs.append(p)
-            if active_profs:
-                active_plan[file] = active_profs
-        plan = active_plan
+        plan = _teardown_of_all(plan, volumes)
 
     # Widen after the running-state filter, not inside it, so a teardown that
     # names profiles directly is validated the same way `--all` is. Without
@@ -552,7 +687,8 @@ def down(
     plan = dict(reversed(list(plan.items())))
 
     if dry_run:
-        ui.print_dry_run(plan, is_teardown=True)
+        removed = _dry_run_volumes(plan, all) if volumes else None
+        ui.print_dry_run(plan, is_teardown=True, volumes=removed)
         return
 
     for file, profs in plan.items():
@@ -763,11 +899,45 @@ def recreate(
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Recreating containers...")
     ui.print_info(
-        "Recreating replaces the containers. Data inside them is lost; PostgreSQL, SeaweedFS, ClickHouse and ZooKeeper keep their volumes.",
+        "Recreating replaces the containers. Data inside them is lost; PostgreSQL, SeaweedFS, ClickHouse with its Keeper, and Fluss's ZooKeeper keep their volumes.",
         style="yellow",
     )
     recreate_managed_containers(plan, pull=pull)
     ui.print_success("Recreate complete.")
+
+
+@app.command(name="mcp", rich_help_panel="Management")
+def mcp(
+    allow_changes: bool = typer.Option(
+        False,
+        "--allow-changes",
+        help="Also serve `up` and `down`, which start and stop profiles.",
+    ),
+):
+    """
+    Serve odctl's commands to an AI agent as MCP tools over stdio.
+    \f
+
+    The tools `list`, `explain`, `ps`, `info` and `logs` only read. `up` and `down`
+    change what runs, so they are served only with `--allow-changes`, an option that
+    shows in the client's configuration. An environment variable left set in a shell
+    could allow changes with nobody seeing it.
+
+    Args:
+        allow_changes (bool): Also serve the tools `up` and `down`.
+
+    Raises:
+        typer.Exit: With code 1 when the `mcp` extra is not installed.
+    """
+    try:
+        from odctl.mcp_server import build_server
+    except ImportError:
+        ui.print_error(
+            escape('The MCP server needs the mcp extra: uv tool install "odctl[mcp]"')
+        )
+        raise typer.Exit(1)
+
+    build_server(allow_changes).run()
 
 
 if __name__ == "__main__":

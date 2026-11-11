@@ -101,6 +101,7 @@ SNIPPET_GROUPS = {
         "metadata:autopilot",
     ],
     "kafka": ["kafka-lite kafka-full"],
+    "mcp-server": ["kafka-lite kafka-full"],
     "kafka-connect": ["kafka-lite kafka-full"],
     "iceberg-ingestion": ["kafka-lite kafka-full", "flink-lite flink-full"],
     "flink-sql": ["flink-lite flink-full"],

@@ -105,6 +105,7 @@ def fake_container(
     state: str,
     health,
     ports,
+    mounts=(),
 ):
     """
     Build an object with the attributes of a python-on-whales container that odctl reads.
@@ -115,6 +116,8 @@ def fake_container(
         state (str): The state Docker reports.
         health: The health status, or None for a container with no health check.
         ports: The `network_settings.ports` map, from container port to bindings.
+        mounts: The `(type, name)` of each mount, such as `("volume", "abc123")`.
+            Defaults to none.
 
     Returns:
         SimpleNamespace: The fake container.
@@ -128,6 +131,7 @@ def fake_container(
             health=SimpleNamespace(status=health) if health else None,
         ),
         network_settings=SimpleNamespace(ports=ports),
+        mounts=[SimpleNamespace(type=t, name=n) for t, n in mounts],
     )
 
 

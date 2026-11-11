@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Tests
         # Target your test folder and output coverage for src/odctl
-        run: uv run --with pytest-cov pytest tests/ --cov=src/odctl --cov-report=xml
+        run: uv run --extra mcp --with pytest-cov pytest tests/ --cov=src/odctl --cov-report=xml
 
       # - name: Upload coverage reports to Codecov
       #   uses: codecov/codecov-action@v4
@@ -62,5 +62,10 @@ jobs:
       - name: Set up Python 3.10
         run: uv python install 3.10
 
-      - name: Run Tests
+      # Without the mcp extra, the core dependencies sit at their floors and the
+      # MCP tests are skipped. With it, mcp 2.3.0 raises pydantic to 2.12.0.
+      - name: Run Tests without the mcp extra
         run: uv run --python 3.10 --isolated --resolution lowest-direct --with pytest pytest tests/
+
+      - name: Run Tests with the mcp extra
+        run: uv run --python 3.10 --isolated --resolution lowest-direct --extra mcp --with pytest pytest tests/
