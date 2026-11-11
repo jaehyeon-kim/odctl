@@ -122,11 +122,11 @@ up: Start profiles and their dependencies, as `odctl up` does.
 down: Stop the named profiles. With `volumes`, also remove their volumes, and the shared jar volume `odctl-shared-deps` once no other profile has a container, as `odctl down --volumes` does.
 ```
 
-`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and a server cannot ask, so no tool removes everything in one call.
+`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and a server cannot ask. So `down` with `volumes` refuses names that cover every profile `odctl down --all --volumes` would stop, and no tool removes everything in one call.
 
 ## Runnable Example
 
-Save this file as `example.py` and run it with `python example.py` in the folder that holds your `.odctl` workspace, made by `odctl init` as [Getting Started](../getting-started.md) shows, in the environment that has `mcp`. It starts the server with `--allow-changes`, starts `kafka-lite`, reads `info`, the containers of `kafka-lite` and the last five lines of the `connect` service, then stops `kafka-lite`:
+Save this file as `example.py` and run it with `python example.py` in the folder that holds your `.odctl` workspace, made by `odctl init` as [Getting Started](../getting-started.md) shows, in the environment that has `mcp`. It starts the server with `--allow-changes`, starts `kafka-lite`, reads `info`, the containers of `kafka-lite` and the last five lines of the `connect` service, then stops `kafka-lite`. A tool that fails returns its error as the result, so the script checks each result, stops at the first error and still stops `kafka-lite`:
 
 ```python title="docs/snippets/mcp-server/example.py"
 import os
@@ -136,16 +136,23 @@ from mcp import Client, StdioServerParameters
 
 
 async def call(client, name, arguments):
-    """Call one tool and print its name and its text result.
+    """Call one tool, print its name and its text result, and stop on an error.
+
+    A tool that fails returns its error as the result, so the call checks for it.
 
     Args:
         client: The connected MCP client.
         name: The tool to call.
         arguments: The tool's parameters.
+
+    Raises:
+        RuntimeError: When the tool returns an error.
     """
     result = await client.call_tool(name, arguments)
     print(f"--- {name}")
     print(result.content[0].text)
+    if result.is_error:
+        raise RuntimeError(f"the tool {name} failed")
 
 
 async def main():
@@ -156,11 +163,14 @@ async def main():
         command="odctl", args=["mcp", "--allow-changes"], env=dict(os.environ)
     )
     async with Client(server) as client:
-        await call(client, "up", {"profiles": ["kafka-lite"]})
-        await call(client, "info", {})
-        await call(client, "ps", {"profiles": ["kafka-lite"]})
-        await call(client, "logs", {"profiles": ["kafka-lite"], "service": "connect", "tail": 5})
-        await call(client, "down", {"profiles": ["kafka-lite"]})
+        try:
+            await call(client, "up", {"profiles": ["kafka-lite"]})
+            await call(client, "info", {})
+            await call(client, "ps", {"profiles": ["kafka-lite"]})
+            await call(client, "logs", {"profiles": ["kafka-lite"], "service": "connect", "tail": 5})
+        finally:
+            # Stop kafka-lite even when a tool failed.
+            await call(client, "down", {"profiles": ["kafka-lite"]})
 
 
 anyio.run(main)

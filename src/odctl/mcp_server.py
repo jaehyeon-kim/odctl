@@ -237,9 +237,10 @@ def build_server(allow_changes: bool) -> MCPServer:
             stdout, stderr = _run(main.up, profiles=profiles, dry_run=False, pull=pull)
             return _text(stdout, stderr)
 
-        # `down` takes named profiles only: the CLI asks before it removes every
-        # profile's data (`--all --volumes`), and the server cannot ask. The
-        # destructive hint lets a client ask its user before the call.
+        # The CLI asks before it removes every profile's data (`--all --volumes`),
+        # and the server cannot ask. So `down` takes named profiles only, and with
+        # `volumes` it refuses names that cover all that `--all --volumes` removes.
+        # The destructive hint lets a client ask its user before the call.
         @server.tool(
             description="Stop the named profiles. With `volumes`, also remove their volumes, and the shared jar volume `odctl-shared-deps` once no other profile has a container, as `odctl down --volumes` does.",
             annotations=ToolAnnotations(destructive_hint=True),
@@ -256,19 +257,34 @@ def build_server(allow_changes: bool) -> MCPServer:
                 str: What `odctl down` prints.
 
             Raises:
-                ToolError: When no profile is named, or with the command's message
-                    when it fails.
+                ToolError: When no profile is named, when `volumes` is set and the
+                    profiles cover every profile `odctl down --all --volumes` would
+                    stop, or with the command's message when it fails.
             """
             if not profiles:
                 raise ToolError("Name at least one profile.")
-            stdout, stderr = _run(
-                main.down,
-                profiles=profiles,
-                all=False,
-                volumes=volumes,
-                dry_run=False,
-                yes=False,
-            )
+
+            def teardown() -> None:
+                """Stop the profiles, unless the call would remove every profile's data."""
+                if (
+                    volumes
+                    and main.is_docker_running()
+                    and main.removes_everything(profiles)
+                ):
+                    raise ToolError(
+                        "These profiles cover every profile with data, so this call would "
+                        "remove all of it. Run `odctl down --all --volumes` in a terminal, "
+                        "which asks first, or name fewer profiles."
+                    )
+                main.down(
+                    profiles=profiles,
+                    all=False,
+                    volumes=volumes,
+                    dry_run=False,
+                    yes=False,
+                )
+
+            stdout, stderr = _run(teardown)
             return _text(stdout, stderr)
 
     return server

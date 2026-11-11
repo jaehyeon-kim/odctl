@@ -9,7 +9,7 @@ from typer.core import TyperGroup
 from odctl import config, reports, ui
 from odctl.docker import (
     find_unpublished_images,
-    get_declared_volume_names,
+    get_declared_volumes,
     get_managed_containers,
     get_stack_details,
     get_volume_names,
@@ -476,6 +476,67 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
     return True
 
 
+def _teardown_of_all(plan: dict, volumes: bool) -> dict:
+    """Keep the profiles of an `--all` plan that a teardown has something to remove for.
+
+    Args:
+        plan (dict): The plan of every profile, compose file to profiles.
+        volumes (bool): The teardown also removes volumes, so a profile that declares
+            named volumes stays even with no container.
+
+    Returns:
+        dict: Compose file to the profiles that have a container, or named volumes
+            when `volumes` is set.
+    """
+    from odctl.docker import get_managed_containers, get_stack_details
+
+    existing_services = set()
+    for c in get_managed_containers(plan):
+        labels = c.config.labels if c.config and c.config.labels else {}
+        svc = labels.get("com.docker.compose.service", "")
+        if svc:
+            existing_services.add(svc)
+
+    active_plan = {}
+    for file, profs in plan.items():
+        active_profs = []
+        for p in profs:
+            services, _, _, named_vols = get_stack_details(file, [p])
+            if any(s in existing_services for s in services) or (
+                volumes and named_vols
+            ):
+                active_profs.append(p)
+        if active_profs:
+            active_plan[file] = active_profs
+    return active_plan
+
+
+def removes_everything(profiles: List[str]) -> bool:
+    """Tell whether a named teardown with `--volumes` removes all that `--all --volumes` does.
+
+    `odctl down --all --volumes` asks before it removes the data of every profile.
+    A caller that cannot ask, such as the MCP server, refuses a named teardown that
+    reaches the same result.
+
+    Args:
+        profiles (List[str]): The profiles the teardown names.
+
+    Returns:
+        bool: True when the named profiles, with their dependencies, include every
+            profile `--all --volumes` would stop, and that is at least one.
+
+    Raises:
+        typer.Exit: With code 1 when a profile is unknown.
+    """
+    every = _teardown_of_all(build_execution_plan(None, True, resolve_deps=False), True)
+    named = expand_plan_dependencies(
+        build_execution_plan(profiles, False, resolve_deps=False)
+    )
+    every_profile = {p for profs in every.values() for p in profs}
+    named_profiles = {p for profs in named.values() for p in profs}
+    return bool(every_profile) and every_profile <= named_profiles
+
+
 def _dry_run_volumes(plan: dict, all: bool) -> dict:
     """List the volumes a teardown with `--volumes` removes, for the dry run.
 
@@ -513,7 +574,10 @@ def _dry_run_volumes(plan: dict, all: bool) -> dict:
     for file, profs in plan.items():
         # The unchecked deps entry names its profile with the note, so ask for deps.
         suffix = note if file == _DEPS_FILE else ""
-        names = get_stack_details(file, ["deps"] if file == _DEPS_FILE else profs)[3]
+        # Services mount a volume by its key, and Docker lists it by its name.
+        declared = get_declared_volumes(file)
+        keys = get_stack_details(file, ["deps"] if file == _DEPS_FILE else profs)[3]
+        names = [declared.get(key, key) for key in keys]
         if existing is not None:
             names = [name for name in names if name in existing]
         lines = [f"{name}{suffix}" for name in names]
@@ -524,14 +588,13 @@ def _dry_run_volumes(plan: dict, all: bool) -> dict:
                     "(Docker is not reachable, so this was not checked)"
                 )
         elif file != _DEPS_FILE:
-            declared = get_declared_volume_names(file)
             for container in sorted(
                 get_managed_containers({file: profs}), key=lambda c: c.name
             ):
                 unnamed = [
                     m
                     for m in container.mounts
-                    if m.type == "volume" and m.name not in declared
+                    if m.type == "volume" and m.name not in declared.values()
                 ]
                 if unnamed:
                     lines.append(
@@ -613,28 +676,7 @@ def down(
     plan = build_execution_plan(profiles, all, resolve_deps=False)
 
     if all:
-        from odctl.docker import get_managed_containers, get_stack_details
-
-        containers = get_managed_containers(plan)
-        existing_services = set()
-        for c in containers:
-            labels = c.config.labels if c.config and c.config.labels else {}
-            svc = labels.get("com.docker.compose.service", "")
-            if svc:
-                existing_services.add(svc)
-
-        active_plan = {}
-        for file, profs in plan.items():
-            active_profs = []
-            for p in profs:
-                services, _, _, named_vols = get_stack_details(file, [p])
-                if any(s in existing_services for s in services) or (
-                    volumes and named_vols
-                ):
-                    active_profs.append(p)
-            if active_profs:
-                active_plan[file] = active_profs
-        plan = active_plan
+        plan = _teardown_of_all(plan, volumes)
 
     # Widen after the running-state filter, not inside it, so a teardown that
     # names profiles directly is validated the same way `--all` is. Without

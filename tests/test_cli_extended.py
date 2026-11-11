@@ -1,4 +1,5 @@
 import sys
+from types import SimpleNamespace
 
 import pytest
 from unittest.mock import MagicMock
@@ -673,3 +674,26 @@ def test_confirmation_with_no_input_aborts(
     assert result.exit_code == 1
     mock_init.assert_not_called()
     mock_stop.assert_not_called()
+
+
+def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
+    """A service mounts a volume by its key, and its `name:` can differ, so the dry run
+    lists the name Docker removes, and a mount of it is not counted as unnamed."""
+    from odctl import main
+
+    plan = {"compose-spark.yml": ["spark-lite"]}
+    monkeypatch.setattr(main, "is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        main, "get_stack_details", lambda f, p: (["spark"], [], [], ["events"])
+    )
+    monkeypatch.setattr(
+        main, "get_declared_volumes", lambda f: {"events": "custom-event-data"}
+    )
+    monkeypatch.setattr(main, "get_volume_names", lambda: {"custom-event-data"})
+    mount = SimpleNamespace(type="volume", name="custom-event-data")
+    container = SimpleNamespace(name="spark", mounts=[mount])
+    monkeypatch.setattr(main, "get_managed_containers", lambda p: [container])
+
+    assert main._dry_run_volumes(plan, all=True) == {
+        "compose-spark.yml": ["custom-event-data"]
+    }

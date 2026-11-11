@@ -1,4 +1,5 @@
 from pathlib import Path
+import pytest
 from unittest.mock import MagicMock
 
 from odctl import docker
@@ -266,3 +267,55 @@ services:
     monkeypatch.setenv("TAG", "1.0.1")
     _, _, images, _ = docker.get_stack_details("compose-test.yml", ["postgres"])
     assert images == ["db -> ghcr.io/jaehyeon-kim/odctl/postgres:1.0.1"]
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("${SET}-$SET-$$SET", "on-on-$SET"),
+        ("${MISSING:-d} ${EMPTY:-d} ${EMPTY-d} ${MISSING-d}", "d d  d"),
+        ("${MISSING:?e}|${EMPTY?e}|${SET:?e}", "||on"),
+        ("${SET:+r} ${EMPTY:+r} ${EMPTY+r} ${MISSING+r}", "r  r "),
+        ("${MISSING:-${SET:-x}-data}", "on-data"),
+        ("${1BAD} and ${UNCLOSED", "${1BAD} and ${UNCLOSED"),
+    ],
+    ids=[
+        "plain and escape",
+        "defaults",
+        "required",
+        "replacements",
+        "nested",
+        "invalid",
+    ],
+)
+def test_expand_follows_compose_interpolation(value, expected):
+    """A workspace file may use any form the Compose specification and Docker's docs list."""
+    env = {"SET": "on", "EMPTY": ""}
+
+    assert docker.expand(value, env) == expected
+
+
+def test_get_declared_volumes_gives_the_names_docker_lists(tmp_path, monkeypatch):
+    """A service mounts a volume by its key, and Docker lists it by its name."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text("""
+name: odctl-test
+volumes:
+  events:
+    name: ${PREFIX:-odctl}-events
+  plain:
+    name: plain-data
+  default-named: {}
+  shared:
+    external: true
+""")
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.setenv("PREFIX", "team")
+
+    assert docker.get_declared_volumes("compose-test.yml") == {
+        "events": "team-events",
+        "plain": "plain-data",
+        "default-named": "odctl-test_default-named",
+        "shared": "shared",
+    }

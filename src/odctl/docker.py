@@ -150,9 +150,11 @@ def get_stack_details(
 # upstream version, and those are never checked here.
 ODCTL_IMAGE_PREFIX = "ghcr.io/jaehyeon-kim/odctl/"
 
-# Compose interpolation, limited to the forms the compose files use:
-# ${VAR}, ${VAR:-default} and ${VAR-default}.
-_VARIABLE_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?-)([^}]*))?\}")
+# Compose interpolation, in every form the Compose specification and Docker's docs
+# list, because a workspace file may use any of them: $VAR, ${VAR}, the operators
+# :- - :? ? :+ +, a word that holds another reference, and $$ for a literal $.
+_VARIABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_BRACED_REFERENCE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?+])(.*))?", re.S)
 
 # Registry replies that mean the tag is genuinely absent. Anything else, a DNS
 # failure or a refused connection for instance, leaves the answer unknown, and
@@ -213,28 +215,85 @@ def expand(value: str, env: Dict[str, str]) -> str:
         env (Dict[str, str]): The variables to substitute.
 
     Returns:
-        str: The value with every recognised variable reference replaced.
+        str: The value with every variable reference replaced. A reference that is
+            not valid Compose syntax is kept as written.
     """
+    parts = []
+    i = 0
+    while i < len(value):
+        if value[i] != "$":
+            parts.append(value[i])
+            i += 1
+        elif value.startswith("$$", i):
+            parts.append("$")
+            i += 2
+        elif value.startswith("${", i):
+            end = _closing_brace(value, i + 2)
+            if end is None:
+                parts.append(value[i:])
+                break
+            parts.append(_substitute(value[i + 2 : end], env))
+            i = end + 1
+        elif name := _VARIABLE_NAME.match(value, i + 1):
+            parts.append(env.get(name.group(0)) or "")
+            i = name.end()
+        else:
+            parts.append("$")
+            i += 1
+    return "".join(parts)
 
-    def replace(match: re.Match) -> str:
-        """
-        Return the value of one variable reference in a compose string.
 
-        Args:
-            match (re.Match): A match of `_VARIABLE_PATTERN`: the name, the operator and its default.
+def _closing_brace(value: str, start: int) -> Optional[int]:
+    """
+    Find the brace that closes a `${` reference, past any reference nested in it.
 
-        Returns:
-            str: The variable's value, or the default its operator selects.
-        """
-        name, operator, default = match.group(1), match.group(2), match.group(3)
-        current = env.get(name)
-        if operator is None:
-            return current or ""
-        if operator == ":-":
-            return current if current else default
-        return default if current is None else current
+    Args:
+        value (str): The string being expanded.
+        start (int): The index just after the opening `${`.
 
-    return _VARIABLE_PATTERN.sub(replace, value)
+    Returns:
+        Optional[int]: The index of the closing brace, or None when there is none.
+    """
+    depth = 1
+    for index in range(start, len(value)):
+        if value[index] == "{":
+            depth += 1
+        elif value[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _substitute(reference: str, env: Dict[str, str]) -> str:
+    """
+    Return the value of one braced reference, the text between `${` and `}`.
+
+    The `:?` and `?` forms make Compose stop with an error when they do not hold.
+    odctl only shows the value, so it shows an empty one instead.
+
+    Args:
+        reference (str): The name, then optionally an operator and its word.
+        env (Dict[str, str]): The variables to substitute.
+
+    Returns:
+        str: The value the operator selects. The word is expanded too, so it can
+            hold another reference.
+    """
+    match = _BRACED_REFERENCE.fullmatch(reference)
+    if not match:
+        return "${" + reference + "}"
+    name, operator, word = match.groups()
+    current = env.get(name)
+    # The operators with a colon test for a non-empty value, the others for a set one.
+    holds = (
+        bool(current) if operator is None or ":" in operator else current is not None
+    )
+    if operator in (None, ":?", "?"):
+        return (current or "") if holds else ""
+    if operator in (":-", "-"):
+        return (current or "") if holds else expand(word, env)
+    return expand(word, env) if holds else ""
 
 
 def resolve_image_tag() -> str:
@@ -423,29 +482,40 @@ def stop_stack(
     stack_client.compose.down(volumes=remove_volumes, remove_orphans=True)
 
 
-def get_declared_volume_names(compose_filename: str) -> set:
+def get_declared_volumes(compose_filename: str) -> Dict[str, str]:
     """
-    Fetch the Docker names of the volumes a compose file declares, external ones too.
+    Map each volume a compose file declares, external ones too, to its Docker name.
 
-    A mount of one of these is a named volume. Any other volume a container mounts
-    is an unnamed one, which Docker creates from the image's `VOLUME` line.
+    A service mounts a volume by its key, and Docker lists it by its name. A mount
+    of one of these is a named volume. Any other volume a container mounts is an
+    unnamed one, which Docker creates from the image's `VOLUME` line.
 
-    This relies on every declared volume setting `name:`, as odctl's compose files
-    do. Without it Compose names the volume `<project>_<key>`, and this function
-    would return the key.
+    The name is the entry's `name:`, interpolated as Compose does, because a
+    workspace file can build it from variables. Without `name:`, Compose names the
+    volume `<project>_<key>`, from the file's top-level `name:`, or `<key>` when
+    the volume is external.
 
     Args:
         compose_filename (str): The name of the compose file to parse.
 
     Returns:
-        set: The volume names, each the `name` of its entry or else its key.
+        Dict[str, str]: Each volume's key to its Docker name.
     """
     with open(get_compose_path(compose_filename), "r") as f:
-        declared = yaml.safe_load(f).get("volumes") or {}
-    return {
-        (spec.get("name") if isinstance(spec, dict) else None) or key
-        for key, spec in declared.items()
-    }
+        compose = yaml.safe_load(f) or {}
+    env = interpolation_env()
+    project = expand(str(compose.get("name") or ""), env)
+    names = {}
+    for key, spec in (compose.get("volumes") or {}).items():
+        name = spec.get("name") if isinstance(spec, dict) else None
+        external = isinstance(spec, dict) and spec.get("external")
+        if name:
+            names[key] = expand(str(name), env)
+        elif external or not project:
+            names[key] = key
+        else:
+            names[key] = f"{project}_{key}"
+    return names
 
 
 def get_volume_names() -> set:

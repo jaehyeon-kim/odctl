@@ -232,3 +232,33 @@ def test_a_warning_stays_off_the_protocol_stream(tmp_path):
         "kafka-lite",
         "valkey",
     ]
+
+
+@pytest.mark.parametrize(
+    "with_data, volumes, refused",
+    [
+        (["kafka-lite"], True, True),
+        (["kafka-lite"], False, False),
+        (["kafka-lite", "valkey"], True, False),
+    ],
+    ids=["covers every profile with data", "without volumes", "leaves a profile"],
+)
+def test_down_refuses_names_that_remove_every_profiles_data(
+    fixed_state, monkeypatch, with_data, volumes, refused
+):
+    """`odctl down --all --volumes` asks first and the server cannot ask, so a call that
+    names every profile `--all --volumes` would stop, with `volumes`, stops nothing."""
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
+    monkeypatch.setattr(
+        "odctl.main._teardown_of_all",
+        lambda plan, volumes: {"compose-x.yml": with_data},
+    )
+
+    result = _call("down", {"profiles": ["kafka-lite"], "volumes": volumes}, True)
+
+    assert result.is_error is refused
+    assert mock_stop.called is not refused
+    if refused:
+        assert "odctl down --all --volumes" in result.content[0].text

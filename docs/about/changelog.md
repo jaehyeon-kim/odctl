@@ -9,8 +9,10 @@ An MCP server that gives AI agents odctl's profiles, containers and logs, and a 
 - `odctl mcp` serves `list`, `explain`, `ps`, `info` and `logs` as tools to an MCP client, such as Claude Code, after `uv tool install "odctl[mcp]"` ([MCP Server](../guides/mcp-server.md)).
 - All tools but `logs` return the same JSON as `--json`, and their names and parameter names stay the same in every 1.x release ([What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x)).
 - `odctl mcp --allow-changes` also serves `up` and `down`, so an agent can start and stop profiles.
+- The `down` tool with `volumes` refuses profiles that cover all that `odctl down --all --volumes` would remove, because that command asks first and the server cannot ask.
 - `odctl down --volumes --dry-run` names the volumes the real run would remove: the named volumes, the number of unnamed volumes of each container, and `odctl-shared-deps` once no other profile has a container.
 - `odctl down --all --dry-run` reports that Docker is not reachable instead of ending with a traceback.
+- odctl reads Compose variables in a workspace file in every form Compose supports, such as `$VAR`, `${VAR:+word}` and a nested default, so the images, ports and volume names it shows match what Compose runs.
 
 ## Version 1.5.0
 

@@ -695,10 +695,11 @@ def test_streaming_jars_are_fetched_and_spark_version_matches_the_image():
 
 
 def test_every_declared_volume_sets_its_name():
-    """`get_declared_volume_names` compares mounts with the `name:` of each volume.
+    """Every bundled volume sets `name:`, so its Docker name does not depend on the project.
 
-    Without `name:`, Compose names a volume `<project>_<key>`, and a volume the
-    function misses would be counted as an unnamed one in the `--volumes` dry run.
+    Named volumes stay the same in every 1.x release. Without `name:`, Compose
+    names a volume `<project>_<key>`, so removing a `name:` would rename the
+    volume and leave its data behind.
     """
     missing = [
         f"{path.name}: {key}"
