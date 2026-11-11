@@ -45,6 +45,7 @@
 - [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)
 - [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
 - [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)
+- [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md)
 - [OpenLineage and Marquez](https://jaehyeon.me/odctl/latest/guides/lineage/index.md)
 - [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)
 - [Telemetry](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md)
