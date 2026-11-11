@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "odctl": {
+      "type": "stdio",
+      "command": "odctl",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}
