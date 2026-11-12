@@ -14,7 +14,8 @@ A Langfuse profile for tracing LLM and agent applications, Valkey starting earli
 
 ### Upgrading
 
-- A workspace made by `odctl init` before 1.7.0 does not have the `langfuse` profile. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. If `ch-lite` is running from an earlier release, create the database first: `docker exec ch-11 clickhouse-client --password password --query "CREATE DATABASE IF NOT EXISTS langfuse"`. Then run `odctl up langfuse`: `seaweed-init` creates the `langfuse` bucket, and Langfuse creates its PostgreSQL database.
+- A workspace made by `odctl init` before 1.7.0 keeps its old files: it has no `langfuse` profile, `telemetry` keeps `otel-lgtm` 0.37.0, and a new OpenMetadata database gives `admin@odctl.io` the password `admin`. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate` for the profiles you use, such as `odctl recreate telemetry metadata`.
+- A `ch-lite` with data from an earlier release does not run its init file again, so it has no `langfuse` database. Start it with `odctl up ch-lite` and create the database: `docker exec ch-11 clickhouse-client --password password --query "CREATE DATABASE IF NOT EXISTS langfuse"`. Then run `odctl up langfuse`: `seaweed-init` creates the `langfuse` bucket, and Langfuse creates its PostgreSQL database.
 - An OpenMetadata database created by 1.3.0 to 1.6.0 keeps the admin password `admin`, so a script that logs in as `admin@odctl.io` uses `admin` there and `password` on a new database. `openmetadata-init` accepts both.
 
 ## Version 1.6.0

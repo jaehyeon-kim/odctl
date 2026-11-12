@@ -30,7 +30,7 @@ TOKEN=$(curl -s -H 'Content-Type: application/json' \
 AUTH="Authorization: Bearer $TOKEN"
 ```
 
-On a database from an earlier release, use `admin@open-data.local` instead.
+On a database from 1.3.0 to 1.6.0, encode `admin` instead of `password`. On a database from before 1.3.0, also use `admin@open-data.local` instead of `admin@odctl.io`.
 
 ## Register PostgreSQL as a Database Service
 
