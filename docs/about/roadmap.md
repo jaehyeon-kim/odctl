@@ -83,7 +83,7 @@ Newest first.
 
 ??? note "1.7.0: Langfuse"
 
-    The `langfuse` profile traces LLM and agent applications in Langfuse, on odctl's PostgreSQL, ClickHouse, Valkey and SeaweedFS ([Langfuse](../guides/langfuse.md)). [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
+    The `langfuse` profile traces LLM and agent applications in Langfuse, on odctl's PostgreSQL, ClickHouse, Valkey and SeaweedFS ([Langfuse](../guides/langfuse.md)). On a new database, `admin@odctl.io` logs in to OpenMetadata with the password `password` ([OpenMetadata](../guides/openmetadata.md)). [#120](https://github.com/jaehyeon-kim/odctl/issues/120), [#181](https://github.com/jaehyeon-kim/odctl/issues/181)
 
 ??? note "1.6.0: MCP server"
 
