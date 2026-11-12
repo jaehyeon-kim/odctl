@@ -1,0 +1,27 @@
+# Commands from docs/guides/telemetry.md. .github/scripts/smoke.sh runs the
+# send-metric and container sections.
+
+# smoke.sh does not run the up sections, because the e2e workflow starts
+# each profile itself; they are the commands as the page shows them.
+# --8<-- [start:up]
+odctl up telemetry kafka-lite flink-lite
+# --8<-- [end:up]
+
+# --8<-- [start:send-metric]
+ts=$(python3 -c "import time;print(int(time.time()*1e9))")
+cat > /tmp/otlp.json <<JSON
+{"resourceMetrics":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"demo"}}]},
+"scopeMetrics":[{"scope":{"name":"demo"},"metrics":[{"name":"demo_total","unit":"1",
+"sum":{"aggregationTemporality":2,"isMonotonic":true,"dataPoints":[
+{"asDouble":42,"timeUnixNano":"${ts}","startTimeUnixNano":"${ts}","attributes":[]}]}}]}]}]}
+JSON
+curl -X POST -H "Content-Type: application/json" --data-binary @/tmp/otlp.json \
+  http://127.0.0.1:4318/v1/metrics
+curl "http://127.0.0.1:19090/api/v1/query?query=demo_total"
+# --8<-- [end:send-metric]
+
+# --8<-- [start:container]
+# An empty batch is enough to check the address. The collector answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -H "Content-Type: application/json" -d '{}' http://otel-lgtm:4318/v1/traces
+# --8<-- [end:container]

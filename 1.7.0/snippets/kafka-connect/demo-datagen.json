@@ -1,0 +1,14 @@
+{
+  "name": "demo-datagen",
+  "config": {
+    "connector.class": "com.amazonaws.mskdatagen.GeneratorSourceConnector",
+    "tasks.max": "1",
+    "genkp.customers.with": "#{Code.isbn10}",
+    "genv.customers.name.with": "#{Name.first_name}",
+    "genv.customers.visits.with": "#{number.number_between '1','10'}",
+    "global.throttle.ms": "500",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
+  }
+}
