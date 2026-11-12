@@ -188,6 +188,11 @@ TECH_GROUPS: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = [
             ("Shared Dependencies", ["deps"]),
         ],
     ),
+    (
+        "AI Engineering",
+        "Langfuse",
+        [("Langfuse", ["langfuse"])],
+    ),
 ]
 
 
@@ -560,7 +565,7 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
     lines = [
         "---",
         "name: odctl",
-        "description: Start a local open data stack with odctl and reach its services. Use when a task needs Kafka, Flink, Spark, Iceberg, Trino, ClickHouse, PostgreSQL, SeaweedFS, MLflow, Feast, Evidently, Airflow, Temporal, Marquez, OpenMetadata, Valkey, Fluss or Grafana running locally in Docker.",
+        "description: Start a local open data stack with odctl and reach its services. Use when a task needs Kafka, Flink, Spark, Iceberg, Trino, ClickHouse, PostgreSQL, SeaweedFS, MLflow, Feast, Evidently, Airflow, Temporal, Marquez, OpenMetadata, Valkey, Fluss, Langfuse or Grafana running locally in Docker.",
         "---",
         "",
         "# odctl",

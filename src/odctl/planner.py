@@ -170,8 +170,10 @@ def build_execution_plan(
     else:
         final_profiles = set(profiles)
 
-    # Enforce lightweight topological sort
-    order_weights = {"deps": 0, "postgres": 1, "storage": 1, "catalog": 2}
+    # Enforce lightweight topological sort. Valkey is listed because Langfuse's
+    # worker is unhealthy until Valkey runs, and compose up waits for health, so
+    # the profile has to start before langfuse, which sorts ahead of it by name.
+    order_weights = {"deps": 0, "postgres": 1, "storage": 1, "catalog": 2, "valkey": 2}
     sorted_profiles = sorted(
         list(final_profiles), key=lambda p: (order_weights.get(p, 99), p)
     )

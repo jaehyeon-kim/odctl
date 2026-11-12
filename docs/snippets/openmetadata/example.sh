@@ -12,7 +12,7 @@ om=http://127.0.0.1:8585/api/v1
 json() { python3 -c "import json, sys; print($1)"; }
 
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf admin | base64)\"}" \
+  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
   "$om/users/login" | json 'json.load(sys.stdin)["accessToken"]')
 AUTH="Authorization: Bearer $TOKEN"
 

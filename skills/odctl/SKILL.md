@@ -1,6 +1,6 @@
 ---
 name: odctl
-description: Start a local open data stack with odctl and reach its services. Use when a task needs Kafka, Flink, Spark, Iceberg, Trino, ClickHouse, PostgreSQL, SeaweedFS, MLflow, Feast, Evidently, Airflow, Temporal, Marquez, OpenMetadata, Valkey, Fluss or Grafana running locally in Docker.
+description: Start a local open data stack with odctl and reach its services. Use when a task needs Kafka, Flink, Spark, Iceberg, Trino, ClickHouse, PostgreSQL, SeaweedFS, MLflow, Feast, Evidently, Airflow, Temporal, Marquez, OpenMetadata, Valkey, Fluss, Langfuse or Grafana running locally in Docker.
 ---
 
 # odctl
@@ -415,10 +415,11 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metadata` also starts: `deps`, `postgres`, `storage`.
 
 ```text
-• OpenMetadata UI & REST API (Credentials: admin@odctl.io / admin, or
-  user@odctl.io / password, on a new database; a database from an
-  earlier release keeps admin@open-data.local and user@open-data.local,
-  both with the password admin):
+• OpenMetadata UI & REST API (Credentials: admin@odctl.io / password,
+  or user@odctl.io / password, on a new database; a database from
+  1.3.0 to 1.6.0 keeps admin@odctl.io / admin, and one from an earlier
+  release keeps admin@open-data.local and user@open-data.local, both
+  with the password admin):
   - External (host): http://127.0.0.1:8585
   - Internal (Docker): http://openmetadata-server:8585
 • Ingestion Pipeline UI (Credentials: user / password):
@@ -581,3 +582,27 @@ Shared Dependencies: Shared dependencies, JARs, connectors, and Docker network `
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
 | `init-deps` | `ghcr.io/jaehyeon-kim/odctl/deps` | none | not set |
+
+## AI Engineering
+
+### langfuse
+
+Langfuse: Tracing and evaluation of LLM and agent applications. `odctl up langfuse` also starts: `ch-lite`, `deps`, `postgres`, `storage`, `valkey`.
+
+```text
+• Langfuse UI (Credentials: user@odctl.io / password):
+  - External (host): http://127.0.0.1:3005
+  - Internal (Docker): http://langfuse-web:3000
+• OTLP endpoint for traces, over HTTP:
+  - External (host): http://127.0.0.1:3005/api/public/otel
+  - Internal (Docker): http://langfuse-web:3000/api/public/otel
+• Project keys: public key pk-lf-odctl, secret key sk-lf-odctl, sent as
+  HTTP Basic auth. Send the header x-langfuse-ingestion-version: 4 so
+  Langfuse shows a trace at once, not up to 10 minutes later.
+• Starts ch-lite, so it cannot run beside ch-full.
+```
+
+| Service | Image | Host:container ports | Memory limit |
+| --- | --- | --- | --- |
+| `langfuse-web` | `langfuse/langfuse` | `3005:3000` | `2g` |
+| `langfuse-worker` | `langfuse/langfuse-worker` | none | `2g` |

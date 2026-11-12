@@ -378,10 +378,11 @@ def test_snippet_changes_select_the_groups_that_run_them():
 
 def test_pages_keep_within_the_heading_limits():
     """A page has at most 10 `##` headings and 15 headings below its title, as
-    the docs guide sets; a longer page is split into a topic folder."""
+    the docs guide sets; a longer page is split into a topic folder. The
+    Changelog is exempt, because it lists every release."""
     over = []
     for page in (REPO / "docs").rglob("*.md"):
-        if "snippets" in page.parts:
+        if "snippets" in page.parts or page == REPO / "docs/about/changelog.md":
             continue
         headings = []
         in_code = False

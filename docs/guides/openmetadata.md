@@ -16,7 +16,7 @@ odctl up metadata
 | UI and REST API inside the `odctl` network | `http://openmetadata-server:8585` |
 | Ingestion Airflow from the host | `http://127.0.0.1:8087` |
 
-Log in as `admin@odctl.io` with the password `admin`, or as `user@odctl.io` with `password`. A database from an earlier release keeps its users `admin@open-data.local` and `user@open-data.local`, both with the password `admin`: the `odctl.io` domain and the password `password` apply to a new database only. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
+Log in as `admin@odctl.io` or `user@odctl.io`, both with the password `password`. A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. From 1.3.0 to 1.6.0, `admin@odctl.io` has the password `admin`. Before 1.3.0, the users are `admin@open-data.local` and `user@open-data.local`, both with the password `admin`. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
 
 ## Get a Token
 
@@ -24,13 +24,13 @@ The login API takes the password base64-encoded and returns a JWT, a signed toke
 
 ```bash title="docs/snippets/openmetadata/commands.sh:login"
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf admin | base64)\"}" \
+  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
   http://127.0.0.1:8585/api/v1/users/login \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
 AUTH="Authorization: Bearer $TOKEN"
 ```
 
-On a database from an earlier release, use `admin@open-data.local` instead.
+On a database from 1.3.0 to 1.6.0, encode `admin` instead of `password`. On a database from before 1.3.0, also use `admin@open-data.local` instead of `admin@odctl.io`.
 
 ## Register PostgreSQL as a Database Service
 
@@ -53,7 +53,7 @@ curl -s -H "$AUTH" \
 
 It prints `False`. To turn AutoPilot on, set `METADATA_AUTOPILOT="true"` in `.odctl/.env` and run `odctl recreate metadata`. The command then prints `True`.
 
-`openmetadata-init` logs in as `admin@odctl.io` with `admin`, or as `admin@open-data.local` on a database from an earlier release; when both fail, `docker logs openmetadata-init` ends with `AutoPilot could not be set`.
+`openmetadata-init` tries the admin login of a new database first, then the admin logins of earlier releases; when all of them fail, `docker logs openmetadata-init` ends with `AutoPilot could not be set`.
 
 ## Run a Metadata Ingestion
 
@@ -281,7 +281,7 @@ om=http://127.0.0.1:8585/api/v1
 json() { python3 -c "import json, sys; print($1)"; }
 
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf admin | base64)\"}" \
+  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
   "$om/users/login" | json 'json.load(sys.stdin)["accessToken"]')
 AUTH="Authorization: Bearer $TOKEN"
 

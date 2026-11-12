@@ -42,6 +42,9 @@ GROUPS = [
     # evidently brings up postgres and storage, and its assertion round-trips a
     # dataset through SeaweedFS as well as a report through Postgres.
     "evidently",
+    # langfuse brings up postgres, storage, ch-lite and valkey with it, and its
+    # case starts telemetry to check that one trace reaches Langfuse and Tempo.
+    "langfuse",
     "lineage",
     "telemetry",
     "metadata",
@@ -75,14 +78,15 @@ REGISTRY = Path("src/odctl/resources/registry.yml")
 
 # smoke.sh starts some profiles from another group's case: the kafka case starts
 # catalog, the flink case starts kafka-lite and feast, the spark case starts
-# kafka-lite, the fluss and feast cases start flink-lite, and the airflow case
-# starts feast. A change to that compose file needs these groups as well as the
-# ones the registry maps to it.
+# kafka-lite, the fluss and feast cases start flink-lite, the airflow case starts
+# feast, and the langfuse case starts telemetry. A change to that compose file
+# needs these groups as well as the ones the registry maps to it.
 ALSO_RUNS = {
     "compose-infra.yml": ["kafka-lite kafka-full"],
     "compose-kafka.yml": ["flink-lite flink-full", "spark-lite spark-full"],
     "compose-flink.yml": ["fluss", "feast"],
     "compose-mlops.yml": ["flink-lite flink-full", "airflow"],
+    "compose-obsv.yml": ["langfuse"],
 }
 
 # smoke.sh runs the guide commands in docs/snippets/<guide>/, so a change there
@@ -121,6 +125,7 @@ SNIPPET_GROUPS = {
     "lineage": ["lineage"],
     "openmetadata": ["metadata", "metadata:autopilot"],
     "telemetry": ["telemetry"],
+    "langfuse": ["langfuse"],
 }
 
 

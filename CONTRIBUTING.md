@@ -24,7 +24,7 @@ Exporting the diagrams also needs draw.io, Chrome and ffmpeg.
 | `src/odctl/models.py`, `reports.py` | the models of the `--json` output of `list`, `explain`, `ps` and `info`, and the functions that build them; `ui.py` renders the same models as tables and panels |
 | `src/odctl/registry.py`, `resources/registry.yml` | profiles, the services in each, dependencies, ports and usage text |
 | `src/odctl/planner.py`, `docker.py`, `projects.py`, `logs.py`, `workspace.py`, `config.py`, `ui.py` | startup order, Docker Compose calls, `restart` and `recreate`, and `logs`, each with one Compose project per file as `up` runs them, the `.odctl` workspace, settings, terminal output |
-| `src/odctl/resources/compose-*.yml` | one compose file per area (kafka, flink, spark, store, analytics, mlops, orch, obsv, metadata, infra, deps) |
+| `src/odctl/resources/compose-*.yml` | one compose file per area (kafka, flink, spark, store, analytics, mlops, orch, obsv, metadata, aieng, infra, deps) |
 | `src/odctl/resources/docker/` | odctl's own images (postgres, mlflow, airflow, spark), published to `ghcr.io/jaehyeon-kim/odctl/<name>:<version>` |
 | `src/odctl/resources/deps/` | the `deps` image: connector and engine jars built or downloaded into the `odctl-shared-deps` volume; versions in `versions.env` |
 | `scripts/gen_pages.py` | builds a page per technology, the CLI reference and the JSON Output page at docs build time, from `registry.yml`, the compose files, `--help` and the models in `src/odctl/models.py`; run directly, it writes `skills/odctl/SKILL.md`, with every command, option and `.env` key, which a test keeps in step |
@@ -87,7 +87,7 @@ For a group name with a colon, such as `metadata:deps`, the e2e job starts the p
 
 ## Add a Profile
 
-1. Add the services to the compose file of their area in `src/odctl/resources/`, following the Rules: a pinned image, a `container_name`, and ports bound to `127.0.0.1`.
+1. Add the services to the compose file of their area in `src/odctl/resources/`, following the Rules: a pinned image, a `container_name`, and ports bound to `127.0.0.1`. A new area needs its entry in `TECH_GROUPS` in `scripts/gen_pages.py`. A dependency whose name sorts after the profile needs a weight in `order_weights` in `src/odctl/planner.py`.
 2. Add the profile to `src/odctl/resources/registry.yml`: its compose file, description, profiles, dependencies, role and usage text. `scripts/gen_pages.py` builds its page from this entry and the compose file.
 3. Add its checks to `.github/scripts/smoke.sh`, and its group to `GROUPS` in `.github/scripts/select-profiles.py`.
 4. Add the technology to the README diagram, `image/diagram.drawio`, then export it. `test_readme_diagram_names_every_technology` fails until you do.
