@@ -5,8 +5,8 @@ profile. AutoPilot is the app that creates and runs default agents for a service
 added in the UI. It does nothing while its `appConfiguration.active` is false, and
 the UI does not change that value. The script logs in as `admin`, writes the
 value, asks the server to apply it, reads it back and prints it. A database from
-an earlier release keeps its `admin@open-data.local` user, so the script tries that
-address when `admin@odctl.io` is refused.
+an earlier release keeps the admin it was created with, so the script tries each
+login in LOGINS in turn until the server accepts one.
 """
 
 import base64
@@ -15,12 +15,24 @@ import os
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Optional
+from typing import Any, Callable, NamedTuple, Optional
+
+
+class Login(NamedTuple):
+    """One admin email and password the server may accept."""
+
+    email: str
+    password: str
+
 
 SERVER = "http://openmetadata-server:8585/api/v1"
 APP = "AutoPilotApplication"
-EMAILS = ("admin@odctl.io", "admin@open-data.local")
-PASSWORD = "admin"
+# A new database from 1.7.0 on; a database from 1.3.0 to 1.6.0; one from before 1.3.0.
+LOGINS = (
+    Login("admin@odctl.io", "password"),
+    Login("admin@odctl.io", "admin"),
+    Login("admin@open-data.local", "admin"),
+)
 TRIES = 12
 RETRY_SECONDS = 5
 # 2.0.7: an unknown email gives 400 (BasicAuthenticator.lookUserInProvider); a wrong
@@ -66,26 +78,32 @@ def _call(
 
 
 def _login(call: Callable[..., Any]) -> Optional[str]:
-    """Log in as admin with the first address the server accepts.
+    """Log in as admin with the first login the server accepts.
 
     Args:
         call (Callable[..., Any]): Sends one API request.
 
     Returns:
-        Optional[str]: The JWT, or None when the server refused every address.
+        Optional[str]: The JWT, or None when the server refused every login.
 
     Raises:
         urllib.error.URLError: When the server is not ready, so the caller tries again.
     """
-    password = base64.b64encode(PASSWORD.encode()).decode()
-    for email in EMAILS:
+    for number, login in enumerate(LOGINS, start=1):
+        password = base64.b64encode(login.password.encode()).decode()
         try:
-            reply = call("POST", "/users/login", {"email": email, "password": password})
+            reply = call(
+                "POST", "/users/login", {"email": login.email, "password": password}
+            )
             return reply["accessToken"]
         except urllib.error.HTTPError as error:
             if error.code not in REFUSED:
                 raise
-            print(f"{email} was refused: HTTP {error.code}", flush=True)
+            print(
+                f"Login {number} of {len(LOGINS)} ({login.email}) was refused:"
+                f" HTTP {error.code}",
+                flush=True,
+            )
     return None
 
 

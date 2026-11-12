@@ -101,7 +101,7 @@ services:
       AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
       # name:password sets that admin's first password; a bare name gets "admin".
       # It applies when the user is created, so an existing database keeps its password.
-      AUTHORIZER_ADMIN_PRINCIPALS: "[admin,user:password]"
+      AUTHORIZER_ADMIN_PRINCIPALS: "[admin:password,user:password]"
       AUTHORIZER_PRINCIPAL_DOMAIN: "odctl.io"
       AUTHORIZER_INGESTION_PRINCIPALS: "[ingestion-bot]"
       AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"

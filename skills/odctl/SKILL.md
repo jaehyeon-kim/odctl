@@ -415,10 +415,11 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metadata` also starts: `deps`, `postgres`, `storage`.
 
 ```text
-• OpenMetadata UI & REST API (Credentials: admin@odctl.io / admin, or
-  user@odctl.io / password, on a new database; a database from an
-  earlier release keeps admin@open-data.local and user@open-data.local,
-  both with the password admin):
+• OpenMetadata UI & REST API (Credentials: admin@odctl.io / password,
+  or user@odctl.io / password, on a new database; a database from
+  1.3.0 to 1.6.0 keeps admin@odctl.io / admin, and one from an earlier
+  release keeps admin@open-data.local and user@open-data.local, both
+  with the password admin):
   - External (host): http://127.0.0.1:8585
   - Internal (Docker): http://openmetadata-server:8585
 • Ingestion Pipeline UI (Credentials: user / password):

@@ -4,6 +4,7 @@ The module is a resource file that the `openmetadata-init` container mounts, not
 part of the odctl package, so it is loaded from its path. Nothing here needs Docker.
 """
 
+import base64
 import importlib.util
 import urllib.error
 
@@ -19,8 +20,8 @@ _SPEC.loader.exec_module(init)
 
 
 class FakeApi:
-    """Records the calls, fails the first `failures` of them, and refuses a login for
-    each address in `refused` with HTTP `status`."""
+    """Records the calls, fails the first `failures` of them, and refuses each login
+    in `refused`, an email and its plain password, with HTTP `status`."""
 
     def __init__(self, failures=0, refused=(), status=400):
         self.calls = []
@@ -35,7 +36,8 @@ class FakeApi:
             raise ConnectionError("server not ready")
         self.calls.append((method, path, body))
         if path == "/users/login":
-            if body["email"] in self.refused:
+            login = (body["email"], base64.b64decode(body["password"]).decode())
+            if login in self.refused:
                 raise urllib.error.HTTPError(path, self.status, "Refused", None, None)
             return {"accessToken": "jwt"}
         if method == "PATCH":
@@ -92,26 +94,27 @@ def test_main_prints_the_state_and_exits_normally_even_when_it_cannot_set_it(
 
 
 @pytest.mark.parametrize("status", [400, 401])
-def test_a_database_from_an_earlier_release_logs_in_with_the_old_domain(status):
-    api = FakeApi(refused=("admin@odctl.io",), status=status)
+def test_a_database_from_an_earlier_release_logs_in_with_its_own_admin(status):
+    refused = tuple(init.LOGINS[:2])
+    api = FakeApi(refused=refused, status=status)
     assert init.apply(False, api, lambda _: None) is False
     emails = [b["email"] for m, p, b in api.calls if p == "/users/login"]
-    assert emails == ["admin@odctl.io", "admin@open-data.local"]
+    assert emails == ["admin@odctl.io", "admin@odctl.io", "admin@open-data.local"]
     assert ("PATCH", "/apps/name/AutoPilotApplication") in [
         (m, p) for m, p, _ in api.calls
     ]
 
 
-def test_both_addresses_refused_gives_none_without_retrying():
-    api = FakeApi(refused=("admin@odctl.io", "admin@open-data.local"))
+def test_every_login_refused_gives_none_without_retrying():
+    api = FakeApi(refused=tuple(init.LOGINS))
     waits = []
     assert init.apply(False, api, waits.append) is None
     assert waits == []
-    assert [p for _, p, _ in api.calls] == ["/users/login", "/users/login"]
+    assert [p for _, p, _ in api.calls] == ["/users/login"] * len(init.LOGINS)
 
 
 def test_a_login_error_that_is_not_a_refusal_is_tried_again():
-    api = FakeApi(refused=("admin@odctl.io",), status=500)
+    api = FakeApi(refused=(init.LOGINS[0],), status=500)
     waits = []
     assert init.apply(False, api, waits.append) is None
     assert len(waits) == 11
