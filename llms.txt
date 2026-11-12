@@ -17,6 +17,7 @@
 ## Profiles
 
 - [Overview](https://jaehyeon.me/odctl/latest/profiles/index.md)
+- [AI Engineering](https://jaehyeon.me/odctl/latest/profiles/ai-engineering/index.md)
 - [Analytics](https://jaehyeon.me/odctl/latest/profiles/analytics/index.md)
 - [Messaging](https://jaehyeon.me/odctl/latest/profiles/messaging/index.md)
 - [Metadata and Lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)
@@ -46,6 +47,7 @@
 - [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
 - [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)
 - [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md)
+- [Langfuse](https://jaehyeon.me/odctl/latest/guides/langfuse/index.md)
 - [OpenLineage and Marquez](https://jaehyeon.me/odctl/latest/guides/lineage/index.md)
 - [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)
 - [Telemetry](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md)

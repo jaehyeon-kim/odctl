@@ -43,6 +43,7 @@ Each command has its own section in the CLI reference, with its options and exam
 | [Metadata and Lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)               | OpenMetadata, Marquez                                                                                                     |
 | [Observability](https://jaehyeon.me/odctl/latest/profiles/observability/index.md)                             | grafana/otel-lgtm (OpenTelemetry Collector, Prometheus, Tempo, Loki, Grafana)                                             |
 | [Storage and Catalog](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/index.md)                 | PostgreSQL 18 with pgvector, pg_textsearch and PostGIS, SeaweedFS (S3), Iceberg REST catalog, Valkey Bundle, Apache Fluss |
+| [AI Engineering](https://jaehyeon.me/odctl/latest/profiles/ai-engineering/index.md)                           | Langfuse                                                                                                                  |
 
 Kafka Connect comes with a set of connectors, such as the Iceberg sink and the Debezium PostgreSQL source. [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md) lists them all.
 
@@ -289,8 +290,8 @@ odctl info --json | python3 -m json.tool
 
 ```text
 {
-    "cli_version": "1.6.0",
-    "tag": "1.6.0",
+    "cli_version": "1.7.0",
+    "tag": "1.7.0",
     "workspace": {
         "path": "/home/you/project/.odctl",
         "exists": true,
@@ -301,23 +302,23 @@ odctl info --json | python3 -m json.tool
     },
     "images": [
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.6.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.7.0",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.6.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.7.0",
             "local": true
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.6.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.7.0",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.6.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.7.0",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.6.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.7.0",
             "local": false
         }
     ]
@@ -496,11 +497,11 @@ odctl down --all --volumes --yes
 
 ## Code in the Guides
 
-Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.6.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
+Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.7.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
 
 ## Use It with an AI Assistant
 
-The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.6.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`. With the `mcp` extra, `odctl mcp` gives an MCP client odctl's commands as tools, as [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) sets up.
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.7.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`. With the `mcp` extra, `odctl mcp` gives an MCP client odctl's commands as tools, as [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) sets up.
 # How It Works
 
 # How It Works
@@ -532,7 +533,7 @@ It lists each compose file with its profiles, from `compose-deps.yml` with `deps
 
 ### Dependencies and the Start Order
 
-Each profile lists the profiles it needs under `depends_on` in `registry.yml`. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: `deps` first, `postgres` and `storage` next, `catalog` after them, and every other profile last, in alphabetical order.
+Each profile lists the profiles it needs under `depends_on` in `registry.yml`. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: `deps` first, `postgres` and `storage` next, `catalog` and `valkey` after them, and every other profile last, in alphabetical order.
 
 The profiles are then grouped by compose file, in that order, and each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
 
@@ -853,6 +854,40 @@ A profile is what `odctl up` starts. These pages are generated from `registry.ym
 | [`fluss`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#fluss)       | Apache Fluss         | Stream storage (Fluss) and multi-model data store (Valkey Bundle). Valkey includes advanced JSON, Bloom, and Vector Search capabilities. |
 | [`deps`](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/#deps)         | Shared Dependencies  | Shared dependencies, JARs, connectors, and Docker network                                                                                |
 
+## [AI Engineering](https://jaehyeon.me/odctl/latest/profiles/ai-engineering/index.md)
+
+| Profile                                                                          | Technology | Description                                           |
+| -------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------- |
+| [`langfuse`](https://jaehyeon.me/odctl/latest/profiles/ai-engineering/#langfuse) | Langfuse   | Tracing and evaluation of LLM and agent applications. |
+
+# AI Engineering
+
+## Langfuse
+
+Profiles: `langfuse`. Stack `aieng`, defined in `compose-aieng.yml`.
+
+### langfuse
+
+Depends on: `postgres`, `storage`, `ch-lite`, `valkey`. `odctl up langfuse` also starts: `ch-lite`, `deps`, `postgres`, `storage`, `valkey`.
+
+```text
+• Langfuse UI (Credentials: user@odctl.io / password):
+  - External (host): http://127.0.0.1:3005
+  - Internal (Docker): http://langfuse-web:3000
+• OTLP endpoint for traces, over HTTP:
+  - External (host): http://127.0.0.1:3005/api/public/otel
+  - Internal (Docker): http://langfuse-web:3000/api/public/otel
+• Project keys: public key pk-lf-odctl, secret key sk-lf-odctl, sent as
+  HTTP Basic auth. Send the header x-langfuse-ingestion-version: 4 so
+  Langfuse shows a trace at once, not up to 10 minutes later.
+• Starts ch-lite, so it cannot run beside ch-full.
+```
+
+| Service           | Image                             | Host:container ports | Memory limit |
+| ----------------- | --------------------------------- | -------------------- | ------------ |
+| `langfuse-web`    | `langfuse/langfuse:4.72.0`        | `3005:3000`          | `2g`         |
+| `langfuse-worker` | `langfuse/langfuse-worker:4.72.0` | none                 | `2g`         |
+
 # Analytics
 
 ## ClickHouse
@@ -1002,10 +1037,11 @@ Profiles: `metadata`. Stack `metadata`, defined in `compose-metadata.yml`.
 Depends on: `postgres`, `storage`. `odctl up metadata` also starts: `deps`, `postgres`, `storage`.
 
 ```text
-• OpenMetadata UI & REST API (Credentials: admin@odctl.io / admin, or
-  user@odctl.io / password, on a new database; a database from an
-  earlier release keeps admin@open-data.local and user@open-data.local,
-  both with the password admin):
+• OpenMetadata UI & REST API (Credentials: admin@odctl.io / password,
+  or user@odctl.io / password, on a new database; a database from
+  1.3.0 to 1.6.0 keeps admin@odctl.io / admin, and one from an earlier
+  release keeps admin@open-data.local and user@open-data.local, both
+  with the password admin):
   - External (host): http://127.0.0.1:8585
   - Internal (Docker): http://openmetadata-server:8585
 • Ingestion Pipeline UI (Credentials: user / password):
@@ -1158,7 +1194,7 @@ Depends on: `deps`. `odctl up telemetry` also starts: `deps`.
 
 | Service     | Image                      | Host:container ports                                | Memory limit |
 | ----------- | -------------------------- | --------------------------------------------------- | ------------ |
-| `otel-lgtm` | `grafana/otel-lgtm:0.37.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g`         |
+| `otel-lgtm` | `grafana/otel-lgtm:0.40.0` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g`         |
 
 # Orchestration
 
@@ -4376,8 +4412,8 @@ It prints the result of each tool under a line with the tool's name. The output 
 ✓ All requested profiles successfully started!
 --- info
 {
-  "cli_version": "1.6.0",
-  "tag": "1.6.0",
+  "cli_version": "1.7.0",
+  "tag": "1.7.0",
   "workspace": {
     "path": "/home/you/project/.odctl",
     "exists": true,
@@ -4388,23 +4424,23 @@ It prints the result of each tool under a line with the tool's name. The output 
   },
   "images": [
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.6.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.7.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.6.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.7.0",
       "local": true
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.6.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.7.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.6.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.7.0",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.6.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.7.0",
       "local": false
     }
   ]
@@ -4478,6 +4514,232 @@ connect  | [2026-10-30 21:50:24,923] INFO [Worker clientId=connect-connect:8083,
 --- down
 🛑 Stopping kafka-lite...
 ✓ Teardown complete.
+```
+
+# Tracing LLM Apps with Langfuse
+
+The `langfuse` profile runs Langfuse, which traces and evaluates applications built on LLMs (large language models) and agents. An application sends Langfuse one trace for each request: the record of what it did to answer, such as a call to a model. OpenTelemetry is an open standard for traces, metrics and logs; it calls each step of a trace a span. Langfuse stores each span it receives as an observation.
+
+The profile runs Langfuse 4. It has `langfuse-web`, which serves the UI and receives traces, and `langfuse-worker`, which processes them. Both use odctl's PostgreSQL, SeaweedFS, Valkey and `ch-lite` (ClickHouse), which `odctl up` starts first. An application sends traces over OTLP, the protocol that the [Telemetry guide](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md) describes.
+
+This guide builds on [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md). The Send to Telemetry Too section also builds on the [Telemetry guide](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md). Run the commands in the folder that holds your `.odctl` workspace. Start the profile:
+
+```bash
+odctl up langfuse
+```
+
+| Endpoint                                                     | Address                                    |
+| ------------------------------------------------------------ | ------------------------------------------ |
+| UI from the host (user `user@odctl.io`, password `password`) | `http://127.0.0.1:3005`                    |
+| OTLP endpoint from the host                                  | `http://127.0.0.1:3005/api/public/otel`    |
+| OTLP endpoint inside the `odctl` network                     | `http://langfuse-web:3000/api/public/otel` |
+| Project keys                                                 | public `pk-lf-odctl`, secret `sk-lf-odctl` |
+
+Three facts about the profile:
+
+- It starts `ch-lite`, whose two ClickHouse servers have a limit of 4 GB each, set by `mem_limit` in `.odctl/compose-analytics.yml`.
+- Langfuse needs its databases in UTC, so keep `TZ` in `.odctl/.env` at its default, `UTC`.
+- `ch-lite` and `ch-full` use the same container names, so stop `ch-full` with `odctl down ch-full` before `odctl up langfuse`.
+
+PostgreSQL reads `TZ` only when it creates its data folder, as [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) explains.
+
+A trace takes this path. `langfuse-web` writes each event it receives to SeaweedFS and puts a reference on a Valkey queue. `langfuse-worker` takes the reference, reads the event and writes it to ClickHouse:
+
+`langfuse-web` keeps users, projects and keys in the `langfuse` database on PostgreSQL. ClickHouse holds the traces in its own `langfuse` database. The worker has no host port, because only `langfuse-web` receives requests.
+
+## Log In
+
+Open `http://127.0.0.1:3005` and sign in as `user@odctl.io` with the password `password`. `langfuse-web` creates this user, the project `odctl` and its two keys when it first starts. Once you have sent the trace in the next section, the Tracing page lists it, and the trace opens like this:
+
+The tree on the left lists the two observations of the trace. The panel on the right shows the input and output of the one you select.
+
+## Send a Trace
+
+This script sends one trace with the OpenTelemetry SDK for Python, the library that creates spans and exports them over OTLP. A question and its answer make one trace of two observations: the root `answer-question`, and its child `model-call`. odctl runs no model, so a fixed answer stands in for the model call. Save the script as `send.py`:
+
+```python
+import base64
+import json
+
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+ENDPOINT = "http://127.0.0.1:3005/api/public/otel/v1/traces"
+AUTH = base64.b64encode(b"pk-lf-odctl:sk-lf-odctl").decode()
+
+provider = TracerProvider(resource=Resource.create({"service.name": "demo"}))
+provider.add_span_processor(
+    SimpleSpanProcessor(
+        OTLPSpanExporter(
+            endpoint=ENDPOINT,
+            headers={
+                "Authorization": f"Basic {AUTH}",
+                "x-langfuse-ingestion-version": "4",
+            },
+        )
+    )
+)
+tracer = provider.get_tracer("demo")
+
+
+def send_trace(question):
+    """Send one trace of a question and its answer, and return its trace ID."""
+    with tracer.start_as_current_span("answer-question") as root:
+        root.set_attribute("langfuse.observation.input", json.dumps(question))
+        with tracer.start_as_current_span("model-call") as call:
+            call.set_attribute("gen_ai.request.model", "stand-in-model")
+            call.set_attribute("langfuse.observation.input", json.dumps(question))
+            # odctl runs no model, so a fixed answer stands in for the model call.
+            answer = "Langfuse stores traces."
+            call.set_attribute("langfuse.observation.output", json.dumps(answer))
+        root.set_attribute("langfuse.observation.output", json.dumps(answer))
+        return format(root.get_span_context().trace_id, "032x")
+
+
+print(send_trace("What does Langfuse store?"))
+```
+
+Run it. The commands use `uv run --with`, which needs uv; with pip, install the two packages with `pip install` and run the script with `python`. `uv run` installs the two OpenTelemetry packages for this run only:
+
+```bash
+uv run --with "opentelemetry-sdk>=1.45,<2" --with "opentelemetry-exporter-otlp-proto-http>=1.45,<2" python send.py
+```
+
+It prints the trace ID, a different one on every run:
+
+```text
+532ec9ccb17361a9cdd312a414119ade
+```
+
+The exporter sends each span to the OTLP endpoint with Basic auth: an `Authorization` header that holds `Basic` and the base64 text of the public key, a colon and the secret key. The header `x-langfuse-ingestion-version` with the value `4` makes Langfuse 4 show the data at once. Without it, Langfuse 4 can show the data up to 10 minutes late. The attributes `langfuse.observation.input` and `langfuse.observation.output` become the input and output of an observation. A span with the attribute `gen_ai.request.model` becomes a generation, which is the kind of observation Langfuse uses for a call to a model.
+
+## Read It Back
+
+Langfuse 4 answers `GET /api/public/traces` with 404, so this reads the trace with the observations API, version 2. Set `TRACE_ID` to the ID the script printed, such as `TRACE_ID=532ec9ccb17361a9cdd312a414119ade`, then run the command from the same terminal:
+
+```bash
+# This prints the name and type of each observation of the trace.
+curl -s -u pk-lf-odctl:sk-lf-odctl -G http://127.0.0.1:3005/api/public/v2/observations \
+  --data-urlencode "traceId=$TRACE_ID" \
+  | python3 -c "import json, sys; [print(o['name'], o['type']) for o in sorted(json.load(sys.stdin)['data'], key=lambda o: o['name'])]"
+```
+
+```text
+answer-question SPAN
+model-call GENERATION
+```
+
+The trace has two observations. The root `answer-question` is a span, and `model-call` is a generation. `langfuse-worker` writes a trace to ClickHouse a moment after `langfuse-web` receives it, so an empty answer means the trace has not arrived yet. Run the command again after a few seconds.
+
+## Send to Telemetry Too
+
+With `odctl up telemetry` running, the same application can send each trace to Langfuse and to the telemetry collector. Add these lines to the end of `send.py`. They add a second span processor with an exporter that sends to the collector, and then send another trace:
+
+```python
+# The collector from `odctl up telemetry` receives OTLP over HTTP on port 4318.
+provider.add_span_processor(
+    SimpleSpanProcessor(OTLPSpanExporter(endpoint="http://127.0.0.1:4318/v1/traces"))
+)
+print(send_trace("Does this trace reach Tempo too?"))
+```
+
+Run the script again with the same command. It prints two IDs. The first trace goes to Langfuse only, because the script adds the second processor after it. The second trace goes to both. Tempo is the trace store inside the `otel-lgtm` container that the `telemetry` profile runs. Set `TRACE_ID` to the second ID and ask Tempo for the trace:
+
+```bash
+# Set TRACE_ID to the second ID the script printed. Tempo answers 200 when it
+# holds the trace and 404 when it does not.
+docker exec otel-lgtm curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:3200/api/traces/$TRACE_ID"
+```
+
+```text
+200
+```
+
+The read command above returns the same two observations for this ID, so the trace is in both places. Tempo can answer 404 for a few seconds after the script ends.
+
+## From Another Container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), send OTLP to `http://langfuse-web:3000/api/public/otel`, with the same keys and header. The container sends to port 3000, which `langfuse-web` listens on, and not to the host port 3005.
+
+This command sends an empty batch from a container on the network:
+
+```bash
+# An empty batch is enough to check the address, the keys and the header.
+# Langfuse answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -u pk-lf-odctl:sk-lf-odctl -H "x-langfuse-ingestion-version: 4" \
+  -H "Content-Type: application/json" -d '{"resourceSpans":[]}' \
+  http://langfuse-web:3000/api/public/otel/v1/traces
+```
+
+```text
+200
+```
+
+## Runnable Example
+
+Save this file as `example.py`. It sends one trace and asks the observations API until both observations are there. Start the profile first, then run it with the same `uv run` command as above, ending in `python example.py`:
+
+```python
+"""Sends one trace to Langfuse and waits until its two observations can be read back.
+
+Start the profile with `odctl up langfuse` first, then run this file with
+`uv run --with "opentelemetry-sdk>=1.45,<2" --with "opentelemetry-exporter-otlp-proto-http>=1.45,<2" python example.py`.
+"""
+
+import base64
+import json
+import time
+import urllib.parse
+import urllib.request
+
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+BASE = "http://127.0.0.1:3005/api/public"
+AUTH = base64.b64encode(b"pk-lf-odctl:sk-lf-odctl").decode()
+
+provider = TracerProvider()
+provider.add_span_processor(
+    SimpleSpanProcessor(
+        OTLPSpanExporter(
+            endpoint=f"{BASE}/otel/v1/traces",
+            headers={
+                "Authorization": f"Basic {AUTH}",
+                "x-langfuse-ingestion-version": "4",
+            },
+        )
+    )
+)
+tracer = provider.get_tracer("demo")
+
+with tracer.start_as_current_span("answer-question") as root:
+    with tracer.start_as_current_span("model-call") as call:
+        # odctl runs no model, so this span only carries a model name.
+        call.set_attribute("gen_ai.request.model", "stand-in-model")
+    trace_id = format(root.get_span_context().trace_id, "032x")
+
+query = urllib.parse.urlencode({"traceId": trace_id})
+request = urllib.request.Request(
+    f"{BASE}/v2/observations?{query}", headers={"Authorization": f"Basic {AUTH}"}
+)
+# Langfuse writes the trace to ClickHouse a moment after it receives it.
+for _ in range(30):
+    with urllib.request.urlopen(request) as response:
+        observations = json.load(response)["data"]
+    if len(observations) == 2:
+        break
+    time.sleep(2)
+print(f"trace {trace_id} has {len(observations)} observations")
+```
+
+It prints the trace ID and the number of observations Langfuse returned for it:
+
+```text
+trace 731b2cf2f10d39660f7e4bb75ff472eb has 2 observations
 ```
 
 # OpenLineage and Marquez
@@ -4589,7 +4851,7 @@ odctl up metadata
 | UI and REST API inside the `odctl` network | `http://openmetadata-server:8585` |
 | Ingestion Airflow from the host            | `http://127.0.0.1:8087`           |
 
-Log in as `admin@odctl.io` with the password `admin`, or as `user@odctl.io` with `password`. A database from an earlier release keeps its users `admin@open-data.local` and `user@open-data.local`, both with the password `admin`: the `odctl.io` domain and the password `password` apply to a new database only. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
+Log in as `admin@odctl.io` or `user@odctl.io`, both with the password `password`. A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. From 1.3.0 to 1.6.0, `admin@odctl.io` has the password `admin`. Before 1.3.0, the users are `admin@open-data.local` and `user@open-data.local`, both with the password `admin`. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
 
 ## Get a Token
 
@@ -4597,13 +4859,13 @@ The login API takes the password base64-encoded and returns a JWT, a signed toke
 
 ```bash
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf admin | base64)\"}" \
+  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
   http://127.0.0.1:8585/api/v1/users/login \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
 AUTH="Authorization: Bearer $TOKEN"
 ```
 
-On a database from an earlier release, use `admin@open-data.local` instead.
+On a database from 1.3.0 to 1.6.0, encode `admin` instead of `password`. On a database from before 1.3.0, also use `admin@open-data.local` instead of `admin@odctl.io`.
 
 ## Register PostgreSQL as a Database Service
 
@@ -4626,7 +4888,7 @@ curl -s -H "$AUTH" \
 
 It prints `False`. To turn AutoPilot on, set `METADATA_AUTOPILOT="true"` in `.odctl/.env` and run `odctl recreate metadata`. The command then prints `True`.
 
-`openmetadata-init` logs in as `admin@odctl.io` with `admin`, or as `admin@open-data.local` on a database from an earlier release; when both fail, `docker logs openmetadata-init` ends with `AutoPilot could not be set`.
+`openmetadata-init` tries the admin login of a new database first, then the admin logins of earlier releases; when all of them fail, `docker logs openmetadata-init` ends with `AutoPilot could not be set`.
 
 ## Run a Metadata Ingestion
 
@@ -4850,7 +5112,7 @@ om=http://127.0.0.1:8585/api/v1
 json() { python3 -c "import json, sys; print($1)"; }
 
 TOKEN=$(curl -s -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf admin | base64)\"}" \
+  -d "{\"email\":\"admin@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
   "$om/users/login" | json 'json.load(sys.stdin)["accessToken"]')
 AUTH="Authorization: Bearer $TOKEN"
 
@@ -4967,6 +5229,18 @@ The collector answers `{"partialSuccess":{}}`. The collector passes metrics on i
 ## From Another Container
 
 Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), send OTLP to the collector at `otel-lgtm:4317` (gRPC) or `http://otel-lgtm:4318` (HTTP), as Airflow does. Prometheus is `http://otel-lgtm:9090` and Grafana is `http://otel-lgtm:3000`.
+
+This command sends an empty batch to the collector from a container on the network:
+
+```bash
+# An empty batch is enough to check the address. The collector answers 200.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s -o /dev/null -w "%{http_code}\n" \
+  -H "Content-Type: application/json" -d '{}' http://otel-lgtm:4318/v1/traces
+```
+
+```text
+200
+```
 
 ## Runnable Example
 
@@ -6037,17 +6311,13 @@ I use odctl in my own projects: [desflow](https://jaehyeon.me/desflow/) starts t
 
 - **Data engineering.** Streaming and batch pipelines on Kafka, Kafka Connect, Flink, Fluss and Spark, an Iceberg lakehouse queried with Trino, ClickHouse for analytics, Airflow and Temporal to run them, and lineage in Marquez and OpenMetadata.
 - **ML and MLOps.** MLflow tracks experiments, registers models and serves them. Feast serves features from Iceberg tables and Valkey, and Evidently stores drift reports. The Airflow image has the MLflow and Feast clients, with the tracking URI and the Feast registry already set.
-- **AI.** PostgreSQL has pgvector and pg_textsearch for [hybrid search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md), and Valkey has vector search. An AI assistant can choose a profile and reach its services with the odctl skill and `llms.txt`, as [Getting started](https://jaehyeon.me/odctl/latest/getting-started/#use-it-with-an-ai-assistant) describes. `odctl mcp` serves odctl's commands to AI agents as MCP tools. The [Roadmap](https://jaehyeon.me/odctl/latest/about/roadmap/index.md) adds a Langfuse profile for tracing LLM and agent applications, and a desflow server profile after desflow 1.0.
+- **AI.** PostgreSQL has pgvector and pg_textsearch for [hybrid search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md), and Valkey has vector search. An AI assistant can choose a profile and reach its services with the odctl skill and `llms.txt`, as [Getting started](https://jaehyeon.me/odctl/latest/getting-started/#use-it-with-an-ai-assistant) describes. `odctl mcp` serves odctl's commands to AI agents as MCP tools. The `langfuse` profile traces LLM and agent applications. The [Roadmap](https://jaehyeon.me/odctl/latest/about/roadmap/index.md) adds a desflow server profile after desflow 1.0.
 
 # Roadmap
 
 The work comes in the order shown, without dates: a release ships when it is ready. Features come first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue where one exists.
 
 ## Next Releases
-
-1.7.0: Langfuse
-
-A profile for tracing and evaluating LLM and agent applications, using odctl's ClickHouse. [#120](https://github.com/jaehyeon-kim/odctl/issues/120)
 
 1.8.0: Lineage and alerts
 
@@ -6115,6 +6385,10 @@ Work that does not wait for a release, published as it is ready.
 
 Newest first.
 
+1.7.0: Langfuse
+
+The `langfuse` profile traces LLM and agent applications in Langfuse, on odctl's PostgreSQL, ClickHouse, Valkey and SeaweedFS ([Langfuse](https://jaehyeon.me/odctl/latest/guides/langfuse/index.md)). On a new database, `admin@odctl.io` logs in to OpenMetadata with the password `password` ([OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)). [#120](https://github.com/jaehyeon-kim/odctl/issues/120), [#181](https://github.com/jaehyeon-kim/odctl/issues/181)
+
 1.6.0: MCP server
 
 `odctl mcp` gives an AI agent `list`, `explain`, `ps`, `info` and `logs` as MCP tools, and `up` and `down` with `--allow-changes` ([MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md)). The dry run of `odctl down --volumes` names the volumes it would remove. [#141](https://github.com/jaehyeon-kim/odctl/issues/141), [#170](https://github.com/jaehyeon-kim/odctl/issues/170)
@@ -6164,6 +6438,22 @@ What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.7.0
+
+A Langfuse profile for tracing LLM and agent applications, Valkey starting earlier, the OpenMetadata admin's password changed to `password`, and newer otel-lgtm and Confluent converters.
+
+- The `langfuse` profile runs Langfuse in a new AI Engineering area, with its UI and OTLP endpoint on host port 3005 ([Langfuse](https://jaehyeon.me/odctl/latest/guides/langfuse/index.md)).
+- The `storage` profile also creates a `langfuse` bucket.
+- `valkey` now starts before the other profiles that sort after it, so `odctl up` and its `--dry-run` list it earlier ([Dependencies and the Start Order](https://jaehyeon.me/odctl/latest/how-it-works/#dependencies-and-the-start-order)).
+- On a new database, `admin@odctl.io` logs in to OpenMetadata with the password `password`, the same as `user@odctl.io` ([OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)).
+- The `telemetry` profile runs `grafana/otel-lgtm:0.40.0`, up from 0.37.0. The deps image has the Confluent Avro, Protobuf and JSON Schema converters 8.4.0, up from 8.3.2.
+
+### Upgrading
+
+- A workspace made by `odctl init` before 1.7.0 keeps its old files: it has no `langfuse` profile, `telemetry` keeps `otel-lgtm` 0.37.0, and a new OpenMetadata database gives `admin@odctl.io` the password `admin`. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate` for the profiles you use, such as `odctl recreate telemetry metadata`.
+- A `ch-lite` with data from an earlier release does not run its init file again, so it has no `langfuse` database. Start it with `odctl up ch-lite` and create the database: `docker exec ch-11 clickhouse-client --password password --query "CREATE DATABASE IF NOT EXISTS langfuse"`. Then run `odctl up langfuse`: `seaweed-init` creates the `langfuse` bucket, and Langfuse creates its PostgreSQL database.
+- An OpenMetadata database created by 1.3.0 to 1.6.0 keeps the admin password `admin`, so a script that logs in as `admin@odctl.io` uses `admin` there and `password` on a new database. `openmetadata-init` accepts both.
 
 ## Version 1.6.0
 
