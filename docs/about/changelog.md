@@ -4,12 +4,13 @@ Each release, newest first: what changed, then under Upgrading what to change in
 
 ## Version 1.7.0
 
-A Langfuse profile for tracing LLM and agent applications, Valkey starting earlier, and the OpenMetadata admin's password changed to `password`.
+A Langfuse profile for tracing LLM and agent applications, Valkey starting earlier, the OpenMetadata admin's password changed to `password`, and newer otel-lgtm and Confluent converters.
 
 - The `langfuse` profile runs Langfuse in a new AI Engineering area, with its UI and OTLP endpoint on host port 3005 ([Langfuse](../guides/langfuse.md)).
 - The `storage` profile also creates a `langfuse` bucket.
 - `valkey` now starts before the other profiles that sort after it, so `odctl up` and its `--dry-run` list it earlier ([Dependencies and the Start Order](../how-it-works.md#dependencies-and-the-start-order)).
 - On a new database, `admin@odctl.io` logs in to OpenMetadata with the password `password`, the same as `user@odctl.io` ([OpenMetadata](../guides/openmetadata.md)).
+- The `telemetry` profile runs `grafana/otel-lgtm:0.40.0`, up from 0.37.0. The deps image has the Confluent Avro, Protobuf and JSON Schema converters 8.4.0, up from 8.3.2.
 
 ### Upgrading
 
