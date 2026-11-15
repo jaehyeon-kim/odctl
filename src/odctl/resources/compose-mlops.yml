@@ -266,6 +266,50 @@ services:
       retries: 12
       start_period: 20s
 
+  # ==========================================
+  # Label Studio: Data Labelling
+  # ==========================================
+  # Keeps projects, tasks and annotations in the labelstudio database on
+  # PostgreSQL, which postgres/01-init-databases.sh creates on a new data folder.
+  label-studio:
+    image: heartexlabs/label-studio:1.23.2
+    container_name: label-studio
+    profiles: ["label-studio"]
+    networks:
+      - odctl
+    ports:
+      # Host 8088: 8080 is Trino's, and 8087 and 8089 are taken.
+      - "127.0.0.1:8088:8080"
+    # One process. On a first start on a new database and one run of the smoke
+    # case it peaked at 524 MiB, page cache included, and held 240 MiB after.
+    mem_limit: 768m
+    environment:
+      TZ: ${TZ:-UTC}
+      DJANGO_DB: default
+      POSTGRE_NAME: labelstudio
+      POSTGRE_USER: ${POSTGRES_USER:-user}
+      POSTGRE_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRE_HOST: postgres
+      POSTGRE_PORT: "5432"
+      # The first user and its API token, created on the first start. These are
+      # local-only values, as the other profiles' logins are. Label Studio
+      # applies a token only when it is longer than 5 characters.
+      LABEL_STUDIO_USERNAME: user@odctl.io
+      LABEL_STUDIO_PASSWORD: password
+      LABEL_STUDIO_USER_TOKEN: odctl-label-studio-token
+      # Without this, the token above gets 401 "legacy token authentication has
+      # been disabled for this organization". It is read once, when the first
+      # start creates the organization.
+      LABEL_STUDIO_ENABLE_LEGACY_API_TOKEN: "true"
+      # Usage analytics to Label Studio are on unless this is set.
+      LABEL_STUDIO_COLLECT_ANALYTICS: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
 networks:
   odctl:
     name: odctl

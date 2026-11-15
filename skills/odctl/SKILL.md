@@ -340,7 +340,7 @@ Temporal: Workflow orchestration and pipeline scheduling (Airflow), and durable 
 
 ### mlflow
 
-MLflow: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). `odctl up mlflow` also starts: `deps`, `postgres`, `storage`.
+MLflow: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). `odctl up mlflow` also starts: `deps`, `postgres`, `storage`.
 
 ```text
 • MLflow Tracking UI & Artifact Registry Server:
@@ -362,7 +362,7 @@ MLflow: Experiment tracking, model registry and model serving (MLflow), the feat
 
 ### feast
 
-Feast: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). `odctl up feast` also starts: `catalog`, `deps`, `postgres`, `storage`, `valkey`.
+Feast: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). `odctl up feast` also starts: `catalog`, `deps`, `postgres`, `storage`, `valkey`.
 
 ```text
 • Feast UI (registry browser, not data):
@@ -390,7 +390,7 @@ Feast: Experiment tracking, model registry and model serving (MLflow), the featu
 
 ### evidently
 
-Evidently: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). `odctl up evidently` also starts: `deps`, `postgres`.
+Evidently: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). `odctl up evidently` also starts: `deps`, `postgres`.
 
 ```text
 • Evidently UI & API (no login, and writes are open):
@@ -408,6 +408,23 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
 | `evidently` | `evidently/evidently-service` | `8089:8000` | `1g` |
+
+### label-studio
+
+Label Studio: Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). `odctl up label-studio` also starts: `deps`, `postgres`.
+
+```text
+• Label Studio UI & API (user user@odctl.io, password password):
+  * External (host): http://127.0.0.1:8088
+  * Internal (Docker): http://label-studio:8080
+• API token: odctl-label-studio-token, sent as the header
+  Authorization: Token odctl-label-studio-token
+• Projects, tasks and annotations: the labelstudio database on Postgres.
+```
+
+| Service | Image | Host:container ports | Memory limit |
+| --- | --- | --- | --- |
+| `label-studio` | `heartexlabs/label-studio` | `8088:8080` | `768m` |
 
 ## Metadata and Lineage
 

@@ -156,11 +156,12 @@ TECH_GROUPS: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = [
     ),
     (
         "MLOps",
-        "MLflow, Feast, Evidently",
+        "MLflow, Feast, Evidently, Label Studio",
         [
             ("MLflow", ["mlflow"]),
             ("Feast", ["feast"]),
             ("Evidently", ["evidently"]),
+            ("Label Studio", ["label-studio"]),
         ],
     ),
     (

@@ -2186,6 +2186,47 @@ smoke_langfuse() {
   pass "one trace reached Langfuse and Tempo"
 }
 
+# Label Studio guide. Its steps run in one shell, in page order, because each
+# step uses the PROJECT_ID that the first one sets. The annotate step stands in
+# for the labelling a person does in the UI.
+smoke_label_studio() {
+  retry 60 5 http_ok "http://127.0.0.1:8088/health/" || fail "no HTTP response from :8088/health/"
+  [ "$(docker exec postgres psql -U user -d odctl -tAc "SELECT count(*) FROM pg_database WHERE datname = 'labelstudio'")" = "1" ] \
+    || fail "PostgreSQL has no labelstudio database"
+  pass "label-studio answering and its database on postgres"
+
+  local work out
+  work=$(mktemp -d)
+  snippet label-studio/steps.py load >"$work/load.py"
+  out=$( (cd "$work" && for section in project import read annotate export load; do
+      snippet label-studio/commands.sh "$section"
+    done | bash -o pipefail) 2>&1) || { echo "$out" | tail -20; fail "the guide's steps failed"; }
+  grep -q '^r-2 Driver 1002, conv_rate 0\.75$' <<<"$out" || { echo "$out" | tail -20; fail "the imported tasks were not read back"; }
+  grep -qE '^ r-1 +\| 1 +\| label-studio' <<<"$out" && grep -qE '^ r-2 +\| 0 +\| label-studio' <<<"$out" \
+    || { echo "$out" | tail -20; fail "the label table does not hold the exported annotations"; }
+  pass "a project, two tasks and their annotations reached the label table"
+
+  # A second annotation on r-1, as the guide's script adds after a UI label:
+  # the load keeps one row per task, from its latest annotation. The table is in
+  # dev, so the CDC publication of the cdc schema does not stream it.
+  local auth="Authorization: Token odctl-label-studio-token" task project
+  read -r task project < <(python3 -c "import json, sys; t = next(t for t in json.load(open(sys.argv[1])) if t['data']['sample_id'] == 'r-1'); print(t['id'], t['project'])" "$work/annotations.json")
+  curl -fsS -o /dev/null -X POST "http://127.0.0.1:8088/api/tasks/$task/annotations" -H "$auth" -H "Content-Type: application/json" \
+    -d '{"result": [{"from_name": "label", "to_name": "text", "type": "choices", "value": {"choices": ["0"]}}]}' \
+    || fail "could not add a second annotation to r-1"
+  curl -fsS "http://127.0.0.1:8088/api/projects/$project/export?exportType=JSON" -H "$auth" -o "$work/annotations.json" \
+    && (cd "$work" && python3 load.py) || fail "the second export or load failed"
+  [ "$(docker exec postgres psql -U user -d odctl -tAc "SELECT label FROM dev.labels WHERE sample_id = 'r-1'")" = "0" ] \
+    || fail "a task with two annotations did not keep its latest label"
+  [ "$(docker exec postgres psql -U user -d odctl -tAc "SELECT count(*) FROM pg_publication_tables WHERE tablename = 'labels'")" = "0" ] \
+    || fail "the label table is in the CDC publication"
+  pass "a task with two annotations keeps its latest label, outside the CDC publication"
+
+  snippet_says label-studio/commands.sh container -qx 'user@odctl.io' \
+    || fail "a container on the odctl network could not call the API with the token"
+  pass "a container on the odctl network reaches the API with the token"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -2266,6 +2307,7 @@ case "$PROFILE" in
     rm -rf feature_repo vector_repo push_definitions.py
     rm -rf "${TMPDIR:-/tmp}/odctl-feast-smoke" ;;
   evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
+  label-studio) smoke_label_studio; run_example label-studio 'e-2 +\| 0 +\| label-studio' python3 ;;
   langfuse)   smoke_langfuse; run_example langfuse 'has 2 observations' "$(langfuse_runner)" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"

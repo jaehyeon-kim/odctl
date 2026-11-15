@@ -31,11 +31,12 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     CREATE DATABASE metabase OWNER "$POSTGRES_USER";
     CREATE DATABASE feast OWNER "$POSTGRES_USER";
     CREATE DATABASE evidently OWNER "$POSTGRES_USER";
+    CREATE DATABASE labelstudio OWNER "$POSTGRES_USER";
     CREATE DATABASE langfuse OWNER "$POSTGRES_USER";
 EOSQL
 
 # Loop through and add pg_stat_statements to all
-for db in marquez omt vector iceberg airflow mlflow metabase feast evidently langfuse; do
+for db in marquez omt vector iceberg airflow mlflow metabase feast evidently labelstudio langfuse; do
     echo "Configuring database: $db"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$db" <<-EOSQL
         CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
