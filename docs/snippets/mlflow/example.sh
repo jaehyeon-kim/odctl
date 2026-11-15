@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Starts mlflow, logs a run with an artifact, registers an XGBoost model with
 # the alias champion, serves it with mlflow-serve and scores two rows. Run it
-# in the folder that holds your .odctl workspace, in an environment with
-# mlflow==3.16.1 and xgboost 3.2 installed.
+# in the folder that holds your .odctl workspace, in an environment with the
+# MLflow and XGBoost versions that the guide names.
 set -euo pipefail
 
 odctl up mlflow

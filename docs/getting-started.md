@@ -229,8 +229,8 @@ odctl info --json | python3 -m json.tool
 
 ```text
 {
-    "cli_version": "1.8.0",
-    "tag": "1.8.0",
+    "cli_version": "<CLI version>",
+    "tag": "<CLI version>",
     "workspace": {
         "path": "/home/you/project/.odctl",
         "exists": true,
@@ -241,23 +241,23 @@ odctl info --json | python3 -m json.tool
     },
     "images": [
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>",
             "local": true
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>",
             "local": false
         }
     ]

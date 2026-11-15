@@ -36,7 +36,9 @@ def test_spark_mounts_the_prometheus_servlet_config():
 
 
 def test_mlflow_exposes_prometheus_metrics():
-    assert "--expose-prometheus" in _services("compose-mlops.yml")["mlflow"]["command"]
+    assert (
+        "--expose-prometheus" in _services("compose-mlops.yml")["mlflow"]["command"][-1]
+    )
 
 
 def test_feast_serve_enables_its_metrics_server():

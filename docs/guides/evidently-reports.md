@@ -16,7 +16,7 @@ odctl up evidently
 pip install evidently==0.7.23 "pandas<3.1"
 ```
 
-The server runs Evidently 0.7.23, so install the same client version. Evidently 0.7.23 fails to import with pandas 3.1, so keep pandas below 3.1. The UI has no login.
+The install command pins the client to the server's version. That version fails to import with pandas 3.1, so the command keeps pandas below 3.1. The UI has no login.
 
 ## Push a Data Drift Report
 
@@ -74,8 +74,8 @@ Save this file as `example.py`. Start the profile and install the client as abov
 ```python title="docs/snippets/evidently-reports/example.py"
 """Pushes a data drift report to Evidently, stores a dataset and reads it back.
 
-Start the profile with `odctl up evidently` and install the client with
-`pip install evidently==0.7.23 "pandas<3.1"` first.
+Start the profile with `odctl up evidently` and install the client first,
+as the guide's install step shows.
 """
 
 import numpy as np

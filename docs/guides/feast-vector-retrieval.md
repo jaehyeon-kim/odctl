@@ -11,11 +11,11 @@ This guide builds on [Feast with Iceberg](feast-iceberg.md), which defines featu
 | Database for the vectors | `vector` |
 | Registry | the `feast` database on PostgreSQL, project `vector_demo` |
 
-Start PostgreSQL and install the client, with the extras that read DuckDB and PostgreSQL:
+The Feast client needs Python 3.11 or newer. Start PostgreSQL and install the client, with the extras that read DuckDB and PostgreSQL:
 
 ```bash title="docs/snippets/feast-vector-retrieval/commands.sh:install"
 odctl up postgres
-pip install "feast[duckdb,postgres]==0.66.0"
+pip install "feast[duckdb,postgres]==0.68.0"
 ```
 
 ## Define a Second Repository
@@ -128,7 +128,7 @@ Save this file as `example.sh` and run it with `bash example.sh` in the folder t
 # Starts postgres, writes a second feature repository whose online store is
 # PostgreSQL with pgvector, registers a feature view of three documents, writes
 # their embeddings and retrieves the two nearest to a query vector. Run it in an
-# environment with "feast[duckdb,postgres]==0.66.0" installed.
+# environment with the packages from the guide's install step.
 set -euo pipefail
 
 odctl up postgres

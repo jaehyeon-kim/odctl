@@ -10,7 +10,7 @@ odctl up flink-lite
 
 # --8<-- [start:install]
 odctl up feast
-pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
+pip install "feast[duckdb,iceberg,redis,postgres]==0.68.0" pyarrow
 # --8<-- [end:install]
 
 # --8<-- [start:catalog-env]

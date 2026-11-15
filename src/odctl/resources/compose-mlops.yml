@@ -93,6 +93,9 @@ services:
     mem_limit: 2500m
     environment:
       <<: *mlops-env
+      # The command reads it as "$$MLFLOW_DB_URL", so a password with a shell
+      # character such as $ or a quote reaches MLflow unchanged.
+      MLFLOW_DB_URL: postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 5s
@@ -102,23 +105,35 @@ services:
     # Each worker imports the ML runtimes in the mlflow image, so memory is about
     # 1.1G fixed plus 0.35G per worker: 1.46G at one, 1.81G at two and 2.58G at
     # the default four. Two is enough for a local stack. A comment cannot live
-    # inside the folded block below, where it becomes an argument.
+    # inside the folded block below: it joins the shell line, and sh ignores
+    # everything after the #.
     # allowed-hosts needs both the container port and the published one: 5000
     # for anything inside, 5004 from the host. A missing entry gives 403 while
     # /health still answers 200, so the container looks healthy.
     # --expose-prometheus serves request metrics at /metrics, keeping per-worker
     # files in the given directory so both workers are counted.
-    # Never comment inside the command block: YAML folds it into the arguments.
-    command: >
-      mlflow server
-      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
-      --artifacts-destination s3://mlflow
-      --serve-artifacts
-      --host 0.0.0.0
-      --port 5000
-      --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000,localhost:5004,127.0.0.1:5004
-      --workers 2
-      --expose-prometheus /tmp/mlflow-prometheus
+    # mlflow db upgrade runs first on every start, before the workers: a server
+    # refuses a database from an older MLflow with "Detected out-of-date database
+    # schema", and PostgreSQL keeps the mlflow database across odctl recreate. It
+    # creates the tables on an empty database, upgrades an older one and changes
+    # nothing on a current one. It runs its migrations in one transaction, so a
+    # stopped upgrade leaves the old schema, and the next start runs it again.
+    # Compose runs a command string with no shell, so && needs sh -c, and exec
+    # lets the server receive docker stop's signal.
+    command:
+      - sh
+      - -c
+      - >
+        mlflow db upgrade "$$MLFLOW_DB_URL"
+        && exec mlflow server
+        --backend-store-uri "$$MLFLOW_DB_URL"
+        --artifacts-destination s3://mlflow
+        --serve-artifacts
+        --host 0.0.0.0
+        --port 5000
+        --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000,localhost:5004,127.0.0.1:5004
+        --workers 2
+        --expose-prometheus /tmp/mlflow-prometheus
 
   # ==========================================
   # MLflow Model Server: scores one registered model
@@ -176,7 +191,7 @@ services:
   #
   # The image sets no CMD, so both services name their own command.
   feast-ui:
-    image: &feast-image quay.io/feastdev/feature-server:0.66.0
+    image: &feast-image quay.io/feastdev/feature-server:0.68.0
     container_name: feast-ui
     profiles: ["feast"]
     networks:

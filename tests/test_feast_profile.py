@@ -63,6 +63,31 @@ def test_one_profile_starts_mlflow_and_its_model_server():
     assert serve["healthcheck"]["test"][1].startswith('[ -z "$${MODEL_URI}" ] ||')
 
 
+def test_mlflow_upgrades_its_database_before_the_server_starts():
+    # A server refuses a database from an older MLflow, and the database stays
+    # across odctl recreate, so every start upgrades it first.
+    import shlex
+
+    service = _compose("compose-mlops.yml")["services"]["mlflow"]
+    assert service["environment"]["MLFLOW_DB_URL"] == (
+        "postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}"
+        "@postgres/mlflow"
+    )
+    command = service["command"]
+    assert command[:2] == ["sh", "-c"]
+    upgrade, server = command[2].split(" && ")
+    # Compose turns $$ into $, so the shell reads the URL from the variable.
+    url = "$$MLFLOW_DB_URL"
+    assert shlex.split(upgrade) == ["mlflow", "db", "upgrade", url]
+    assert shlex.split(server)[:5] == [
+        "exec",
+        "mlflow",
+        "server",
+        "--backend-store-uri",
+        url,
+    ]
+
+
 def test_feast_ui_waits_for_a_healthy_feast_serve():
     # Both create the registry tables at start; together, the loser exits.
     services = _compose("compose-mlops.yml")["services"]

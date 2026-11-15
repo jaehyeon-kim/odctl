@@ -110,6 +110,11 @@ evidently_runner() {
     "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2)
   echo "uv run --no-project --quiet --python 3.12 --with evidently==$version --with pandas<3.1 python"
 }
+# The Feast client version the feature server image runs.
+feast_version() {
+  grep -oE 'feastdev/feature-server:[0-9.]+' \
+    "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2
+}
 
 # How It Works edits a workspace file and applies it with odctl recreate. Each
 # check runs the guide's section, puts the file back and recreates again, so
@@ -733,7 +738,8 @@ smoke_mlflow() {
 # image pins, so read them from the Dockerfile the image is built from.
 # mlflow_snippet <section> [sed expression] [timeout in seconds]: the optional
 # sed expression changes the section before it runs, and the timeout stops a
-# call that hangs, as a download from the host does without its setting.
+# call that hangs, as a download from the host would if the server sent it to
+# presigned URLs for seaweed:8333.
 mlflow_snippet() {
   local dockerfile="$SNIPPETS/../../src/odctl/resources/docker/mlflow/Dockerfile" mlflow xgboost
   local edit="${2:-}" limit="${3:-}"
@@ -795,15 +801,12 @@ smoke_model_server() {
   esac
   pass "a new version behind the alias is served after odctl restart mlflow: $got"
 
-  # From the host, a download works only with the setting the guide names. Without
-  # it the call waits on presigned URLs for seaweed:8333 and never returns.
+  # From the host, a download goes through the tracking server with no setting.
+  # If it went to presigned URLs for seaweed:8333, it would wait until the timeout.
   local files
-  files=$(mlflow_snippet download "" 120 2>&1) || fail "the download with the setting failed: $files"
+  files=$(mlflow_snippet download "" 120 2>&1) || fail "the download from the host failed: $files"
   grep -q MLmodel <<<"$files" || fail "the downloaded model has no MLmodel file: $files"
-  if mlflow_snippet download '/MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD/d' 45 >/dev/null 2>&1; then
-    fail "the download worked without MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false, so the guide's reason is stale"
-  fi
-  pass "a registered model downloads from the host with the setting and not without it"
+  pass "a registered model downloads from the host with no setting"
 }
 
 # A model that reads online features calls feast-serve over HTTP from inside
@@ -920,7 +923,7 @@ smoke_airflow_materialize() {
   rm -rf "$work"; mkdir -p "$work"
   uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
-    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
+    "feast[duckdb,iceberg,redis,postgres]==$(feast_version)" "pyarrow" >/dev/null 2>&1 \
     || fail "could not install the feast client"
 
   cp -r "$SNIPPETS/feast-iceberg/feature_repo" "$work/"
@@ -1769,7 +1772,7 @@ smoke_feast() {
   # the published image carries feast[minimal], which has no iceberg or duckdb.
   uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
-    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" "mcp>=1.24,<2" >/dev/null 2>&1 \
+    "feast[duckdb,iceberg,redis,postgres]==$(feast_version)" "pyarrow" "mcp>=1.24,<2" >/dev/null 2>&1 \
     || fail "could not install the feast and mcp clients"
 
   # Repository from the guide, whose source passes warehouse="" so that PyIceberg
