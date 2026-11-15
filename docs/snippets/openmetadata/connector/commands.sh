@@ -28,8 +28,8 @@ PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/"$PIPE"
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 # --8<-- [end:agent]
 
 # --8<-- [start:status]
@@ -51,7 +51,7 @@ docker exec openmetadata-ingestion grep -c orders_v2 /opt/airflow/connectors/dem
 # --8<-- [end:copied-change]
 
 # --8<-- [start:retrigger]
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 # --8<-- [end:retrigger]
 
 # --8<-- [start:changed-table]

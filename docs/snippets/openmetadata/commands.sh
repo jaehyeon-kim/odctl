@@ -35,8 +35,8 @@ PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/"$PIPE"
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 # --8<-- [end:pipeline]
 
 # --8<-- [start:status]

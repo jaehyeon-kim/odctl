@@ -65,8 +65,8 @@ PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/"$PIPE"
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 ```
 
 The deploy answers that the agent's workflow has been created. It works once `odctl up metadata` has returned, because the profile waits until the ingestion Airflow answers. Airflow has to parse the new DAG file before the trigger works, so repeat the trigger every few seconds until it answers that the workflow has been triggered. Then read the run's state:
@@ -195,8 +195,8 @@ PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/"$PIPE"
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 ```
 
 Read the run's state until the `pipelineState` of the first entry of `pipelineStatuses` reaches `success`:
@@ -232,7 +232,7 @@ docker exec openmetadata-ingestion grep -c orders_v2 /opt/airflow/connectors/dem
 Trigger the agent again:
 
 ```bash title="docs/snippets/openmetadata/connector/commands.sh:retrigger"
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 ```
 
 A run that starts after the copy reports `orders_v2`. Read the run's state as above, then the changed table:

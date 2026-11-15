@@ -1,0 +1,6 @@
+# The guides' commands.sh snippets have no shebang: smoke.sh runs their sections
+# with bash.
+shell=bash
+# The deps scripts source versions.env from their own folder.
+external-sources=true
+source-path=SCRIPTDIR

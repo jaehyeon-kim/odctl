@@ -32,8 +32,11 @@ A project's label config is the labelling setup, written in Label Studio's XML t
 
 ```bash title="docs/snippets/label-studio/commands.sh:project"
 # A project that labels each request 1 or 0, the two scores the driver model
-# gives. It prints the project ID.
+# gives. It prints the project ID. $text names each task's text field, which
+# Label Studio fills in, so it stays in single quotes. The shellcheck line tells
+# the repository's shell linter that this is intended.
 TOKEN=odctl-label-studio-token
+# shellcheck disable=SC2016
 PROJECT_ID=$(curl -s -X POST http://127.0.0.1:8088/api/projects \
   -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
   -d '{"title": "Driver requests", "label_config": "<View><Text name=\"text\" value=\"$text\"/><Choices name=\"label\" toName=\"text\"><Choice value=\"1\"/><Choice value=\"0\"/></Choices></View>"}' \
