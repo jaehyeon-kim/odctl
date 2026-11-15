@@ -12,6 +12,10 @@ x-airflow-common: &airflow-common
   mem_limit: 1500m
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    # Where Airflow's OpenLineage provider sends the lineage of each DAG run. Empty by
+    # default: with no transport the provider turns itself off, so Airflow sends nothing
+    # and logs no OpenLineage error. Set AIRFLOW_OPENLINEAGE_TRANSPORT in .env to turn it on.
+    AIRFLOW__OPENLINEAGE__TRANSPORT: ${AIRFLOW_OPENLINEAGE_TRANSPORT:-}
     # Worker processes the LocalExecutor runs tasks in. The default of 32 is far more
     # than a laptop needs, and each idle one holds memory.
     AIRFLOW__CORE__PARALLELISM: "4"

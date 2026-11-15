@@ -2,6 +2,21 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.8.0
+
+Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules in the `telemetry` profile.
+
+- Airflow sends each DAG run's lineage to Marquez when `AIRFLOW_OPENLINEAGE_TRANSPORT` is set in `.env`; the key is empty by default ([Lineage from Airflow](../guides/lineage.md#lineage-from-airflow)).
+- A Spark job sends its lineage to Marquez through the OpenLineage Spark listener, whose jar the Spark containers already load ([Lineage from Spark](../guides/lineage.md#lineage-from-spark)).
+- `feast apply` sends the feature views it applies to Marquez when `feature_store.yaml` enables it, and the `airflow` image has Feast's `openlineage` extra for that ([Lineage from Feast](../guides/lineage.md#lineage-from-feast)).
+- The `telemetry` profile loads Grafana alert rules from `.odctl/grafana/alerting/` and ships one that fires when an Airflow DAG run fails ([Add an Alert Rule](../guides/telemetry.md#add-an-alert-rule)).
+- The Telemetry guide has two sample rules: one for data drift found by an Evidently check in an Airflow DAG, and one for a budget of model tokens.
+
+### Upgrading
+
+- A new `.env` key, `AIRFLOW_OPENLINEAGE_TRANSPORT`, is empty by default, so nothing changes until you set it.
+- A workspace made by `odctl init` before 1.8.0 keeps its old `compose-orch.yml` and `compose-obsv.yml`, has no `grafana/alerting` folder, and has no `AIRFLOW_OPENLINEAGE_TRANSPORT` line in its `.env`. Run `odctl init --force` to copy the new files and write a new `.env` that has the key; it replaces your edits, so keep a copy of them. Then set the key as [Lineage from Airflow](../guides/lineage.md#lineage-from-airflow) shows, and run `odctl recreate` for the profiles you use, such as `odctl recreate airflow telemetry`.
+
 ## Version 1.7.0
 
 A Langfuse profile for tracing LLM and agent applications, Valkey starting earlier, the OpenMetadata admin's password changed to `password`, and newer otel-lgtm and Confluent converters.

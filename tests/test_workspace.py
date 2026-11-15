@@ -31,7 +31,12 @@ def test_init_workspace(tmp_path, monkeypatch):
     assert (workspace / "subdir" / "subfile.txt").read_text() == "world"
     assert (workspace / ".env").exists()
     env = (workspace / ".env").read_text()
-    for key in ("_AIRFLOW_PIP_DEPS", "_MLOPS_PIP_DEPS", "_METADATA_PIP_DEPS"):
+    for key in (
+        "_AIRFLOW_PIP_DEPS",
+        "_MLOPS_PIP_DEPS",
+        "AIRFLOW_OPENLINEAGE_TRANSPORT",
+        "_METADATA_PIP_DEPS",
+    ):
         assert f'\n{key}=""\n' in env
     assert '\nMETADATA_AUTOPILOT="false"\n' in env
 

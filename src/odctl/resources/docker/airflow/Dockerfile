@@ -24,11 +24,13 @@ RUN --mount=type=cache,target=/home/airflow/.cache/pip \
 # Clients for the stack's own MLflow and Feast services, matched to their servers:
 # the mlflow image runs 3.16 and the feast profile runs feature-server 0.66.0.
 # Feast's offline half runs in the task's process, so it needs the DuckDB,
-# Iceberg, Postgres registry and Valkey extras here rather than in a server.
+# Iceberg, Postgres registry and Valkey extras here rather than in a server. The
+# OpenLineage extra lets `feast apply` report lineage from here when the
+# feature_store.yaml has an openlineage block.
 RUN --mount=type=cache,target=/home/airflow/.cache/pip \
     pip install \
     'mlflow~=3.16.0' \
-    'feast[duckdb,iceberg,postgres,redis]==0.66.0'
+    'feast[duckdb,iceberg,openlineage,postgres,redis]==0.66.0'
 
 # Model runtimes, pinned to the same minors as the mlflow image, because a model
 # trained here is loaded there. A model saved by a newer runtime is not

@@ -278,6 +278,42 @@ def test_every_named_selection_yields_a_valid_project():
     )
 
 
+def test_airflow_takes_its_lineage_transport_from_the_env_key_with_an_empty_default():
+    """An empty transport turns Airflow's OpenLineage provider off, so Airflow
+    sends no lineage until `.env` sets AIRFLOW_OPENLINEAGE_TRANSPORT."""
+    env = _services(get_internal_resources_dir() / "compose-orch.yml")["airflow"][
+        "environment"
+    ]
+    assert (
+        env["AIRFLOW__OPENLINEAGE__TRANSPORT"] == "${AIRFLOW_OPENLINEAGE_TRANSPORT:-}"
+    )
+
+
+def test_the_alerting_folder_is_mounted_read_only_into_grafana():
+    """Grafana reads its provisioning directory when it starts, so the alert rules
+    load from the folder mounted here, and odctl never writes to it."""
+    volumes = _services(get_internal_resources_dir() / "compose-obsv.yml")["otel-lgtm"][
+        "volumes"
+    ]
+    assert (
+        "./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro" in volumes
+    )
+
+
+def test_the_shipped_alert_rule_queries_a_metric_the_airflow_dashboard_queries():
+    """A rule on a metric name that Airflow does not send never fires, and no
+    other check would show it."""
+    grafana = get_internal_resources_dir() / "grafana"
+    [group] = yaml.safe_load((grafana / "alerting" / "airflow.yaml").read_text())[
+        "groups"
+    ]
+    [rule] = group["rules"]
+    [query] = [step for step in rule["data"] if step["datasourceUid"] == "prometheus"]
+    metric = "airflow_dagrun_duration_failed_milliseconds"
+    assert metric in query["model"]["expr"]
+    assert metric in (grafana / "dashboards" / "airflow.json").read_text()
+
+
 def test_valkey_user_can_use_pubsub_channels():
     """Channels are a separate ACL class from keys, and Valkey defaults to
     resetchannels. Without an explicit channel grant, PUBLISH and SUBSCRIBE return

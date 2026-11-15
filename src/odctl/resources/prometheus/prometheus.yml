@@ -1,7 +1,8 @@
 # Replaces /otel-lgtm/prometheus.yaml in grafana/otel-lgtm. The global, otlp and
 # storage blocks are copied from the image's own file, so OTLP metrics keep their
 # resource attributes as labels and late samples are still accepted. The scrape
-# jobs are odctl's. There is no alerting block: odctl defines no alert rules.
+# jobs are odctl's. There is no alerting block: odctl's alert rule is a Grafana
+# alert rule in `grafana/alerting/`, which Grafana evaluates itself.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s

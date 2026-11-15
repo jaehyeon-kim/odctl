@@ -6,7 +6,7 @@ A CLI that starts a local open data stack with Docker Compose profiles: Kafka, F
 
 ## Running the Tests
 
-- Run the unit suite, `pytest tests/`, in full once before each commit, never after each step.
+- Run the unit suite, `pytest tests/`, in full once before a push or a pull request, not before each commit or after each step.
 - Run the strict build at most once per commit.
 
 ## Owner Decisions

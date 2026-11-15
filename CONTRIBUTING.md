@@ -55,7 +55,7 @@ Each layer checks one thing:
 - The strict docs build fails on a broken link or anchor.
 - The e2e tests start each profile group and run `.github/scripts/smoke.sh` on it. A running container is not enough: the script checks that the profile does its job, such as a Kafka consumer reading a message or a Flink job committing to Iceberg. It also runs each guide's snippets and Runnable Example.
 
-Run the unit suite in full once before each commit. While fixing, run only the failed tests (`pytest --lf`) and the tests of the files you changed. Run the strict build when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed: `registry.yml`, a compose file, a command's `--help` text, or `src/odctl/models.py`.
+Run the unit suite in full once before a push or a pull request, not before each commit. While fixing, run only the failed tests (`pytest --lf`) and the tests of the files you changed. Run the strict build when `docs/`, `mkdocs.yml` or an input of `scripts/gen_pages.py` changed: `registry.yml`, a compose file, a command's `--help` text, or `src/odctl/models.py`.
 
 A pull request runs these checks:
 

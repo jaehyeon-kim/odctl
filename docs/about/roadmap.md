@@ -5,14 +5,10 @@ The work comes in the order shown, without dates: a release ships when it is rea
 ## Next Releases
 
 ::timeline::
-- title: '1.8.0: Lineage and alerts'
-  content: 'Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules, starting with one for a failed DAG run. [#149](https://github.com/jaehyeon-kim/odctl/issues/149)'
-  icon: ':material-play:'
-  key: now
 - title: '1.9.0: Label Studio'
   content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
-  icon: ':material-clock-outline:'
-  key: planned
+  icon: ':material-play:'
+  key: now
 - title: '1.10.0: Agent skill'
   content: 'The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)'
   icon: ':material-clock-outline:'
@@ -80,6 +76,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.8.0: Lineage and alerts"
+
+    Airflow, Spark and Feast send their lineage to Marquez ([OpenLineage and Marquez](../guides/lineage.md)), and the Airflow image has Feast's `openlineage` extra. The `telemetry` profile loads Grafana alert rules from the workspace and ships one for a failed DAG run, and the Telemetry guide adds sample rules for data drift and a token budget ([Add an Alert Rule](../guides/telemetry.md#add-an-alert-rule)). [#149](https://github.com/jaehyeon-kim/odctl/issues/149)
 
 ??? note "1.7.0: Langfuse"
 
