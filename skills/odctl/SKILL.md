@@ -523,7 +523,7 @@ SeaweedFS: SeaweedFS S3-compatible object storage. `odctl up storage` also start
 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
-| `seaweed` | `chrislusf/seaweedfs` | `8333:8333`, `8889:8888`, `9333:9333` | `512m` |
+| `seaweed` | `chrislusf/seaweedfs` | `8333:8333`, `8889:8888`, `9333:9333` | `1024m` |
 | `seaweed-init` | `chrislusf/seaweedfs` | none | not set |
 
 ### catalog
