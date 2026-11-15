@@ -114,3 +114,5 @@ def test_a_patch_release_deployed_under_its_full_version_is_replaced_by_its_mino
     assert commands.index(deletes[0]) < next(
         i for i, c in enumerate(commands) if "mike deploy" in c
     )
+    # The deleted version's name stays as an alias of the minor, so its links work.
+    assert "run mike deploy --update-aliases 1.2 1.2.3 latest 1.2.0" in commands

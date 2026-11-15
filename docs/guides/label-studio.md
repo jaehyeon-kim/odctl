@@ -170,7 +170,7 @@ subprocess.run(
 Run it and read the table:
 
 ```bash title="docs/snippets/label-studio/commands.sh:load"
-python3 load.py
+python3 load.py &&
 docker exec postgres psql -U user -d odctl -c "SELECT sample_id, label, source FROM dev.labels ORDER BY sample_id"
 ```
 

@@ -36,19 +36,25 @@ DOCS_VERSION=$(echo "$VERSION" | cut -d . -f 1,2)
 echo "Docs version: $DOCS_VERSION"
 
 # A release of this minor deployed under its full version is replaced by the
-# minor, which takes over its name as an alias.
-for old in $(uv run mike list --json | uv run python -c '
+# minor, which takes over its name and its aliases as aliases. mike delete
+# removes a version with its aliases, so the names are kept first. Each line
+# holds one such version, then its aliases other than `latest`.
+old_names=()
+while read -r -a names; do
+  uv run mike delete "${names[0]}"
+  old_names+=("${names[@]}")
+done < <(uv run mike list --json | uv run python -c '
 import json, sys
 minor = sys.argv[1]
 for v in json.load(sys.stdin):
     if v["version"] != minor and ".".join(v["version"].split(".")[:2]) == minor:
-        print(v["version"])
-' "$DOCS_VERSION"); do
-  uv run mike delete "$old"
-done
+        print(" ".join([v["version"], *(a for a in v["aliases"] if a != "latest")]))
+' "$DOCS_VERSION")
 
-# Deploy the minor version and tag it as 'latest'
-uv run mike deploy --update-aliases "$DOCS_VERSION" "$VERSION" latest
+# Deploy the minor version and tag it as 'latest'. mike adds these aliases to
+# those the minor already has, so the full version of an earlier patch stays.
+# The + form expands an empty list to nothing under set -u in bash 3.2 too.
+uv run mike deploy --update-aliases "$DOCS_VERSION" "$VERSION" latest ${old_names[@]+"${old_names[@]}"}
 
 # The root of the site opens latest.
 uv run mike set-default latest

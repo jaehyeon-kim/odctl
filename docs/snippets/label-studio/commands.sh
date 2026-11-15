@@ -53,7 +53,7 @@ curl -s "http://127.0.0.1:8088/api/projects/$PROJECT_ID/export?exportType=JSON" 
 # --8<-- [end:export]
 
 # --8<-- [start:load]
-python3 load.py
+python3 load.py &&
 docker exec postgres psql -U user -d odctl -c "SELECT sample_id, label, source FROM dev.labels ORDER BY sample_id"
 # --8<-- [end:load]
 
