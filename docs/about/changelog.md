@@ -14,8 +14,8 @@ Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules in the
 
 ### Upgrading
 
-- A new `.env` key, `AIRFLOW_OPENLINEAGE_TRANSPORT`, is empty by default, so nothing changes until you set it. A workspace made before 1.8.0 has no such line, so add `AIRFLOW_OPENLINEAGE_TRANSPORT=` to its `.env` before following [Lineage from Airflow](../guides/lineage.md#lineage-from-airflow).
-- A workspace made by `odctl init` before 1.8.0 keeps its old `compose-orch.yml` and `compose-obsv.yml` and has no `grafana/alerting` folder. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them. Then run `odctl recreate` for the profiles you use, such as `odctl recreate airflow telemetry`.
+- A new `.env` key, `AIRFLOW_OPENLINEAGE_TRANSPORT`, is empty by default, so nothing changes until you set it.
+- A workspace made by `odctl init` before 1.8.0 keeps its old `compose-orch.yml` and `compose-obsv.yml`, has no `grafana/alerting` folder, and has no `AIRFLOW_OPENLINEAGE_TRANSPORT` line in its `.env`. Run `odctl init --force` to copy the new files and write a new `.env` that has the key; it replaces your edits, so keep a copy of them. Then set the key as [Lineage from Airflow](../guides/lineage.md#lineage-from-airflow) shows, and run `odctl recreate` for the profiles you use, such as `odctl recreate airflow telemetry`.
 
 ## Version 1.7.0
 
