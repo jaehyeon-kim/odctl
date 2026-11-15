@@ -1,54 +1,61 @@
 # Roadmap
 
-The work comes in the order shown, without dates or version numbers: an item gets its version when it ships. Features come first, then the testing and setup work that adds no feature. Each item links to its GitHub issue where one exists.
+Now is the work being built, and Planned lists the rest in no order. Neither has dates or version numbers: an item gets its version when it ships. Each item links to its GitHub issue where one exists.
 
 ## Now
 
 ::timeline::
-- title: 'Label Studio'
-  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
+- title: 'Agent skill'
+  content: 'The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)'
   icon: ':material-play:'
   key: now
 ::/timeline::
 
 ## Planned
 
-::timeline::
-- title: 'Agent skill'
-  content: 'The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Guides'
-  content: 'Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow. [#152](https://github.com/jaehyeon-kim/odctl/issues/152)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'MLOps guides'
-  content: 'A prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Agents guides'
-  content: 'Traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Retrieval guides'
-  content: 'Hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Testing and CI'
-  content: 'The end-to-end tests run on every pull request, including image updates. Each release is also tested as an upgrade from the one before it, and on arm64. [#102](https://github.com/jaehyeon-kim/odctl/issues/102)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: 'Kafka Connect transforms'
-  content: 'Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector. [#143](https://github.com/jaehyeon-kim/odctl/issues/143)'
-  icon: ':material-clock-outline:'
-  key: planned
-::/timeline::
-
-## Later
-
-Work with no place in the order yet.
-
 <div class="grid cards" markdown>
+
+-   __Guides__
+
+    ---
+
+    Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.
+
+    [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
+
+-   __MLOps guides__
+
+    ---
+
+    A prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.
+
+-   __Agents guides__
+
+    ---
+
+    Traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.
+
+-   __Retrieval guides__
+
+    ---
+
+    Hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.
+
+-   __Testing and CI__
+
+    ---
+
+    The end-to-end tests run on every pull request, including image updates. Each release is also tested as an upgrade from the one before it, and on arm64.
+
+    [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
+
+-   __Kafka Connect transforms__
+
+    ---
+
+    Transforms built into the Connect image: make a record schema required, replace personal fields with a hash, and send lineage events to Marquez for any connector.
+
+    [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
 -   __Memory check and models on the host__
 
@@ -71,6 +78,10 @@ Work with no place in the order yet.
 ## Released
 
 Newest first.
+
+??? note "1.9.0: Label Studio"
+
+    The `label-studio` profile runs Label Studio on odctl's PostgreSQL, and its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use ([Label Studio](../guides/label-studio.md)). MLflow is 3.18.0 and Feast is 0.68.0. [#169](https://github.com/jaehyeon-kim/odctl/issues/169), [#184](https://github.com/jaehyeon-kim/odctl/issues/184)
 
 ??? note "1.8.0: Lineage and alerts"
 

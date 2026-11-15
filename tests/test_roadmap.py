@@ -1,6 +1,6 @@
 """The public roadmap follows the version in `pyproject.toml`.
 
-Only Released names versions: an item in Now, Planned or Later gets its version when it
+Only Released names versions: an item in Now or Planned gets its version when it
 ships. The release commit bumps the version and, in the same commit, moves the release
 from Now to Released. These tests fail when a release is tagged with the roadmap still
 showing it as current, or when a coming item names a version that can go stale.
