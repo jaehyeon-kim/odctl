@@ -164,11 +164,11 @@ Recreating discards the data inside those containers, with the exceptions that [
 
 Each example edits the workspace, then applies the change. `sed -i.bak` works with both GNU and macOS `sed`, and keeps the original as a `.bak` file.
 
-Give SeaweedFS 2 GB instead of 512 MB, for example when several projects share it. SeaweedFS is a Go program, and `GOMEMLIMIT` is a soft memory limit: as the memory the Go runtime manages nears it, the garbage collector runs more often and returns memory to the system sooner. It is three quarters of `mem_limit`, so change both:
+Give SeaweedFS 2 GB instead of 1 GB, for example when several projects share it. SeaweedFS is a Go program, and `GOMEMLIMIT` is a soft memory limit: as the memory the Go runtime manages nears it, the garbage collector runs more often and returns memory to the system sooner. It is three quarters of `mem_limit`, so change both:
 
 ```bash
-sed -i.bak -e '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' \
-  -e '/^  seaweed:/,/^  [a-z]/ s/GOMEMLIMIT: 384MiB/GOMEMLIMIT: 1536MiB/' .odctl/compose-infra.yml
+sed -i.bak -e '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 1024m/mem_limit: 2g/' \
+  -e '/^  seaweed:/,/^  [a-z]/ s/GOMEMLIMIT: 768MiB/GOMEMLIMIT: 1536MiB/' .odctl/compose-infra.yml
 odctl recreate storage
 docker inspect seaweed --format '{{.HostConfig.Memory}}'
 ```

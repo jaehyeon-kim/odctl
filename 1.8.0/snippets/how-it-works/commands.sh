@@ -30,8 +30,8 @@ odctl --workspace ./.odctl ps catalog
 # --8<-- [end:workspace-flag]
 
 # --8<-- [start:seaweed-memory]
-sed -i.bak -e '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 512m/mem_limit: 2g/' \
-  -e '/^  seaweed:/,/^  [a-z]/ s/GOMEMLIMIT: 384MiB/GOMEMLIMIT: 1536MiB/' .odctl/compose-infra.yml
+sed -i.bak -e '/^  seaweed:/,/^  [a-z]/ s/mem_limit: 1024m/mem_limit: 2g/' \
+  -e '/^  seaweed:/,/^  [a-z]/ s/GOMEMLIMIT: 768MiB/GOMEMLIMIT: 1536MiB/' .odctl/compose-infra.yml
 odctl recreate storage
 docker inspect seaweed --format '{{.HostConfig.Memory}}'
 # --8<-- [end:seaweed-memory]
