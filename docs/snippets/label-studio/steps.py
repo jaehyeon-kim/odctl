@@ -38,7 +38,7 @@ for task in tasks:
         " WHERE labels.label <> EXCLUDED.label;"
     )
 subprocess.run(
-    ["docker", "exec", "-i", "postgres", "psql", "-q", "-U", "user", "-d", "odctl"],
+    ["docker", "exec", "-i", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "user", "-d", "odctl"],
     input="\n".join(statements),
     text=True,
     check=True,

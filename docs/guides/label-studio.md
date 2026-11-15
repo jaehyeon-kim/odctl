@@ -85,7 +85,7 @@ Open the project at [http://127.0.0.1:8088/projects/1](http://127.0.0.1:8088/pro
 
 ![Label Studio labelling view of task r-1, with 1 chosen](../images/label-studio.png){ .screenshot }
 
-If you labelled the tasks in the UI, skip the next command, because it adds a second annotation to each task. Otherwise a script can add the annotations through the API, which is how the end-to-end tests label them. This labels `r-1` with `1` and `r-2` with `0`. A label is what a person judges, so it can differ from the model's score: the model scores driver 1002 as 1, because 0.75 is above 0.5, and the person labels it 0:
+If you labelled the tasks in the UI, skip the next command, because it adds a second annotation to each task. Otherwise a script can add the annotations through the API, which is how the end-to-end tests label them. This labels `r-1` with `1` and `r-2` with `0`. A label is what a person judges, so it can differ from the model's score:
 
 ```bash title="docs/snippets/label-studio/commands.sh:annotate"
 # Labels the first task 1 and the second 0 from a script, as a person does in
@@ -160,7 +160,7 @@ for task in tasks:
         " WHERE labels.label <> EXCLUDED.label;"
     )
 subprocess.run(
-    ["docker", "exec", "-i", "postgres", "psql", "-q", "-U", "user", "-d", "odctl"],
+    ["docker", "exec", "-i", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "user", "-d", "odctl"],
     input="\n".join(statements),
     text=True,
     check=True,
@@ -282,7 +282,7 @@ statements.append(
     "SELECT sample_id, label, source FROM dev.labels WHERE sample_id LIKE 'e-%' ORDER BY sample_id;"
 )
 subprocess.run(
-    ["docker", "exec", "-i", "postgres", "psql", "-q", "-U", "user", "-d", "odctl"],
+    ["docker", "exec", "-i", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "user", "-d", "odctl"],
     input="\n".join(statements),
     text=True,
     check=True,

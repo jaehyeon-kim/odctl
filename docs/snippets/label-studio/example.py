@@ -77,7 +77,7 @@ statements.append(
     "SELECT sample_id, label, source FROM dev.labels WHERE sample_id LIKE 'e-%' ORDER BY sample_id;"
 )
 subprocess.run(
-    ["docker", "exec", "-i", "postgres", "psql", "-q", "-U", "user", "-d", "odctl"],
+    ["docker", "exec", "-i", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "user", "-d", "odctl"],
     input="\n".join(statements),
     text=True,
     check=True,
