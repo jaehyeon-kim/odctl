@@ -195,11 +195,13 @@ services:
         condition: service_healthy
       openmetadata-init:
         condition: service_completed_successfully
-    # Healthy once Airflow answers. The start period covers up to 60 seconds for the
-    # first connector copy, the image entrypoint's pip install of _METADATA_PIP_DEPS
-    # and the Airflow start.
+    # Healthy once OpenMetadata's plugin answers, the API the server deploys and
+    # triggers agents through. Airflow 3 serves it under /pluginsv2/, and Airflow's
+    # own /api/v2/monitor/health can answer before it, so a deploy right after start
+    # failed. The start period covers up to 60 seconds for the first connector copy,
+    # the image entrypoint's pip install of _METADATA_PIP_DEPS and the Airflow start.
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/v2/monitor/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/pluginsv2/api/v2/openmetadata/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 20

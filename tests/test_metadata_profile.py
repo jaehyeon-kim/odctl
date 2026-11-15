@@ -87,9 +87,13 @@ def test_metadata_starts_storage_with_it():
     ]
 
 
-def test_ingestion_is_healthy_only_once_airflow_answers_after_the_slow_start():
+def test_ingestion_is_healthy_only_once_the_openmetadata_plugin_answers():
     check = _ingestion()["healthcheck"]
-    assert "curl -fs http://localhost:8080/api/v2/monitor/health" in check["test"][-1]
+    # The server deploys agents through the plugin, which can answer after Airflow.
+    assert (
+        "curl -fs http://localhost:8080/pluginsv2/api/v2/openmetadata/health"
+        in check["test"][-1]
+    )
     # 60 seconds of first copy, the pip install and the Airflow start.
     assert int(check["start_period"].rstrip("s")) >= 120
 
