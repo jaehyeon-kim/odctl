@@ -25,6 +25,8 @@ The server runs MLflow 3.18.0, so install the same client version on the host.
 
 PostgreSQL keeps the `mlflow` database across `odctl recreate` ([Where Data Lives](../how-it-works.md#where-data-lives)), and a server refuses a database whose schema an older MLflow created. So the `mlflow` command in `.odctl/compose-mlops.yml` runs `mlflow db upgrade` before the server on every start. The upgrade creates the tables on an empty database, upgrades an older one and leaves a current one unchanged. It adds about a second to each start.
 
+The server also runs MLflow's AI Gateway and automatic evaluation, whose judges run in the server's job workers. The `mlflow` service sets `MLFLOW_GATEWAY_URI=http://127.0.0.1:5000`, so a judge with a `gateway:/` model reaches the gateway at an address that `--allowed-hosts` accepts.
+
 ## Log a Run with an Artifact
 
 This logs a run with a parameter, a metric and a small file as an artifact, then prints where the artifacts are stored and the run's artifact list:

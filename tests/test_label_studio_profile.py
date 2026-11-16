@@ -58,6 +58,21 @@ def test_label_studio_sends_no_usage_analytics():
     assert env["LABEL_STUDIO_COLLECT_ANALYTICS"] == "false"
 
 
+def test_label_studio_reaches_services_on_the_odctl_network():
+    env = _services()["label-studio"]["environment"]
+    # 1.23.1 and later refuse an ML backend or a webhook at a private address.
+    assert env["ML_BLOCK_LOCAL_IP"] == "false"
+    assert env["USE_DEFAULT_BANNED_SUBNETS"] == "false"
+
+
+def test_label_studio_stores_to_its_own_seaweedfs_bucket():
+    env = _services()["label-studio"]["environment"]
+    assert env["LABEL_STUDIO_S3_ENDPOINT"] == "http://seaweed:8333"
+    infra = yaml.safe_load((RESOURCES / "compose-infra.yml").read_text())["services"]
+    buckets = re.search(r"BUCKETS='([^']*)'", infra["seaweed-init"]["entrypoint"])
+    assert "label-studio" in buckets.group(1).split()
+
+
 def test_healthcheck_calls_the_health_route():
     test = _services()["label-studio"]["healthcheck"]["test"]
     assert "http://localhost:8080/health/" in test[1]

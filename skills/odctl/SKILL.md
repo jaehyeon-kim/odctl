@@ -420,6 +420,8 @@ Label Studio: Experiment tracking, model registry and model serving (MLflow), th
 • API token: odctl-label-studio-token, sent as the header
   Authorization: Token odctl-label-studio-token
 • Projects, tasks and annotations: the labelstudio database on Postgres.
+• S3 storage: the label-studio bucket on SeaweedFS (start storage),
+  with the endpoint field left empty.
 ```
 
 | Service | Image | Host:container ports | Memory limit |

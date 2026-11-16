@@ -51,11 +51,21 @@ x-feast-repo-sync: &feast-repo-sync |
           os.makedirs(os.path.dirname(path), exist_ok=True)
           s3.download_file("feast", key, path)
       print("Feature repository:", "s3://feast/repo" if objects else "bundled", flush=True)
+  def reload():
+      # An object can vanish between the listing and its download when the
+      # prefix changes during a load, so list again and retry until a load ends.
+      while True:
+          objects = listing()
+          try:
+              load(objects)
+              return objects
+          except Exception as error:
+              print("Loading s3://feast/repo failed, trying again:", error, flush=True)
+              time.sleep(5)
   def start():
       return subprocess.Popen(["feast", "-c", REPO, *sys.argv[1:]])
   signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-  objects = listing()
-  load(objects)
+  objects = reload()
   feast = start()
   try:
       while feast.poll() is None:
@@ -66,10 +76,9 @@ x-feast-repo-sync: &feast-repo-sync |
               print("Listing s3://feast/repo failed:", error, flush=True)
               continue
           if latest != objects:
-              objects = latest
               feast.terminate()
               feast.wait()
-              load(objects)
+              objects = reload()
               feast = start()
       sys.exit(feast.returncode)
   finally:
@@ -96,6 +105,11 @@ services:
       # The command reads it as "$$MLFLOW_DB_URL", so a password with a shell
       # character such as $ or a quote reaches MLflow unchanged.
       MLFLOW_DB_URL: postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
+      # The server's job workers run automatic evaluation, and a judge with a
+      # gateway:/ model calls the gateway at this address. Unset, the server
+      # gives them http://0.0.0.0:5000 from --host, which --allowed-hosts
+      # refuses with "Invalid Host header".
+      MLFLOW_GATEWAY_URI: http://127.0.0.1:5000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 5s
@@ -318,6 +332,17 @@ services:
       LABEL_STUDIO_ENABLE_LEGACY_API_TOKEN: "true"
       # Usage analytics to Label Studio are on unless this is set.
       LABEL_STUDIO_COLLECT_ANALYTICS: "false"
+      # Label Studio 1.23.1 and later refuse calls to private addresses, which
+      # every container on the odctl network has. These two let it reach an ML
+      # backend and a webhook receiver on that network, at a name with a dot,
+      # such as a network alias my-backend.odctl. The UI is published on
+      # 127.0.0.1 only.
+      ML_BLOCK_LOCAL_IP: "false"
+      USE_DEFAULT_BANNED_SUBNETS: "false"
+      # S3 storage reaches SeaweedFS through this address, which Label Studio
+      # trusts, so leave the endpoint field of a storage connection empty. The
+      # storage profile creates the label-studio bucket.
+      LABEL_STUDIO_S3_ENDPOINT: http://seaweed:8333
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ || exit 1"]
       interval: 10s

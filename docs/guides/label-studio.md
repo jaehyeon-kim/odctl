@@ -198,6 +198,14 @@ docker run --rm --network odctl curlimages/curl:8.17.0 -s \
 user@odctl.io
 ```
 
+## Connect Other Services
+
+Label Studio 1.23.1 and later refuse calls to private addresses, and every container on the `odctl` network has one. odctl sets `ML_BLOCK_LOCAL_IP` and `USE_DEFAULT_BANNED_SUBNETS` to `false` in `.odctl/compose-mlops.yml`, so Label Studio can call an ML backend or a webhook receiver that runs as a container on that network. The UI and API are published on `127.0.0.1` only.
+
+Give that container a network alias with a dot, such as `docker run --network odctl --network-alias my-backend.odctl ...`, and use `http://my-backend.odctl:9090`. Label Studio's URL check refuses a host name with no dot: a webhook at `http://my-backend:9090` is refused with "Enter a valid URL", and an ML backend at that address connects but gets no automatic webhook, so annotation events never reach it. The Start Training button still works, because it calls the backend's address directly.
+
+For S3 storage, start the `storage` profile with `odctl up storage`, which creates the `label-studio` bucket. odctl sets `LABEL_STUDIO_S3_ENDPOINT` to `http://seaweed:8333`, an address Label Studio trusts, so leave the endpoint field of a storage connection empty and give the bucket `label-studio` with the access key `user` and the secret `password`.
+
 ## Runnable Example
 
 Save this file as `example.py`. It creates a project, imports two tasks, labels them through the API and loads the labels into the label table. Start the profile first, then run it with `python3 example.py`:
