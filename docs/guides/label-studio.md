@@ -204,7 +204,7 @@ Label Studio 1.23.1 and later refuse calls to private addresses, and every conta
 
 Give that container a network alias with a dot, such as `docker run --network odctl --network-alias my-backend.odctl ...`, and use `http://my-backend.odctl:9090`. Label Studio's URL check refuses a host name with no dot: a webhook at `http://my-backend:9090` is refused with "Enter a valid URL", and an ML backend at that address connects but gets no automatic webhook, so annotation events never reach it. The Start Training button still works, because it calls the backend's address directly.
 
-For S3 storage, start the `storage` profile with `odctl up storage`, which creates the `label-studio` bucket. odctl sets `LABEL_STUDIO_S3_ENDPOINT` to `http://seaweed:8333`, an address Label Studio trusts, so leave the endpoint field of a storage connection empty and give the bucket `label-studio` with the access key `user` and the secret `password`.
+For S3 storage, start the `storage` profile with `odctl up storage`, which creates the `label-studio` bucket. odctl sets `LABEL_STUDIO_S3_ENDPOINT` to `http://seaweed:8333`, an address Label Studio trusts, so leave the endpoint field of a storage connection empty and give the bucket `label-studio` with the access key `user` and the secret `password`. Turn off pre-signed URLs (`presign=False` in the API) for files that a browser loads: a pre-signed URL names `seaweed:8333`, which the browser on your host cannot open. With them off, Label Studio sends each file itself.
 
 ## Runnable Example
 

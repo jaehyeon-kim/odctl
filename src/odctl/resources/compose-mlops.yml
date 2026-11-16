@@ -55,8 +55,8 @@ x-feast-repo-sync: &feast-repo-sync |
       # An object can vanish between the listing and its download when the
       # prefix changes during a load, so list again and retry until a load ends.
       while True:
-          objects = listing()
           try:
+              objects = listing()
               load(objects)
               return objects
           except Exception as error:
