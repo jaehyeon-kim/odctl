@@ -11,7 +11,9 @@ RESOURCES = get_internal_resources_dir()
 
 
 def _mlflow():
-    return yaml.safe_load((RESOURCES / "compose-mlops.yml").read_text())["services"]["mlflow"]
+    return yaml.safe_load((RESOURCES / "compose-mlops.yml").read_text())["services"][
+        "mlflow"
+    ]
 
 
 def test_job_workers_call_the_gateway_at_an_allowed_host():
