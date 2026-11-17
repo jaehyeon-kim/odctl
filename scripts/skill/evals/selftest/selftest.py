@@ -10,13 +10,14 @@ It builds kept runs by hand in a temporary folder, in the layout `claude plugin 
 - `facts.py` on a run of every case writes each file the prompt asks for, the transcript, the
   task files and the skill, lists no missing file, and gives the explain, compose and dry-run
   facts of every profile in the case's `task.yaml`; and `check_hidden.py` passes on the result.
-- A file the run did not write is listed in `missing`.
+- A file the run did not write is listed in `missing`, and `facts.py` works with a relative
+  `--python-dir`.
 - `facts.py` exits 2 with no line when the transcript, the workspace or the case's
   `task.yaml` cannot be read, because a fact that reads nothing must fail, not count nothing.
 - `check_hidden.py` exits 1 when a file names a suite or an odctl version.
 - `summarise.py` exits 0 on complete lines, counts a kind once per run, and exits 1 for a
-  missing `REVIEWED` line, a repeated `FACTS` line, a run not in the plan and a kind the
-  reviewer does not judge.
+  missing `REVIEWED` line, a repeated `FACTS` line, a run not in the plan, a run twice in
+  the plan and a kind the reviewer does not judge.
 
 It prints `ok <check>` or `FAIL <check>: <reason>` for each, and exits 1 when one fails.
 """
@@ -68,9 +69,9 @@ def fake_run(ctx: Context, name: str, case: str, skip: Optional[str] = None) -> 
 
 
 def run_facts(
-    ctx: Context, root: Path, case: str, out: Path
+    ctx: Context, root: Path, case: str, out: Path, relative: bool = False
 ) -> subprocess.CompletedProcess:
-    """Runs facts.py on a kept run."""
+    """Runs facts.py on a kept run; `relative` passes --python-dir relative to the folder it runs in."""
     return subprocess.run(
         [
             PYTHON,
@@ -79,7 +80,7 @@ def run_facts(
             "--task",
             case,
             "--python-dir",
-            str(ctx.python_dir),
+            ctx.python_dir.name if relative else str(ctx.python_dir),
             "--skill",
             str(ctx.skill),
             "--out",
@@ -93,6 +94,7 @@ def run_facts(
         ],
         capture_output=True,
         text=True,
+        cwd=ctx.python_dir.parent if relative else None,
     )
 
 
@@ -180,6 +182,15 @@ def check_fails_without_task(ctx: Context) -> List[str]:
     return []
 
 
+def check_relative_python_dir(ctx: Context) -> List[str]:
+    """facts.py works when --python-dir is relative to the folder it runs in."""
+    root = fake_run(ctx, "run-relative", "pg-tz")
+    done = run_facts(ctx, root, "pg-tz", ctx.scratch / "review-relative", relative=True)
+    if done.returncode != 0:
+        return [f"exited {done.returncode}: {done.stderr.strip()[-200:]}"]
+    return []
+
+
 def check_hidden_catches(ctx: Context) -> List[str]:
     """check_hidden.py exits 1 on a suite name and on an odctl version."""
     wrong = []
@@ -256,8 +267,12 @@ def check_summarise(ctx: Context) -> List[str]:
         "repeated FACTS": (grades + grades[:1], reviews),
         "run not in the plan": (grades, reviews + [line("feast-venv", "REVIEWED")]),
         "kind not judged": (grades, reviews + [line("pg-tz", "A5", 1)]),
+        # Why: last, because it rewrites the plan the checks above read
+        "run twice in the plan": (grades, reviews),
     }
     for name, (g, r) in bad.items():
+        if name == "run twice in the plan":
+            plan.write_text("pg-tz\ta\thaiku\t1\npg-tz\ta\thaiku\t1\nspark-kafka\ta\thaiku\t1\n", "utf-8")
         if run(g, r).returncode != 1:
             wrong.append(f"{name}: did not exit 1")
     return wrong
@@ -298,6 +313,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 lambda: check_fails_without(ctx, "workspace"),
             ),
             ("facts fails with no task.yaml", lambda: check_fails_without_task(ctx)),
+            ("facts takes a relative --python-dir", lambda: check_relative_python_dir(ctx)),
             (
                 "check_hidden catches a suite and a version",
                 lambda: check_hidden_catches(ctx),

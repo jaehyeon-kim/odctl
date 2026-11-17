@@ -12,7 +12,7 @@ This file holds the main session's steps, from the suite to the result table. `c
 
 ## Steps
 
-1. Build the suite of each version from a copy of the repository at that version, into a folder whose name does not tell the version: `git archive <tag> | tar -x -C <scratch>/tree-a`, then `uv run --no-project python scripts/skill/evals/make_suite.py --tree <scratch>/tree-a --out <scratch>/suite-a`. Write down which suite is which in `<scratch>/versions.txt`; no file the reviewer reads names it.
+1. Build the suite of each version from a copy of the repository at that version, into a folder whose name does not tell the version: `git archive <tag> | tar -x -C <scratch>/tree-a`, then `uv run --no-project python scripts/skill/evals/make_suite.py --tree <scratch>/tree-a --out <scratch>/suite-a`. Write down which suite is which in `<scratch>/versions.txt`; no file the reviewer reads names it. `make_suite.py` builds and installs with `--offline`, so uv's cache must already hold `hatchling`, the wheel's dependencies and `pytest`: run `uv sync` (which includes the `dev` group, where `pytest` is) and `uv build` once in the repository, online, before the first suite.
 2. Run the cases from the suite's folder (`cd <scratch>/suite-a`), once per model:
 
    ```bash

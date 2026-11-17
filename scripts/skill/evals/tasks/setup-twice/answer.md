@@ -15,7 +15,7 @@ Kinds: A9 (state from an earlier run breaks the next), A2 (service called before
 
 - Each step is safe to run twice on one stack: the table is created with `create_table_if_not_exists` or dropped first (`docs/guides/feast-iceberg.md:41`; `smoke.sh:952` deletes it with `DELETE /v1/namespaces/demo/tables/driver_stats?purgeRequested=true`, accepting 204 or 404); rows are not appended twice.
 - The Feast cleanup is `feast -c feature_repo delete driver_stats`, never `feast teardown` (`smoke.sh:957`, 1853, comments 1792 to 1794).
-- After the upload, wait with a limit until Airflow lists the DAG before `dags unpause` and the trigger (`smoke.sh:964-965`, 881; `feast-iceberg.md:202`).
+- After the upload, wait with a limit until Airflow lists the DAG before `dags unpause` and the trigger (`smoke.sh:964-965`, 881; `feast-iceberg.md:202`), then wait with a limit until the triggered run succeeds, and fail if it fails, before any cleanup.
 - A failure stops the script: `set -euo pipefail`, and no `|| true` on a step that must succeed.
 - At the end, or at the start of the next run, the DAG is paused and its file removed from `s3://airflow`, or the script handles a DAG already there (`smoke.sh:993-999`).
 

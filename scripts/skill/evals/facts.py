@@ -126,7 +126,8 @@ def odctl(python_dir: Path, args: List[str]) -> str:
     # Why: a workspace in the current folder would change what odctl reads
     with tempfile.TemporaryDirectory() as empty:
         done = subprocess.run(
-            [str(python_dir / "bin" / "odctl"), *args],
+            # Why: a relative --python-dir would otherwise be read from the empty folder
+            [str(python_dir.resolve() / "bin" / "odctl"), *args],
             cwd=empty,
             env=env,
             capture_output=True,

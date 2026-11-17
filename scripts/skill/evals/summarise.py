@@ -14,7 +14,7 @@ A run with a line missing would read as a run with no mistake, and a run graded 
 the lines of two gradings, so the runs to expect come from the plan, not from the lines. Each
 run of the plan has exactly one `FACTS` line of `facts.py` and exactly one `REVIEWED` line of
 the reviewer, which may write any number of lines of the kinds it judges. The script lists
-each run that lacks a line, holds one twice, or is not in the plan, and each reviewer line of a
+each run that lacks a line, holds one twice, is in the plan twice or is not in the plan, and each reviewer line of a
 kind it does not judge, and exits 1.
 
 A kind counts at most once per run: a `count` above 0 on any line of that run and kind scores
@@ -96,6 +96,9 @@ def problems(plan: List[RunKey], grades: List[dict], reviews: List[dict]) -> Lis
                 f"{run_key(row)}: reviewer line of kind {row['kind']}, which it does not judge"
             )
     planned = set(plan)
+    for key in sorted(planned):
+        if plan.count(key) > 1:
+            found.append(f"{key}: {plan.count(key)} times in the plan, want 1")
     for key in plan:
         if facts[key] != 1:
             found.append(f"{key}: {facts[key]} FACTS lines, want 1")
