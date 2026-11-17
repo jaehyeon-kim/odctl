@@ -1,0 +1,17 @@
+{
+  "known": true,
+  "counts": {
+    "A1": 0,
+    "A2": 0,
+    "A3": 1,
+    "A4": 0,
+    "A6": 0,
+    "A7": 0,
+    "A8": 1,
+    "A9": 0,
+    "A10": 0,
+    "A11": 0,
+    "A12": 0
+  },
+  "reason": "read_orders.py runs in spark-master and uses localhost:9092, the host's address (A3); run.sh and reply.md add --packages because the image is assumed to lack the Kafka connector, which the shared jar volume provides (A8). The wait has a limit and a reason, so A2 and A12 are 0."
+}

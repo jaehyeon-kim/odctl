@@ -1,0 +1,11 @@
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("read-orders").getOrCreate()
+rows = (
+    spark.read.format("kafka")
+    .option("kafka.bootstrap.servers", "localhost:9092")
+    .option("subscribe", "orders")
+    .option("startingOffsets", "earliest")
+    .load()
+)
+rows.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)").show(truncate=False)
