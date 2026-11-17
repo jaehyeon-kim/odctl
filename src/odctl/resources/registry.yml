@@ -236,13 +236,14 @@ stacks:
 
   mlops:
     file: "compose-mlops.yml"
-    description: "Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently)."
-    profiles: ["mlflow", "feast", "evidently"]
+    description: "Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio)."
+    profiles: ["mlflow", "feast", "evidently", "label-studio"]
     depends_on:
       mlflow: ["postgres", "storage"]
       feast: ["catalog", "valkey"]
       evidently: ["postgres"]
-    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own. Evidently keeps data drift, prediction drift, data quality and model quality reports over time, with projects, reports and datasets on Postgres."
+      label-studio: ["postgres"]
+    role: "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own. Evidently keeps data drift, prediction drift, data quality and model quality reports over time, with projects, reports and datasets on Postgres. Label Studio is where people label data, with projects, tasks and annotations on Postgres."
     usage:
       mlflow: |
         • MLflow Tracking UI & Artifact Registry Server:
@@ -283,6 +284,15 @@ stacks:
         • Projects, reports, dashboards and datasets: the evidently database
           on Postgres.
         • Settings: evidently/config.yaml in the workspace.
+      label-studio: |
+        • Label Studio UI & API (user user@odctl.io, password password):
+          * External (host): http://127.0.0.1:8088
+          * Internal (Docker): http://label-studio:8080
+        • API token: odctl-label-studio-token, sent as the header
+          Authorization: Token odctl-label-studio-token
+        • Projects, tasks and annotations: the labelstudio database on Postgres.
+        • S3 storage: the label-studio bucket on SeaweedFS (start storage),
+          with the endpoint field left empty and pre-signed URLs off.
 
   obsv:
     file: "compose-obsv.yml"

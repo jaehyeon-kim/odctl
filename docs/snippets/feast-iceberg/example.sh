@@ -3,8 +3,7 @@
 # registers a feature view over it, materialises it into Valkey and reads it
 # back, then pushes a value to the feature server over HTTP and through Flink
 # SQL, reads that back, and lists the feature server's MCP tools. Run it in an
-# environment with "feast[duckdb,iceberg,redis,postgres]==0.66.0", pyarrow and
-# "mcp>=1.24,<2" installed.
+# environment with the packages from the guide's two install steps.
 set -euo pipefail
 
 odctl up feast flink-lite

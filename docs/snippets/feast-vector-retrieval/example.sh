@@ -2,7 +2,7 @@
 # Starts postgres, writes a second feature repository whose online store is
 # PostgreSQL with pgvector, registers a feature view of three documents, writes
 # their embeddings and retrieves the two nearest to a query vector. Run it in an
-# environment with "feast[duckdb,postgres]==0.66.0" installed.
+# environment with the packages from the guide's install step.
 set -euo pipefail
 
 odctl up postgres

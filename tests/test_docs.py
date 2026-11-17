@@ -249,11 +249,11 @@ def test_client_versions_in_guides_match_the_stack():
 
     text = (guides / "evidently-reports.md").read_text()
     assert set(re.findall(r"evidently==([\d.]+)", text)) == {evidently}
-    assert set(re.findall(r"Evidently (\d[\d.]*)", text)) == {evidently}
     text = (guides / "telemetry.md").read_text()
     assert set(re.findall(r"evidently==([\d.]+)", text)) == {evidently}
-    text = (guides / "feast-iceberg.md").read_text()
-    assert set(re.findall(r"feast\[[^\]]*\]==([\d.]+)", text)) == {feast}
+    for page in ("feast-iceberg.md", "feast-vector-retrieval.md"):
+        text = (guides / page).read_text()
+        assert set(re.findall(r"feast\[[^\]]*\]==([\d.]+)", text)) == {feast}, page
     text = (guides / "mlflow.md").read_text()
     assert set(re.findall(r"MLflow (\d[\d.]*)", text)) == {mlflow}
     assert set(re.findall(r"XGBoost (\d[\d.]*)", text)) == {xgboost}

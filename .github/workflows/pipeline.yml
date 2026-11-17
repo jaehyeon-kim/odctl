@@ -119,8 +119,8 @@ jobs:
         run: uv run mkdocs build --strict
 
   # The site is published from main, as desflow does, after the unit tests,
-  # lint and the strict build pass. Each version in pyproject.toml gets its own
-  # copy, because each CLI version runs images with its own tag.
+  # lint and the strict build pass. Each minor version gets one copy, and a patch
+  # release replaces its minor's docs.
   docs:
     needs: [ci, docs-build]
     permissions:
@@ -134,31 +134,4 @@ jobs:
           fetch-depth: 0 # mike needs the full history to update the gh-pages branch
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Deploy the versioned docs
-        run: |
-          # Commit as the owner, so the gh-pages history adds no bot contributor.
-          git config --global user.name "jaehyeon-kim"
-          git config --global user.email "1023748+jaehyeon-kim@users.noreply.github.com"
-
-          # Version 1.0.0 in pyproject.toml is published as 1.0.0, aliased latest.
-          VERSION=$(grep -m 1 '^version = ' pyproject.toml | cut -d '"' -f 2)
-          echo "Deploying docs version $VERSION"
-          uv run mike deploy --update-aliases "$VERSION" latest
-
-          # The root of the site opens latest.
-          uv run mike set-default latest
-
-          # GitHub Pages answers every missing path under the site with the 404.html
-          # at the root of gh-pages, but mike writes one into each version folder
-          # only. Copy this version's page to the root. Its links point at latest/,
-          # so it renders at any depth.
-          git worktree add "$RUNNER_TEMP/gh-pages" gh-pages
-          cp "$RUNNER_TEMP/gh-pages/$VERSION/404.html" "$RUNNER_TEMP/gh-pages/404.html"
-          # Assistants look for llms.txt at the root of the site. Its links already
-          # point at latest/, so the copy works from there.
-          cp "$RUNNER_TEMP/gh-pages/$VERSION/llms.txt" "$RUNNER_TEMP/gh-pages/llms.txt"
-          cp "$RUNNER_TEMP/gh-pages/$VERSION/llms-full.txt" "$RUNNER_TEMP/gh-pages/llms-full.txt"
-          git -C "$RUNNER_TEMP/gh-pages" add 404.html llms.txt llms-full.txt
-          git -C "$RUNNER_TEMP/gh-pages" diff --cached --quiet || git -C "$RUNNER_TEMP/gh-pages" commit -m "Root 404 page and llms.txt from $VERSION"
-          # mike commits to the local gh-pages branch (after updating it from the remote),
-          # so everything above goes out in one push and starts one Pages build.
-          git -C "$RUNNER_TEMP/gh-pages" push origin gh-pages
+        run: bash scripts/deploy_docs.sh

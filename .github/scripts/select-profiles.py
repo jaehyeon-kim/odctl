@@ -42,6 +42,7 @@ GROUPS = [
     # evidently brings up postgres and storage, and its assertion round-trips a
     # dataset through SeaweedFS as well as a report through Postgres.
     "evidently",
+    "label-studio",
     # langfuse brings up postgres, storage, ch-lite and valkey with it, and its
     # case starts telemetry to check that one trace reaches Langfuse and Tempo.
     "langfuse",
@@ -126,6 +127,7 @@ SNIPPET_GROUPS = {
     "feast-iceberg": ["feast", "flink-lite flink-full", "mlflow", "airflow", "lineage"],
     "feast-vector-retrieval": ["feast"],
     "evidently-reports": ["evidently"],
+    "label-studio": ["label-studio"],
     "lineage": ["lineage"],
     "openmetadata": ["metadata", "metadata:autopilot"],
     "telemetry": ["telemetry"],

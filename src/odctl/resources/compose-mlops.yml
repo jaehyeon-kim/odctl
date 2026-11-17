@@ -51,11 +51,21 @@ x-feast-repo-sync: &feast-repo-sync |
           os.makedirs(os.path.dirname(path), exist_ok=True)
           s3.download_file("feast", key, path)
       print("Feature repository:", "s3://feast/repo" if objects else "bundled", flush=True)
+  def reload():
+      # An object can vanish between the listing and its download when the
+      # prefix changes during a load, so list again and retry until a load ends.
+      while True:
+          try:
+              objects = listing()
+              load(objects)
+              return objects
+          except Exception as error:
+              print("Loading s3://feast/repo failed, trying again:", error, flush=True)
+              time.sleep(5)
   def start():
       return subprocess.Popen(["feast", "-c", REPO, *sys.argv[1:]])
   signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-  objects = listing()
-  load(objects)
+  objects = reload()
   feast = start()
   try:
       while feast.poll() is None:
@@ -66,10 +76,9 @@ x-feast-repo-sync: &feast-repo-sync |
               print("Listing s3://feast/repo failed:", error, flush=True)
               continue
           if latest != objects:
-              objects = latest
               feast.terminate()
               feast.wait()
-              load(objects)
+              objects = reload()
               feast = start()
       sys.exit(feast.returncode)
   finally:
@@ -93,6 +102,14 @@ services:
     mem_limit: 2500m
     environment:
       <<: *mlops-env
+      # The command reads it as "$$MLFLOW_DB_URL", so a password with a shell
+      # character such as $ or a quote reaches MLflow unchanged.
+      MLFLOW_DB_URL: postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
+      # The server's job workers run automatic evaluation, and a judge with a
+      # gateway:/ model calls the gateway at this address. Unset, the server
+      # gives them http://0.0.0.0:5000 from --host, which --allowed-hosts
+      # refuses with "Invalid Host header".
+      MLFLOW_GATEWAY_URI: http://127.0.0.1:5000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 5s
@@ -102,23 +119,35 @@ services:
     # Each worker imports the ML runtimes in the mlflow image, so memory is about
     # 1.1G fixed plus 0.35G per worker: 1.46G at one, 1.81G at two and 2.58G at
     # the default four. Two is enough for a local stack. A comment cannot live
-    # inside the folded block below, where it becomes an argument.
+    # inside the folded block below: it joins the shell line, and sh ignores
+    # everything after the #.
     # allowed-hosts needs both the container port and the published one: 5000
     # for anything inside, 5004 from the host. A missing entry gives 403 while
     # /health still answers 200, so the container looks healthy.
     # --expose-prometheus serves request metrics at /metrics, keeping per-worker
     # files in the given directory so both workers are counted.
-    # Never comment inside the command block: YAML folds it into the arguments.
-    command: >
-      mlflow server
-      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@postgres/mlflow
-      --artifacts-destination s3://mlflow
-      --serve-artifacts
-      --host 0.0.0.0
-      --port 5000
-      --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000,localhost:5004,127.0.0.1:5004
-      --workers 2
-      --expose-prometheus /tmp/mlflow-prometheus
+    # mlflow db upgrade runs first on every start, before the workers: a server
+    # refuses a database from an older MLflow with "Detected out-of-date database
+    # schema", and PostgreSQL keeps the mlflow database across odctl recreate. It
+    # creates the tables on an empty database, upgrades an older one and changes
+    # nothing on a current one. It runs its migrations in one transaction, so a
+    # stopped upgrade leaves the old schema, and the next start runs it again.
+    # Compose runs a command string with no shell, so && needs sh -c, and exec
+    # lets the server receive docker stop's signal.
+    command:
+      - sh
+      - -c
+      - >
+        mlflow db upgrade "$$MLFLOW_DB_URL"
+        && exec mlflow server
+        --backend-store-uri "$$MLFLOW_DB_URL"
+        --artifacts-destination s3://mlflow
+        --serve-artifacts
+        --host 0.0.0.0
+        --port 5000
+        --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000,localhost:5004,127.0.0.1:5004
+        --workers 2
+        --expose-prometheus /tmp/mlflow-prometheus
 
   # ==========================================
   # MLflow Model Server: scores one registered model
@@ -176,7 +205,7 @@ services:
   #
   # The image sets no CMD, so both services name their own command.
   feast-ui:
-    image: &feast-image quay.io/feastdev/feature-server:0.66.0
+    image: &feast-image quay.io/feastdev/feature-server:0.68.0
     container_name: feast-ui
     profiles: ["feast"]
     networks:
@@ -265,6 +294,61 @@ services:
       timeout: 10s
       retries: 12
       start_period: 20s
+
+  # ==========================================
+  # Label Studio: Data Labelling
+  # ==========================================
+  # Keeps projects, tasks and annotations in the labelstudio database on
+  # PostgreSQL, which postgres/01-init-databases.sh creates on a new data folder.
+  label-studio:
+    image: heartexlabs/label-studio:1.23.2
+    container_name: label-studio
+    profiles: ["label-studio"]
+    networks:
+      - odctl
+    ports:
+      # Host 8088: 8080 is Trino's, and 8087 and 8089 are taken.
+      - "127.0.0.1:8088:8080"
+    # One process. On a first start on a new database and one run of the smoke
+    # case it peaked at 524 MiB, page cache included, and held 240 MiB after.
+    mem_limit: 768m
+    environment:
+      TZ: ${TZ:-UTC}
+      DJANGO_DB: default
+      POSTGRE_NAME: labelstudio
+      POSTGRE_USER: ${POSTGRES_USER:-user}
+      POSTGRE_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRE_HOST: postgres
+      POSTGRE_PORT: "5432"
+      # The first user and its API token, created on the first start. These are
+      # local-only values, as the other profiles' logins are. Label Studio
+      # applies a token only when it is longer than 5 characters.
+      LABEL_STUDIO_USERNAME: user@odctl.io
+      LABEL_STUDIO_PASSWORD: password
+      LABEL_STUDIO_USER_TOKEN: odctl-label-studio-token
+      # Without this, the token above gets 401 "legacy token authentication has
+      # been disabled for this organization". It is read once, when the first
+      # start creates the organization.
+      LABEL_STUDIO_ENABLE_LEGACY_API_TOKEN: "true"
+      # Usage analytics to Label Studio are on unless this is set.
+      LABEL_STUDIO_COLLECT_ANALYTICS: "false"
+      # Label Studio 1.23.1 and later refuse calls to private addresses, which
+      # every container on the odctl network has. These two let it reach an ML
+      # backend and a webhook receiver on that network, at a name with a dot,
+      # such as a network alias my-backend.odctl. The UI is published on
+      # 127.0.0.1 only.
+      ML_BLOCK_LOCAL_IP: "false"
+      USE_DEFAULT_BANNED_SUBNETS: "false"
+      # S3 storage reaches SeaweedFS through this address, which Label Studio
+      # trusts, so leave the endpoint field of a storage connection empty. The
+      # storage profile creates the label-studio bucket.
+      LABEL_STUDIO_S3_ENDPOINT: http://seaweed:8333
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 networks:
   odctl:

@@ -115,6 +115,7 @@ nav:
           - Feast Vector Retrieval: guides/feast-vector-retrieval.md
           - MLflow: guides/mlflow.md
           - Evidently Reports: guides/evidently-reports.md
+          - Label Studio: guides/label-studio.md
           - Hybrid Search: guides/hybrid-search.md
           - Valkey: guides/valkey.md
           - MCP Server: guides/mcp-server.md

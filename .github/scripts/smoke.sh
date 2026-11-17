@@ -89,7 +89,7 @@ snippet_says() {
 # command that runs the file, such as a Python with the client installed.
 run_example() {
   local guide="$1" want="$2" runner="${3:-bash}" file out
-  file=$(ls "$SNIPPETS/$guide"/example.* 2>/dev/null | head -1)
+  file=$(find "$SNIPPETS/$guide" -maxdepth 1 -name 'example.*' 2>/dev/null | sort | head -1)
   [ -n "$file" ] || fail "no runnable example in docs/snippets/$guide"
   out=$($runner "$file" 2>&1) || { echo "$out" | tail -20; fail "the $guide example failed"; }
   grep -qE -- "$want" <<<"$out" || { echo "$out" | tail -20; fail "the $guide example printed no '$want'"; }
@@ -109,6 +109,11 @@ evidently_runner() {
   version=$(grep -oE 'evidently/evidently-service:[0-9.]+' \
     "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2)
   echo "uv run --no-project --quiet --python 3.12 --with evidently==$version --with pandas<3.1 python"
+}
+# The Feast client version the feature server image runs.
+feast_version() {
+  grep -oE 'feastdev/feature-server:[0-9.]+' \
+    "$SNIPPETS/../../src/odctl/resources/compose-mlops.yml" | head -1 | cut -d: -f2
 }
 
 # How It Works edits a workspace file and applies it with odctl recreate. Each
@@ -192,12 +197,12 @@ guide_kafka() {
 
   # demo was created without settings, so it shows the broker defaults.
   out=$(run_snippet kafka/commands.sh retention-default 2>/dev/null)
-  grep -Eq '^ *retention\.ms=86400000 ' <<<"$out" && grep -Eq '^ *retention\.bytes=524288000 ' <<<"$out" \
+  { grep -Eq '^ *retention\.ms=86400000 ' <<<"$out" && grep -Eq '^ *retention\.bytes=524288000 ' <<<"$out"; } \
     || { echo "$out"; fail "a topic created without settings did not get one day and 500 MB"; }
   pass "the broker defaults are one day and 500 MB per partition"
   kafka_topic --delete --topic history >/dev/null 2>&1
   out=$(run_snippet kafka/commands.sh retention-unlimited 2>/dev/null)
-  grep -q 'retention.ms=-1' <<<"$out" && grep -q 'retention.bytes=-1' <<<"$out" \
+  { grep -q 'retention.ms=-1' <<<"$out" && grep -q 'retention.bytes=-1' <<<"$out"; } \
     || { echo "$out"; fail "the topic did not take retention.ms=-1 and retention.bytes=-1"; }
   pass "a topic created with retention.ms and retention.bytes at -1 keeps both"
 }
@@ -474,6 +479,7 @@ smoke_ch_full() {
   out=$(run_snippet clickhouse/commands.sh replicated 2>&1) \
     || { echo "$out" | tail -20; fail "replicated DDL failed, check keeper reachability"; }
   # The guide reads ch-12 at once; replication can take a moment, so wait here.
+  # shellcheck disable=SC2016 # the inner bash expands $(...) on each try
   retry 12 5 bash -c '[ "$(docker exec ch-12 clickhouse-client --password password -q "SELECT count() FROM default.repl" 2>/dev/null)" = "50" ]' \
     || fail "rows never replicated to the sibling replica"
   [ "$(ch ch-21 "SELECT count() FROM default.repl")" = "0" ] || fail "shard 2 unexpectedly holds shard 1 data"
@@ -733,7 +739,8 @@ smoke_mlflow() {
 # image pins, so read them from the Dockerfile the image is built from.
 # mlflow_snippet <section> [sed expression] [timeout in seconds]: the optional
 # sed expression changes the section before it runs, and the timeout stops a
-# call that hangs, as a download from the host does without its setting.
+# call that hangs, as a download from the host would if the server sent it to
+# presigned URLs for seaweed:8333.
 mlflow_snippet() {
   local dockerfile="$SNIPPETS/../../src/odctl/resources/docker/mlflow/Dockerfile" mlflow xgboost
   local edit="${2:-}" limit="${3:-}"
@@ -777,7 +784,8 @@ smoke_model_server() {
   # The server resolves the alias once, at start. Register a second version
   # whose trees split, so that it predicts differently. That moves champion to
   # it, and the server must keep answering as version 1 until the restart.
-  local before="$(tail -1 <<<"$got")" stale rc out
+  local before stale rc out
+  before=$(tail -1 <<<"$got")
   mlflow_snippet register-model 's/max_depth=2)/max_depth=2, min_child_weight=0)/' >/dev/null 2>&1 \
     || fail "could not register a second version of demo-model"
   stale=$(curl -s -X POST http://127.0.0.1:5003/invocations \
@@ -795,15 +803,12 @@ smoke_model_server() {
   esac
   pass "a new version behind the alias is served after odctl restart mlflow: $got"
 
-  # From the host, a download works only with the setting the guide names. Without
-  # it the call waits on presigned URLs for seaweed:8333 and never returns.
+  # From the host, a download goes through the tracking server with no setting.
+  # If it went to presigned URLs for seaweed:8333, it would wait until the timeout.
   local files
-  files=$(mlflow_snippet download "" 120 2>&1) || fail "the download with the setting failed: $files"
+  files=$(mlflow_snippet download "" 120 2>&1) || fail "the download from the host failed: $files"
   grep -q MLmodel <<<"$files" || fail "the downloaded model has no MLmodel file: $files"
-  if mlflow_snippet download '/MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD/d' 45 >/dev/null 2>&1; then
-    fail "the download worked without MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false, so the guide's reason is stale"
-  fi
-  pass "a registered model downloads from the host with the setting and not without it"
+  pass "a registered model downloads from the host with no setting"
 }
 
 # A model that reads online features calls feast-serve over HTTP from inside
@@ -920,7 +925,7 @@ smoke_airflow_materialize() {
   rm -rf "$work"; mkdir -p "$work"
   uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
-    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" >/dev/null 2>&1 \
+    "feast[duckdb,iceberg,redis,postgres]==$(feast_version)" "pyarrow" >/dev/null 2>&1 \
     || fail "could not install the feast client"
 
   cp -r "$SNIPPETS/feast-iceberg/feature_repo" "$work/"
@@ -973,7 +978,7 @@ smoke_airflow_materialize() {
     grep -qE 'queued|running' <<<"$states" || [ -z "$states" ] || break
     sleep 10
   done
-  [ -n "$states" ] && ! grep -qvx success <<<"$states" \
+  { [ -n "$states" ] && ! grep -qvx success <<<"$states"; } \
     || fail "the materialise DAG runs ended in states: ${states:-none}"
   pass "the materialise DAG ran to success inside the Airflow container"
 
@@ -1019,8 +1024,8 @@ smoke_deps() {
   for dir in shared flink spark; do
     printf '%s\n' "$listing" | grep -qx "$dir" || missing="$missing $dir"
   done
-  [ -z "$missing" ] && pass "shared-deps holds:$(printf ' %s' $listing)" \
-    || fail "shared-deps is missing:$missing (has:$(printf ' %s' $listing))"
+  [ -z "$missing" ] || fail "shared-deps is missing:$missing (has: ${listing//$'\n'/ })"
+  pass "shared-deps holds: ${listing//$'\n'/ }"
 
   # A directory can exist and hold nothing, which is the same failure later.
   local jars
@@ -1199,17 +1204,17 @@ with DAG(
 ):
     BashOperator(task_id="fail", bash_command="exit 1")
 PY
-  docker cp "$work/always_fails.py" airflow:/tmp/always_fails.py >/dev/null 2>&1 \
+  { docker cp "$work/always_fails.py" airflow:/tmp/always_fails.py >/dev/null 2>&1 \
     && docker exec airflow python -c '
 import boto3
 boto3.client("s3", endpoint_url="http://seaweed:8333").upload_file(
-    "/tmp/always_fails.py", "airflow", "dags/always_fails.py")' >/dev/null 2>&1 \
+    "/tmp/always_fails.py", "airflow", "dags/always_fails.py")' >/dev/null 2>&1; } \
     || { rm -rf "$work"; fail "could not upload the failing DAG to s3://airflow/dags"; }
   rm -rf "$work"
   retry 30 10 bash -c "docker exec airflow airflow dags list 2>/dev/null | grep -q always_fails" \
     || fail "the S3 DAG bundle never delivered the failing DAG, or it was never parsed"
-  docker exec airflow airflow dags unpause always_fails >/dev/null 2>&1 \
-    && docker exec airflow airflow dags trigger always_fails --run-id failing >/dev/null 2>&1 \
+  { docker exec airflow airflow dags unpause always_fails >/dev/null 2>&1 \
+    && docker exec airflow airflow dags trigger always_fails --run-id failing >/dev/null 2>&1; } \
     || fail "could not trigger the failing DAG"
   [ "$(telemetry_run_state always_fails failing)" = "failed" ] || fail "the failing DAG's run did not end in state failed"
   # Airflow exports metrics every 15 seconds and Grafana evaluates the rule every minute.
@@ -1404,7 +1409,7 @@ smoke_fluss() {
   pass "coordinator registered itself as the active leader"
   local out
   out=$(run_snippet fluss/commands.sh registrations 2>/dev/null)
-  grep -q '\[0' <<<"$out" && grep -q fluss-coordinator:9123 <<<"$out" \
+  { grep -q '\[0' <<<"$out" && grep -q fluss-coordinator:9123 <<<"$out"; } \
     || { echo "$out"; fail "the guide's ZooKeeper commands did not show the registrations"; }
   assert_metrics http://fluss-coordinator:9249/metrics http://fluss-tablet-1:9249/metrics
 
@@ -1438,6 +1443,8 @@ smoke_metadata() {
   # The principal domain odctl sets is odctl.io, not the upstream
   # default. A wrong domain fails with a misleading invalid password error.
   local token
+  # om_step runs its last argument after the guide's step, where the variables are set.
+  # shellcheck disable=SC2016
   token=$(om_step login 'echo "$TOKEN"' 2>/dev/null | tail -1)
   [ -n "$token" ] || fail "admin@odctl.io could not log in"
   pass "admin logged in and received a JWT"
@@ -1477,10 +1484,12 @@ smoke_metadata() {
   # A real ingestion, with the guide's steps. Postgres is already running, so it
   # is its own source.
   local svc
+  # shellcheck disable=SC2016
   svc=$(TOKEN="$token" om_step service 'echo "$SVC"' 2>/dev/null | tail -1)
   [ -n "$svc" ] || fail "could not create a database service"
 
   local out pipe
+  # shellcheck disable=SC2016
   out=$(TOKEN="$token" SVC="$svc" om_step pipeline 'echo; echo "$PIPE"' 2>/dev/null)
   pipe=$(tail -1 <<<"$out")
   [ -n "$pipe" ] || fail "could not create an ingestion pipeline"
@@ -1679,8 +1688,11 @@ smoke_metadata_connector() {
     || fail "the ingestion container never copied the connector from S3"
   pass "the connector reached /opt/airflow/connectors in the ingestion container"
 
+  # om_connector_step runs its last argument after the guide's step, where the variables are set.
+  # shellcheck disable=SC2016
   svc=$(TOKEN="$token" om_connector_step service 'echo "$SVC"' 2>/dev/null | tail -1)
   [ -n "$svc" ] || fail "could not create the CustomDatabase service through the API"
+  # shellcheck disable=SC2016
   out=$(TOKEN="$token" SVC="$svc" om_connector_step agent 'echo; echo "$PIPE"' 2>/dev/null)
   pipe=$(tail -1 <<<"$out")
   [ -n "$pipe" ] || fail "could not create the custom connector's agent"
@@ -1689,8 +1701,8 @@ smoke_metadata_connector() {
   state=$(om_run_state "$token" om_connector_step "")
   [ "$state" = "success" ] || fail "the custom connector's run finished in state ${state:-none}, not success"
   out=$(TOKEN="$token" om_connector_step table 2>/dev/null)
-  grep -q '"fullyQualifiedName":"demo_connector.demo_db.public.orders"' <<<"$out" \
-    && grep -q '"name":"id"' <<<"$out" && grep -q '"name":"amount"' <<<"$out" \
+  { grep -q '"fullyQualifiedName":"demo_connector.demo_db.public.orders"' <<<"$out" \
+    && grep -q '"name":"id"' <<<"$out" && grep -q '"name":"amount"' <<<"$out"; } \
     || fail "the custom connector's table orders, with its columns id and amount, is not in the catalogue"
   pass "the custom connector's agent ran and its table orders is in the catalogue"
 
@@ -1734,6 +1746,7 @@ smoke_metadata_example() {
 
 # An admin token, from the guide's login step.
 om_token() {
+  # shellcheck disable=SC2016 # om_step expands it after the guide's login step
   om_step login 'echo "$TOKEN"' 2>/dev/null | tail -1
 }
 
@@ -1769,7 +1782,7 @@ smoke_feast() {
   # the published image carries feast[minimal], which has no iceberg or duckdb.
   uv venv --python 3.12 "$work/.venv" >/dev/null 2>&1 || fail "could not create a venv for the feast client"
   VIRTUAL_ENV="$work/.venv" uv pip install -q \
-    "feast[duckdb,iceberg,redis,postgres]==0.66.0" "pyarrow" "mcp>=1.24,<2" >/dev/null 2>&1 \
+    "feast[duckdb,iceberg,redis,postgres]==$(feast_version)" "pyarrow" "mcp>=1.24,<2" >/dev/null 2>&1 \
     || fail "could not install the feast and mcp clients"
 
   # Repository from the guide, whose source passes warehouse="" so that PyIceberg
@@ -1891,8 +1904,8 @@ smoke_feast_push_and_mcp() {
   cp "$SNIPPETS/feast-iceberg/mcp_client.py" "$work/"
   out=$(cd "$work" && "$work/.venv/bin/python" mcp_client.py 2>&1) \
     || { echo "$out" | tail -20; fail "the MCP client failed"; }
-  grep -qx 'get_online_features_get_online_features_post' <<<"$out" \
-    && grep -qx 'push_push_post' <<<"$out" \
+  { grep -qx 'get_online_features_get_online_features_post' <<<"$out" \
+    && grep -qx 'push_push_post' <<<"$out"; } \
     || { echo "$out" | tail -20; fail "the MCP endpoint did not list Feast's tools"; }
   grep -qxF '[0.699999988079071]' <<<"$out" \
     || { echo "$out" | tail -20; fail "the MCP tool did not return the pushed value"; }
@@ -2011,7 +2024,8 @@ if __name__ == "__main__":
     asyncio.run(main(sys.argv[1]))
 PYEOF
 
-  export SMOKE_RUN="$$-$(date -u +%Y%m%d%H%M%S)" SMOKE_ADDRESS="127.0.0.1:7233"
+  SMOKE_RUN="$$-$(date -u +%Y%m%d%H%M%S)"
+  export SMOKE_RUN SMOKE_ADDRESS="127.0.0.1:7233"
   local py="$work/.venv/bin/python" log="$work/step.log"
 
   # Output goes to a file, so a failure prints what broke rather than nothing.
@@ -2102,7 +2116,7 @@ smoke_mcp_server() {
   grep -q '^up: ' <<<"$out" && fail "the read-only server lists up"
   out=$(cd "$SNIPPETS/mcp-server" && PATH="$client:$PATH" run_snippet mcp-server/commands.sh list-tools-changes 2>&1) \
     || { echo "$out" | tail -20; fail "the MCP list-tools-changes step failed"; }
-  grep -q '^up: ' <<<"$out" && grep -q '^down: ' <<<"$out" \
+  { grep -q '^up: ' <<<"$out" && grep -q '^down: ' <<<"$out"; } \
     || { echo "$out"; fail "the server started with --allow-changes does not list up and down"; }
   pass "odctl mcp lists five read tools, and up and down with --allow-changes"
 
@@ -2186,6 +2200,47 @@ smoke_langfuse() {
   pass "one trace reached Langfuse and Tempo"
 }
 
+# Label Studio guide. Its steps run in one shell, in page order, because each
+# step uses the PROJECT_ID that the first one sets. The annotate step stands in
+# for the labelling a person does in the UI.
+smoke_label_studio() {
+  retry 60 5 http_ok "http://127.0.0.1:8088/health/" || fail "no HTTP response from :8088/health/"
+  [ "$(docker exec postgres psql -U user -d odctl -tAc "SELECT count(*) FROM pg_database WHERE datname = 'labelstudio'")" = "1" ] \
+    || fail "PostgreSQL has no labelstudio database"
+  pass "label-studio answering and its database on postgres"
+
+  local work out
+  work=$(mktemp -d)
+  snippet label-studio/steps.py load >"$work/load.py"
+  out=$( (cd "$work" && for section in project import read annotate export load; do
+      snippet label-studio/commands.sh "$section"
+    done | bash -o pipefail) 2>&1) || { echo "$out" | tail -20; fail "the guide's steps failed"; }
+  grep -q '^r-2 Driver 1002, conv_rate 0\.75$' <<<"$out" || { echo "$out" | tail -20; fail "the imported tasks were not read back"; }
+  { grep -qE '^ r-1 +\| 1 +\| label-studio' <<<"$out" && grep -qE '^ r-2 +\| 0 +\| label-studio' <<<"$out"; } \
+    || { echo "$out" | tail -20; fail "the label table does not hold the exported annotations"; }
+  pass "a project, two tasks and their annotations reached the label table"
+
+  # A second annotation on r-1, as the guide's script adds after a UI label:
+  # the load keeps one row per task, from its latest annotation. The table is in
+  # dev, so the CDC publication of the cdc schema does not stream it.
+  local auth="Authorization: Token odctl-label-studio-token" task project
+  read -r task project < <(python3 -c "import json, sys; t = next(t for t in json.load(open(sys.argv[1])) if t['data']['sample_id'] == 'r-1'); print(t['id'], t['project'])" "$work/annotations.json")
+  curl -fsS -o /dev/null -X POST "http://127.0.0.1:8088/api/tasks/$task/annotations" -H "$auth" -H "Content-Type: application/json" \
+    -d '{"result": [{"from_name": "label", "to_name": "text", "type": "choices", "value": {"choices": ["0"]}}]}' \
+    || fail "could not add a second annotation to r-1"
+  { curl -fsS "http://127.0.0.1:8088/api/projects/$project/export?exportType=JSON" -H "$auth" -o "$work/annotations.json" \
+    && (cd "$work" && python3 load.py); } || fail "the second export or load failed"
+  [ "$(docker exec postgres psql -U user -d odctl -tAc "SELECT label FROM dev.labels WHERE sample_id = 'r-1'")" = "0" ] \
+    || fail "a task with two annotations did not keep its latest label"
+  [ "$(docker exec postgres psql -U user -d odctl -tAc "SELECT count(*) FROM pg_publication_tables WHERE tablename = 'labels'")" = "0" ] \
+    || fail "the label table is in the CDC publication"
+  pass "a task with two annotations keeps its latest label, outside the CDC publication"
+
+  snippet_says label-studio/commands.sh container -qx 'user@odctl.io' \
+    || fail "a container on the odctl network could not call the API with the token"
+  pass "a container on the odctl network reaches the API with the token"
+}
+
 # A profile with no functional assertion yet still has to expose its endpoint.
 smoke_http_only() {
   local url="$1"
@@ -2266,6 +2321,7 @@ case "$PROFILE" in
     rm -rf feature_repo vector_repo push_definitions.py
     rm -rf "${TMPDIR:-/tmp}/odctl-feast-smoke" ;;
   evidently)  smoke_evidently; run_example evidently-reports 'report pushed to project' "$(evidently_runner)" ;;
+  label-studio) smoke_label_studio; run_example label-studio 'e-2 +\| 0 +\| label-studio' python3 ;;
   langfuse)   smoke_langfuse; run_example langfuse 'has 2 observations' "$(langfuse_runner)" ;;
   *)
     echo "ℹ️  $PROFILE: no functional assertion defined, checking containers only"

@@ -208,7 +208,7 @@
     },
     {
       "id": 6,
-      "title": "Latency by Feature Count (p95)",
+      "title": "Latency by Feature Count Range (p95)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -226,8 +226,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(feast_feature_server_request_latency_seconds_bucket{job=\"feast-serve\"}[1m])) by (le, feature_count))",
-          "legendFormat": "p95 (features={{feature_count}})",
+          "expr": "histogram_quantile(0.95, sum(rate(feast_feature_server_request_latency_seconds_bucket{job=\"feast-serve\", endpoint=\"/get-online-features\"}[1m])) by (le, feature_count))",
+          "legendFormat": "p95 (feature count range {{feature_count}})",
           "refId": "A"
         }
       ],

@@ -6,11 +6,11 @@ This guide builds on [Ingest into Iceberg](iceberg-ingestion.md), which writes I
 
 ![The feast CLI writes definitions to the registry in PostgreSQL, reads offline values from Iceberg and materialises them into Valkey; an Airflow DAG also materialises into Valkey; the Feast UI and feature server load the repository from SeaweedFS and the feature server reads and writes Valkey; a client pushes values to the feature server's /push route](../assets/diagrams/path-feast.png)
 
-Start the profile and install the client, with the extras that read Iceberg, PostgreSQL and Valkey:
+The Feast client needs Python 3.11 or newer. Start the profile and install the client, with the extras that read Iceberg, PostgreSQL and Valkey:
 
 ```bash title="docs/snippets/feast-iceberg/commands.sh:install"
 odctl up feast
-pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
+pip install "feast[duckdb,iceberg,redis,postgres]==0.68.0" pyarrow
 ```
 
 | Endpoint | Address |
@@ -400,8 +400,7 @@ Save this file as `example.sh` and run it with `bash example.sh` in the folder t
 # registers a feature view over it, materialises it into Valkey and reads it
 # back, then pushes a value to the feature server over HTTP and through Flink
 # SQL, reads that back, and lists the feature server's MCP tools. Run it in an
-# environment with "feast[duckdb,iceberg,redis,postgres]==0.66.0", pyarrow and
-# "mcp>=1.24,<2" installed.
+# environment with the packages from the guide's two install steps.
 set -euo pipefail
 
 odctl up feast flink-lite

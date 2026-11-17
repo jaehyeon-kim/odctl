@@ -1,27 +1,17 @@
 # Roadmap
 
-The work comes in the order shown, without dates: a release ships when it is ready. Features come first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue where one exists.
+Now is the work being built, and Planned lists the rest in no order. Neither has dates or version numbers: an item gets its version when it ships. Each item links to its GitHub issue where one exists.
 
-## Next Releases
+## Now
 
 ::timeline::
-- title: '1.9.0: Label Studio'
-  content: 'A `label-studio` profile for labelling data by hand, on odctl''s PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)'
+- title: 'Agent skill'
+  content: 'The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)'
   icon: ':material-play:'
   key: now
-- title: '1.10.0: Agent skill'
-  content: 'The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)'
-  icon: ':material-clock-outline:'
-  key: planned
-- title: '1.11.0: Memory check and models on the host'
-  content: '`odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. The guide also covers the Ollama embeddings route, batch embedding in Airflow and a hand-run rerank server. [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)'
-  icon: ':material-clock-outline:'
-  key: planned
 ::/timeline::
 
-## Alongside
-
-Work that does not wait for a release, published as it is ready.
+## Planned
 
 <div class="grid cards" markdown>
 
@@ -31,15 +21,33 @@ Work that does not wait for a release, published as it is ready.
 
     Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.
 
-    MLOps guides: a prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.
-
-    Agents guides: traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.
-
-    Retrieval guides: hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.
-
-    No new service and no new version: each guide is published when it reaches `main`.
-
     [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
+
+-   __MLOps guides__
+
+    ---
+
+    A prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.
+
+-   __Agents guides__
+
+    ---
+
+    Traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.
+
+-   __Retrieval guides__
+
+    ---
+
+    Hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.
+
+-   __Testing and CI__
+
+    ---
+
+    The end-to-end tests run on every pull request, including image updates. Each release is also tested as an upgrade from the one before it, and on arm64.
+
+    [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
 
 -   __Kafka Connect transforms__
 
@@ -49,19 +57,13 @@ Work that does not wait for a release, published as it is ready.
 
     [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
--   __Testing and CI__
+-   __Memory check and models on the host__
 
     ---
 
-    It lands between 1.9.0 and 1.10.0. It changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.10.0.
+    `odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio.
 
-    [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
-
-</div>
-
-## After desflow 1.0
-
-<div class="grid cards" markdown>
+    [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
 
 -   __desflow server__
 
@@ -76,6 +78,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+??? note "1.9.0: Label Studio"
+
+    The `label-studio` profile runs Label Studio on odctl's PostgreSQL, and its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use ([Label Studio](../guides/label-studio.md)). MLflow is 3.18.0 and Feast is 0.68.0. [#169](https://github.com/jaehyeon-kim/odctl/issues/169), [#184](https://github.com/jaehyeon-kim/odctl/issues/184)
 
 ??? note "1.8.0: Lineage and alerts"
 

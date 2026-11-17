@@ -1,8 +1,9 @@
 """The public roadmap follows the version in `pyproject.toml`.
 
-The release commit bumps the version and, in the same commit, moves that release from
-the timeline to Released and makes the next release the current entry. These tests fail
-when a release is tagged with the roadmap still showing it as planned or current.
+Only Released names versions: an item in Now or Planned gets its version when it
+ships. The release commit bumps the version and, in the same commit, moves the release
+from Now to Released. These tests fail when a release is tagged with the roadmap still
+showing it as current, or when a coming item names a version that can go stale.
 """
 
 import re
@@ -16,40 +17,35 @@ _VERSION_LINE = re.search(
 )
 assert _VERSION_LINE is not None
 _VERSION = _VERSION_LINE.group(1)
-_PLANNED, _RELEASED = _ROADMAP.split("\n## Released\n", 1)
+_COMING, _RELEASED = _ROADMAP.split("\n## Released\n", 1)
 # A YAML single-quoted title writes a quote as two, as in 'SimPy''s examples'
 _ENTRIES = re.findall(
-    r"^- title: '((?:[^']|'')*)'\n((?:  .*\n)+)", _PLANNED, re.MULTILINE
+    r"^- title: '((?:[^']|'')*)'\n((?:  .*\n)+)", _COMING, re.MULTILINE
 )
-
-
-def _version(text: str) -> tuple[int, ...] | None:
-    match = re.match(r"(\d+)\.(\d+)\.(\d+):", text)
-    return tuple(int(part) for part in match.groups()) if match else None
 
 
 def test_the_current_version_is_under_released():
     assert f'??? note "{_VERSION}:' in _RELEASED
 
 
-def test_no_planned_entry_is_a_released_version():
-    current = _version(f"{_VERSION}:")
-    stale = [title for title, _ in _ENTRIES if (v := _version(title)) and v <= current]
-    assert stale == []
+def test_nothing_still_to_come_names_a_version():
+    headings = re.findall(
+        r"^(?:- title: '|-   __)(.*?)(?:'|__)$", _COMING, re.MULTILINE
+    )
+    assert headings
+    assert [h for h in headings if re.search(r"\d+\.\d+\.\d+", h)] == []
 
 
-def test_one_entry_is_current_and_it_is_the_next_release():
+def test_at_most_one_entry_is_current():
     now = [title for title, body in _ENTRIES if "  key: now\n" in body]
-    assert len(now) == 1
-    assert _version(now[0]) > _version(f"{_VERSION}:")
-    versions = [v for title, _ in _ENTRIES if (v := _version(title))]
-    assert _version(now[0]) == min(versions)
+    assert len(now) <= 1
 
 
-def test_every_planned_release_names_its_issues():
+def test_the_current_entry_names_its_issue():
+    # The release's Changelog section links the same issue.
     missing = [
         title
         for title, body in _ENTRIES
-        if _version(title) and not re.search(r"/issues/\d+\)", body)
+        if "  key: now\n" in body and not re.search(r"/issues/\d+\)", body)
     ]
     assert missing == []

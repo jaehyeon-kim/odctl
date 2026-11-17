@@ -107,7 +107,7 @@ Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), a work
 
 ## Runnable Example
 
-Save this file as `example.py` and run it with `python example.py` while the `temporal` profile is up, in an environment with `temporalio==1.34.0`. It is `greet.py` with both steps above:
+Save this file as `example.py` and run it with `python example.py` while the `temporal` profile is up, in an environment with the SDK from the install step. It is `greet.py` with both steps above:
 
 ```python title="docs/snippets/temporal-workers/example.py"
 """A Temporal worker with two workflows: one retries a failing activity, the other

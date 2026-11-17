@@ -73,7 +73,8 @@ def test_langfuse_logs_in_to_valkey_as_the_user_with_the_default_user_off():
 
 
 def test_storage_keeps_its_buckets_and_adds_the_langfuse_bucket():
-    assert _buckets() == BUCKETS_IN_1_5_0 + ["langfuse"]
+    # Later releases add their buckets after langfuse.
+    assert _buckets()[: len(BUCKETS_IN_1_5_0) + 1] == BUCKETS_IN_1_5_0 + ["langfuse"]
     env = _langfuse("langfuse-web")["environment"]
     assert env["LANGFUSE_S3_EVENT_UPLOAD_BUCKET"] == "langfuse"
 

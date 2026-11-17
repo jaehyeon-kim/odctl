@@ -33,3 +33,10 @@ repos:
           - types-PyYAML
         args: [--ignore-missing-imports]
         exclude: ^docs/snippets/
+
+  # Checks every .sh file, the snippets included; .shellcheckrc sets bash for the
+  # guides' commands.sh snippets, which have no shebang.
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck

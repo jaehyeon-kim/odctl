@@ -39,7 +39,6 @@ client.set_registered_model_alias("demo-model", "champion", version)
 # --8<-- [start:download]
 import os
 
-os.environ["MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD"] = "false"
 import mlflow
 
 mlflow.set_tracking_uri("http://127.0.0.1:5004")

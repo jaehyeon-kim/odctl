@@ -2,6 +2,27 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.9.0
+
+Label Studio, and MLflow 3.18.0 and Feast 0.68.0.
+
+- The `label-studio` profile runs Label Studio on odctl's PostgreSQL, and its guide loads the exported labels into a label table in PostgreSQL ([Label Studio](../guides/label-studio.md)).
+- Label Studio can reach an ML backend, a webhook receiver and SeaweedFS on the `odctl` network, and the `storage` profile creates a `label-studio` bucket for its S3 storage ([Connect Other Services](../guides/label-studio.md#connect-other-services)).
+- MLflow is 3.18.0. On each start, `mlflow` upgrades the schema of a database that an earlier MLflow created.
+- A download of a model from the host works with no client setting ([Load a Model from Your Machine](../guides/mlflow.md#load-a-model-from-your-machine)).
+- MLflow's automatic evaluation scores traces with a judge that uses an AI Gateway endpoint. Before, every assessment failed with "Invalid Host header" ([MLflow](../guides/mlflow.md)).
+- Feast is 0.68.0.
+- `feast-serve` and `feast-ui` keep running when `s3://feast/repo` changes while they load it. Before, a file deleted during the load stopped the container until the next `odctl up`.
+- The docs site keeps one version per minor release, and an address with a patch version, such as `https://jaehyeon.me/odctl/1.2.0/`, opens its minor.
+
+### Upgrading
+
+- A new profile, `label-studio`, in the `mlops` stack. It starts PostgreSQL and uses host port 8088.
+- A workspace made by `odctl init` before 1.9.0 has an older `compose-mlops.yml`, `compose-infra.yml` and PostgreSQL init script. Run `odctl init --force` to copy the new files; it replaces your edits, including `.env`, so keep a copy of them. Put your settings back into the new `.env` before you start the services, because a `postgres` container keeps the user and password it was created with. A `postgres` container started before 1.9.0 does not run the init script again, so it has no `labelstudio` database. Start it with `odctl up postgres`, then create the database once before `odctl up label-studio`: `docker exec postgres psql -U user -d postgres -c 'CREATE DATABASE labelstudio OWNER "user"'`. The `postgres` database always exists, whatever `POSTGRES_DB` is set to. If you set `POSTGRES_USER`, put that name in place of `user` in both places.
+- MLflow is 3.18.0, up from 3.16.1. On its next start, `mlflow` upgrades the schema of your existing `mlflow` database. Going back to 3.16.1 afterwards is not tested. Install `mlflow==3.18.0` on the host to match the server.
+- A download from the host no longer needs `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false`; you can remove it.
+- Feast is 0.68.0, up from 0.66.0, and needs Python 3.11 or newer. Install `feast[...]==0.68.0` on the host. The feature server's latency metric labels `feature_count` with a range, such as `1-10`, so a query that matches a single count changes.
+
 ## Version 1.8.0
 
 Lineage from Airflow, Spark and Feast in Marquez, and Grafana alert rules in the `telemetry` profile.

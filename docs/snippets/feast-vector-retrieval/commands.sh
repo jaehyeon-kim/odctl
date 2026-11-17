@@ -6,7 +6,7 @@
 # each profile itself; they are the commands as the page shows them.
 # --8<-- [start:install]
 odctl up postgres
-pip install "feast[duckdb,postgres]==0.66.0"
+pip install "feast[duckdb,postgres]==0.68.0"
 # --8<-- [end:install]
 
 # --8<-- [start:apply]

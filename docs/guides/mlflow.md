@@ -21,7 +21,11 @@ odctl up mlflow
 | Model server from the host | `http://127.0.0.1:5003/invocations` |
 | Model server inside the `odctl` network | `http://mlflow-serve:5003/invocations` |
 
-The server runs MLflow 3.16.1, so install the same client version on the host.
+The server runs MLflow 3.18.0, so install the same client version on the host.
+
+PostgreSQL keeps the `mlflow` database across `odctl recreate` ([Where Data Lives](../how-it-works.md#where-data-lives)), and a server refuses a database whose schema an older MLflow created. So the `mlflow` command in `.odctl/compose-mlops.yml` runs `mlflow db upgrade` before the server on every start. The upgrade creates the tables on an empty database, upgrades an older one and leaves a current one unchanged. It adds about a second to each start.
+
+The server also runs MLflow's AI Gateway and automatic evaluation, whose judges run in the server's job workers. The `mlflow` service sets `MLFLOW_GATEWAY_URI=http://127.0.0.1:5000`, so a judge with a `gateway:/` model reaches the gateway at an address that `--allowed-hosts` accepts.
 
 ## Log a Run with an Artifact
 
@@ -45,7 +49,7 @@ print(mlflow.get_run(run.info.run_id).info.artifact_uri)
 print([f.path for f in mlflow.MlflowClient().list_artifacts(run.info.run_id)])
 ```
 
-The code prints the artifact URI and the list `['notes.txt']`. The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. Downloads from your machine need one setting, as [Load a Model from Your Machine](#load-a-model-from-your-machine) shows. The run and its artifact appear in the UI.
+The code prints the artifact URI and the list `['notes.txt']`. The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. Downloads go through the tracking server too, as [Load a Model from Your Machine](#load-a-model-from-your-machine) shows. The run and its artifact appear in the UI.
 
 The runs are listed under the experiment in the Model training view:
 
@@ -114,12 +118,11 @@ The predictions now come from version 2: `{"predictions": [0, 1]}` instead of `[
 
 ## Load a Model from Your Machine
 
-Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name that only containers in the `odctl` network resolve. On your machine, `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` therefore wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
+Downloads go through the tracking server, as uploads do, so `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` work from your machine with no setting:
 
 ```python title="docs/snippets/mlflow/steps.py:download"
 import os
 
-os.environ["MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD"] = "false"
 import mlflow
 
 mlflow.set_tracking_uri("http://127.0.0.1:5004")
@@ -127,7 +130,7 @@ path = mlflow.artifacts.download_artifacts("models:/demo-model@champion")
 print(sorted(os.listdir(path)))
 ```
 
-The output is a listing of the model files that includes `MLmodel`. `mlflow-serve` is not affected, because it loads its model inside the `odctl` network.
+The output is a listing of the model files that includes `MLmodel`.
 
 ## Serve a Model That Reads Online Features
 
@@ -205,14 +208,14 @@ Inside the [`odctl` network](../how-it-works.md#how-you-reach-a-service), set th
 
 ## Runnable Example
 
-Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace, in an environment with `mlflow==3.16.1` and XGBoost 3.2 installed. It logs a run, registers `demo-model`, sets `MODEL_URI` in `.odctl/.env` and scores two rows:
+Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace, in an environment with the MLflow and XGBoost versions named above installed. It logs a run, registers `demo-model`, sets `MODEL_URI` in `.odctl/.env` and scores two rows:
 
 ```bash title="docs/snippets/mlflow/example.sh"
 #!/usr/bin/env bash
 # Starts mlflow, logs a run with an artifact, registers an XGBoost model with
 # the alias champion, serves it with mlflow-serve and scores two rows. Run it
-# in the folder that holds your .odctl workspace, in an environment with
-# mlflow==3.16.1 and xgboost 3.2 installed.
+# in the folder that holds your .odctl workspace, in an environment with the
+# MLflow and XGBoost versions that the guide names.
 set -euo pipefail
 
 odctl up mlflow

@@ -1,7 +1,7 @@
 """Pushes a data drift report to Evidently, stores a dataset and reads it back.
 
-Start the profile with `odctl up evidently` and install the client with
-`pip install evidently==0.7.23 "pandas<3.1"` first.
+Start the profile with `odctl up evidently` and install the client first,
+as the guide's install step shows.
 """
 
 import numpy as np
