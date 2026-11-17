@@ -39,7 +39,7 @@ Each command has its own section in the CLI reference, with its options and exam
 | [Stream and Batch Processing](https://jaehyeon.me/odctl/latest/profiles/stream-and-batch-processing/index.md) | Apache Flink, Apache Spark                                                                                                |
 | [Analytics](https://jaehyeon.me/odctl/latest/profiles/analytics/index.md)                                     | ClickHouse, Trino, Metabase                                                                                               |
 | [Orchestration](https://jaehyeon.me/odctl/latest/profiles/orchestration/index.md)                             | Apache Airflow, Temporal                                                                                                  |
-| [MLOps](https://jaehyeon.me/odctl/latest/profiles/mlops/index.md)                                             | MLflow, Feast, Evidently                                                                                                  |
+| [MLOps](https://jaehyeon.me/odctl/latest/profiles/mlops/index.md)                                             | MLflow, Feast, Evidently, Label Studio                                                                                    |
 | [Metadata and Lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)               | OpenMetadata, Marquez                                                                                                     |
 | [Observability](https://jaehyeon.me/odctl/latest/profiles/observability/index.md)                             | grafana/otel-lgtm (OpenTelemetry Collector, Prometheus, Tempo, Loki, Grafana)                                             |
 | [Storage and Catalog](https://jaehyeon.me/odctl/latest/profiles/storage-and-catalog/index.md)                 | PostgreSQL 18 with pgvector, pg_textsearch and PostGIS, SeaweedFS (S3), Iceberg REST catalog, Valkey Bundle, Apache Fluss |
@@ -290,8 +290,8 @@ odctl info --json | python3 -m json.tool
 
 ```text
 {
-    "cli_version": "1.8.0",
-    "tag": "1.8.0",
+    "cli_version": "<CLI version>",
+    "tag": "<CLI version>",
     "workspace": {
         "path": "/home/you/project/.odctl",
         "exists": true,
@@ -302,23 +302,23 @@ odctl info --json | python3 -m json.tool
     },
     "images": [
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>",
             "local": true
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>",
             "local": false
         },
         {
-            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.8.0",
+            "reference": "ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>",
             "local": false
         }
     ]
@@ -497,11 +497,11 @@ odctl down --all --volumes --yes
 
 ## Code in the Guides
 
-Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.8.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
+Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.9.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
 
 ## Use It with an AI Assistant
 
-The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.8.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`. With the `mcp` extra, `odctl mcp` gives an MCP client odctl's commands as tools, as [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) sets up.
+The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.9.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`. With the `mcp` extra, `odctl mcp` gives an MCP client odctl's commands as tools, as [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) sets up.
 # How It Works
 
 # How It Works
@@ -825,11 +825,12 @@ A profile is what `odctl up` starts. These pages are generated from `registry.ym
 
 ## [MLOps](https://jaehyeon.me/odctl/latest/profiles/mlops/index.md)
 
-| Profile                                                                   | Technology | Description                                                                                                               |
-| ------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [`mlflow`](https://jaehyeon.me/odctl/latest/profiles/mlops/#mlflow)       | MLflow     | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). |
-| [`feast`](https://jaehyeon.me/odctl/latest/profiles/mlops/#feast)         | Feast      | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). |
-| [`evidently`](https://jaehyeon.me/odctl/latest/profiles/mlops/#evidently) | Evidently  | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), and ML monitoring (Evidently). |
+| Profile                                                                         | Technology   | Description                                                                                                                                              |
+| ------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`mlflow`](https://jaehyeon.me/odctl/latest/profiles/mlops/#mlflow)             | MLflow       | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). |
+| [`feast`](https://jaehyeon.me/odctl/latest/profiles/mlops/#feast)               | Feast        | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). |
+| [`evidently`](https://jaehyeon.me/odctl/latest/profiles/mlops/#evidently)       | Evidently    | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). |
+| [`label-studio`](https://jaehyeon.me/odctl/latest/profiles/mlops/#label-studio) | Label Studio | Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio). |
 
 ## [Metadata and Lineage](https://jaehyeon.me/odctl/latest/profiles/metadata-and-lineage/index.md)
 
@@ -1141,8 +1142,8 @@ Depends on: `catalog`, `valkey`. `odctl up feast` also starts: `catalog`, `deps`
 
 | Service       | Image                                    | Host:container ports | Memory limit |
 | ------------- | ---------------------------------------- | -------------------- | ------------ |
-| `feast-ui`    | `quay.io/feastdev/feature-server:0.66.0` | `8890:8888`          | `1g`         |
-| `feast-serve` | `quay.io/feastdev/feature-server:0.66.0` | `6566:6566`          | `1g`         |
+| `feast-ui`    | `quay.io/feastdev/feature-server:0.68.0` | `8890:8888`          | `1g`         |
+| `feast-serve` | `quay.io/feastdev/feature-server:0.68.0` | `6566:6566`          | `1g`         |
 
 ## Evidently
 
@@ -1168,6 +1169,29 @@ Depends on: `postgres`. `odctl up evidently` also starts: `deps`, `postgres`.
 | Service     | Image                                | Host:container ports | Memory limit |
 | ----------- | ------------------------------------ | -------------------- | ------------ |
 | `evidently` | `evidently/evidently-service:0.7.23` | `8089:8000`          | `1g`         |
+
+## Label Studio
+
+Profiles: `label-studio`. Stack `mlops`, defined in `compose-mlops.yml`.
+
+### label-studio
+
+Depends on: `postgres`. `odctl up label-studio` also starts: `deps`, `postgres`.
+
+```text
+• Label Studio UI & API (user user@odctl.io, password password):
+  * External (host): http://127.0.0.1:8088
+  * Internal (Docker): http://label-studio:8080
+• API token: odctl-label-studio-token, sent as the header
+  Authorization: Token odctl-label-studio-token
+• Projects, tasks and annotations: the labelstudio database on Postgres.
+• S3 storage: the label-studio bucket on SeaweedFS (start storage),
+  with the endpoint field left empty and pre-signed URLs off.
+```
+
+| Service        | Image                             | Host:container ports | Memory limit |
+| -------------- | --------------------------------- | -------------------- | ------------ |
+| `label-studio` | `heartexlabs/label-studio:1.23.2` | `8088:8080`          | `768m`       |
 
 # Observability
 
@@ -2876,7 +2900,7 @@ Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-
 
 ## Runnable Example
 
-Save this file as `example.py` and run it with `python example.py` while the `temporal` profile is up, in an environment with `temporalio==1.34.0`. It is `greet.py` with both steps above:
+Save this file as `example.py` and run it with `python example.py` while the `temporal` profile is up, in an environment with the SDK from the install step. It is `greet.py` with both steps above:
 
 ```python
 """A Temporal worker with two workflows: one retries a failing activity, the other
@@ -2945,11 +2969,11 @@ Feast is a feature store: it keeps the definitions of a model's input features a
 
 This guide builds on [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md), which writes Iceberg tables through the catalog, [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md), whose SQL client the Flink push uses, and [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md), which uploads and runs a DAG. Follow the arrows from the `feast` CLI on the left: definitions go to the registry, and values go from Iceberg to Valkey. An Airflow DAG at the bottom centre also materialises into Valkey, on a schedule. A client at the bottom right can also push a value through the feature server into Valkey.
 
-Start the profile and install the client, with the extras that read Iceberg, PostgreSQL and Valkey:
+The Feast client needs Python 3.11 or newer. Start the profile and install the client, with the extras that read Iceberg, PostgreSQL and Valkey:
 
 ```bash
 odctl up feast
-pip install "feast[duckdb,iceberg,redis,postgres]==0.66.0" pyarrow
+pip install "feast[duckdb,iceberg,redis,postgres]==0.68.0" pyarrow
 ```
 
 | Endpoint                                  | Address                            |
@@ -3335,8 +3359,7 @@ Save this file as `example.sh` and run it with `bash example.sh` in the folder t
 # registers a feature view over it, materialises it into Valkey and reads it
 # back, then pushes a value to the feature server over HTTP and through Flink
 # SQL, reads that back, and lists the feature server's MCP tools. Run it in an
-# environment with "feast[duckdb,iceberg,redis,postgres]==0.66.0", pyarrow and
-# "mcp>=1.24,<2" installed.
+# environment with the packages from the guide's two install steps.
 set -euo pipefail
 
 odctl up feast flink-lite
@@ -3521,11 +3544,11 @@ This guide builds on [Feast with Iceberg](https://jaehyeon.me/odctl/latest/guide
 | Database for the vectors              | `vector`                                                  |
 | Registry                              | the `feast` database on PostgreSQL, project `vector_demo` |
 
-Start PostgreSQL and install the client, with the extras that read DuckDB and PostgreSQL:
+The Feast client needs Python 3.11 or newer. Start PostgreSQL and install the client, with the extras that read DuckDB and PostgreSQL:
 
 ```bash
 odctl up postgres
-pip install "feast[duckdb,postgres]==0.66.0"
+pip install "feast[duckdb,postgres]==0.68.0"
 ```
 
 ## Define a Second Repository
@@ -3638,7 +3661,7 @@ Save this file as `example.sh` and run it with `bash example.sh` in the folder t
 # Starts postgres, writes a second feature repository whose online store is
 # PostgreSQL with pgvector, registers a feature view of three documents, writes
 # their embeddings and retrieves the two nearest to a query vector. Run it in an
-# environment with "feast[duckdb,postgres]==0.66.0" installed.
+# environment with the packages from the guide's install step.
 set -euo pipefail
 
 odctl up postgres
@@ -3735,7 +3758,11 @@ odctl up mlflow
 | Model server from the host              | `http://127.0.0.1:5003/invocations`    |
 | Model server inside the `odctl` network | `http://mlflow-serve:5003/invocations` |
 
-The server runs MLflow 3.16.1, so install the same client version on the host.
+The server runs MLflow 3.18.0, so install the same client version on the host.
+
+PostgreSQL keeps the `mlflow` database across `odctl recreate` ([Where Data Lives](https://jaehyeon.me/odctl/latest/how-it-works/#where-data-lives)), and a server refuses a database whose schema an older MLflow created. So the `mlflow` command in `.odctl/compose-mlops.yml` runs `mlflow db upgrade` before the server on every start. The upgrade creates the tables on an empty database, upgrades an older one and leaves a current one unchanged. It adds about a second to each start.
+
+The server also runs MLflow's AI Gateway and automatic evaluation, whose judges run in the server's job workers. The `mlflow` service sets `MLFLOW_GATEWAY_URI=http://127.0.0.1:5000`, so a judge with a `gateway:/` model reaches the gateway at an address that `--allowed-hosts` accepts.
 
 ## Log a Run with an Artifact
 
@@ -3759,7 +3786,7 @@ print(mlflow.get_run(run.info.run_id).info.artifact_uri)
 print([f.path for f in mlflow.MlflowClient().list_artifacts(run.info.run_id)])
 ```
 
-The code prints the artifact URI and the list `['notes.txt']`. The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. Downloads from your machine need one setting, as [Load a Model from Your Machine](#load-a-model-from-your-machine) shows. The run and its artifact appear in the UI.
+The code prints the artifact URI and the list `['notes.txt']`. The artifact URI starts with `mlflow-artifacts:/`. The server proxies artifacts, so the client uploads through the tracking server and needs no S3 address or keys. Downloads go through the tracking server too, as [Load a Model from Your Machine](#load-a-model-from-your-machine) shows. The run and its artifact appear in the UI.
 
 The runs are listed under the experiment in the Model training view:
 
@@ -3824,12 +3851,11 @@ The predictions now come from version 2: `{"predictions": [0, 1]}` instead of `[
 
 ## Load a Model from Your Machine
 
-Uploads go through the tracking server, but a download does not by default. The server then hands the client presigned URLs for `http://seaweed:8333`, a name that only containers in the `odctl` network resolve. On your machine, `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` therefore wait and print no error. Set `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD` to `false` before the call, and the client downloads through the tracking server instead:
+Downloads go through the tracking server, as uploads do, so `mlflow.artifacts.download_artifacts` and a `load_model` call such as `mlflow.sklearn.load_model` work from your machine with no setting:
 
 ```python
 import os
 
-os.environ["MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD"] = "false"
 import mlflow
 
 mlflow.set_tracking_uri("http://127.0.0.1:5004")
@@ -3837,7 +3863,7 @@ path = mlflow.artifacts.download_artifacts("models:/demo-model@champion")
 print(sorted(os.listdir(path)))
 ```
 
-The output is a listing of the model files that includes `MLmodel`. `mlflow-serve` is not affected, because it loads its model inside the `odctl` network.
+The output is a listing of the model files that includes `MLmodel`.
 
 ## Serve a Model That Reads Online Features
 
@@ -3915,14 +3941,14 @@ Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-
 
 ## Runnable Example
 
-Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace, in an environment with `mlflow==3.16.1` and XGBoost 3.2 installed. It logs a run, registers `demo-model`, sets `MODEL_URI` in `.odctl/.env` and scores two rows:
+Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace, in an environment with the MLflow and XGBoost versions named above installed. It logs a run, registers `demo-model`, sets `MODEL_URI` in `.odctl/.env` and scores two rows:
 
 ```bash
 #!/usr/bin/env bash
 # Starts mlflow, logs a run with an artifact, registers an XGBoost model with
 # the alias champion, serves it with mlflow-serve and scores two rows. Run it
-# in the folder that holds your .odctl workspace, in an environment with
-# mlflow==3.16.1 and xgboost 3.2 installed.
+# in the folder that holds your .odctl workspace, in an environment with the
+# MLflow and XGBoost versions that the guide names.
 set -euo pipefail
 
 odctl up mlflow
@@ -3981,7 +4007,7 @@ odctl up evidently
 pip install evidently==0.7.23 "pandas<3.1"
 ```
 
-The server runs Evidently 0.7.23, so install the same client version. Evidently 0.7.23 fails to import with pandas 3.1, so keep pandas below 3.1. The UI has no login.
+The install command pins the client to the server's version. That version fails to import with pandas 3.1, so the command keeps pandas below 3.1. The UI has no login.
 
 ## Push a Data Drift Report
 
@@ -4037,8 +4063,8 @@ Save this file as `example.py`. Start the profile and install the client as abov
 ```python
 """Pushes a data drift report to Evidently, stores a dataset and reads it back.
 
-Start the profile with `odctl up evidently` and install the client with
-`pip install evidently==0.7.23 "pandas<3.1"` first.
+Start the profile with `odctl up evidently` and install the client first,
+as the guide's install step shows.
 """
 
 import numpy as np
@@ -4065,6 +4091,311 @@ print(ws.load_dataset(dataset_id).as_dataframe())
 ```
 
 It prints `report pushed to project` with the project's id, and then the dataset with its three rows.
+
+# Labelling Data with Label Studio
+
+The `label-studio` profile runs Label Studio, where people label data: a person reads each task and picks its label. A project holds the tasks and the labelling setup, and each label a person gives is an annotation. Label Studio keeps projects, tasks and annotations in the `labelstudio` database on odctl's PostgreSQL. The end-to-end tests run the commands below on every release.
+
+This guide builds on [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md). Its samples are requests to the driver model of the [MLflow guide](https://jaehyeon.me/odctl/latest/guides/mlflow/#serve-a-model-that-reads-online-features), which scores a driver 1 when the `conv_rate` feature is above 0.5. Run the commands in the folder that holds your `.odctl` workspace, and in one terminal, because later steps use the variables that earlier ones set. Start the profile:
+
+```bash
+odctl up label-studio
+```
+
+| Endpoint                                                             | Address                    |
+| -------------------------------------------------------------------- | -------------------------- |
+| UI and API from the host (user `user@odctl.io`, password `password`) | `http://127.0.0.1:8088`    |
+| API inside the `odctl` network                                       | `http://label-studio:8080` |
+| API token, sent as `Authorization: Token <token>`                    | `odctl-label-studio-token` |
+
+`odctl up label-studio` starts PostgreSQL first. Label Studio creates the user and its token on its first start, from the settings in `.odctl/compose-mlops.yml`, where you can change them before the first start.
+
+Labels go from Label Studio to a table that your training and monitoring code can join to its predictions:
+
+Both green boxes are the same `postgres` container: Label Studio's own data is in the `labelstudio` database, and the label table is `dev.labels` in the `odctl` database.
+
+## Log In
+
+Open <http://127.0.0.1:8088> and log in with the user and password in the table above. The login takes an email address, not a user name. The API steps below use the same user's token instead of the password.
+
+## Create a Project
+
+A project's label config is the labelling setup, written in Label Studio's XML tags. This one shows each task's `text` and offers two choices, `1` and `0`, the two scores the driver model gives. The command creates the project and keeps its ID in `PROJECT_ID`:
+
+```bash
+# A project that labels each request 1 or 0, the two scores the driver model
+# gives. It prints the project ID. $text names each task's text field, which
+# Label Studio fills in, so it stays in single quotes. The shellcheck line tells
+# the repository's shell linter that this is intended.
+TOKEN=odctl-label-studio-token
+# shellcheck disable=SC2016
+PROJECT_ID=$(curl -s -X POST http://127.0.0.1:8088/api/projects \
+  -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+  -d '{"title": "Driver requests", "label_config": "<View><Text name=\"text\" value=\"$text\"/><Choices name=\"label\" toName=\"text\"><Choice value=\"1\"/><Choice value=\"0\"/></Choices></View>"}' \
+  | python3 -c "import json, sys; print(json.load(sys.stdin)['id'])")
+echo "$PROJECT_ID"
+```
+
+It prints the project ID, which is `1` for the first project:
+
+```text
+1
+```
+
+## Import Tasks
+
+Each task is a JSON object. Its keys become the task's data: `text` is the field the label config shows, and `sample_id` is the ID of the request, so the label can be joined back to the request's prediction later:
+
+```bash
+# Two tasks, each a request's ID and a text that describes the request.
+curl -s -X POST "http://127.0.0.1:8088/api/projects/$PROJECT_ID/import" \
+  -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+  -d '[{"sample_id": "r-1", "text": "Driver 1001, conv_rate 0.9"}, {"sample_id": "r-2", "text": "Driver 1002, conv_rate 0.75"}]'
+echo
+```
+
+```text
+{"task_count":2,"annotation_count":0,"prediction_count":0,"duration":0.013175487518310547,"file_upload_ids":[],"could_be_tasks_list":false,"found_formats":[],"data_columns":[]}
+```
+
+Read the tasks back:
+
+```bash
+# This prints the sample ID and text of each task in the project.
+curl -s "http://127.0.0.1:8088/api/tasks?project=$PROJECT_ID" -H "Authorization: Token $TOKEN" \
+  | python3 -c "import json, sys; [print(t['data']['sample_id'], t['data']['text']) for t in json.load(sys.stdin)['tasks']]"
+```
+
+```text
+r-1 Driver 1001, conv_rate 0.9
+r-2 Driver 1002, conv_rate 0.75
+```
+
+## Label the Tasks
+
+Open the project at <http://127.0.0.1:8088/projects/1>, or use your `PROJECT_ID` in place of `1`. Open a task, pick a choice and click Submit. This is the labelling view of the first task after it was labelled `1`. The task list is on the left, and the task's text and the two choices are in the middle:
+
+If you labelled the tasks in the UI, skip the next command, because it adds a second annotation to each task. Otherwise a script can add the annotations through the API, which is how the end-to-end tests label them. This labels `r-1` with `1` and `r-2` with `0`. A label is what a person judges, so it can differ from the model's score:
+
+```bash
+# Labels the first task 1 and the second 0 from a script, as a person does in
+# the UI.
+read -r FIRST SECOND < <(curl -s "http://127.0.0.1:8088/api/tasks?project=$PROJECT_ID" -H "Authorization: Token $TOKEN" \
+  | python3 -c "import json, sys; print(*[t['id'] for t in json.load(sys.stdin)['tasks']])")
+annotate() {
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://127.0.0.1:8088/api/tasks/$1/annotations" \
+    -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+    -d "{\"result\": [{\"from_name\": \"label\", \"to_name\": \"text\", \"type\": \"choices\", \"value\": {\"choices\": [\"$2\"]}}]}"
+}
+annotate "$FIRST" 1
+annotate "$SECOND" 0
+```
+
+Label Studio answers 201 for each annotation it creates:
+
+```text
+201
+201
+```
+
+## Load the Labels into PostgreSQL
+
+Export the project's tasks with their annotations as JSON. The file `annotations.json` holds one object for each task that has at least one annotation, with its data and its list of annotations:
+
+```bash
+# Exports the project's tasks with their annotations as JSON.
+curl -s "http://127.0.0.1:8088/api/projects/$PROJECT_ID/export?exportType=JSON" \
+  -H "Authorization: Token $TOKEN" -o annotations.json
+```
+
+The label table, `dev.labels`, has four columns: the sample ID, the label, the source of the label and its arrival time, which is when the label reached the table. Labels can come from more than one source, such as people in Label Studio and a script that labels by rule, so the table's primary key is the sample ID and the source together.
+
+The table is in the `dev` schema of the `odctl` database. The database's search path starts with `cdc`, and a Debezium source reads every table in `cdc`, as the [Kafka Connect guide](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md) shows, so the SQL names `dev`. Save this script as `load.py`. It creates the label table if it does not exist, and writes one row for each labelled task, from its latest annotation, with the source `label-studio`. A task you skipped in the UI gives no row. Loading a later export again changes a row only when its label changed, and then sets its arrival time again:
+
+```python
+import json
+import subprocess
+
+
+def quote(text):
+    """Quote a value as an SQL string literal."""
+    return "'" + text.replace("'", "''") + "'"
+
+
+statements = [
+    "SET client_min_messages = warning;",
+    """CREATE TABLE IF NOT EXISTS dev.labels (
+        sample_id  text NOT NULL,
+        label      text NOT NULL,
+        source     text NOT NULL,
+        arrived_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (sample_id, source)
+    );""",
+]
+with open("annotations.json") as file:
+    tasks = json.load(file)
+for task in tasks:
+    # A task skipped in the UI has an annotation with no result. A task with
+    # more than one annotation keeps its latest.
+    done = [a for a in task["annotations"] if not a["was_cancelled"] and a["result"]]
+    if not done:
+        continue
+    latest = max(done, key=lambda annotation: annotation["updated_at"])
+    label = latest["result"][0]["value"]["choices"][0]
+    statements.append(
+        "INSERT INTO dev.labels (sample_id, label, source)"
+        f" VALUES ({quote(task['data']['sample_id'])}, {quote(label)}, 'label-studio')"
+        " ON CONFLICT (sample_id, source) DO UPDATE"
+        " SET label = EXCLUDED.label, arrived_at = now()"
+        " WHERE labels.label <> EXCLUDED.label;"
+    )
+subprocess.run(
+    ["docker", "exec", "-i", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "user", "-d", "odctl"],
+    input="\n".join(statements),
+    text=True,
+    check=True,
+)
+```
+
+Run it and read the table:
+
+```bash
+python3 load.py &&
+docker exec postgres psql -U user -d odctl -c "SELECT sample_id, label, source FROM dev.labels ORDER BY sample_id"
+```
+
+```text
+ sample_id | label |    source
+-----------+-------+--------------
+ r-1       | 1     | label-studio
+ r-2       | 0     | label-studio
+(2 rows)
+```
+
+## From Another Container
+
+Inside the [`odctl` network](https://jaehyeon.me/odctl/latest/how-it-works/#how-you-reach-a-service), call the API at `http://label-studio:8080` with the same token. The container calls Label Studio's own port, 8080, not the port published on the host:
+
+```bash
+# Inside the odctl network, Label Studio is label-studio:8080. This prints the
+# email of the user that the token belongs to.
+docker run --rm --network odctl curlimages/curl:8.17.0 -s \
+  -H "Authorization: Token odctl-label-studio-token" http://label-studio:8080/api/current-user/whoami \
+  | python3 -c "import json, sys; print(json.load(sys.stdin)['email'])"
+```
+
+```text
+user@odctl.io
+```
+
+## Connect Other Services
+
+Label Studio 1.23.1 and later refuse calls to private addresses, and every container on the `odctl` network has one. odctl sets `ML_BLOCK_LOCAL_IP` and `USE_DEFAULT_BANNED_SUBNETS` to `false` in `.odctl/compose-mlops.yml`, so Label Studio can call an ML backend or a webhook receiver that runs as a container on that network. The UI and API are published on `127.0.0.1` only.
+
+Give that container a network alias with a dot, such as `docker run --network odctl --network-alias my-backend.odctl ...`, and use `http://my-backend.odctl:9090`. Label Studio's URL check refuses a host name with no dot: a webhook at `http://my-backend:9090` is refused with "Enter a valid URL", and an ML backend at that address connects but gets no automatic webhook, so annotation events never reach it. The Start Training button still works, because it calls the backend's address directly.
+
+For S3 storage, start the `storage` profile with `odctl up storage`, which creates the `label-studio` bucket. odctl sets `LABEL_STUDIO_S3_ENDPOINT` to `http://seaweed:8333`, an address Label Studio trusts, so leave the endpoint field of a storage connection empty and give the bucket `label-studio` with the access key `user` and the secret `password`. Turn off pre-signed URLs (`presign=False` in the API) for files that a browser loads: a pre-signed URL names `seaweed:8333`, which the browser on your host cannot open. With them off, Label Studio sends each file itself.
+
+## Runnable Example
+
+Save this file as `example.py`. It creates a project, imports two tasks, labels them through the API and loads the labels into the label table. Start the profile first, then run it with `python3 example.py`:
+
+```python
+"""Labels two samples in Label Studio and loads the labels into PostgreSQL.
+
+It creates a project, imports two tasks, labels them through the API, exports the
+annotations and loads them into the label table, `dev.labels`, in the odctl database. Start the
+profile with `odctl up label-studio` first, then run `python3 example.py`. It uses
+only the Python standard library and `docker exec` for psql.
+"""
+
+import json
+import subprocess
+import urllib.request
+
+URL = "http://127.0.0.1:8088"
+TOKEN = "odctl-label-studio-token"
+LABEL_CONFIG = (
+    '<View><Text name="text" value="$text"/>'
+    '<Choices name="label" toName="text">'
+    '<Choice value="1"/><Choice value="0"/></Choices></View>'
+)
+# Each sample is a request to the driver model: its ID, a text that describes it,
+# and the score a person gives it.
+SAMPLES = [
+    ("e-1", "Driver 1001, conv_rate 0.9", "1"),
+    ("e-2", "Driver 1002, conv_rate 0.75", "0"),
+]
+
+
+def call(path, body=None):
+    """Send one request to the Label Studio API and return its JSON answer."""
+    request = urllib.request.Request(
+        URL + path,
+        data=None if body is None else json.dumps(body).encode(),
+        headers={"Authorization": f"Token {TOKEN}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request) as response:
+        return json.load(response)
+
+
+def quote(text):
+    """Quote a value as an SQL string literal."""
+    return "'" + text.replace("'", "''") + "'"
+
+
+project = call("/api/projects", {"title": "Example", "label_config": LABEL_CONFIG})
+call(
+    f"/api/projects/{project['id']}/import",
+    [{"sample_id": sample_id, "text": text} for sample_id, text, _ in SAMPLES],
+)
+tasks = call(f"/api/tasks?project={project['id']}")["tasks"]
+labels = {sample_id: label for sample_id, _, label in SAMPLES}
+for task in tasks:
+    # A person labels each task in the UI; this script stands in for them.
+    choice = {"choices": [labels[task["data"]["sample_id"]]]}
+    result = {"from_name": "label", "to_name": "text", "type": "choices", "value": choice}
+    call(f"/api/tasks/{task['id']}/annotations", {"result": [result]})
+
+statements = [
+    "SET client_min_messages = warning;",
+    "CREATE TABLE IF NOT EXISTS dev.labels (sample_id text NOT NULL, label text NOT NULL,"
+    " source text NOT NULL, arrived_at timestamptz NOT NULL DEFAULT now(),"
+    " PRIMARY KEY (sample_id, source));",
+]
+for task in call(f"/api/projects/{project['id']}/export?exportType=JSON"):
+    done = [a for a in task["annotations"] if not a["was_cancelled"] and a["result"]]
+    if not done:
+        continue
+    latest = max(done, key=lambda annotation: annotation["updated_at"])
+    label = latest["result"][0]["value"]["choices"][0]
+    statements.append(
+        "INSERT INTO dev.labels (sample_id, label, source)"
+        f" VALUES ({quote(task['data']['sample_id'])}, {quote(label)}, 'label-studio')"
+        " ON CONFLICT (sample_id, source) DO UPDATE"
+        " SET label = EXCLUDED.label, arrived_at = now()"
+        " WHERE labels.label <> EXCLUDED.label;"
+    )
+statements.append(
+    "SELECT sample_id, label, source FROM dev.labels WHERE sample_id LIKE 'e-%' ORDER BY sample_id;"
+)
+subprocess.run(
+    ["docker", "exec", "-i", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "user", "-d", "odctl"],
+    input="\n".join(statements),
+    text=True,
+    check=True,
+)
+```
+
+It prints the two rows it loaded:
+
+```text
+ sample_id | label |    source
+-----------+-------+--------------
+ e-1       | 1     | label-studio
+ e-2       | 0     | label-studio
+(2 rows)
+```
 
 # Hybrid Search in PostgreSQL
 
@@ -4416,8 +4747,8 @@ It prints the result of each tool under a line with the tool's name. The output 
 ✓ All requested profiles successfully started!
 --- info
 {
-  "cli_version": "1.8.0",
-  "tag": "1.8.0",
+  "cli_version": "<CLI version>",
+  "tag": "<CLI version>",
   "workspace": {
     "path": "/home/you/project/.odctl",
     "exists": true,
@@ -4428,23 +4759,23 @@ It prints the result of each tool under a line with the tool's name. The output 
   },
   "images": [
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:1.8.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:1.8.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>",
       "local": true
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:1.8.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:1.8.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>",
       "local": false
     },
     {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:1.8.0",
+      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>",
       "local": false
     }
   ]
@@ -5144,8 +5475,8 @@ PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/"$PIPE"
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 ```
 
 The deploy answers that the agent's workflow has been created. It works once `odctl up metadata` has returned, because the profile waits until the ingestion Airflow answers. Airflow has to parse the new DAG file before the trigger works, so repeat the trigger every few seconds until it answers that the workflow has been triggered. Then read the run's state:
@@ -5272,8 +5603,8 @@ PIPE=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   http://127.0.0.1:8585/api/v1/services/ingestionPipelines \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/$PIPE
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/"$PIPE"
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 ```
 
 Read the run's state until the `pipelineState` of the first entry of `pipelineStatuses` reaches `success`:
@@ -5307,7 +5638,7 @@ docker exec openmetadata-ingestion grep -c orders_v2 /opt/airflow/connectors/dem
 Trigger the agent again:
 
 ```bash
-curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/$PIPE
+curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/"$PIPE"
 ```
 
 A run that starts after the copy reports `orders_v2`. Read the run's state as above, then the changed table:
@@ -5474,7 +5805,7 @@ The collector answers `{"partialSuccess":{}}`. The collector passes metrics on i
 
 An alert rule is a query that Grafana runs against Prometheus every minute, and a limit it compares the result with. The rule fires when the result passes the limit. Grafana then shows one alert for each DAG, or other label set, that the query returns. odctl ships one rule, which fires when an Airflow DAG run fails. This section builds on [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md), which explains how to upload and run a DAG, and on [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md), which explains drift.
 
-The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/v1.8.0/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
+The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/v1.9.0/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
 
 ```bash
 # Title of each alert rule that Grafana loaded.
@@ -6799,25 +7130,15 @@ I use odctl in my own projects: [desflow](https://jaehyeon.me/desflow/) starts t
 
 # Roadmap
 
-The work comes in the order shown, without dates: a release ships when it is ready. Features come first, then the testing and setup work that adds no feature. Each planned item links to its GitHub issue where one exists.
+Now is the work being built, and Planned lists the rest in no order. Neither has dates or version numbers: an item gets its version when it ships. Each item links to its GitHub issue where one exists.
 
-## Next Releases
+## Now
 
-1.9.0: Label Studio
-
-A `label-studio` profile for labelling data by hand, on odctl's PostgreSQL. Its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use. [#169](https://github.com/jaehyeon-kim/odctl/issues/169)
-
-1.10.0: Agent skill
+Agent skill
 
 The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)
 
-1.11.0: Memory check and models on the host
-
-`odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio, on macOS, Linux and WSL2. The guide also covers the Ollama embeddings route, batch embedding in Airflow and a hand-run rerank server. [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
-
-## Alongside
-
-Work that does not wait for a release, published as it is ready.
+## Planned
 
 - **Guides**
 
@@ -6825,15 +7146,33 @@ Work that does not wait for a release, published as it is ready.
 
   Iceberg table maintenance with Spark, vector search in Valkey, and traces and prompts in MLflow.
 
-  MLOps guides: a prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.
-
-  Agents guides: traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.
-
-  Retrieval guides: hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.
-
-  No new service and no new version: each guide is published when it reaches `main`.
-
   [#152](https://github.com/jaehyeon-kim/odctl/issues/152)
+
+- **MLOps guides**
+
+  ______________________________________________________________________
+
+  A prediction log and labels in PostgreSQL, feature and leakage checks, hyperparameter search, ONNX quantisation, serving a second model or many models, serving latency sent over OTLP, Feast dataset versions and reads of large Iceberg tables.
+
+- **Agents guides**
+
+  ______________________________________________________________________
+
+  Traces, token metrics, feedback and evaluation of agent and model calls, an agent in a Temporal workflow, agent services beside the stack, and agent state in PostgreSQL.
+
+- **Retrieval guides**
+
+  ______________________________________________________________________
+
+  Hybrid search with rank fusion, graph queries in PostgreSQL, ingestion with change detection, Valkey as a cache, and media with signed URLs.
+
+- **Testing and CI**
+
+  ______________________________________________________________________
+
+  The end-to-end tests run on every pull request, including image updates. Each release is also tested as an upgrade from the one before it, and on arm64.
+
+  [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
 
 - **Kafka Connect transforms**
 
@@ -6843,15 +7182,13 @@ Work that does not wait for a release, published as it is ready.
 
   [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
-- **Testing and CI**
+- **Memory check and models on the host**
 
   ______________________________________________________________________
 
-  It lands between 1.9.0 and 1.10.0. It changes only the tests, the CI workflows, the dependency update settings and two docs pages, not odctl itself, so it has no version of its own. The end-to-end tests run on every pull request, including image updates, so an update is tested before it merges. Each release is also tested as an upgrade from the one before it, and on arm64, which most Macs run. A pull request then tests only the profiles it changes, and the full suite runs every night. The CI user guide and the per-task environments section are published with 1.10.0.
+  `odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio.
 
-  [#102](https://github.com/jaehyeon-kim/odctl/issues/102)
-
-## After desflow 1.0
+  [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
 
 - **desflow server**
 
@@ -6864,6 +7201,10 @@ Work that does not wait for a release, published as it is ready.
 ## Released
 
 Newest first.
+
+1.9.0: Label Studio
+
+The `label-studio` profile runs Label Studio on odctl's PostgreSQL, and its guide loads the exported labels into a label table in PostgreSQL, which the MLOps guides then use ([Label Studio](https://jaehyeon.me/odctl/latest/guides/label-studio/index.md)). MLflow is 3.18.0 and Feast is 0.68.0. [#169](https://github.com/jaehyeon-kim/odctl/issues/169), [#184](https://github.com/jaehyeon-kim/odctl/issues/184)
 
 1.8.0: Lineage and alerts
 
@@ -6922,6 +7263,27 @@ What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.9.0
+
+Label Studio, and MLflow 3.18.0 and Feast 0.68.0.
+
+- The `label-studio` profile runs Label Studio on odctl's PostgreSQL, and its guide loads the exported labels into a label table in PostgreSQL ([Label Studio](https://jaehyeon.me/odctl/latest/guides/label-studio/index.md)).
+- Label Studio can reach an ML backend, a webhook receiver and SeaweedFS on the `odctl` network, and the `storage` profile creates a `label-studio` bucket for its S3 storage ([Connect Other Services](https://jaehyeon.me/odctl/latest/guides/label-studio/#connect-other-services)).
+- MLflow is 3.18.0. On each start, `mlflow` upgrades the schema of a database that an earlier MLflow created.
+- A download of a model from the host works with no client setting ([Load a Model from Your Machine](https://jaehyeon.me/odctl/latest/guides/mlflow/#load-a-model-from-your-machine)).
+- MLflow's automatic evaluation scores traces with a judge that uses an AI Gateway endpoint. Before, every assessment failed with "Invalid Host header" ([MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)).
+- Feast is 0.68.0.
+- `feast-serve` and `feast-ui` keep running when `s3://feast/repo` changes while they load it. Before, a file deleted during the load stopped the container until the next `odctl up`.
+- The docs site keeps one version per minor release, and an address with a patch version, such as `https://jaehyeon.me/odctl/1.2.0/`, opens its minor.
+
+### Upgrading
+
+- A new profile, `label-studio`, in the `mlops` stack. It starts PostgreSQL and uses host port 8088.
+- A workspace made by `odctl init` before 1.9.0 has an older `compose-mlops.yml`, `compose-infra.yml` and PostgreSQL init script. Run `odctl init --force` to copy the new files; it replaces your edits, including `.env`, so keep a copy of them. Put your settings back into the new `.env` before you start the services, because a `postgres` container keeps the user and password it was created with. A `postgres` container started before 1.9.0 does not run the init script again, so it has no `labelstudio` database. Start it with `odctl up postgres`, then create the database once before `odctl up label-studio`: `docker exec postgres psql -U user -d postgres -c 'CREATE DATABASE labelstudio OWNER "user"'`. The `postgres` database always exists, whatever `POSTGRES_DB` is set to. If you set `POSTGRES_USER`, put that name in place of `user` in both places.
+- MLflow is 3.18.0, up from 3.16.1. On its next start, `mlflow` upgrades the schema of your existing `mlflow` database. Going back to 3.16.1 afterwards is not tested. Install `mlflow==3.18.0` on the host to match the server.
+- A download from the host no longer needs `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false`; you can remove it.
+- Feast is 0.68.0, up from 0.66.0, and needs Python 3.11 or newer. Install `feast[...]==0.68.0` on the host. The feature server's latency metric labels `feature_count` with a range, such as `1-10`, so a query that matches a single count changes.
 
 ## Version 1.8.0
 

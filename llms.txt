@@ -44,6 +44,7 @@
 - [Feast Vector Retrieval](https://jaehyeon.me/odctl/latest/guides/feast-vector-retrieval/index.md)
 - [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)
 - [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)
+- [Label Studio](https://jaehyeon.me/odctl/latest/guides/label-studio/index.md)
 - [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
 - [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)
 - [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md)
