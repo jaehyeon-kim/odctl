@@ -2590,7 +2590,7 @@
 <li>MLflow's automatic evaluation scores traces with a judge that uses an AI Gateway endpoint. Before, every assessment failed with "Invalid Host header" (<a href="../../guides/mlflow/">MLflow</a>).</li>
 <li>Feast is 0.68.0.</li>
 <li><code>feast-serve</code> and <code>feast-ui</code> keep running when <code>s3://feast/repo</code> changes while they load it. Before, a file deleted during the load stopped the container until the next <code>odctl up</code>.</li>
-<li>The docs site keeps one version per minor release, and an address with a patch version, such as <code>https://jaehyeon.me/odctl/1.2.0/</code>, opens its minor.</li>
+<li>The docs site lists one version per minor release, such as 1.2, with the docs of its last patch. Patch versions are no longer listed, so an address with one, such as <code>https://jaehyeon.me/odctl/1.2.0/</code>, now returns 404; use the minor, <code>https://jaehyeon.me/odctl/1.2/</code>.</li>
 </ul>
 <h3 id="upgrading">Upgrading</h3>
 <ul>

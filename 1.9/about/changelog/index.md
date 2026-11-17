@@ -13,7 +13,7 @@ Label Studio, and MLflow 3.18.0 and Feast 0.68.0.
 - MLflow's automatic evaluation scores traces with a judge that uses an AI Gateway endpoint. Before, every assessment failed with "Invalid Host header" ([MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)).
 - Feast is 0.68.0.
 - `feast-serve` and `feast-ui` keep running when `s3://feast/repo` changes while they load it. Before, a file deleted during the load stopped the container until the next `odctl up`.
-- The docs site keeps one version per minor release, and an address with a patch version, such as `https://jaehyeon.me/odctl/1.2.0/`, opens its minor.
+- The docs site lists one version per minor release, such as 1.2, with the docs of its last patch. Patch versions are no longer listed, so an address with one, such as `https://jaehyeon.me/odctl/1.2.0/`, now returns 404; use the minor, `https://jaehyeon.me/odctl/1.2/`.
 
 ### Upgrading
 
