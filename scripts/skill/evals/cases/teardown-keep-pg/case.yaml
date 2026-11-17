@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: teardown-keep-pg
+expected_outcome: >
+  The folder holds teardown.sh, reply.md.
+context:
+  scaffold_script: setup.sh
