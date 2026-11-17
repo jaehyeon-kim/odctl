@@ -28,33 +28,32 @@ if [ "$(git rev-parse FETCH_HEAD)" != "$(git rev-parse HEAD)" ]; then
     uv run mkdocs build --strict --site-dir "$RUNNER_TEMP/strict-site"
 fi
 
-# The docs are deployed per minor version, so a patch release replaces its minor's
-# docs instead of adding a copy of the site: the docs of 1.9.1 replace those of
-# 1.9.0 under 1.9. The full version is an alias of the minor, so a link that
-# names it still opens the docs.
+# The docs are deployed per minor version only, so a patch release replaces its
+# minor's docs instead of adding a copy of the site: the docs of 1.9.1 replace
+# those of 1.9.0 under 1.9. No patch version is listed on the site.
 DOCS_VERSION=$(echo "$VERSION" | cut -d . -f 1,2)
 echo "Docs version: $DOCS_VERSION"
 
-# A release of this minor deployed under its full version is replaced by the
-# minor, which takes over its name and its aliases as aliases. mike delete
-# removes a version with its aliases, so the names are kept first. Each line
-# holds one such version, then its aliases other than `latest`.
-old_names=()
-while read -r -a names; do
-  uv run mike delete "${names[0]}"
-  old_names+=("${names[@]}")
+# Remove every patch name of this minor from gh-pages: a version of this minor
+# deployed under its full version, and an alias of the minor other than
+# `latest`. mike delete removes a version with its aliases, or only the alias
+# it is given.
+while read -r name; do
+  uv run mike delete "$name"
 done < <(uv run mike list --json | uv run python -c '
 import json, sys
 minor = sys.argv[1]
 for v in json.load(sys.stdin):
-    if v["version"] != minor and ".".join(v["version"].split(".")[:2]) == minor:
-        print(" ".join([v["version"], *(a for a in v["aliases"] if a != "latest")]))
+    if v["version"] == minor:
+        for a in v["aliases"]:
+            if a != "latest":
+                print(a)
+    elif ".".join(v["version"].split(".")[:2]) == minor:
+        print(v["version"])
 ' "$DOCS_VERSION")
 
-# Deploy the minor version and tag it as 'latest'. mike adds these aliases to
-# those the minor already has, so the full version of an earlier patch stays.
-# The + form expands an empty list to nothing under set -u in bash 3.2 too.
-uv run mike deploy --update-aliases "$DOCS_VERSION" "$VERSION" latest ${old_names[@]+"${old_names[@]}"}
+# Deploy the minor version and tag it as 'latest'.
+uv run mike deploy --update-aliases "$DOCS_VERSION" latest
 
 # The root of the site opens latest.
 uv run mike set-default latest
