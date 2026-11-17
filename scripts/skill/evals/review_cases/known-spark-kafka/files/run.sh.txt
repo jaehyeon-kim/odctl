@@ -2,16 +2,17 @@
 set -euo pipefail
 py/bin/odctl up spark-lite kafka-lite
 # odctl up returns before Kafka answers, because the kafka service has no health check, so
-# wait for the broker: 30 tries 2 seconds apart allow about a minute for it to start.
+# wait for the broker. odctl's own e2e test waits for the same check with 30 tries 5 seconds
+# apart (.github/scripts/smoke.sh, guide_kafka), so this uses the same limit.
 for try in $(seq 1 30); do
   if docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:19092 --list >/dev/null 2>&1; then
     break
   fi
   if [ "$try" -eq 30 ]; then
-    echo "Kafka did not answer within a minute" >&2
+    echo "Kafka did not answer within 150 seconds" >&2
     exit 1
   fi
-  sleep 2
+  sleep 5
 done
 docker cp read_orders.py spark-master:/tmp/read_orders.py
 docker exec spark-master /opt/spark/bin/spark-submit \
