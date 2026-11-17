@@ -168,6 +168,12 @@
         "marquezproject/marquez-web"
       ],
       "groupName": "Lineage Ecosystem"
+    },
+    {
+      "description": "Update images from registries other than Docker Hub, such as docker.getcollate.io, docker.elastic.co, quay.io and ghcr.io, with no release-age wait. Renovate reads a release date only from Docker Hub, so under minimumReleaseAge with the default timestamp-required, these images would never count as stable and would get no pull request.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["/^[^/]+\\.[^/]+/"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
     }
   ]
 }

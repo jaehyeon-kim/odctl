@@ -35,7 +35,7 @@ LOGINS = (
 )
 TRIES = 12
 RETRY_SECONDS = 5
-# 2.0.7: an unknown email gives 400 (BasicAuthenticator.lookUserInProvider); a wrong
+# 2.0.8: an unknown email gives 400 (BasicAuthenticator.lookUserInProvider); a wrong
 # password or a blocked login gives 401 (AuthenticationException).
 REFUSED = (400, 401)
 
