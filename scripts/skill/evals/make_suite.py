@@ -10,11 +10,11 @@ odctl release (`git archive v1.9.0 | tar -x -C DIR`), with its `skills/odctl` as
 name that does not say the version, such as `suite-a`, because the reviewer reads paths that
 hold it. The script writes:
 
-- `OUT/wheel/`: the wheel of the tree (`uv build --wheel`), odctl without extras.
+- `OUT/wheel/`: the wheel of the tree (`uv build --wheel --offline`), odctl without extras.
 - `OUT/py/`: the prepared Python, a copy of uv's managed Python 3.12 with that wheel and
-  pytest installed. A venv cannot be used, because its interpreter stays in the home folder,
-  which the command's sandbox does not let the agent read. Each case's `setup.sh` copies this
-  folder into the run's workspace.
+  pytest installed offline from uv's cache. A venv cannot be used, because its interpreter
+  stays in the home folder, which the command's sandbox does not let the agent read. Each
+  case's `setup.sh` copies this folder into the run's workspace.
 - `OUT/odctl/`: a copy of the tree's `skills/odctl`, the command's target, with `evals/`
   holding a copy of each folder of `cases/` and `evals/python-path`, the path of `OUT/py`,
   which every `setup.sh` reads.
@@ -48,7 +48,7 @@ def _run(cmd: List[str], cwd: Optional[Path] = None) -> str:
 def _wheel(tree: Path, out: Path) -> Path:
     """Builds the tree's wheel into `out/wheel` and returns its path."""
     folder = out / "wheel"
-    _run(["uv", "build", "--wheel", "--out-dir", str(folder)], cwd=tree)
+    _run(["uv", "build", "--wheel", "--offline", "--out-dir", str(folder)], cwd=tree)
     wheels = sorted(folder.glob("*.whl"))
     if len(wheels) != 1:
         raise SystemExit(
@@ -70,6 +70,7 @@ def _prepared_python(wheel: Path, out: Path) -> Path:
             "uv",
             "pip",
             "install",
+            "--offline",
             "--python",
             str(python),
             "--break-system-packages",
