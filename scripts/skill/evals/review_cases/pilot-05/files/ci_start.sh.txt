@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# CI step: start odctl's kafka-lite and postgres profiles, then block until a
+# Kafka consumer group can read a message end to end. Tests that follow this
+# step can rely on the broker accepting produce and consume requests.
+#
+# Exit status: 0 when the probe succeeds, non-zero otherwise.
+#
+# Environment overrides:
+#   ODCTL_BIN          path to the odctl binary        (default: <script dir>/py/bin/odctl)
+#   CI_READY_TIMEOUT   seconds to wait for Kafka       (default: 240)
+#   CI_PROBE_TOPIC     topic used by the readiness probe (default: odctl-ci-probe)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+ODCTL_BIN="${ODCTL_BIN:-$SCRIPT_DIR/py/bin/odctl}"
+READY_TIMEOUT="${CI_READY_TIMEOUT:-240}"
+PROBE_TOPIC="${CI_PROBE_TOPIC:-odctl-ci-probe}"
+
+# Inside the kafka container, the internal listener is kafka:19092
+# (see compose-kafka.yml, KAFKA_LISTENERS). The container name is `kafka`.
+KAFKA_CONTAINER="kafka"
+KAFKA_BOOTSTRAP="kafka:19092"
+KAFKA_BIN="/opt/kafka/bin"
+
+POSTGRES_CONTAINER="postgres"
+POSTGRES_USER="${POSTGRES_USER:-user}"
+POSTGRES_DB="${POSTGRES_DB:-odctl}"
+
+log() { printf '[ci_start] %s\n' "$*" >&2; }
+
+dump_diagnostics() {
+  log "kafka container logs (last 80 lines):"
+  docker logs --tail 80 "$KAFKA_CONTAINER" >&2 2>&1 || true
+}
+
+# 1. Start the profiles. `odctl up` also starts the dependencies `deps`.
+log "starting profiles: kafka-lite postgres"
+"$ODCTL_BIN" up kafka-lite postgres
+
+# 2. Postgres: odctl up returns once the container runs; wait until it accepts
+#    connections so the tests do not race the database either.
+log "waiting for postgres to accept connections"
+pg_deadline=$((SECONDS + READY_TIMEOUT))
+until docker exec "$POSTGRES_CONTAINER" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; do
+  if (( SECONDS >= pg_deadline )); then
+    log "postgres did not become ready within ${READY_TIMEOUT}s"
+    exit 1
+  fi
+  sleep 2
+done
+log "postgres is ready"
+
+# 3. Kafka: the kafka-lite service has no healthcheck, so `odctl up` returns
+#    before the broker is usable. Probe it: create the topic, produce a unique
+#    token, then read it back with a brand-new consumer group. A new group
+#    starts from the earliest offset, so the probe does not depend on timing
+#    between produce and group join. Every attempt uses a new group and token.
+kafka_probe() {
+  local token="$1"
+  local group="ci-ready-${token}"
+
+  docker exec "$KAFKA_CONTAINER" "$KAFKA_BIN/kafka-topics.sh" \
+    --bootstrap-server "$KAFKA_BOOTSTRAP" \
+    --create --if-not-exists --topic "$PROBE_TOPIC" \
+    --partitions 1 --replication-factor 1 >/dev/null 2>&1 || return 1
+
+  printf '%s\n' "$token" | docker exec -i "$KAFKA_CONTAINER" "$KAFKA_BIN/kafka-console-producer.sh" \
+    --bootstrap-server "$KAFKA_BOOTSTRAP" \
+    --topic "$PROBE_TOPIC" \
+    --producer-property delivery.timeout.ms=15000 \
+    --producer-property request.timeout.ms=5000 >/dev/null 2>&1 || return 1
+
+  # The consumer exits after --timeout-ms without a new message, so a missing
+  # token just means this attempt failed and the caller retries. Output goes
+  # to a variable, not a pipe, so `pipefail` does not turn an early grep exit
+  # into a false failure.
+  local out
+  out="$(docker exec "$KAFKA_CONTAINER" "$KAFKA_BIN/kafka-console-consumer.sh" \
+    --bootstrap-server "$KAFKA_BOOTSTRAP" \
+    --topic "$PROBE_TOPIC" \
+    --group "$group" \
+    --from-beginning \
+    --timeout-ms 10000 2>/dev/null || true)"
+  grep -qxF "$token" <<<"$out"
+}
+
+log "waiting up to ${READY_TIMEOUT}s for a consumer group to read a message from ${PROBE_TOPIC}"
+kafka_deadline=$((SECONDS + READY_TIMEOUT))
+attempt=0
+until kafka_probe "probe-$(date +%s)-$$-$RANDOM"; do
+  attempt=$((attempt + 1))
+  if (( SECONDS >= kafka_deadline )); then
+    log "Kafka consumer probe failed after ${attempt} attempts (${READY_TIMEOUT}s)"
+    dump_diagnostics
+    exit 1
+  fi
+  sleep 3
+done
+
+log "Kafka is ready: a consumer group read a message after ${attempt} retries"

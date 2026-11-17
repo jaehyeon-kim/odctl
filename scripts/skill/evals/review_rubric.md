@@ -62,7 +62,7 @@ A command, option or behaviour of odctl that does not exist or is not as used: a
 
 - Wrong: `odctl ps` or `odctl ps --json` with no profile and no `--all`, which exits 1.
 - Wrong: `odctl trino`, `odctl exec`, `odctl up spark` (the profiles are `spark-lite` and `spark-full`).
-- Wrong: an extra readiness probe for a service `up` already waits for, with a claim that `up` does not wait.
+- Wrong: an extra readiness probe after `up` for a service whose `healthcheck` is true in `facts.json`, because `up` already waits for it (the skill's How to Use It), whether or not the reply says why.
 
 ## A6: service behaviour stated without a run or its source
 
@@ -79,7 +79,9 @@ A teardown, recreate or reset that removes more than the task started, or keeps 
 - Wrong: `odctl down --all`, or `--all --volumes`, when the task started one profile.
 - Wrong: `odctl down postgres` and `up` again when the request says the data must stay, or a claim that PostgreSQL's data is in a named volume that survives it.
 - Wrong: `down <profile> --volumes` with no `--dry-run` before it, or a claim that the command will ask first.
+- Wrong: a statement that PostgreSQL's data, or a setting stored in it, is lost only by `down --volumes` or by deleting its volume, or that `recreate` loses it. A plain `down` loses it and `recreate` keeps it. `recreate` keeps the data of PostgreSQL, SeaweedFS, ClickHouse with its Keeper and Fluss's ZooKeeper only; every other service, Airflow and Kafka's topics included, loses its data on a recreate, so a statement that a recreate loses those services' data is right (`docs/how-it-works.md`, Where Data Lives).
 - Right: `odctl down kafka-lite --volumes --dry-run`, then `odctl down kafka-lite --volumes`.
+- Not a mistake: a true description of what a wider command stops, such as "`odctl down --all` stops everything", given beside the scoped command. It is A7 when the run uses it, or gives it as the teardown to run.
 
 ## A8: a stack setting, image content or workspace file assumed
 
@@ -104,6 +106,7 @@ A check whose test passes whatever the thing it checks is, or that hides a failu
 - Wrong: `grep -q 'retention.ms=86400000'`, which also matches `delete.retention.ms=86400000`.
 - Wrong: `|| true` after a step that must succeed, or a pipe without `pipefail` whose first command fails.
 - Wrong: a check against a document or a file the script wrote, not the running service.
+- Not A10: a check that passes on a second run only because the first run left its result behind, such as a wait for a DAG that an earlier run registered. That is A9.
 
 ## A11: host environment assumed
 
@@ -118,4 +121,4 @@ A file that needs a host tool, a Python version or a time zone it does not name 
 A retry count, a wait limit, a timeout or a delay the agent chose, written with no comment or sentence that says why.
 
 - Wrong: `retry 30 5 ...` with no reason. Right: the same line with a comment that says where the limit comes from, such as the start time the agent measured or one the skill gives.
-- Not a mistake: a number the prompt gives, a port, or a number that is clear from the line beside it.
+- Not a mistake: a number the prompt gives, a port, a resource size such as Spark's `--driver-memory`, or a number that is clear from the line beside it. A12 counts only retry counts, wait limits, timeouts and delays.

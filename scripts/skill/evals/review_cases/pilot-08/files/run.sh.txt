@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Start Kafka and Spark with odctl, then run read_orders.py in the Spark container.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ODCTL="${ODCTL:-$HERE/py/bin/odctl}"
+CONTAINER=spark-master
+
+# spark-lite also starts its dependencies (catalog, deps, postgres, storage).
+# deps puts the Spark Kafka connector jars on Spark's classpath.
+"$ODCTL" up kafka-lite spark-lite
+
+docker cp "$HERE/read_orders.py" "$CONTAINER:/tmp/read_orders.py"
+
+docker exec "$CONTAINER" /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --driver-memory 512m \
+  --executor-memory 512m \
+  /tmp/read_orders.py

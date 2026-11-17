@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Stops and removes only the kafka-lite profile. PostgreSQL and its data are left alone.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# No --all and no --volumes: either could touch postgres or the shared volume it uses.
+"$here/py/bin/odctl" --workspace "$here/.odctl" down kafka-lite --yes

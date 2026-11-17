@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Set the PostgreSQL time zone in the odctl workspace to Australia/Sydney.
+# Only PostgreSQL changes: .odctl/.env (TZ=UTC, read by other services) is left as it is.
+# Data volumes are not touched; no `down --volumes`.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+ODCTL=py/bin/odctl
+TZ_NAME='Australia/Sydney'
+
+# 1. Make sure the postgres profile (and deps) is running.
+"$ODCTL" up postgres
+
+# 2. Wait until the server accepts connections.
+for _ in $(seq 1 30); do
+  if docker exec postgres pg_isready -U user -d odctl >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+# 3. Persist the setting. ALTER SYSTEM writes postgresql.auto.conf in the data
+#    volume, which overrides the UTC value that initdb wrote into postgresql.conf
+#    when the volume was first created (changing TZ in .env alone would not do it).
+docker exec postgres psql -v ON_ERROR_STOP=1 -U user -d odctl \
+  -c "ALTER SYSTEM SET timezone = '${TZ_NAME}';"
+
+# 4. Apply it to running sessions and new connections without a restart.
+docker exec postgres psql -v ON_ERROR_STOP=1 -U user -d odctl \
+  -c "SELECT pg_reload_conf();"
+
+# 5. Verify.
+current="$(docker exec postgres psql -v ON_ERROR_STOP=1 -U user -d odctl -tAc 'SHOW timezone;')"
+echo "SHOW timezone -> ${current}"
+if [ "$current" != "$TZ_NAME" ]; then
+  echo "ERROR: expected ${TZ_NAME}" >&2
+  exit 1
+fi

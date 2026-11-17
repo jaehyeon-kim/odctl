@@ -1,0 +1,415 @@
+{
+  "missing": [],
+  "odctl": {
+    "compose": {
+      "compose-kafka.yml": {
+        "connect": {
+          "aliases": [],
+          "container_name": "connect",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8083:8083"
+          ],
+          "profiles": [
+            "kafka-lite",
+            "kafka-full"
+          ]
+        },
+        "kafka": {
+          "aliases": [
+            "broker-1",
+            "broker-2",
+            "broker-3"
+          ],
+          "container_name": "kafka",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9092:9092"
+          ],
+          "profiles": [
+            "kafka-lite"
+          ]
+        },
+        "kafka-1": {
+          "aliases": [
+            "broker-1"
+          ],
+          "container_name": "kafka-1",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9092:9092"
+          ],
+          "profiles": [
+            "kafka-full"
+          ]
+        },
+        "kafka-2": {
+          "aliases": [
+            "broker-2"
+          ],
+          "container_name": "kafka-2",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9093:9093"
+          ],
+          "profiles": [
+            "kafka-full"
+          ]
+        },
+        "kafka-3": {
+          "aliases": [
+            "broker-3"
+          ],
+          "container_name": "kafka-3",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9094:9094"
+          ],
+          "profiles": [
+            "kafka-full"
+          ]
+        },
+        "kafka-ui": {
+          "aliases": [],
+          "container_name": "kafka-ui",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8086:8080"
+          ],
+          "profiles": [
+            "kafka-lite",
+            "kafka-full"
+          ]
+        },
+        "karapace": {
+          "aliases": [],
+          "container_name": "karapace",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8081:8081"
+          ],
+          "profiles": [
+            "kafka-lite",
+            "kafka-full"
+          ]
+        }
+      },
+      "compose-spark.yml": {
+        "spark-history": {
+          "aliases": [],
+          "container_name": "spark-history",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:18080:18080"
+          ],
+          "profiles": [
+            "spark-lite",
+            "spark-full"
+          ]
+        },
+        "spark-master": {
+          "aliases": [],
+          "container_name": "spark-master",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:9080:8080",
+            "127.0.0.1:7077:7077"
+          ],
+          "profiles": [
+            "spark-lite",
+            "spark-full"
+          ]
+        },
+        "spark-worker-1": {
+          "aliases": [],
+          "container_name": "spark-worker-1",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9081:8081"
+          ],
+          "profiles": [
+            "spark-lite",
+            "spark-full"
+          ]
+        },
+        "spark-worker-2": {
+          "aliases": [],
+          "container_name": "spark-worker-2",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9082:8081"
+          ],
+          "profiles": [
+            "spark-full"
+          ]
+        },
+        "spark-worker-3": {
+          "aliases": [],
+          "container_name": "spark-worker-3",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9083:8081"
+          ],
+          "profiles": [
+            "spark-full"
+          ]
+        }
+      }
+    },
+    "dry_run": "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 Dry Run Execution Plan                                                                                                                                                                               \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n\ud83d\udce6 compose-deps.yml (Infrastructure Layer)\n  \u2514\u2500 \ud83d\ude80 Profile: deps\n\ud83d\udce6 compose-infra.yml (Infrastructure Layer)\n  \u2514\u2500 \ud83d\ude80 Profile: postgres\n  \u2514\u2500 \ud83d\ude80 Profile: storage\n  \u2514\u2500 \ud83d\ude80 Profile: catalog\n\ud83d\udce6 compose-kafka.yml (Target Stack)\n  \u2514\u2500 \ud83d\ude80 Profile: kafka-lite\n\ud83d\udce6 compose-spark.yml (Target Stack)\n  \u2514\u2500 \ud83d\ude80 Profile: spark-lite\n",
+    "explain": {
+      "kafka-lite": {
+        "compose_file": "compose-kafka.yml",
+        "depends_on": [
+          "deps"
+        ],
+        "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+        "profile": "kafka-lite",
+        "role": "KRaft broker(s) with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion.",
+        "services": [
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "connect",
+            "ports": [
+              {
+                "container": 8083,
+                "host": 8083,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "kafka",
+            "ports": [
+              {
+                "container": 9092,
+                "host": 9092,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "name": "kafka-ui",
+            "ports": [
+              {
+                "container": 8080,
+                "host": 8086,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "name": "karapace",
+            "ports": [
+              {
+                "container": 8081,
+                "host": 8081,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "kafka",
+        "starts": [
+          "deps",
+          "kafka-lite"
+        ],
+        "usage": "\u2022 Kafka UI:\n  - External (host): http://127.0.0.1:8086\n  - Internal (Docker): http://kafka-ui:8080\n\u2022 Schema Registry & Connect:\n  - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083\n\u2022 Bootstrap Servers (1-Node Lite):\n  - External (host): 127.0.0.1:9092\n  - Internal (Docker): broker-1:19092\n",
+        "volumes": []
+      },
+      "spark-lite": {
+        "compose_file": "compose-spark.yml",
+        "depends_on": [
+          "catalog"
+        ],
+        "description": "Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers.",
+        "profile": "spark-lite",
+        "role": "Distributed batch engine for data preparation and large-scale ETL.",
+        "services": [
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/spark:<version>",
+            "name": "spark-history",
+            "ports": [
+              {
+                "container": 18080,
+                "host": 18080,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/spark:<version>",
+            "name": "spark-master",
+            "ports": [
+              {
+                "container": 7077,
+                "host": 7077,
+                "protocol": "tcp"
+              },
+              {
+                "container": 8080,
+                "host": 9080,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/spark:<version>",
+            "name": "spark-worker-1",
+            "ports": [
+              {
+                "container": 8081,
+                "host": 9081,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "spark",
+        "starts": [
+          "catalog",
+          "deps",
+          "postgres",
+          "spark-lite",
+          "storage"
+        ],
+        "usage": "\u2022 Spark Master UI (1 Worker):\n  - External (host): http://127.0.0.1:9080\n  - Internal (Docker): http://spark-master:8080\n\u2022 Master RPC:\n  - External (host): spark://127.0.0.1:7077\n  - Internal (Docker): spark://spark-master:7077\n\u2022 Spark History Server:\n  - External (host): http://127.0.0.1:18080\n  - Internal (Docker): http://spark-history:18080\n",
+        "volumes": [
+          "spark-events-data"
+        ]
+      }
+    },
+    "list": [
+      {
+        "compose_file": "compose-kafka.yml",
+        "depends_on": [
+          "deps"
+        ],
+        "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+        "profile": "kafka-lite",
+        "services": [
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "connect",
+            "ports": [
+              {
+                "container": 8083,
+                "host": 8083,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "kafka",
+            "ports": [
+              {
+                "container": 9092,
+                "host": 9092,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "name": "kafka-ui",
+            "ports": [
+              {
+                "container": 8080,
+                "host": 8086,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "name": "karapace",
+            "ports": [
+              {
+                "container": 8081,
+                "host": 8081,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "kafka",
+        "starts": [
+          "deps",
+          "kafka-lite"
+        ]
+      },
+      {
+        "compose_file": "compose-spark.yml",
+        "depends_on": [
+          "catalog"
+        ],
+        "description": "Distributed batch and micro-batch data processing. Lite uses 1 Worker; Full uses 3 Workers.",
+        "profile": "spark-lite",
+        "services": [
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/spark:<version>",
+            "name": "spark-history",
+            "ports": [
+              {
+                "container": 18080,
+                "host": 18080,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/spark:<version>",
+            "name": "spark-master",
+            "ports": [
+              {
+                "container": 7077,
+                "host": 7077,
+                "protocol": "tcp"
+              },
+              {
+                "container": 8080,
+                "host": 9080,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/spark:<version>",
+            "name": "spark-worker-1",
+            "ports": [
+              {
+                "container": 8081,
+                "host": 9081,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "spark",
+        "starts": [
+          "catalog",
+          "deps",
+          "postgres",
+          "spark-lite",
+          "storage"
+        ]
+      }
+    ]
+  }
+}

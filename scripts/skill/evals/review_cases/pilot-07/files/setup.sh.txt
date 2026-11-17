@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Set up the odctl test stack for the test suite:
+#   1. create the Iceberg table demo.driver_stats and load a few rows,
+#   2. apply the Feast repository in feature_repo/ and upload it to s3://feast/repo,
+#   3. upload dags/materialize_driver_stats.py to Airflow and run that DAG once.
+#
+# Runs on a long-lived stack, from every CI job, so each step is repeatable:
+# the table is created only if missing and its rows are replaced, `feast apply`
+# is idempotent, the DAG file is overwritten, and each DAG run gets a unique id.
+#
+# Needs the stack already running (odctl up catalog storage feast airflow),
+# plus on the machine running this: aws (AWS CLI v2), curl, jq, feast, and a
+# Python with pyiceberg and pyarrow. Override PYTHON to pick the interpreter.
+#
+# Host ports are used throughout (127.0.0.1), so this script does not call Docker.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+# ---- Endpoints and credentials (odctl defaults; override from the environment)
+CATALOG_URI="${CATALOG_URI:-http://127.0.0.1:8181}"
+S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:8333}"
+AIRFLOW_URL="${AIRFLOW_URL:-http://127.0.0.1:8085}"
+AIRFLOW_USER="${AIRFLOW_USER:-user}"
+AIRFLOW_PASSWORD="${AIRFLOW_PASSWORD:-password}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-user}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-password}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+PYTHON="${PYTHON:-python3}"
+
+DAG_ID="materialize_driver_stats"
+DAG_WAIT_SECONDS="${DAG_WAIT_SECONDS:-180}"
+RUN_TIMEOUT_SECONDS="${RUN_TIMEOUT_SECONDS:-1800}"
+
+log() { printf '[setup] %s\n' "$*"; }
+die() { printf '[setup] ERROR: %s\n' "$*" >&2; exit 1; }
+
+# ---- 0. Preflight
+for cmd in aws curl jq feast "$PYTHON"; do
+  command -v "$cmd" >/dev/null 2>&1 || die "'$cmd' is not on PATH"
+done
+"$PYTHON" -c 'import pyiceberg, pyarrow' 2>/dev/null \
+  || die "$PYTHON cannot import pyiceberg and pyarrow; install them in the CI environment"
+[[ -f feature_repo/feature_store.yaml ]] \
+  || die "feature_repo/feature_store.yaml is missing; feast apply needs it (see reply.md)"
+[[ -f dags/materialize_driver_stats.py ]] || die "dags/materialize_driver_stats.py is missing"
+
+curl -fsS "$CATALOG_URI/v1/config" >/dev/null \
+  || die "Iceberg REST catalog is not reachable at $CATALOG_URI (odctl up catalog)"
+curl -fsS "$AIRFLOW_URL/api/v2/monitor/health" >/dev/null \
+  || die "Airflow is not reachable at $AIRFLOW_URL (odctl up airflow)"
+log "stack reachable"
+
+# ---- 1. Iceberg table demo.driver_stats
+log "creating demo.driver_stats if missing and loading rows"
+CATALOG_URI="$CATALOG_URI" S3_ENDPOINT="$S3_ENDPOINT" "$PYTHON" - <<'PY'
+import datetime as dt
+import os
+
+import pyarrow as pa
+from pyiceberg.catalog import load_catalog
+from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
+from pyiceberg.schema import Schema
+from pyiceberg.types import DoubleType, LongType, NestedField, TimestamptzType
+
+# warehouse must be empty for odctl's REST catalog (see the feast profile notes).
+catalog = load_catalog("odctl", **{
+    "type": "rest",
+    "uri": os.environ["CATALOG_URI"],
+    "warehouse": "",
+    "s3.endpoint": os.environ["S3_ENDPOINT"],
+    "s3.access-key-id": os.environ["AWS_ACCESS_KEY_ID"],
+    "s3.secret-access-key": os.environ["AWS_SECRET_ACCESS_KEY"],
+    "s3.path-style-access": "true",
+    "s3.region": os.environ["AWS_DEFAULT_REGION"],
+})
+
+try:
+    catalog.create_namespace("demo")
+except NamespaceAlreadyExistsError:
+    pass
+
+schema = Schema(
+    NestedField(1, "driver_id", LongType(), required=False),
+    NestedField(2, "conv_rate", DoubleType(), required=False),
+    NestedField(3, "acc_rate", DoubleType(), required=False),
+    NestedField(4, "avg_daily_trips", LongType(), required=False),
+    NestedField(5, "event_timestamp", TimestamptzType(), required=False),
+    NestedField(6, "created", TimestamptzType(), required=False),
+)
+
+try:
+    table = catalog.load_table("demo.driver_stats")
+except NoSuchTableError:
+    table = catalog.create_table("demo.driver_stats", schema=schema)
+
+# Fixed rows, so every CI run loads the same data.
+base = dt.datetime(2026, 11, 1, 12, 0, tzinfo=dt.timezone.utc)
+rows = [
+    # driver_id, conv_rate, acc_rate, avg_daily_trips, hours after base
+    (1001, 0.81, 0.92, 120, 0),
+    (1002, 0.67, 0.88, 95, 1),
+    (1003, 0.93, 0.97, 150, 2),
+]
+arrow = pa.table({
+    "driver_id": pa.array([r[0] for r in rows], type=pa.int64()),
+    "conv_rate": pa.array([r[1] for r in rows], type=pa.float64()),
+    "acc_rate": pa.array([r[2] for r in rows], type=pa.float64()),
+    "avg_daily_trips": pa.array([r[3] for r in rows], type=pa.int64()),
+    "event_timestamp": pa.array(
+        [base + dt.timedelta(hours=r[4]) for r in rows],
+        type=pa.timestamp("us", tz="UTC")),
+    "created": pa.array(
+        [base + dt.timedelta(hours=r[4] + 1) for r in rows],
+        type=pa.timestamp("us", tz="UTC")),
+})
+
+# Overwrite, not append, so repeated runs keep exactly these rows.
+table.overwrite(arrow)
+print(f"demo.driver_stats now has {table.scan().to_arrow().num_rows} rows")
+PY
+
+# ---- 2. Feast repository
+log "applying Feast repository in feature_repo/"
+(cd feature_repo && feast apply)
+
+log "uploading feature_repo/ to s3://feast/repo (the feast services reload it)"
+aws s3 sync feature_repo/ s3://feast/repo/ \
+  --endpoint-url "$S3_ENDPOINT" \
+  --exclude "README.md" --exclude "__pycache__/*" --exclude "*.pyc" --exclude ".feast/*"
+
+# ---- 3. Airflow DAG
+log "uploading DAG to s3://airflow/dags/"
+aws s3 cp dags/materialize_driver_stats.py "s3://airflow/dags/materialize_driver_stats.py" \
+  --endpoint-url "$S3_ENDPOINT"
+
+token=$(curl -fsS -X POST "$AIRFLOW_URL/auth/token" \
+  -H 'Content-Type: application/json' \
+  -d "{\"username\": \"$AIRFLOW_USER\", \"password\": \"$AIRFLOW_PASSWORD\"}" \
+  | jq -r '.access_token')
+[[ -n "$token" && "$token" != "null" ]] || die "could not get an Airflow API token"
+auth=(-H "Authorization: Bearer $token")
+
+# The DAG processor re-reads s3://airflow/dags every 15 seconds.
+log "waiting for Airflow to load $DAG_ID"
+deadline=$((SECONDS + DAG_WAIT_SECONDS))
+until curl -fsS "${auth[@]}" "$AIRFLOW_URL/api/v2/dags/$DAG_ID" >/dev/null 2>&1; do
+  (( SECONDS < deadline )) || die "Airflow did not load DAG $DAG_ID within ${DAG_WAIT_SECONDS}s"
+  sleep 5
+done
+
+run_id="ci-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+log "triggering $DAG_ID as run $run_id"
+curl -fsS -X POST "${auth[@]}" -H 'Content-Type: application/json' \
+  "$AIRFLOW_URL/api/v2/dags/$DAG_ID/dagRuns" \
+  -d "{\"dag_run_id\": \"$run_id\", \"logical_date\": null, \"conf\": {}}" >/dev/null
+
+deadline=$((SECONDS + RUN_TIMEOUT_SECONDS))
+state=""
+while :; do
+  state=$(curl -fsS "${auth[@]}" "$AIRFLOW_URL/api/v2/dags/$DAG_ID/dagRuns/$run_id" \
+    | jq -r '.state')
+  case "$state" in
+    success) break ;;
+    failed) die "DAG run $run_id failed" ;;
+  esac
+  (( SECONDS < deadline )) || die "DAG run $run_id still '$state' after ${RUN_TIMEOUT_SECONDS}s"
+  sleep 10
+done
+
+log "DAG run $run_id succeeded; setup complete"
