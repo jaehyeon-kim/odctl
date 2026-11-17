@@ -1,0 +1,25 @@
+{
+  "name": "demo-iceberg",
+  "config": {
+    "connector.class": "org.apache.iceberg.connect.IcebergSinkConnector",
+    "tasks.max": "1",
+    "topics": "demo-iceberg",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "iceberg.tables": "demo.kc",
+    "iceberg.control.commit.interval-ms": "10000",
+    "iceberg.kafka.session.timeout.ms": "300000",
+    "iceberg.kafka.heartbeat.interval.ms": "3000",
+    "iceberg.kafka.auto.offset.reset": "earliest",
+    "consumer.override.auto.offset.reset": "earliest",
+    "iceberg.catalog.type": "rest",
+    "iceberg.catalog.uri": "http://catalog:8181",
+    "iceberg.catalog.io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+    "iceberg.catalog.client.region": "us-east-1",
+    "iceberg.catalog.s3.endpoint": "http://seaweed:8333",
+    "iceberg.catalog.s3.path-style-access": "true",
+    "iceberg.catalog.s3.access-key-id": "user",
+    "iceberg.catalog.s3.secret-access-key": "password"
+  }
+}
