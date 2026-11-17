@@ -272,7 +272,10 @@ def check_summarise(ctx: Context) -> List[str]:
     }
     for name, (g, r) in bad.items():
         if name == "run twice in the plan":
-            plan.write_text("pg-tz\ta\thaiku\t1\npg-tz\ta\thaiku\t1\nspark-kafka\ta\thaiku\t1\n", "utf-8")
+            plan.write_text(
+                "pg-tz\ta\thaiku\t1\npg-tz\ta\thaiku\t1\nspark-kafka\ta\thaiku\t1\n",
+                "utf-8",
+            )
         if run(g, r).returncode != 1:
             wrong.append(f"{name}: did not exit 1")
     return wrong
@@ -313,7 +316,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 lambda: check_fails_without(ctx, "workspace"),
             ),
             ("facts fails with no task.yaml", lambda: check_fails_without_task(ctx)),
-            ("facts takes a relative --python-dir", lambda: check_relative_python_dir(ctx)),
+            (
+                "facts takes a relative --python-dir",
+                lambda: check_relative_python_dir(ctx),
+            ),
             (
                 "check_hidden catches a suite and a version",
                 lambda: check_hidden_catches(ctx),

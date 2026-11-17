@@ -7,5 +7,7 @@ set -eu
 prepared=$(cat "$(dirname "$0")/../python-path")
 cp -R "$prepared" py
 # Why: the path is matched and replaced as literal text, so a character such as [ in it
-# cannot act as a pattern
+# cannot act as a pattern; perl reads both paths from the environment, so the single
+# quotes are meant
+# shellcheck disable=SC2016
 grep -lF "$prepared/" py/bin/* | PREP="$prepared/" NEW="$PWD/py/" xargs perl -pi -e 's/\Q$ENV{PREP}\E/$ENV{NEW}/g'
