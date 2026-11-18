@@ -87,7 +87,8 @@ def _found(path: Path) -> tuple:
             raw: Any = row.get("count")
             try:
                 count = int(raw)
-            except (TypeError, ValueError):
+            # Why: json.loads reads Infinity, and int() of it raises OverflowError
+            except (TypeError, ValueError, OverflowError):
                 problems.append(
                     f"line {number}: count {row.get('count')!r} is not a number"
                 )

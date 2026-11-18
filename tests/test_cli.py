@@ -68,3 +68,21 @@ def test_bordered_output_has_no_emoji_variation_selector():
         texts.extend(getattr(param, "help", None) or "" for param in command.params)
     assert "\ufe0f" not in Path(odctl.ui.__file__).read_text(encoding="utf-8")
     assert "\ufe0f" not in "".join(texts)
+
+
+def test_the_command_list_shows_no_docstring_args():
+    """typer's command list shows a command's first paragraph and does not stop at
+    `\\f`, so a docstring needs a blank line after it (typer 0.27.3 rich_utils.py)."""
+    import inspect
+
+    import typer.main
+
+    from odctl.main import app
+
+    command = typer.main.get_command(app)
+    leaks = [
+        name
+        for name, cmd in command.commands.items()
+        if "Args:" in inspect.cleandoc(cmd.help or "").split("\n\n")[0]
+    ]
+    assert leaks == []

@@ -94,9 +94,10 @@ def check_workspace_path(workspace: Path) -> None:
         )
 
 
-# The keys `odctl init` writes to `.odctl/.env`, in the order it writes them: each group
-# is followed by a blank line, and each key has its comment lines and its value; None is
-# the CLI version. `scripts/gen_pages.py` reads the keys from here for the docs.
+# The keys `odctl init` writes to `.odctl/.env`, in the order it writes them: each
+# group but the last is followed by a blank line, and each key has its comment lines
+# and its value; None is the CLI version. `scripts/gen_pages.py` reads the keys from
+# here for the docs.
 ENV_FILE: Tuple[Tuple[Tuple[Tuple[str, ...], str, Optional[str]], ...], ...] = (
     (((), "TAG", None), ((), "TZ", "UTC")),
     (

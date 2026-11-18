@@ -436,8 +436,6 @@ def test_down_named_profile_with_volumes_also_removes_shared_deps(monkeypatch):
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     # Nothing else is left running, so deps is safe to remove.
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
-    # The question of a teardown that names every profile reads them here.
-    monkeypatch.setattr("odctl.docker.get_managed_containers", lambda plan: [])
 
     result = runner.invoke(app, ["down", "kafka-lite", "-v"])
 
@@ -459,10 +457,6 @@ def test_down_named_profile_keeps_shared_deps_while_others_run(monkeypatch):
     other_profile = fake_container("spark-master", "spark-master", "running", None, {})
     monkeypatch.setattr(
         "odctl.main.get_managed_containers", lambda plan: [other_profile]
-    )
-    # The question of a teardown that names every profile reads them here.
-    monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda plan: [other_profile]
     )
 
     result = runner.invoke(app, ["down", "kafka-lite", "-v"])
@@ -991,20 +985,40 @@ def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "names, volumes, idle, expected",
+    "names, volumes, idle, shared, expected",
     [
-        (["deps-extra"], ["-v"], False, (["deps-extra"], False)),
-        (["deps", "deps-extra"], [], False, (["deps", "deps-extra"], False)),
-        (["deps-extra"], ["-v"], True, (["deps", "deps-extra"], True)),
+        (["deps-extra"], ["-v"], False, False, [(["deps-extra"], True)]),
+        (["deps-extra"], ["-v"], False, True, [(["deps-extra"], False)]),
+        (["deps", "deps-extra"], [], False, False, [(["deps", "deps-extra"], False)]),
+        (
+            ["deps", "deps-extra"],
+            ["-v"],
+            False,
+            False,
+            [(["deps-extra"], True), (["deps"], False)],
+        ),
+        (["deps-extra"], ["-v"], True, False, [(["deps", "deps-extra"], True)]),
     ],
-    ids=["extra, others run", "deps and extra", "extra, nothing else runs"],
+    ids=[
+        "extra, others run",
+        "extra mounts deps' volume, others run",
+        "deps and extra",
+        "deps and extra with volumes, others run",
+        "extra, nothing else runs",
+    ],
 )
 def test_down_stops_every_named_profile_of_the_deps_file(
-    monkeypatch, names, volumes, idle, expected
+    monkeypatch, names, volumes, idle, shared, expected
 ):
     """A workspace can add a profile such as deps-extra to compose-deps.yml, and the
-    teardown dropped it with deps. It follows deps' rule for volumes, because
-    `down --volumes` on that file removes every volume the file declares."""
+    teardown dropped it with deps. `down --volumes` removes only the volumes of the
+    profiles it is given (Compose v5), so deps-extra's own volumes go with `-v`; it
+    follows deps' rule for the shared jar volume only when it mounts one of deps'."""
+    extra = ["shared-deps"] if shared else ["extra-data"]
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], ["shared-deps"] if p == ["deps"] else extra),
+    )
     mock_stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
@@ -1022,7 +1036,7 @@ def test_down_stops_every_named_profile_of_the_deps_file(
     assert [
         (c.args[0], c.args[1], c.kwargs["remove_volumes"])
         for c in mock_stop.call_args_list
-    ] == [("compose-deps.yml", expected[0], expected[1])]
+    ] == [("compose-deps.yml", profiles, remove) for profiles, remove in expected]
 
 
 def test_down_dry_run_lists_the_other_profiles_of_the_deps_file(monkeypatch):
@@ -1048,8 +1062,9 @@ def test_down_dry_run_lists_the_other_profiles_of_the_deps_file(monkeypatch):
 def test_down_dry_run_lists_the_volumes_of_the_deps_files_other_profiles(
     monkeypatch, idle
 ):
-    """`down deps-extra -v` on an idle stack removes the deps file's volumes, deps-extra's
-    included, so the dry run lists them; with other profiles running it removes none."""
+    """`down deps-extra -v` removes deps-extra's own volume, so the dry run lists it;
+    the shared jar volume is listed only on an idle stack, when the real run removes
+    it too."""
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     monkeypatch.setattr(
         "odctl.main.build_execution_plan",
@@ -1079,5 +1094,42 @@ def test_down_dry_run_lists_the_volumes_of_the_deps_files_other_profiles(
     )
 
     assert result.exit_code == 0, result.stdout
-    assert ("odctl_extra-data" in result.stdout) is idle, result.stdout
+    assert "odctl_extra-data" in result.stdout, result.stdout
     assert ("odctl-shared-deps" in result.stdout) is idle, result.stdout
+
+
+def test_down_all_dry_run_lists_the_volumes_of_every_deps_file_profile(monkeypatch):
+    """`down --all -v` stops every profile of the deps file with `--volumes`, so the
+    dry run lists deps-extra's volume beside the shared jar volume."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-deps.yml": ["deps", "deps-extra"]
+        },
+    )
+    monkeypatch.setattr("odctl.main._teardown_of_all", lambda plan, volumes: plan)
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {
+            "shared-deps": "odctl-shared-deps",
+            "extra-data": "odctl_extra-data",
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_volume_names", lambda: {"odctl-shared-deps", "odctl_extra-data"}
+    )
+    keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+
+    result = runner.invoke(
+        app, ["down", "--all", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "odctl_extra-data" in result.stdout, result.stdout
+    assert "odctl-shared-deps" in result.stdout, result.stdout

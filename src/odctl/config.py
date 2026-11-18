@@ -92,12 +92,47 @@ class UnreadableFileError(ValueError):
 
 
 class _ComposeLoader(yaml.SafeLoader):
-    """PyYAML's safe loader with the two tags a compose file may use.
+    """PyYAML's safe loader, reading a compose file as Compose reads it.
 
-    Compose drops a node tagged `!reset` and keeps a node tagged `!override` as
-    written (compose-go loader/reset.go, `resolveReset`). `safe_load` refuses
-    both tags, so a file Compose runs would not be readable.
+    Compose drops a node tagged `!reset` before it resolves merge keys, and keeps a
+    node tagged `!override` as written (compose-go loader/reset.go, `resolveReset`).
+    `safe_load` refuses both tags, so a file Compose runs would not be readable.
+
+    Compose's YAML library (go-yaml v4, resolver.go) also reads plain values by
+    YAML 1.2 rules: only `true` and `false` in three spellings are booleans, an int
+    has no `:` part, so `2222:22` is a string where YAML 1.1 reads the base 60
+    integer 133342, and `yes`, `on` and `off` are strings.
     """
+
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> Any:
+        # Why: Compose drops a `!reset` key first, so a merged `<<` value fills it
+        node.value = [(k, v) for k, v in node.value if v.tag != "!reset"]
+        return super().construct_mapping(node, deep=deep)
+
+
+_YAML_12 = {
+    "tag:yaml.org,2002:bool": (
+        re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
+        list("tTfF"),
+    ),
+    "tag:yaml.org,2002:int": (
+        re.compile(r"^[-+]?(?:0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[0-9][0-9_]*)$"),
+        list("-+0123456789"),
+    ),
+    "tag:yaml.org,2002:float": (
+        re.compile(
+            r"^(?:[-+]?(?:\.[0-9]+|[0-9][0-9_]*(?:\.[0-9_]*)?)(?:[eE][-+]?[0-9]+)?"
+            r"|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$"
+        ),
+        list("-+.0123456789"),
+    ),
+}
+_ComposeLoader.yaml_implicit_resolvers = {
+    first: [(tag, regexp) for tag, regexp in resolvers if tag not in _YAML_12]
+    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+for _tag, (_regexp, _first) in _YAML_12.items():
+    _ComposeLoader.add_implicit_resolver(_tag, _regexp, _first)
 
 
 _RESET = object()
@@ -108,13 +143,12 @@ def _construct_reset(loader: yaml.SafeLoader, node: yaml.Node) -> object:
 
 
 def _construct_override(loader: yaml.SafeLoader, node: yaml.Node) -> Any:
+    # Why: go-yaml keeps a scalar with a tag it does not know as its text
+    if isinstance(node, yaml.ScalarNode):
+        return node.value
     # Why: a copy with the plain tag, because the tagged node is still being built
-    scalar = isinstance(node, yaml.ScalarNode)
-    value = node.value if scalar else None
-    # A quoted scalar stays a string, as it does without the tag
-    implicit = (not (isinstance(node, yaml.ScalarNode) and node.style), False)
     plain = type(node)(
-        loader.resolve(type(node), value, implicit),
+        loader.resolve(type(node), None, (True, False)),
         node.value,
         node.start_mark,
         node.end_mark,
@@ -332,7 +366,7 @@ def read_env_file(path: Path) -> Dict[str, str]:
 
     # compose-go reads bytes and drops a UTF-8 byte order mark (dotenv/godotenv.go,
     # parseWithLookup); a byte that is not UTF-8 stays inside its value.
-    src = data.decode("utf-8", errors="replace").removeprefix("﻿")
+    src = data.decode("utf-8", errors="replace").removeprefix("\ufeff")
     while True:
         src = src.lstrip()
         while src.startswith("#"):

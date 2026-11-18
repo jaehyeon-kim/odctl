@@ -1,9 +1,10 @@
 import functools
 import logging
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import typer
+from rich.markup import escape
 from typer.core import TyperGroup
 
 from odctl import config, reports, ui
@@ -373,7 +374,7 @@ def pull(
 
     for file, profs in execution_plan.items():
         ui.print_info(
-            f"Fetching images for [yellow]{ui.plain(file)}[/yellow]...", style="white"
+            f"Fetching images for [yellow]{escape(file)}[/yellow]...", style="white"
         )
         try:
             pull_stack_images(file, profs)
@@ -470,7 +471,7 @@ def up(
 
         if pull:
             ui.print_info(
-                f"📥 Pulling images for {prefix} ([cyan]{', '.join(profs)}[/cyan])..."
+                f"📥 Pulling images for {prefix} ([cyan]{escape(', '.join(profs))}[/cyan])..."
             )
             try:
                 pull_stack_images(file, profs)
@@ -482,7 +483,7 @@ def up(
                 raise typer.Exit(1)
 
         ui.print_info(
-            f"⚙️  Launching {prefix} ([cyan]{ui.plain(', '.join(profs))}[/cyan])..."
+            f"⚙️  Launching {prefix} ([cyan]{escape(', '.join(profs))}[/cyan])..."
         )
         try:
             launch_stack(file, profs)
@@ -630,11 +631,29 @@ def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
     return "" if _shared_deps_are_idle(plan) else None
 
 
+def _own_volumes_only(deps_others: List[str]) -> bool:
+    """Tell whether the deps file's other profiles mount none of deps' volumes.
+
+    `down --volumes` removes only the volumes of the active profiles' services
+    (Compose v5, `WithoutUnnecessaryResources`), so for such profiles, such as a
+    deps-extra a workspace adds, it never removes the shared jar volume.
+
+    Args:
+        deps_others (List[str]): Profiles of the deps file other than deps.
+
+    Returns:
+        bool: True when there are some and none of their volumes is one of deps'.
+    """
+    if not deps_others:
+        return False
+    shared = set(get_stack_details(_DEPS_FILE, ["deps"]).volumes)
+    return not shared & set(get_stack_details(_DEPS_FILE, deps_others).volumes)
+
+
 def _dry_run_volumes(
     plan: dict,
     reachable: bool,
-    note: str = "",
-    deps_profiles: Optional[List[str]] = None,
+    deps_groups: Optional[List[Tuple[List[str], str]]] = None,
 ) -> dict:
     """List the volumes a teardown with `--volumes` removes, for the dry run.
 
@@ -649,10 +668,9 @@ def _dry_run_volumes(
     Args:
         plan (dict): The teardown plan, with the deps file when the teardown stops it.
         reachable (bool): Whether Docker answers.
-        note (str): Printed after each volume of the deps file, such as
-            `_DEPS_UNCHECKED`.
-        deps_profiles (Optional[List[str]]): The deps file's profiles whose volumes
-            go, such as deps and deps-extra; None is deps alone.
+        deps_groups (Optional[List[Tuple[List[str], str]]]): The deps file's profiles
+            whose volumes go, each group with the note printed after its volumes,
+            such as `_DEPS_UNCHECKED`; None lists none of the deps file's volumes.
 
     Returns:
         dict: Compose file to the volumes to remove, each as the text printed after
@@ -661,16 +679,16 @@ def _dry_run_volumes(
     existing = get_volume_names() if reachable else None
     removed = {}
     for file, profs in plan.items():
-        suffix = note if file == _DEPS_FILE else ""
         # Services mount a volume by its key, and Docker lists it by its name.
         declared = get_declared_volumes(file)
-        keys = get_stack_details(
-            file, (deps_profiles or ["deps"]) if file == _DEPS_FILE else profs
-        ).volumes
-        names = [declared.get(key, key) for key in keys]
-        if existing is not None:
-            names = [name for name in names if name in existing]
-        lines = [f"{name}{suffix}" for name in names]
+        groups = (deps_groups or []) if file == _DEPS_FILE else [(profs, "")]
+        lines: List[str] = []
+        for group, suffix in groups:
+            keys = get_stack_details(file, group).volumes
+            names = [declared.get(key, key) for key in keys]
+            if existing is not None:
+                names = [name for name in names if name in existing]
+            lines += [f"{n}{suffix}" for n in names if f"{n}{suffix}" not in lines]
         if not reachable:
             if file != _DEPS_FILE:
                 lines.append(
@@ -785,24 +803,32 @@ def down(
 
     # A named deps follows the rule of a named teardown below: its shared jar volume
     # goes only once no other profile has a container. Another profile a workspace
-    # adds to the deps file, such as deps-extra, follows the same rule, because
-    # `down --volumes` on that file removes every volume it declares.
+    # adds to the deps file, such as deps-extra, has its own volumes removed, because
+    # `down --volumes` removes only the volumes of the profiles it is given; it
+    # follows deps' rule only when it mounts one of deps' volumes.
     deps_profiles: List[str] = [] if all else plan.pop(_DEPS_FILE, [])
     deps_named = "deps" in deps_profiles
     deps_others = [p for p in deps_profiles if p != "deps"]
+    own = volumes and _own_volumes_only(deps_others)
 
     if dry_run:
         removed = None
         if volumes:
             reachable = is_docker_running()
             note = _deps_join_note(plan, all, reachable)
+            groups: List[Tuple[List[str], str]] = []
+            if all:
+                groups.append((plan.get(_DEPS_FILE, []), ""))
             if note is not None:
                 # A named deps is stopped in every case, so only its volume carries
                 # the note.
                 plan[_DEPS_FILE] = ["deps"] if deps_named else [f"deps{note}"]
-            removed = _dry_run_volumes(
-                plan, reachable, note or "", ["deps", *deps_others]
-            )
+                groups.append((["deps"] + ([] if own else deps_others), note))
+            if own:
+                groups.append((deps_others, ""))
+            if own and _DEPS_FILE not in plan:
+                plan[_DEPS_FILE] = []
+            removed = _dry_run_volumes(plan, reachable, groups)
         if deps_named and _DEPS_FILE not in plan:
             plan[_DEPS_FILE] = ["deps"]
         if deps_others:
@@ -811,7 +837,7 @@ def down(
         return
 
     for file, profs in plan.items():
-        ui.print_info(f"🛑 Stopping [cyan]{ui.plain(', '.join(profs))}[/cyan]...")
+        ui.print_info(f"🛑 Stopping [cyan]{escape(', '.join(profs))}[/cyan]...")
         try:
             stop_stack(file, profs, remove_volumes=volumes)
         except Exception as e:
@@ -825,13 +851,21 @@ def down(
     # attaches to that network and mounts that volume.
     idle = volumes and not all and _shared_deps_are_idle(plan)
     if idle or deps_profiles:
-        stopped = (["deps"] if idle or deps_named else []) + deps_others
-        ui.print_info(f"🛑 Stopping [cyan]{ui.plain(', '.join(stopped))}[/cyan]...")
-        try:
-            stop_stack(_DEPS_FILE, stopped, remove_volumes=idle)
-        except Exception as e:
-            ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
-            raise typer.Exit(1)
+        calls = []
+        if own and not idle:
+            calls.append((deps_others, True))
+            rest = ["deps"] if deps_named else []
+        else:
+            rest = (["deps"] if idle or deps_named else []) + deps_others
+        if rest:
+            calls.append((rest, idle))
+        for stopped, remove in calls:
+            ui.print_info(f"🛑 Stopping [cyan]{escape(', '.join(stopped))}[/cyan]...")
+            try:
+                stop_stack(_DEPS_FILE, stopped, remove_volumes=remove)
+            except Exception as e:
+                ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
+                raise typer.Exit(1)
         if volumes and not idle:
             ui.print_info(
                 "The shared jar volume odctl-shared-deps stays, because other "
@@ -892,6 +926,7 @@ def info(
     """
     Show the odctl version, whether Docker is reachable and, with `--json`, the image tag, the workspace and odctl's own images.
     \f
+
     Args:
         json_output (bool): Print the report as JSON, with the tag, the workspace and the images.
 
@@ -1007,7 +1042,7 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Restarting containers...")
     for file, profs in plan.items():
-        ui.print_info(f"Restarting [yellow]{ui.plain(file)}[/yellow]...", style="white")
+        ui.print_info(f"Restarting [yellow]{escape(file)}[/yellow]...", style="white")
         try:
             restart_managed_containers({file: profs})
         except Exception as e:
@@ -1045,7 +1080,7 @@ def recreate(
         style="yellow",
     )
     for file, profs in plan.items():
-        ui.print_info(f"Recreating [yellow]{ui.plain(file)}[/yellow]...", style="white")
+        ui.print_info(f"Recreating [yellow]{escape(file)}[/yellow]...", style="white")
         try:
             recreate_managed_containers({file: profs}, pull=pull)
         except Exception as e:

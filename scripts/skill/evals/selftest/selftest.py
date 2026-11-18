@@ -331,6 +331,8 @@ def check_hidden_needs_folders(ctx: Context) -> List[str]:
     (closed / "a.txt").write_text("text\n", "utf-8")
     (closed / "inner" / "b.txt").write_text("odctl 1.9.0\n", "utf-8")
     (closed / "inner").chmod(0)
+    # Why: root reads a folder of mode 000, so there the case tests nothing
+    unreadable = [] if os.access(closed / "inner", os.R_OK) else [closed]
     wrong = []
     try:
         for path in [
@@ -338,7 +340,7 @@ def check_hidden_needs_folders(ctx: Context) -> List[str]:
             a_file,
             ctx.scratch / "no-file",
             cut,
-            closed,
+            *unreadable,
         ]:
             done = subprocess.run(
                 [PYTHON, str(EVALS / "check_hidden.py"), str(path)],

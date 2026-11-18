@@ -47,7 +47,7 @@ def test_get_compose_path(mock_workspace):
         ("a:\n  - 1\n  - !reset 2\n  - 3\n", {"a": [1, 3]}),
         ("a: !override\n  - 8080:80\n", {"a": ["8080:80"]}),
         ("a: !override {b: 1}\n", {"a": {"b": 1}}),
-        ("a: !override 5\nb: !override '5'\n", {"a": 5, "b": "5"}),
+        ("a: !override 5\nb: !override '5'\n", {"a": "5", "b": "5"}),
         (
             "x: &x {b: 1}\na: !override\n  <<: *x\n  c: 2\n",
             {"x": {"b": 1}, "a": {"b": 1, "c": 2}},
@@ -77,3 +77,29 @@ def test_an_unknown_tag_is_still_not_valid_yaml(tmp_path):
     path.write_text("a: !foo 1\n")
     with pytest.raises(UnreadableFileError, match="not valid YAML"):
         read_yaml(path, "compose-x.yml")
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("p: 2222:22\n", {"p": "2222:22"}),
+        (
+            "a: yes\nb: on\nc: off\nd: true\ne: FALSE\n",
+            {"a": "yes", "b": "on", "c": "off", "d": True, "e": False},
+        ),
+        (
+            "a: 017\nb: 0x1f\nc: 1_000\nd: 1.5\ne: .inf\n",
+            {"a": 15, "b": 31, "c": 1000, "d": 1.5, "e": float("inf")},
+        ),
+        (
+            "x: &x {ports: [80]}\na:\n  <<: *x\n  ports: !reset []\n",
+            {"x": {"ports": [80]}, "a": {"ports": [80]}},
+        ),
+    ],
+    ids=["sexagesimal port", "yaml 1.1 booleans", "numbers", "reset then merge"],
+)
+def test_read_yaml_reads_plain_values_as_compose_does(tmp_path, text, expected):
+    """Compose's go-yaml reads YAML 1.2 values and drops a `!reset` key before merging."""
+    path = tmp_path / "compose.yml"
+    path.write_text(text)
+    assert read_yaml(path, "compose.yml") == expected
