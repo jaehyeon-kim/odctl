@@ -657,8 +657,8 @@ mb_session() {
   [ -n "$sid" ] && printf '%s' "$sid"
 }
 
-# Create a database and run a query through it. Creating one returns 200 even
-# when the target is unreachable, so only a completed query proves the path.
+# Create a database and run a query through it. Creating one tests the
+# connection first, and the query proves the path end to end.
 mb_query() {
   local sid="$1" name="$2" engine="$3" details="$4" sql="$5" id res
   # Reuse a database of this name if one exists, so a retry does not pile up

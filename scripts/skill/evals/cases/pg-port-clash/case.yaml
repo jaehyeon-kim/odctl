@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pg-port-clash
+expected_outcome: >
+  The folder holds start_pg.sh, reply.md.
+context:
+  scaffold_script: setup.sh

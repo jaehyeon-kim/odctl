@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: mlflow-register-serve
+expected_outcome: >
+  The folder holds register.py, serve.sh, reply.md.
+context:
+  scaffold_script: setup.sh

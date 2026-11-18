@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pg-restart-wait
+expected_outcome: >
+  The folder holds nightly.sh, reply.md.
+context:
+  scaffold_script: setup.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: om-ingest-postgres
+expected_outcome: >
+  The folder holds catalogue_pg.sh, reply.md.
+context:
+  scaffold_script: setup.sh

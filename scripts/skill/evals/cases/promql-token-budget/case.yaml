@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: promql-token-budget
+expected_outcome: >
+  The folder holds token_usage.py, run.sh, reply.md.
+context:
+  scaffold_script: setup.sh

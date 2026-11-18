@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: marquez-run-report
+expected_outcome: >
+  The folder holds report_run.sh, latest_run.sh, reply.md.
+context:
+  scaffold_script: setup.sh

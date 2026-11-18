@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: mlflow-serve-new-version
+expected_outcome: >
+  The folder holds register_version.py, reload.sh, score_client.py, reply.md.
+context:
+  scaffold_script: setup.sh
