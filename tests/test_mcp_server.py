@@ -13,7 +13,7 @@ mcp = pytest.importorskip("mcp")
 
 from mcp import Client, StdioServerParameters  # noqa: E402
 
-from cli_workspace import fake_containers, write_workspace  # noqa: E402
+from cli_workspace import fake_container, fake_containers, write_workspace  # noqa: E402
 from odctl.main import app  # noqa: E402
 from odctl.mcp_server import build_server  # noqa: E402
 
@@ -262,3 +262,60 @@ def test_down_refuses_names_that_remove_every_profiles_data(
     assert mock_stop.called is not refused
     if refused:
         assert "odctl down --all --volumes" in result.content[0].text
+
+
+def test_down_refuses_every_profile_but_deps(monkeypatch, tmp_path):
+    """`--all` keeps deps, because it declares the shared jar volume, and a named
+    teardown with `volumes` removes deps once the rest is idle. So naming every
+    profile but deps removes all of it, and the guard, run against the real
+    `_teardown_of_all`, refuses it."""
+    from odctl.docker import get_stack_details
+    from odctl.planner import build_execution_plan
+
+    monkeypatch.chdir(tmp_path)  # no workspace, so the bundled files are read
+    every = build_execution_plan(None, True, resolve_deps=False)
+
+    def services(plan):
+        return {s for f, p in plan.items() for s in get_stack_details(f, p)[0]}
+
+    containers = [
+        fake_container(s, s, "running", None, {}) for s in sorted(services(every))
+    ]
+
+    def managed(plan):
+        wanted = services(plan)
+        return [c for c in containers if c.name in wanted]
+
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.get_managed_containers", managed)
+    monkeypatch.setattr("odctl.docker.get_managed_containers", managed)
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    profiles = [p for profs in every.values() for p in profs if p != "deps"]
+
+    result = _call("down", {"profiles": profiles, "volumes": True}, True)
+
+    assert result.is_error
+    assert "odctl down --all --volumes" in result.content[0].text
+    mock_stop.assert_not_called()
+
+
+def test_down_stops_nothing_when_the_guard_holds_only_inside_the_command(
+    fixed_state, monkeypatch
+):
+    """The tool checks the guard, then `odctl down` checks it again and asks. The
+    server's stdin gives no answer, so the question aborts, and the tool returns the
+    command's text as an error instead of a bare Abort."""
+    import io
+
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    answers = iter([False, True])
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: next(answers))
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+
+    result = _call("down", {"profiles": ["kafka-lite"], "volumes": True}, True)
+
+    assert result.is_error
+    assert "WIPE ALL DATA" in result.content[0].text, result.content[0].text
+    mock_stop.assert_not_called()

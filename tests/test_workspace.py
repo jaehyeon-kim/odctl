@@ -1,3 +1,5 @@
+import pytest
+
 from odctl.workspace import get_cli_version, init_workspace
 
 
@@ -15,6 +17,8 @@ def test_init_workspace(tmp_path, monkeypatch):
     internal_dir = tmp_path / "internal"
     internal_dir.mkdir()
     (internal_dir / "test_file.txt").write_text("hello")
+    # Every workspace holds registry.yml, which is how `init --force` knows one.
+    (internal_dir / "registry.yml").write_text("stacks: {}\n")
     internal_subdir = internal_dir / "subdir"
     internal_subdir.mkdir()
     (internal_subdir / "subfile.txt").write_text("world")
@@ -46,6 +50,48 @@ def test_init_workspace(tmp_path, monkeypatch):
     assert (workspace / "test_file.txt").read_text() == "hello"
 
 
+@pytest.mark.parametrize("force", [False, True], ids=["init", "init --force"])
+def test_an_interrupted_init_can_be_run_again(tmp_path, monkeypatch, force):
+    """`init` refuses a folder with files and no registry.yml, so a copy that failed
+    after the first file and before registry.yml left a folder that neither `init`
+    nor `init --force` would repair."""
+    import shutil
+    from pathlib import Path
+
+    from odctl import workspace as ws
+
+    workspace = tmp_path / ".odctl"
+    monkeypatch.setattr(ws, "get_workspace_dir", lambda: workspace)
+    internal = tmp_path / "internal"
+    internal.mkdir()
+    for name in ("a.yml", "b.yml", "registry.yml"):
+        (internal / name).write_text("x: 1\n")
+    monkeypatch.setattr(ws, "INTERNAL_RESOURCES_DIR", internal)
+    # A file system that lists the folder in name order.
+    listing = Path.iterdir
+    monkeypatch.setattr(Path, "iterdir", lambda self: iter(sorted(listing(self))))
+    copy = shutil.copy2
+
+    def disk_full(src, dst, **kwargs):
+        if Path(src).name == "b.yml":
+            raise OSError(28, "No space left on device")
+        return copy(src, dst, **kwargs)
+
+    monkeypatch.setattr(ws.shutil, "copy2", disk_full)
+    with pytest.raises(OSError):
+        init_workspace()
+    monkeypatch.setattr(ws.shutil, "copy2", copy)
+
+    init_workspace(force=force)
+
+    assert sorted(p.name for p in workspace.iterdir()) == [
+        ".env",
+        "a.yml",
+        "b.yml",
+        "registry.yml",
+    ]
+
+
 def _workspace_with_tag(tmp_path, monkeypatch, tag):
     workspace = tmp_path / ".odctl"
     workspace.mkdir()
@@ -75,6 +121,56 @@ def test_shell_tag_is_an_explicit_choice(tmp_path, monkeypatch):
     _workspace_with_tag(tmp_path, monkeypatch, "0.7.0")
     monkeypatch.setenv("TAG", "0.7.0")
     assert stale_workspace_tag() is None
+
+
+# The TAG lines hunt4's env_probe.py tried with CLI 1.10.0, each with the warning
+# that matches the TAG Compose runs: the last TAG line, with `export` and the spaces
+# around `=` dropped and an inline comment removed.
+TAG_LINES = [
+    ("export TAG=1.9.0\n", "1.9.0"),
+    ("TAG = 1.9.0\n", "1.9.0"),
+    ("TAG=1.10.0 # pinned\n", None),
+    ("TAG=1.9.0\nTAG=1.10.0\n", None),
+    ("TAG=1.10.0\nTAG=1.9.0\n", "1.9.0"),
+]
+
+
+@pytest.mark.parametrize("text, stale", TAG_LINES, ids=[t for t, _ in TAG_LINES])
+def test_the_stale_check_reads_the_tag_compose_runs(tmp_path, monkeypatch, text, stale):
+    """The check read the first TAG line and kept `export`, while the tag odctl shows
+    and Compose runs comes from the last one."""
+    from odctl.workspace import stale_workspace_tag
+
+    workspace = tmp_path / ".odctl"
+    workspace.mkdir()
+    (workspace / ".env").write_text(text)
+    monkeypatch.setattr("odctl.workspace.get_workspace_dir", lambda: workspace)
+    monkeypatch.setattr("odctl.workspace.get_cli_version", lambda: "1.10.0")
+
+    assert stale_workspace_tag() == stale
+
+
+@pytest.mark.parametrize(
+    "env", ["TAG=\n", "TZ=UTC\n", None], ids=["empty", "no TAG", "no .env"]
+)
+def test_a_workspace_without_a_tag_runs_the_cli_version(tmp_path, monkeypatch, env):
+    """Compose's `${TAG:-latest}` ran `latest` for a workspace that sets no TAG, the
+    case #127 fixed for a machine with no workspace."""
+    from odctl import config
+    from odctl.docker import resolve_image_tag
+    from odctl.workspace import default_tag_to_cli_version
+
+    workspace = tmp_path / ".odctl"
+    workspace.mkdir()
+    if env is not None:
+        (workspace / ".env").write_text(env)
+    monkeypatch.setattr(config, "get_workspace_dir", lambda: workspace)
+    monkeypatch.setattr("odctl.workspace.get_workspace_dir", lambda: workspace)
+    monkeypatch.setattr("odctl.workspace.get_cli_version", lambda: "1.10.0")
+
+    default_tag_to_cli_version()
+
+    assert resolve_image_tag() == "1.10.0"
 
 
 def test_no_workspace_is_not_reported(tmp_path, monkeypatch):
@@ -127,6 +223,7 @@ def test_tag_is_left_alone_with_a_workspace_or_a_shell_tag(tmp_path, monkeypatch
 
     workspace = tmp_path / ".odctl"
     workspace.mkdir()
+    (workspace / ".env").write_text("TAG=0.9.0\n")
     monkeypatch.setattr("odctl.workspace.get_workspace_dir", lambda: workspace)
     default_tag_to_cli_version()
     assert "TAG" not in os.environ, "the workspace's .env decides the tag"

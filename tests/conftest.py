@@ -39,6 +39,14 @@ def mock_workspace(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _run_in_an_empty_folder(tmp_path, monkeypatch):
+    """odctl reads `./.odctl` when no `--workspace` is given, so a test run from a
+    folder that holds a workspace would read it. Each test runs in its own empty
+    folder; a test that wants a workspace writes one there with `write_workspace`."""
+    monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture(autouse=True)
 def _no_tag_in_environment(monkeypatch):
     """CLI commands set TAG in the process when there is no workspace (#127).
     Each test starts without it, and monkeypatch restores the original after."""

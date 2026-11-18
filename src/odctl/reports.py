@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from odctl import config, docker, planner, workspace
 from odctl.models import (
@@ -18,26 +18,6 @@ from odctl.registry import Registry, load_registry
 
 class UnknownProfileError(Exception):
     """Raised when a profile is not in the registry."""
-
-
-def _compose_unreadable(compose_file: str, services: List[str]) -> Optional[str]:
-    """
-    Report why `get_stack_details` could not read a compose file.
-
-    Args:
-        compose_file (str): The compose file that was read.
-        services (List[str]): The services `get_stack_details` returned for it.
-
-    Returns:
-        Optional[str]: A message when the services are the error marker that
-        `get_stack_details` returns for a missing or unparseable file, otherwise None.
-    """
-    unreadable = services and (
-        services[0] == "File Error" or services[0].startswith("Err: ")
-    )
-    if unreadable:
-        return f"Cannot read {compose_file}: {services[0]}"
-    return None
 
 
 def _parse_port(spec: str) -> Optional[Port]:
@@ -65,7 +45,7 @@ def _parse_port(spec: str) -> Optional[Port]:
 
 
 def _read_stack(
-    compose_file: str, profile: str, for_json: bool
+    compose_file: str, profile: str
 ) -> Tuple[List[ServiceInfo], List[str], List[str]]:
     """
     Read the services, raw ports and volumes of a profile from its compose file.
@@ -73,9 +53,6 @@ def _read_stack(
     Args:
         compose_file (str): The compose file that defines the profile.
         profile (str): The profile name.
-        for_json (bool): True to fail when the file cannot be read. False to keep the
-            error marker of `get_stack_details` as the only service, port and volume, as
-            the tables show it.
 
     Returns:
         Tuple[List[ServiceInfo], List[str], List[str]]: The services, sorted by name,
@@ -83,14 +60,9 @@ def _read_stack(
         them, as `service:port`; and the named volumes.
 
     Raises:
-        ValueError: If `for_json` is set and the compose file cannot be read.
+        ValueError: If the compose file cannot be read.
     """
     names, specs, images, volumes = docker.get_stack_details(compose_file, [profile])
-    unreadable = _compose_unreadable(compose_file, names)
-    if unreadable:
-        if for_json:
-            raise ValueError(unreadable)
-        return [ServiceInfo(name=names[0])], specs, volumes
 
     image_of: Dict[str, str] = {}
     for entry in images:
@@ -98,7 +70,7 @@ def _read_stack(
         image_of[name] = image
 
     # Compose expands variables in a port before it reads it.
-    env = docker.interpolation_env()
+    env = docker.interpolation_env(compose_file)
     ports_of: Dict[str, List[Port]] = {name: [] for name in names}
     for entry in specs:
         name, _, spec = entry.partition(":")
@@ -191,9 +163,8 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
     Build the entry of every profile, in registry order.
 
     Args:
-        for_json (bool): True for the JSON, which works out `starts` and fails when a
-            compose file cannot be read. False for the tables, which leave `starts`
-            empty and show an unreadable compose file as the error marker.
+        for_json (bool): True for the JSON, which works out `starts`. False for the
+            tables, which leave `starts` empty.
         with_services (bool): Whether to read the compose files for each profile's
             services and ports. Defaults to True.
 
@@ -201,9 +172,8 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
         List[ProfileInfo]: One entry per profile.
 
     Raises:
-        FileNotFoundError: If the registry file does not exist.
-        ValueError: If `for_json` is set and a compose file cannot be read or the
-            registry lists an unknown dependency.
+        ValueError: If the registry or a compose file cannot be read, or `for_json` is
+            set and the registry lists an unknown dependency.
     """
     registry = load_registry()
     profile_map = planner.get_profile_map()
@@ -213,7 +183,7 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
             services: List[ServiceInfo] = []
             port_specs: List[str] = []
             if with_services:
-                services, port_specs, _ = _read_stack(stack.file, profile, for_json)
+                services, port_specs, _ = _read_stack(stack.file, profile)
             profiles.append(
                 _profile_info(
                     registry,
@@ -227,22 +197,19 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
     return profiles
 
 
-def build_profile_details(profile: str, for_json: bool) -> ProfileDetails:
+def build_profile_details(profile: str) -> ProfileDetails:
     """
     Build the details of one profile.
 
     Args:
         profile (str): The profile name.
-        for_json (bool): True to fail when the compose file cannot be read. False to
-            show it as the error marker, as the panel does.
 
     Returns:
         ProfileDetails: The profile's entry with its usage text, role and volumes.
 
     Raises:
-        FileNotFoundError: If the registry file does not exist.
         UnknownProfileError: If the registry has no such profile.
-        ValueError: If `for_json` is set and the compose file cannot be read, or the
+        ValueError: If the registry or the compose file cannot be read, or the
             registry lists an unknown dependency.
     """
     registry = load_registry()
@@ -251,7 +218,7 @@ def build_profile_details(profile: str, for_json: bool) -> ProfileDetails:
         raise UnknownProfileError(profile)
 
     stack = registry.stacks[profile_map[profile]["stack_id"]]
-    services, port_specs, volumes = _read_stack(stack.file, profile, for_json)
+    services, port_specs, volumes = _read_stack(stack.file, profile)
     info = _profile_info(
         registry, profile_map, profile, services, port_specs, with_starts=True
     )
@@ -310,13 +277,33 @@ def _container_info(container) -> ContainerInfo:
     )
 
 
+def _waits_for_completion(condition: Any, env: Dict[str, str]) -> bool:
+    """Tell whether a `depends_on` entry waits for its service to exit with code 0.
+
+    Args:
+        condition (Any): The entry's value, a mapping in the long syntax.
+        env (Dict[str, str]): The variables its file is interpolated with.
+
+    Returns:
+        bool: True when its `condition`, expanded, is `service_completed_successfully`.
+    """
+    if not isinstance(condition, dict) or condition.get("condition") is None:
+        return False
+    expanded = docker.expand(str(condition["condition"]), env)
+    return expanded == "service_completed_successfully"
+
+
 def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[str]:
     """
     Find the profiles whose services are all running.
 
-    A profile whose services are a strict subset of another active profile's is
-    left out, so `kafka-lite` does not also list the profiles it contains. The
-    shared `deps` profile is never listed.
+    A service runs when its container, of the file's own Compose project, is
+    running. A one-shot service, one that another service of its file waits on with
+    `condition:
+    service_completed_successfully`, as the packaged files mark one, counts once it
+    has exited with code 0. A profile whose services are a strict subset of another
+    active profile's is left out, so `kafka-lite` does not also list the profiles it
+    contains. The shared `deps` profile is never listed.
 
     Args:
         plan (Dict[str, List[str]]): A mapping of compose files to the profiles asked for.
@@ -324,20 +311,48 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
 
     Returns:
         List[str]: The active profiles, sorted.
+
+    Raises:
+        ValueError: If a compose file of the plan cannot be read.
     """
+    # A service is known by its project and its name, because two files can each
+    # have a service of the same name.
+    projects = {file: docker.get_project_name(file) for file in plan}
+    one_shots: Set[Tuple[str, str]] = set()
+    for file in plan:
+        # Compose expands variables in a condition before it reads it.
+        env = docker.interpolation_env(file)
+        for service in (docker.read_compose(file).get("services") or {}).values():
+            depends_on = service.get("depends_on")
+            if isinstance(depends_on, dict):
+                one_shots.update(
+                    (projects[file], name)
+                    for name, condition in depends_on.items()
+                    if _waits_for_completion(condition, env)
+                )
+
     running_services = set()
     for c in containers:
         labels = c.config.labels if c.config and c.config.labels else {}
+        project = labels.get("com.docker.compose.project", "")
         service = labels.get("com.docker.compose.service", "")
-        if service:
-            running_services.add(service)
+        state = c.state
+        finished = (
+            state.status == "exited"
+            and state.exit_code == 0
+            and (project, service) in one_shots
+        )
+        if service and (state.status == "running" or finished):
+            running_services.add((project, service))
 
     active: Dict[str, set] = {}
     for file, profiles in plan.items():
         for profile in profiles:
             services = docker.get_stack_details(file, [profile])[0]
-            if services and all(s in running_services for s in services):
-                active[profile] = set(services)
+            if services and all(
+                (projects[file], s) in running_services for s in services
+            ):
+                active[profile] = {(projects[file], s) for s in services}
 
     outermost = set()
     for profile, profile_services in active.items():
@@ -391,7 +406,8 @@ def build_info(include_images: bool = True) -> Info:
         Info: The version, tag, workspace, Docker state and, when asked, the images.
 
     Raises:
-        FileNotFoundError: If `include_images` is set and the registry file does not exist.
+        ValueError: If `include_images` is set and the registry or a compose file
+            cannot be read.
     """
     reachable = docker.is_docker_running()
 

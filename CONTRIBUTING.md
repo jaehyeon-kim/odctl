@@ -87,7 +87,7 @@ For a group name with a colon, such as `metadata:deps`, the e2e job starts the p
 
 ## Add a Profile
 
-1. Add the services to the compose file of their area in `src/odctl/resources/`, following the Rules: a pinned image, a `container_name`, and ports bound to `127.0.0.1`. A new area needs its entry in `TECH_GROUPS` in `scripts/gen_pages.py`. A dependency whose name sorts after the profile needs a weight in `order_weights` in `src/odctl/planner.py`.
+1. Add the services to the compose file of their area in `src/odctl/resources/`, following the Rules: a pinned image, a `container_name`, and ports bound to `127.0.0.1`. A new area needs its entry in `TECH_GROUPS` in `scripts/gen_pages.py`. Give each new image a role in `CONTAINER_ROLES` in `src/odctl/ui.py`, which `odctl explain` prints for its service; `tests/test_ui.py` fails until you do.
 2. Add the profile to `src/odctl/resources/registry.yml`: its compose file, description, profiles, dependencies, role and usage text. `scripts/gen_pages.py` builds its page from this entry and the compose file.
 3. Add its checks to `.github/scripts/smoke.sh`, and its group to `GROUPS` in `.github/scripts/select-profiles.py`.
 4. Add the technology to the README diagram, `image/diagram.drawio`, then export it. `test_readme_diagram_names_every_technology` fails until you do.
@@ -114,5 +114,5 @@ Work on a branch from `main` and open a pull request against `main`. Before you 
 The maintainer releases. These steps are written down so that each release is the same:
 
 1. Bump `version` in `pyproject.toml`, run `uv lock`, and add the release to `docs/about/changelog.md`, with an Upgrading line for any change to ports, profiles, `.env` keys, volumes or workspace files. The same commit updates the public roadmap, `docs/about/roadmap.md`: the release moves from Now to Released, and the next item moves into Now with its issue. No entry still to come names a version, and `tests/test_roadmap.py` fails otherwise. When it reaches `main`, the docs deploy as its minor version, such as 1.9, with `latest` on it, and replace that minor's earlier docs; no patch version is listed on the site.
-2. Once the `main` pipeline for that commit is green, push tag `vX.Y.Z` on it. A tag on a commit whose checks fail builds no images and cannot be released until it is moved. The tag pipeline builds and pushes the `X.Y.Z` images, then runs e2e for every profile group (about an hour).
+2. Once the `main` pipeline for that commit is green, push tag `vX.Y.Z` on it. A tag on a commit whose checks fail builds no images and cannot be released until it is moved. The tag pipeline builds and pushes the `X.Y.Z` images, then runs e2e for every profile group (about 25 minutes).
 3. Publish the GitHub release with that version's Changelog section as its text, so the two never differ: `python scripts/release_notes.py X.Y.Z > /tmp/notes.md`, then `gh release create vX.Y.Z --title vX.Y.Z --notes-file /tmp/notes.md`. `publish.yml` waits for the tag pipeline and uploads to PyPI only when every unit test job and every e2e job in it passed and every `X.Y.Z` image is in ghcr; neither check can be skipped.

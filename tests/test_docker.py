@@ -1,4 +1,3 @@
-from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 
@@ -44,17 +43,118 @@ services:
     assert volumes == ["my-vol"]
 
 
-def test_get_stack_details_missing_file(monkeypatch):
-    monkeypatch.setattr(docker, "get_compose_path", lambda x: Path("/nonexistent/file"))
-    services, ports, images, volumes = docker.get_stack_details(
-        "compose-test.yml", ["prof1"]
+@pytest.mark.parametrize(
+    "text, reason",
+    [
+        (None, "the file does not exist"),
+        ("services: [\n", "it is not valid YAML"),
+        ("", "its top level is not a mapping"),
+        ("- a\n- b\n", "its top level is not a mapping"),
+        ("services:\n  - a\n", "its services are not a mapping"),
+        ("services: []\n", "its services are not a mapping"),
+        ("services: ''\n", "its services are not a mapping"),
+        ("services: false\n", "its services are not a mapping"),
+        ("services: 0\n", "its services are not a mapping"),
+        ("services:\n  a:\n", "the service 'a' is not a mapping"),
+    ],
+    ids=[
+        "missing",
+        "invalid",
+        "empty",
+        "list",
+        "services list",
+        "services empty list",
+        "services empty string",
+        "services false",
+        "services zero",
+        "service null",
+    ],
+)
+def test_an_unreadable_compose_file_raises_one_error(
+    tmp_path, monkeypatch, text, reason
+):
+    """Every reader of a compose file stops with the same message, which names the
+    file and the reason, where it used to return an error marker as data or raise
+    the error of the YAML parser."""
+    compose_path = tmp_path / "compose-test.yml"
+    if text is not None:
+        compose_path.write_text(text)
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+    for read in (
+        lambda: docker.get_stack_details("compose-test.yml", ["prof1"]),
+        lambda: docker.get_declared_volumes("compose-test.yml"),
+        lambda: docker.get_versioned_images({"compose-test.yml": ["prof1"]}),
+    ):
+        with pytest.raises(
+            ValueError, match=f"^Cannot read compose-test.yml: {reason}"
+        ):
+            read()
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["name: x\n", "services:\n", "services: {}\n"],
+    ids=["omitted", "null", "empty"],
+)
+def test_a_compose_file_without_services_reads_as_none(tmp_path, monkeypatch, text):
+    """Only a `services` value that is present and not a mapping is an error; an
+    omitted, null or empty `services` gives no services."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text(text)
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+    assert docker.get_stack_details("compose-test.yml", ["prof1"]) == ([], [], [], [])
+
+
+def test_a_short_volume_is_read_after_interpolation(tmp_path, monkeypatch):
+    """Compose interpolates a mount before it splits it, and a source that starts with
+    `~` is a bind mount, as with `.` and `/` (Docker docs, "Volumes" in the services
+    top-level element: a source that is a path is a bind mount)."""
+    compose_path = tmp_path / "compose-x.yml"
+    compose_path.write_text(
+        "name: odctl-x\nservices:\n  db:\n    image: postgres:17\n    profiles: [x]\n"
+        "    volumes:\n      - ${PG_VOLUME:-pgdata}:/var/lib/postgresql/data\n"
+        "      - ~/backups:/backups\n"
+        "      - {type: volume, source: '${LOGS_VOLUME:-logs}', target: /logs}\n"
+        "      - {type: volume, source: '${NO_VOLUME}', target: /scratch}\n"
+        "volumes:\n  pgdata: {}\n  logs: {}\n"
     )
-    assert "File Error" in services[0]
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    for name in ("PG_VOLUME", "LOGS_VOLUME", "NO_VOLUME"):
+        monkeypatch.delenv(name, raising=False)
+
+    keys = docker.get_stack_details("compose-x.yml", ["x"])[3]
+    declared = docker.get_declared_volumes("compose-x.yml")
+    # The names the dry run of `down --volumes` prints, as `_dry_run_volumes` builds them.
+    # A long form source that interpolates to nothing is an anonymous volume.
+    assert [declared.get(key, key) for key in keys] == [
+        "odctl-x_logs",
+        "odctl-x_pgdata",
+    ]
+
+
+def test_a_service_without_profiles_belongs_to_every_profile(tmp_path, monkeypatch):
+    """Compose starts a service with no `profiles` key whatever profiles are active
+    (Docker docs, "Using profiles with Compose": services without a profiles
+    attribute are always enabled)."""
+    compose_path = tmp_path / "compose-x.yml"
+    compose_path.write_text(
+        "services:\n  a:\n    image: x:1\n    profiles: [x]\n  sidecar:\n    image: y:1\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+    services = docker.get_stack_details("compose-x.yml", ["x"])[0]
+    assert services == ["a", "sidecar"]
 
 
 def test_docker_actions(monkeypatch):
     mock_client = MagicMock()
-    monkeypatch.setattr(docker, "create_client", lambda **kw: mock_client)
+    monkeypatch.setattr(docker, "create_client", lambda *a, **kw: mock_client)
     monkeypatch.setattr(docker, "wait_for_one_shot_containers", lambda: None)
     monkeypatch.setattr(docker, "get_compose_path", lambda x: "dummy.yml")
 
@@ -73,11 +173,18 @@ def test_docker_actions(monkeypatch):
     mock_client.compose.down.assert_called_with(volumes=True, remove_orphans=True)
 
 
-def test_get_managed_containers(monkeypatch):
-    # Mock get_stack_details
-    monkeypatch.setattr(
-        docker, "get_stack_details", lambda f, p: (["test-service"], [], [], [])
+def _compose_named(tmp_path, monkeypatch, name):
+    """Point every compose file at one with a single service and the given `name:`."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text(
+        f"name: {name}\nservices:\n  test-service:\n    image: x:1\n    profiles: [prof1]\n"
     )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+
+def test_get_managed_containers(tmp_path, monkeypatch):
+    _compose_named(tmp_path, monkeypatch, "odctl-test")
 
     mock_container = MagicMock()
     mock_container.config.labels = {
@@ -96,6 +203,85 @@ def test_get_managed_containers(monkeypatch):
     res = docker.get_managed_containers({"dummy.yml": ["prof1"]})
     assert len(res) == 1
     assert res[0] == mock_container
+
+
+def test_a_workspace_file_with_its_own_project_name_is_managed(tmp_path, monkeypatch):
+    """A workspace file whose `name:` the user changed is still odctl's: its
+    containers count, where only projects named `odctl-...` counted before."""
+    _compose_named(tmp_path, monkeypatch, "my-${TEAM:-x}")
+    monkeypatch.setenv("TEAM", "flink")
+    renamed = MagicMock()
+    renamed.config.labels = {
+        "com.docker.compose.project": "my-flink",
+        "com.docker.compose.service": "test-service",
+    }
+    mock_client = MagicMock()
+    mock_client.container.list.return_value = [renamed]
+    monkeypatch.setattr(docker, "client", mock_client)
+
+    assert docker.get_managed_containers({"dummy.yml": ["prof1"]}) == [renamed]
+
+
+def test_a_container_counts_only_with_its_own_files_service(tmp_path, monkeypatch):
+    """A service selected in one file does not select the service of the same name
+    in another file's project, which belongs to a profile not in the plan."""
+    (tmp_path / "compose-a.yml").write_text(
+        "name: team-a\nservices:\n  api:\n    profiles: [a]\n"
+        "  worker:\n    profiles: [a-jobs]\n"
+    )
+    (tmp_path / "compose-b.yml").write_text(
+        "name: team-b\nservices:\n  worker:\n    profiles: [b]\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: tmp_path / x)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    containers = []
+    for project, service in [
+        ("team-a", "api"),
+        ("team-b", "worker"),
+        ("team-a", "worker"),
+    ]:
+        container = MagicMock()
+        container.config.labels = {
+            "com.docker.compose.project": project,
+            "com.docker.compose.service": service,
+        }
+        containers.append(container)
+    mock_client = MagicMock()
+    mock_client.container.list.return_value = containers
+    monkeypatch.setattr(docker, "client", mock_client)
+
+    plan = {"compose-a.yml": ["a"], "compose-b.yml": ["b"]}
+    assert docker.get_managed_containers(plan) == containers[:2]
+
+
+def test_each_client_names_its_project_from_its_file(tmp_path, monkeypatch):
+    """`--project-name` takes precedence over COMPOSE_PROJECT_NAME, which would
+    otherwise run every file as one project (Docker docs, "Specify a project
+    name"). python-on-whales passes `compose_project_name` as `--project-name`
+    (client_config.py, ClientConfig.docker_compose_cmd)."""
+    _compose_named(tmp_path, monkeypatch, "odctl-kafka")
+    monkeypatch.setenv("COMPOSE_PROJECT_NAME", "demo")
+
+    client = docker.create_client("compose-kafka.yml", ["kafka-lite"])
+
+    command = list(client.client_config.docker_compose_cmd)
+    assert command[command.index("--project-name") + 1] == "odctl-kafka"
+    assert command[command.index("--file") + 1] == str(tmp_path / "compose-test.yml")
+
+
+def test_a_file_without_a_name_gets_the_name_compose_gives_it(tmp_path, monkeypatch):
+    """Without `name:`, Compose names the project after the folder of the file,
+    lower-cased with every character other than a-z, 0-9, `_` and `-` removed, and
+    `_` and `-` trimmed from the start (compose-go loader/loader.go,
+    NormalizeProjectName)."""
+    folder = tmp_path / "My.Work"
+    folder.mkdir()
+    compose_path = folder / "compose-test.yml"
+    compose_path.write_text("services:\n  a:\n    image: x:1\n")
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: folder)
+
+    assert docker.get_project_name("compose-test.yml") == "mywork"
 
 
 # ==========================================
@@ -222,6 +408,33 @@ def test_find_unpublished_images_passes_an_unreachable_registry(monkeypatch):
     assert docker.find_unpublished_images({"compose-test.yml": ["prof1"]}) == []
 
 
+def test_a_failure_that_says_not_found_is_not_an_absent_tag(monkeypatch):
+    """Only Docker's answer for an absent tag stops a launch. `docker manifest
+    inspect` reports one as "no such manifest: <reference>" (docker/cli
+    internal/registryclient/fetcher.go), and the registry's own code is
+    MANIFEST_UNKNOWN. A missing credential helper fails with "error getting
+    credentials - err: exec: ...: executable file not found in $PATH"
+    (docker-credential-helpers client/client.go, Go's os/exec ErrNotFound),
+    which says nothing about the tag."""
+    mock_client = _mock_preflight_client(monkeypatch, local=False)
+    mock_client.manifest.inspect.side_effect = FakeDockerException(
+        'error getting credentials - err: exec: "docker-credential-desktop": '
+        "executable file not found in $PATH, out: ``\n"
+    )
+
+    assert docker._registry_has_image(f"{DEPS_IMAGE}:9.9.9") is None
+    assert docker.find_unpublished_images({"compose-test.yml": ["prof1"]}) == []
+
+
+def test_docker_names_an_absent_tag_no_such_manifest(monkeypatch):
+    mock_client = _mock_preflight_client(monkeypatch, local=False)
+    mock_client.manifest.inspect.side_effect = FakeDockerException(
+        f"no such manifest: {DEPS_IMAGE}:9.9.9\n"
+    )
+
+    assert docker._registry_has_image(f"{DEPS_IMAGE}:9.9.9") is False
+
+
 def test_find_unpublished_images_survives_a_broken_local_lookup(monkeypatch):
     """A daemon error on the local lookup must not hide the registry answer."""
     mock_client = _mock_preflight_client(monkeypatch, local=False)
@@ -319,3 +532,152 @@ volumes:
         "default-named": "odctl-test_default-named",
         "shared": "shared",
     }
+
+
+@pytest.mark.parametrize(
+    "header, project",
+    [("name: My-Kafka\n", "my-kafka"), ("", "ws2")],
+    ids=["upper case name", "no name"],
+)
+def test_declared_volumes_carry_the_project_name_compose_runs(
+    tmp_path, monkeypatch, header, project
+):
+    """Compose names a volume `<project>_<key>` from the normalised project name
+    (compose-go loader/normalize.go, setNameFromKey), which is the folder's name
+    when the file has no `name:`."""
+    folder = tmp_path / "ws2"
+    folder.mkdir()
+    compose_path = folder / "compose-test.yml"
+    compose_path.write_text(header + "volumes:\n  data: {}\n")
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: folder)
+
+    assert docker.get_project_name("compose-test.yml") == project
+    assert docker.get_declared_volumes("compose-test.yml") == {
+        "data": f"{project}_data"
+    }
+
+
+# ==========================================
+# The workspace .env, read as Compose reads it
+# ==========================================
+
+# Each form Docker documents for `.env` ("Interpolation", .env file syntax), with the
+# value Compose gives it. Compose reads the file with compose-go's dotenv parser
+# (dotenv/parser.go), which the comments name where a case follows its code.
+ENV_FORMS = [
+    ("TAG=1.9.0\n", "1.9.0"),
+    ("# TAG=0.1.0\n\nTAG=1.9.0\n", "1.9.0"),
+    ("TAG=1.9.0 # pinned\n", "1.9.0"),
+    # Why: only " #" starts an inline comment (extractVarValue cuts at " #").
+    ("TAG=1.9.0#pinned\n", "1.9.0#pinned"),
+    ('TAG="1.10.0" # c\n', "1.10.0"),
+    ("TAG='1.10.0' # c\n", "1.10.0"),
+    ("TAG: 1.9.0\n", "1.9.0"),
+    ("TAG =  1.9.0  \n", "1.9.0"),
+    ("export TAG=1.9.0\n", "1.9.0"),
+    ("TAG=1.9.0\nTAG=1.10.0\n", "1.10.0"),
+    ("TAG='a\\nb $X'\n", "a\\nb $X"),
+    ("TAG='line one\nline two'\n", "line one\nline two"),
+    ('TAG="a\\tb\\nc\\\\d"\n', "a\tb\nc\\d"),
+    ('TAG="say \\"hi\\""\n', 'say "hi"'),
+    ("TAG='it\\'s'\n", "it's"),
+    ("BASE=1.9\nTAG=${BASE}.0\n", "1.9.0"),
+    ('BASE=1.9\nTAG="${BASE}.0"\n', "1.9.0"),
+    ("TAG=${MISSING:-1.9.0}\n", "1.9.0"),
+    # Why: `\$` and `$$` both give a literal `$` (expandEscapes, then interpolation).
+    ('TAG="\\$BASE"\n', "$BASE"),
+    ("TAG=$$BASE\n", "$BASE"),
+    # Why: Go's UnquoteChar rejects `\c`, so expandEscapes keeps it as written.
+    ('TAG="a\\cb"\n', "a\\cb"),
+    ('CACHE_DIR="C:\\cache"\nTAG=1.9.0\n', "1.9.0"),
+    # Why: expandEscapes rewrites `\0` to `\`, then keeps the rewritten text when
+    # UnquoteChar rejects it: `\0101` is "A", while `\0`, `\012`, `\0400` (above
+    # 255) and `\08` lose their `0`.
+    ('TAG="\\0101"\n', "A"),
+    ('TAG="a\\0b"\n', "a\\b"),
+    ('TAG="a\\012b"\n', "a\\12b"),
+    ('TAG="a\\0400b"\n', "a\\400b"),
+    ('TAG="a\\08b"\n', "a\\8b"),
+]
+
+
+@pytest.mark.parametrize("text, tag", ENV_FORMS, ids=[t for t, _ in ENV_FORMS])
+def test_the_env_file_is_read_as_compose_reads_it(tmp_path, monkeypatch, text, tag):
+    (tmp_path / ".env").write_text(text)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.delenv("TAG", raising=False)
+    monkeypatch.delenv("BASE", raising=False)
+    monkeypatch.delenv("MISSING", raising=False)
+
+    assert docker.resolve_image_tag() == tag
+
+
+@pytest.mark.parametrize(
+    "data, tag",
+    [
+        (b"\xef\xbb\xbfTAG=1.9.0\n", "1.9.0"),
+        (b"NOTE=caf\xe9\nTAG=1.9.0\n", "1.9.0"),
+        (b'TAG=1.9.0\r\nOTHER="x"\r\n', "1.9.0"),
+    ],
+    ids=["byte order mark", "not UTF-8", "CRLF"],
+)
+def test_the_env_file_is_read_as_bytes_as_compose_reads_it(
+    tmp_path, monkeypatch, data, tag
+):
+    """compose-go reads the file as bytes and drops a UTF-8 byte order mark before it
+    parses (dotenv/godotenv.go, parseWithLookup)."""
+    (tmp_path / ".env").write_bytes(data)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.delenv("TAG", raising=False)
+
+    assert docker.resolve_image_tag() == tag
+
+
+def test_an_env_path_that_is_not_a_file_gives_no_values(tmp_path, monkeypatch):
+    """Compose itself reports a `.env` that is a folder; odctl only reads TAG from it,
+    so it reads nothing rather than stop every command."""
+    (tmp_path / ".env").mkdir()
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.delenv("TAG", raising=False)
+
+    assert docker.resolve_image_tag() == "latest"
+
+
+def test_the_shell_wins_when_the_env_file_interpolates(tmp_path, monkeypatch):
+    """compose-go looks a variable up in the environment first, then in the lines
+    above it (dotenv/godotenv.go, expandVariables)."""
+    (tmp_path / ".env").write_text("BASE=1.9\nTAG=${BASE}.0\n")
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.setenv("BASE", "2.0")
+
+    assert docker.resolve_image_tag() == "2.0.0"
+
+
+def test_a_line_compose_rejects_does_not_hide_the_others(tmp_path, monkeypatch):
+    """compose-go stops at a key with a space or a character outside letters, digits
+    and `_.-[]` (locateKeyName), and Compose reports it when it runs. odctl reads
+    the file only to show and check TAG, so it skips that line and reads the rest."""
+    (tmp_path / ".env").write_text("MY KEY=x\nBAD!=y\nTAG=1.9.0\n")
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+    assert docker.resolve_image_tag() == "1.9.0"
+
+
+def test_a_file_reads_compose_project_name_as_its_own_project(tmp_path, monkeypatch):
+    """Compose sets COMPOSE_PROJECT_NAME to the project a file runs as, over the
+    shell's value, before it expands the file (compose-go loader/loader.go,
+    `projectName`). odctl expanded it from the shell or left it empty."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text(
+        "name: Team-A\nservices:\n  db:\n"
+        "    image: x/${COMPOSE_PROJECT_NAME:-none}:1\n    profiles: [p]\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.setenv("COMPOSE_PROJECT_NAME", "from-shell")
+
+    _, _, images, _ = docker.get_stack_details("compose-test.yml", ["p"])
+
+    assert images == ["db -> x/team-a:1"]
+    assert docker.interpolation_env()["COMPOSE_PROJECT_NAME"] == "from-shell"

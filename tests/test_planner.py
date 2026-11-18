@@ -77,7 +77,7 @@ class TestUnreachableProfiles:
         for name, body in files.items():
             (tmp_path / name).write_text(body)
         monkeypatch.setattr(
-            "odctl.planner.get_compose_path", lambda name: tmp_path / name
+            "odctl.docker.get_compose_path", lambda name: tmp_path / name
         )
 
     def test_reports_a_profile_declared_in_another_file(self, tmp_path, monkeypatch):
@@ -155,6 +155,9 @@ class TestUnreachableProfiles:
         assert find_unreachable_profiles() == []
 
     def test_survives_a_missing_or_unparseable_file(self, tmp_path, monkeypatch):
+        """A file that is missing, not valid YAML, or whose top level or services
+        are a list is left to the command that reads it; a list raised
+        AttributeError here, from every `odctl up`."""
         from odctl.planner import find_unreachable_profiles
 
         registry = Registry(
@@ -165,10 +168,24 @@ class TestUnreachableProfiles:
                 "bad": StackConfig(
                     file="compose-bad.yml", description="d", profiles=["b"]
                 ),
+                "list": StackConfig(
+                    file="compose-list.yml", description="d", profiles=["c"]
+                ),
+                "services": StackConfig(
+                    file="compose-services.yml", description="d", profiles=["d"]
+                ),
             },
         )
         monkeypatch.setattr("odctl.planner.load_registry", lambda: registry)
-        self._setup(tmp_path, monkeypatch, {"compose-bad.yml": "services: [oops\n"})
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            {
+                "compose-bad.yml": "services: [oops\n",
+                "compose-list.yml": "- a\n",
+                "compose-services.yml": "services:\n  - a\n",
+            },
+        )
 
         assert find_unreachable_profiles() == []
 
@@ -187,3 +204,60 @@ class TestUnreachableProfiles:
         assert "compose-analytics.yml" in out
         assert "ch-keeper" in out
         assert "fluss" in out
+
+
+def _starts_each_file_after_its_dependencies(plan, profile_map, registry):
+    """List each (profile, dependency) whose dependency's file starts later."""
+    files = list(plan)
+    late = []
+    for file, profiles in plan.items():
+        for profile in profiles:
+            stack = registry.stacks[profile_map[profile]["stack_id"]]
+            for dependency in stack.depends_on.get(profile, []):
+                if files.index(profile_map[dependency]["file"]) > files.index(file):
+                    late.append((profile, dependency))
+    return late
+
+
+def test_every_packaged_request_starts_dependencies_first():
+    """Every packaged request of one or two profiles starts the file of each
+    dependency before the file that needs it (hunt4's order_check.py)."""
+    import itertools
+
+    from odctl.registry import load_registry
+
+    registry = load_registry()
+    profile_map = get_profile_map()
+    late = []
+    for count in (1, 2):
+        for request in itertools.combinations(sorted(profile_map), count):
+            plan = build_execution_plan(list(request))
+            late += _starts_each_file_after_its_dependencies(
+                plan, profile_map, registry
+            )
+    assert late == []
+
+
+def test_a_dependency_in_another_file_starts_first(tmp_path):
+    """`api` sorts before `zookeeper` and has no weight, so the weight table alone
+    started the file of `api` first."""
+    from odctl import config
+
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "registry.yml").write_text(
+        "stacks:\n"
+        "  app:\n    file: compose-app.yml\n    description: d\n    profiles: [api]\n"
+        "    depends_on:\n      api: [zookeeper]\n"
+        "  zk:\n    file: compose-zk.yml\n    description: d\n    profiles: [zookeeper]\n"
+    )
+    config.set_workspace_override(workspace)
+    try:
+        plan = build_execution_plan(["api"])
+    finally:
+        config.set_workspace_override(None)
+
+    assert list(plan.items()) == [
+        ("compose-zk.yml", ["zookeeper"]),
+        ("compose-app.yml", ["api"]),
+    ]

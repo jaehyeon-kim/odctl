@@ -43,11 +43,12 @@ def test_registry_validation_missing_fields():
 
 
 def test_load_registry_file_not_found(mock_workspace, monkeypatch):
-    """Should raise standard FileNotFoundError if registry file is missing entirely."""
-    monkeypatch.setattr(
-        "odctl.config.get_registry_path", lambda: mock_workspace / "ghost_registry.yml"
-    )
-    with pytest.raises(FileNotFoundError):
+    """A missing registry file gives the one error every command reports."""
+    path = mock_workspace / "ghost_registry.yml"
+    monkeypatch.setattr("odctl.registry.get_registry_path", lambda: path)
+    with pytest.raises(
+        ValueError, match=f"^Cannot read {path}: the file does not exist"
+    ):
         load_registry()
 
 
