@@ -333,6 +333,8 @@ def check_hidden_needs_folders(ctx: Context) -> List[str]:
     (closed / "inner").chmod(0)
     # Why: root reads a folder of mode 000, so there the case tests nothing
     unreadable = [] if os.access(closed / "inner", os.R_OK) else [closed]
+    if not unreadable:
+        print("note: the unreadable folder case is skipped, as this user can read it")
     wrong = []
     try:
         for path in [

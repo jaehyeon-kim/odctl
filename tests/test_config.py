@@ -95,11 +95,47 @@ def test_an_unknown_tag_is_still_not_valid_yaml(tmp_path):
             "x: &x {ports: [80]}\na:\n  <<: *x\n  ports: !reset []\n",
             {"x": {"ports": [80]}, "a": {"ports": [80]}},
         ),
+        (
+            "a: 0930\nb: 09\nc: 0_8\nd: 0b_\ne: 0X1F\nf: -0\n",
+            {"a": 930.0, "b": 9.0, "c": 8.0, "d": "0b_", "e": 31, "f": -0.0},
+        ),
+        (
+            "a: 18446744073709551616\nb: 1e3\nc: 1:30\nd: 2024-01-02\n",
+            {
+                "a": 1.8446744073709552e19,
+                "b": 1000.0,
+                "c": "1:30",
+                "d": __import__("datetime").date(2024, 1, 2),
+            },
+        ),
+        ("x: {<<: [{k: !reset null, m: 1}, {k: 2}]}\n", {"x": {"k": 2, "m": 1}}),
+        (
+            "x: {inner: {deeper: &a {k: !reset null, m: 1}}}\nt: {<<: [*a, {k: 3}]}\n",
+            {"x": {"inner": {"deeper": {"m": 1}}}, "t": {"k": 3, "m": 1}},
+        ),
     ],
-    ids=["sexagesimal port", "yaml 1.1 booleans", "numbers", "reset then merge"],
+    ids=[
+        "sexagesimal port",
+        "yaml 1.1 booleans",
+        "numbers",
+        "reset then merge",
+        "leading zeros",
+        "large and other",
+        "reset in a merge source",
+        "nested anchor",
+    ],
 )
 def test_read_yaml_reads_plain_values_as_compose_does(tmp_path, text, expected):
     """Compose's go-yaml reads YAML 1.2 values and drops a `!reset` key before merging."""
     path = tmp_path / "compose.yml"
     path.write_text(text)
     assert read_yaml(path, "compose.yml") == expected
+
+
+def test_read_yaml_gives_go_yaml_number_types(tmp_path):
+    """go-yaml reads `-0` and a number past 64 bits as floats, and `017` as an int."""
+    path = tmp_path / "compose.yml"
+    path.write_text("a: -0\nb: 18446744073709551616\nc: 017\nd: 0930\n")
+    data = read_yaml(path, "compose.yml")
+    assert [type(data[k]) for k in "abcd"] == [float, float, int, float]
+    assert str(data["a"]) == "-0.0" and data["c"] == 15

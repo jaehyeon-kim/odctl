@@ -99,40 +99,107 @@ class _ComposeLoader(yaml.SafeLoader):
     `safe_load` refuses both tags, so a file Compose runs would not be readable.
 
     Compose's YAML library (go-yaml v4, resolver.go) also reads plain values by
-    YAML 1.2 rules: only `true` and `false` in three spellings are booleans, an int
-    has no `:` part, so `2222:22` is a string where YAML 1.1 reads the base 60
-    integer 133342, and `yes`, `on` and `off` are strings.
+    YAML 1.2 rules, which `_go_scalar` follows: only `true` and `false` in three
+    spellings are booleans, so `yes`, `on` and `off` are strings, and an int has no
+    `:` part, so `2222:22` is a string where YAML 1.1 reads the base 60 integer
+    133342.
     """
 
-    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> Any:
-        # Why: Compose drops a `!reset` key first, so a merged `<<` value fills it
+    def flatten_mapping(self, node: yaml.MappingNode) -> None:
+        # Why: Compose drops a `!reset` key in every mapping, merge sources included,
+        # before merge keys apply, so a merged `<<` value fills it
         node.value = [(k, v) for k, v in node.value if v.tag != "!reset"]
-        return super().construct_mapping(node, deep=deep)
+        super().flatten_mapping(node)
+
+    def resolve(self, kind: Any, value: Any, implicit: Any) -> str:
+        if kind is yaml.ScalarNode and implicit[0]:
+            tag = _go_scalar(value)[0]
+            if tag is not None:
+                return tag
+            resolved = super().resolve(kind, value, implicit)
+            if resolved in _GO_TAGS:
+                return "tag:yaml.org,2002:str"
+            return resolved
+        return super().resolve(kind, value, implicit)
 
 
-_YAML_12 = {
-    "tag:yaml.org,2002:bool": (
-        re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
-        list("tTfF"),
-    ),
-    "tag:yaml.org,2002:int": (
-        re.compile(r"^[-+]?(?:0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[0-9][0-9_]*)$"),
-        list("-+0123456789"),
-    ),
-    "tag:yaml.org,2002:float": (
-        re.compile(
-            r"^(?:[-+]?(?:\.[0-9]+|[0-9][0-9_]*(?:\.[0-9_]*)?)(?:[eE][-+]?[0-9]+)?"
-            r"|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$"
-        ),
-        list("-+.0123456789"),
-    ),
+_BOOL = "tag:yaml.org,2002:bool"
+_INT = "tag:yaml.org,2002:int"
+_FLOAT = "tag:yaml.org,2002:float"
+_GO_TAGS = {_BOOL, _INT, _FLOAT}
+_GO_WORDS: Dict[str, Any] = {
+    **dict.fromkeys(["true", "True", "TRUE"], True),
+    **dict.fromkeys(["false", "False", "FALSE"], False),
+    **dict.fromkeys([".nan", ".NaN", ".NAN"], float("nan")),
+    **dict.fromkeys([".inf", ".Inf", ".INF", "+.inf", "+.Inf", "+.INF"], float("inf")),
+    **dict.fromkeys(["-.inf", "-.Inf", "-.INF"], float("-inf")),
+    **dict.fromkeys(["-0", "-0.0"], -0.0),
 }
-_ComposeLoader.yaml_implicit_resolvers = {
-    first: [(tag, regexp) for tag, regexp in resolvers if tag not in _YAML_12]
-    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
-}
-for _tag, (_regexp, _first) in _YAML_12.items():
-    _ComposeLoader.add_implicit_resolver(_tag, _regexp, _first)
+# Go's strconv.ParseInt with base 0, after go-yaml removes every `_`
+_GO_INT = re.compile(
+    r"([-+]?)(?:0[xX]([0-9a-fA-F]+)|0[oO]([0-7]+)|0[bB]([01]+)|0([0-7]*)|([1-9][0-9]*))"
+)
+_GO_FLOAT = re.compile(r"[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?")
+
+
+def _go_scalar(text: str) -> Tuple[Optional[str], Any]:
+    """Read a plain scalar as go-yaml v4 does, for booleans and numbers.
+
+    Follows `resolve` in go-yaml's resolver.go: a fixed word list, then for text
+    that starts with a digit or a sign an int by Go's base 0 rules within 64 bits
+    (`017` is octal 15, `0x1F` is 31), then a float (`0930` is 930.0). A leading
+    `.` is tried as a float as written.
+
+    Args:
+        text (str): The scalar as written.
+
+    Returns:
+        Tuple[Optional[str], Any]: The YAML tag and the value, or (None, None) when
+        go-yaml reads the text as something other than a boolean or a number.
+    """
+    if text in _GO_WORDS:
+        value = _GO_WORDS[text]
+        return (_BOOL if isinstance(value, bool) else _FLOAT), value
+    if text[:1] == ".":
+        try:
+            return _FLOAT, float(text)
+        except ValueError:
+            return None, None
+    if text[:1] not in set("+-0123456789"):
+        return None, None
+    plain = text.replace("_", "")
+    match = _GO_INT.fullmatch(plain)
+    if match:
+        sign, hexa, octal, binary, zero, decimal = match.groups()
+        if hexa is not None:
+            number = int(hexa, 16)
+        elif octal is not None:
+            number = int(octal, 8)
+        elif binary is not None:
+            number = int(binary, 2)
+        elif zero is not None:
+            number = int(zero or "0", 8)
+        else:
+            number = int(decimal)
+        number = -number if sign == "-" else number
+        if -(2**63) <= number < 2**64:
+            return _INT, number
+    if _GO_FLOAT.fullmatch(plain):
+        return _FLOAT, float(plain)
+    return None, None
+
+
+def _construct_go_number(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
+    tag, value = _go_scalar(loader.construct_scalar(node))
+    if tag is None:
+        raise yaml.constructor.ConstructorError(
+            None, None, f"cannot read {node.value!r} as {node.tag}", node.start_mark
+        )
+    return value
+
+
+_ComposeLoader.add_constructor(_INT, _construct_go_number)
+_ComposeLoader.add_constructor(_FLOAT, _construct_go_number)
 
 
 _RESET = object()
@@ -180,8 +247,7 @@ def read_yaml(path: Path, name: str) -> Any:
         name (str): How the error message names the file.
 
     Returns:
-        Any: The file's content, as PyYAML's `safe_load` gives it, with the
-        nodes Compose's `!reset` tag drops left out.
+        Any: The file's content, read as Compose reads it (`_ComposeLoader`).
 
     Raises:
         UnreadableFileError: As `Cannot read <name>: <reason>`, when the file is

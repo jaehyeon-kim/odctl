@@ -632,19 +632,24 @@ def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
 
 
 def _own_volumes_only(deps_others: List[str]) -> bool:
-    """Tell whether the deps file's other profiles mount none of deps' volumes.
+    """Tell whether the deps file's other profiles can be stopped with their volumes.
 
     `down --volumes` removes only the volumes of the active profiles' services
     (Compose v5, `WithoutUnnecessaryResources`), so for such profiles, such as a
-    deps-extra a workspace adds, it never removes the shared jar volume.
+    deps-extra a workspace adds, it never removes the shared jar volume. They are
+    stopped by a call of their own, which Compose refuses when one of their
+    services depends on a service of deps.
 
     Args:
         deps_others (List[str]): Profiles of the deps file other than deps.
 
     Returns:
-        bool: True when there are some and none of their volumes is one of deps'.
+        bool: True when there are some, none of them depends on deps, and none of
+        their volumes is one of deps'.
     """
     if not deps_others:
+        return False
+    if "deps" in expand_plan_dependencies({_DEPS_FILE: deps_others})[_DEPS_FILE]:
         return False
     shared = set(get_stack_details(_DEPS_FILE, ["deps"]).volumes)
     return not shared & set(get_stack_details(_DEPS_FILE, deps_others).volumes)
@@ -827,7 +832,7 @@ def down(
             if own:
                 groups.append((deps_others, ""))
             if own and _DEPS_FILE not in plan:
-                plan[_DEPS_FILE] = []
+                plan[_DEPS_FILE] = ["deps"] if deps_named else []
             removed = _dry_run_volumes(plan, reachable, groups)
         if deps_named and _DEPS_FILE not in plan:
             plan[_DEPS_FILE] = ["deps"]
