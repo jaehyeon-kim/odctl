@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import typer
 from pydantic import BaseModel, TypeAdapter
@@ -7,10 +7,14 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from odctl.models import Info, ProfileDetails, ProfileInfo, PsReport
+from odctl.models import Info, ProfileDetails, ProfileInfo, PsReport, ServiceInfo
 
 console = Console()
 _error_console = Console(stderr=True)
+
+# The profiles every other one runs on. A compose file with one of them is shown as
+# the infrastructure layer, by `up` and by the dry run.
+INFRASTRUCTURE_PROFILES = ("deps", "postgres", "storage", "catalog")
 
 _json_output = False
 
@@ -190,24 +194,8 @@ HOST_ADDRESS_NOTE = (
 )
 
 
-def print_explain_panel(details: ProfileDetails):
-    """
-    Format and print the detailed Profile Inspector panel.
-
-    Args:
-        details (ProfileDetails): The profile to describe.
-    """
-    # Registry and compose text is plain: escape it, or Rich reads `[...]` as markup.
-    profile = plain(details.profile)
-    deps = [plain(p) for p in details.starts if p != details.profile] or ["None"]
-    deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
-    services = details.services
-    volumes = details.volumes
-    usage = details.usage
-    if details.usage_missing:
-        usage = f"• No specific usage guide for profile: {details.profile}"
-    role = plain(details.role) if details.role else None
-
+def _services_section(services: List[ServiceInfo]) -> str:
+    """The Containers (Images) lines: each service with its image and role."""
     # A service built from source has no image, and its file still starts it.
     services_list = []
     for svc in services:
@@ -218,9 +206,11 @@ def print_explain_panel(details: ProfileDetails):
         services_list.append(
             f"  📦 [magenta]{plain(svc.name.ljust(22, ' '))}[/magenta] ([green]{shown}[/green])\n      ↳ [dim]{role_desc}[/dim]"
         )
-    services_str = "\n".join(services_list) if services_list else "  None"
+    return "\n".join(services_list) if services_list else "  None"
 
-    # Volumes Context
+
+def _volumes_section(volumes: List[str]) -> str:
+    """The Persistent Volumes lines, with how to wipe them when there are any."""
     volumes_str = (
         "\n".join(f"  💾 [green]{plain(v)}[/green]" for v in volumes)
         if volumes
@@ -230,11 +220,18 @@ def print_explain_panel(details: ProfileDetails):
         volumes_str += (
             "\n  [dim italic](Use 'odctl down -v' to wipe these volumes)[/dim italic]"
         )
+    return volumes_str
 
-    # Port Context (Host vs Internal Routing), from the ports `reports._parse_port`
-    # read, with variables expanded. A port with no host part is published on a
-    # random host port, so it has no line. The order is that of the specs as
-    # written, `service:127.0.0.1:host:container`, sorted as text.
+
+def _ports_section(services: List[ServiceInfo]) -> str:
+    """
+    The Network Mapping lines (host against internal routing).
+
+    They come from the ports `reports._parse_port` read, with variables expanded. A
+    port with no host part is published on a random host port, so it has no line. The
+    order is that of the specs as written, `service:127.0.0.1:host:container`, sorted
+    as text.
+    """
     mappings = []
     for svc in services:
         for port in svc.ports:
@@ -248,9 +245,15 @@ def print_explain_panel(details: ProfileDetails):
         f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] → Container [cyan]{svc_name}:{container_port}[/cyan]"
         for _, svc_name, host_port, container_port in sorted(mappings)
     ]
-    ports_str = "\n".join(ports_list) if ports_list else "  None"
+    return "\n".join(ports_list) if ports_list else "  None"
 
-    # Constructing the Output
+
+def _role_and_usage_sections(details: ProfileDetails) -> Tuple[str, str]:
+    """The Architecture Role and How to Use It sections, each empty when absent."""
+    usage = details.usage
+    if details.usage_missing:
+        usage = f"• No specific usage guide for profile: {details.profile}"
+    role = plain(details.role) if details.role else None
     role_section = f"\n[bold]Architecture Role:[/bold]\n{role}\n" if role else ""
     usage_section = (
         # Usage text is plain: escape it, or Rich reads feast[duckdb,...] as markup.
@@ -258,6 +261,24 @@ def print_explain_panel(details: ProfileDetails):
         if usage
         else ""
     )
+    return role_section, usage_section
+
+
+def print_explain_panel(details: ProfileDetails):
+    """
+    Format and print the detailed Profile Inspector panel.
+
+    Args:
+        details (ProfileDetails): The profile to describe.
+    """
+    # Registry and compose text is plain: escape it, or Rich reads `[...]` as markup.
+    profile = plain(details.profile)
+    deps = [plain(p) for p in details.starts if p != details.profile] or ["None"]
+    deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
+    services_str = _services_section(details.services)
+    volumes_str = _volumes_section(details.volumes)
+    ports_str = _ports_section(details.services)
+    role_section, usage_section = _role_and_usage_sections(details)
 
     body = f"""
 [bold]Parent Stack:[/bold] {plain(details.stack)}
@@ -322,7 +343,7 @@ def print_dry_run(
         else:
             layer = (
                 "Infrastructure Layer"
-                if any(x in profs for x in ["deps", "postgres", "storage", "catalog"])
+                if any(x in profs for x in INFRASTRUCTURE_PROFILES)
                 else "Target Stack"
             )
             console.print(f"📦 [cyan]{plain(file)}[/cyan] ({layer})")

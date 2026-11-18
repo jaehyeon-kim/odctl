@@ -152,13 +152,13 @@ def _profile_info(
     )
 
 
-def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileInfo]:
+def build_profiles(with_starts: bool, with_services: bool = True) -> List[ProfileInfo]:
     """
     Build the entry of every profile, in registry order.
 
     Args:
-        for_json (bool): True for the JSON, which works out `starts`. False for the
-            tables, which leave `starts` empty.
+        with_starts (bool): Whether to work out `starts`, as the JSON does; the tables
+            leave it empty.
         with_services (bool): Whether to read the compose files for each profile's
             services and ports. Defaults to True.
 
@@ -166,8 +166,8 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
         List[ProfileInfo]: One entry per profile.
 
     Raises:
-        ValueError: If the registry or a compose file cannot be read, or `for_json` is
-            set and the registry lists an unknown dependency.
+        ValueError: If the registry or a compose file cannot be read, or `with_starts`
+            is set and the registry lists an unknown dependency.
     """
     registry = load_registry()
     profile_map = planner.get_profile_map(registry)
@@ -185,7 +185,7 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
                     profile,
                     services,
                     port_specs,
-                    with_starts=for_json,
+                    with_starts=with_starts,
                 )
             )
     return profiles

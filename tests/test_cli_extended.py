@@ -24,11 +24,9 @@ def test_down_command(monkeypatch):
     # Mock get_managed_containers to return a fake container so down --all proceeds
     mock_container = MagicMock()
     mock_container.config.labels = {"com.docker.compose.service": "kafka"}
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda x: [mock_container])
     monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda x: [mock_container]
-    )
-    monkeypatch.setattr(
-        "odctl.docker.get_stack_details",
+        "odctl.main.get_stack_details",
         lambda x, y: _stack(["kafka"]),
     )
 
@@ -497,10 +495,10 @@ def test_down_all_with_volumes_removes_deps_exactly_once(monkeypatch):
     mock_container = MagicMock()
     mock_container.config.labels = {"com.docker.compose.service": "init-deps"}
     monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda plan: [mock_container]
+        "odctl.main.get_managed_containers", lambda plan: [mock_container]
     )
     monkeypatch.setattr(
-        "odctl.docker.get_stack_details",
+        "odctl.main.get_stack_details",
         lambda f, p: _stack(["init-deps"], ["odctl-shared-deps"]),
     )
 
@@ -530,7 +528,6 @@ def _every_service_has_a_container(monkeypatch):
 
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     monkeypatch.setattr("odctl.main.get_managed_containers", managed)
-    monkeypatch.setattr("odctl.docker.get_managed_containers", managed)
     stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", stop)
     return stop
@@ -596,7 +593,6 @@ def test_naming_deps_keeps_the_shared_volume_while_others_run(monkeypatch):
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     other = fake_container("spark-master", "spark-master", "running", None, {})
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [other])
-    monkeypatch.setattr("odctl.docker.get_managed_containers", lambda plan: [other])
 
     result = runner.invoke(app, ["down", "deps", "-v"], env={"COLUMNS": "200"})
 
@@ -606,7 +602,6 @@ def test_naming_deps_keeps_the_shared_volume_while_others_run(monkeypatch):
 
     stop.reset_mock()
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
-    monkeypatch.setattr("odctl.docker.get_managed_containers", lambda plan: [])
     assert runner.invoke(app, ["down", "deps", "-v"]).exit_code == 0
     stop.assert_called_once_with("compose-deps.yml", ["deps"], remove_volumes=True)
 
@@ -618,11 +613,9 @@ def _down_all_mocks(monkeypatch):
     mock_container = MagicMock()
     mock_container.config.labels = {"com.docker.compose.service": "kafka"}
     monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda plan: [mock_container]
+        "odctl.main.get_managed_containers", lambda plan: [mock_container]
     )
-    monkeypatch.setattr(
-        "odctl.docker.get_stack_details", lambda f, p: _stack(["kafka"])
-    )
+    monkeypatch.setattr("odctl.main.get_stack_details", lambda f, p: _stack(["kafka"]))
     return mock_stop
 
 
@@ -817,7 +810,6 @@ def test_down_dry_run_names_the_volumes(
         ]
 
     monkeypatch.setattr("odctl.main.get_managed_containers", containers_of)
-    monkeypatch.setattr("odctl.docker.get_managed_containers", containers_of)
     monkeypatch.setattr(
         "odctl.main.get_volume_names",
         lambda: {"spark-events-data", "odctl-shared-deps"} - missing,
@@ -993,7 +985,7 @@ def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
     container = SimpleNamespace(name="spark", mounts=[mount])
     monkeypatch.setattr(main, "get_managed_containers", lambda p: [container])
 
-    assert main._dry_run_volumes(plan, all=True) == {
+    assert main._dry_run_volumes(plan, reachable=True) == {
         "compose-spark.yml": ["custom-event-data"]
     }
 

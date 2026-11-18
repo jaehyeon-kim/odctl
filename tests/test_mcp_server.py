@@ -288,7 +288,6 @@ def test_down_refuses_every_profile_but_deps(monkeypatch, tmp_path):
 
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     monkeypatch.setattr("odctl.main.get_managed_containers", managed)
-    monkeypatch.setattr("odctl.docker.get_managed_containers", managed)
     mock_stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
     profiles = [p for profs in every.values() for p in profs if p != "deps"]
@@ -319,3 +318,49 @@ def test_down_stops_nothing_when_the_guard_holds_only_inside_the_command(
     assert result.is_error
     assert "WIPE ALL DATA" in result.content[0].text, result.content[0].text
     mock_stop.assert_not_called()
+
+
+def test_every_tool_passes_every_parameter_of_its_command():
+    """A tool calls a command function as a plain function, so a parameter it leaves
+    out gets the `typer.Option` object, which is true in a condition. A new option,
+    such as a `--force` on `down`, must reach each tool that calls the command."""
+    import ast
+    import inspect
+    from pathlib import Path
+
+    from typer.models import ParameterInfo
+
+    from odctl import main, mcp_server
+
+    tree = ast.parse(Path(mcp_server.__file__).read_text())
+    calls = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "_run" and node.args:
+            func = node.args[0]
+        if (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "main"
+        ):
+            calls.append((func.attr, {k.arg for k in node.keywords}))
+
+    checked = []
+    for name, sent in calls:
+        params = inspect.signature(getattr(main, name)).parameters.values()
+        typer_params = {p.name for p in params if isinstance(p.default, ParameterInfo)}
+        if not typer_params:
+            continue
+        checked.append(name)
+        assert sent == typer_params, (name, sorted(typer_params - sent))
+    assert sorted(set(checked)) == [
+        "down",
+        "explain",
+        "info",
+        "list_profiles",
+        "logs",
+        "ps",
+        "up",
+    ]

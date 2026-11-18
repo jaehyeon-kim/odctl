@@ -169,6 +169,18 @@ def main(
             )
 
 
+def _require_docker() -> None:
+    """
+    Stop the command when Docker is not reachable.
+
+    Raises:
+        typer.Exit: With code 1, after the error, when Docker does not answer.
+    """
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+
 @app.command(
     name="list",
     rich_help_panel="Inspection & Info",
@@ -207,7 +219,7 @@ def list_profiles(
     """
     try:
         profiles = reports.build_profiles(
-            for_json=json_output, with_services=details or json_output
+            with_starts=json_output, with_services=details or json_output
         )
         if json_output:
             ui.print_json(sorted(profiles, key=lambda p: p.profile))
@@ -354,9 +366,7 @@ def pull(
     Raises:
         typer.Exit: With code 1 when Docker is not reachable or a pull fails.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     execution_plan = build_execution_plan(profiles, all, resolve_deps=True)
     ui.print_info("📥 Pre-fetching Docker images...")
@@ -425,9 +435,8 @@ def up(
         typer.Exit: With code 1 when Docker is not reachable, an image for TAG is not
             published, or a compose file fails to start.
     """
-    if not dry_run and not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    if not dry_run:
+        _require_docker()
 
     plan = build_execution_plan(profiles, resolve_deps=True)
     # A profile resolves to one file. A service elsewhere declaring it is never
@@ -456,7 +465,7 @@ def up(
         raise typer.Exit(1)
 
     for file, profs in plan.items():
-        is_base = any(x in profs for x in ["deps", "postgres", "storage", "catalog"])
+        is_base = any(x in profs for x in ui.INFRASTRUCTURE_PROFILES)
         prefix = "🧱 Infrastructure" if is_base else "🚀 Target"
 
         if pull:
@@ -537,8 +546,6 @@ def _teardown_of_all(plan: dict, volumes: bool) -> dict:
         dict: Compose file to the profiles that have a container, or named volumes
             when `volumes` is set.
     """
-    from odctl.docker import get_managed_containers, get_stack_details
-
     existing_services = set()
     for c in get_managed_containers(plan):
         svc = compose_service(c)
@@ -594,11 +601,40 @@ def removes_everything(profiles: List[str]) -> bool:
     return bool(every_profile) and every_profile <= named_profiles
 
 
+# A dry run without Docker cannot tell whether other profiles still use the shared jar
+# volume, so the deps file's line says so.
+_DEPS_UNCHECKED = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
+
+
+def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
+    """Decide whether a dry run of a teardown with `--volumes` adds the deps file.
+
+    A named teardown also removes the shared jar volume once no other profile has a
+    container. When Docker is not reachable the answer is not known, and since a
+    dry run of a named teardown needs no Docker, the deps file is added with that
+    said.
+
+    Args:
+        plan (dict): The teardown plan, without the deps file unless `all` is set.
+        all (bool): True for `--all`, whose plan already holds the deps file.
+        reachable (bool): Whether Docker answers.
+
+    Returns:
+        Optional[str]: None when the deps file does not join, "" when it does, and
+            the note to print beside deps when it might.
+    """
+    if all or _DEPS_FILE in plan:
+        return None
+    if not reachable:
+        return _DEPS_UNCHECKED
+    return "" if _shared_deps_are_idle(plan) else None
+
+
 def _dry_run_volumes(
     plan: dict,
-    all: bool,
-    deps_named: bool = False,
-    deps_others: Optional[List[str]] = None,
+    reachable: bool,
+    note: str = "",
+    deps_profiles: Optional[List[str]] = None,
 ) -> dict:
     """List the volumes a teardown with `--volumes` removes, for the dry run.
 
@@ -607,45 +643,29 @@ def _dry_run_volumes(
     `docker compose down --volumes` removes too. Docker names each container's
     mounts, so a container with unnamed volumes gets one line with their number,
     and the deps file never gets one. Only the named volumes that exist are listed.
-    A named teardown also removes the shared jar volume once no other profile has a
-    container, so the plan gains the deps file when that holds. When Docker is not
-    reachable the answer is not known, so the plan gains the deps file with that
-    said, since a dry run of a named teardown needs no Docker, and each other file
-    says its unnamed volumes were not checked. A named deps is stopped in every
-    case, so only its volume carries that note.
+    When Docker is not reachable, each file other than the deps file says its
+    unnamed volumes were not checked.
 
     Args:
-        plan (dict): The teardown plan. It gains the deps file when the real run
-            would stop it, or might.
-        all (bool): True for `--all`, whose plan already holds the deps file.
-        deps_named (bool): True when the teardown names deps, which the real run
-            stops whatever else has containers.
-        deps_others (Optional[List[str]]): The other profiles of the deps file the
-            teardown names, such as deps-extra, whose volumes go with deps' volume.
+        plan (dict): The teardown plan, with the deps file when the teardown stops it.
+        reachable (bool): Whether Docker answers.
+        note (str): Printed after each volume of the deps file, such as
+            `_DEPS_UNCHECKED`.
+        deps_profiles (Optional[List[str]]): The deps file's profiles whose volumes
+            go, such as deps and deps-extra; None is deps alone.
 
     Returns:
         dict: Compose file to the volumes to remove, each as the text printed after
             `Remove Volume:`.
     """
-    note = ""
-    if not all and _DEPS_FILE not in plan:
-        if not is_docker_running():
-            note = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
-            plan[_DEPS_FILE] = ["deps"] if deps_named else [f"deps{note}"]
-        elif _shared_deps_are_idle(plan):
-            plan[_DEPS_FILE] = ["deps"]
-
-    reachable = is_docker_running()
     existing = get_volume_names() if reachable else None
     removed = {}
     for file, profs in plan.items():
-        # The unchecked deps entry names its profile with the note, so ask for deps.
         suffix = note if file == _DEPS_FILE else ""
         # Services mount a volume by its key, and Docker lists it by its name.
         declared = get_declared_volumes(file)
-        deps_profs = ["deps", *(deps_others or [])]
         keys = get_stack_details(
-            file, deps_profs if file == _DEPS_FILE else profs
+            file, (deps_profiles or ["deps"]) if file == _DEPS_FILE else profs
         ).volumes
         names = [declared.get(key, key) for key in keys]
         if existing is not None:
@@ -735,9 +755,8 @@ def down(
     # `--all` needs Docker to know which profiles have containers, so its dry run
     # does too.
     needs_docker = not dry_run or all
-    if needs_docker and not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    if needs_docker:
+        _require_docker()
 
     # Naming every profile with `--volumes` removes the same data as `--all --volumes`.
     if (
@@ -773,9 +792,17 @@ def down(
     deps_others = [p for p in deps_profiles if p != "deps"]
 
     if dry_run:
-        removed = (
-            _dry_run_volumes(plan, all, deps_named, deps_others) if volumes else None
-        )
+        removed = None
+        if volumes:
+            reachable = is_docker_running()
+            note = _deps_join_note(plan, all, reachable)
+            if note is not None:
+                # A named deps is stopped in every case, so only its volume carries
+                # the note.
+                plan[_DEPS_FILE] = ["deps"] if deps_named else [f"deps{note}"]
+            removed = _dry_run_volumes(
+                plan, reachable, note or "", ["deps", *deps_others]
+            )
         if deps_named and _DEPS_FILE not in plan:
             plan[_DEPS_FILE] = ["deps"]
         if deps_others:
@@ -849,9 +876,7 @@ def ps(
     Raises:
         typer.Exit: With code 1 when Docker is not reachable.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     report = reports.build_ps(profiles, all)
     if json_output:
@@ -942,9 +967,7 @@ def logs(
         typer.Exit: With code 1 when Docker is not reachable, no compose file of the
             profiles defines `service`, or `docker compose logs` fails.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     try:
@@ -979,9 +1002,7 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
         typer.Exit: With code 1 when Docker is not reachable or a compose file fails
             to restart.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Restarting containers...")
@@ -1015,9 +1036,7 @@ def recreate(
         typer.Exit: With code 1 when Docker is not reachable or a compose file fails
             to recreate. The files printed before it were already replaced.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Recreating containers...")
