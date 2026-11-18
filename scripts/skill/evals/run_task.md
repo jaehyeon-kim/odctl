@@ -12,7 +12,7 @@ This file holds the main session's steps, from the suite to the result table. `c
 
 ## Steps
 
-1. Build the suite of each version from a copy of the repository at that version, into a folder whose name does not tell the version: `git archive <tag> | tar -x -C <scratch>/tree-a`, then `uv run --no-project python scripts/skill/evals/make_suite.py --tree <scratch>/tree-a --out <scratch>/suite-a`. Write down which suite is which in `<scratch>/versions.txt`; no file the reviewer reads names it. `make_suite.py` builds and installs with `--offline`, so uv's cache must already hold `hatchling`, the wheel's dependencies and `pytest`: run `uv sync` (which includes the `dev` group, where `pytest` is) and `uv build` once in the repository, online, before the first suite.
+1. Create the folders the steps write into: `mkdir -p <scratch>/tree-a <scratch>/results <scratch>/review <scratch>/grades <scratch>/reviews`, with one `tree-` folder per version. Build the suite of each version from a copy of the repository at that version, into a folder whose name does not tell the version: `git archive <tag> | tar -x -C <scratch>/tree-a`, then `uv run --no-project python scripts/skill/evals/make_suite.py --tree <scratch>/tree-a --out <scratch>/suite-a`. Write down which suite is which in `<scratch>/versions.txt`; no file the reviewer reads names it. `make_suite.py` builds and installs with `--offline`, so uv's cache must already hold `hatchling`, the wheel's dependencies and `pytest`: run `uv sync` (which includes the `dev` group, where `pytest` is) and `uv build` once in the repository, online, before the first suite.
 2. Run the cases from the suite's folder (`cd <scratch>/suite-a`), once per model:
 
    ```bash
@@ -34,7 +34,7 @@ This file holds the main session's steps, from the suite to the result table. `c
      >> <scratch>/grades/<version>-<model>.jsonl
    ```
 
-   It exits 2 with no line when a file or a command it needs fails; that run's facts are written again once the cause is fixed.
+   It exits 2 with no line when a file or a command it needs fails, and removes what it wrote of `--out`; that run's facts are written again once the cause is fixed. It also exits 2 when `--out` already exists, so that no file of another run stays in it.
 6. `python3 scripts/skill/evals/check_hidden.py <scratch>/review/*` prints nothing and exits 0: no file names a suite or an odctl version.
 7. Start one fresh Opus reviewer per folder (`model: opus`), at most three at a time, with this message, where `<rubric>` is the path of `review_rubric.md` and `<folder>` is `<scratch>/review/<n>`:
 

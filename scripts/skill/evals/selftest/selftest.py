@@ -11,10 +11,13 @@ It builds kept runs by hand in a temporary folder, in the layout `claude plugin 
   task files and the skill, lists no missing file, and gives the explain, compose and dry-run
   facts of every profile in the case's `task.yaml`; and `check_hidden.py` passes on the result.
 - A file the run did not write is listed in `missing`, and `facts.py` works with a relative
-  `--python-dir`.
+  `--python-dir`, and with a relative `--skill` without replacing every period.
 - `facts.py` exits 2 with no line when the transcript, the workspace or the case's
-  `task.yaml` cannot be read, because a fact that reads nothing must fail, not count nothing.
-- `check_hidden.py` exits 1 when a file names a suite or an odctl version.
+  `task.yaml` cannot be read, because a fact that reads nothing must fail, not count nothing;
+  and when `--out` already exists, so that no file of another run stays in it.
+- `check_hidden.py` exits 1 when a file names a suite or an odctl version, and 2 when a
+  folder it is given is not a folder.
+- `review_cases/check.py` finds no kind on a line whose `count` is 0.
 - `summarise.py` exits 0 on complete lines, counts a kind once per run, and exits 1 for a
   missing `REVIEWED` line, a repeated `FACTS` line, a run not in the plan, a run twice in
   the plan and a kind the reviewer does not judge.
@@ -37,6 +40,10 @@ EVALS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(EVALS))
 
 from facts import asked_files  # noqa: E402
+
+sys.path.insert(0, str(EVALS / "review_cases"))
+
+from check import _found  # noqa: E402
 
 PYTHON = sys.executable
 
@@ -69,9 +76,15 @@ def fake_run(ctx: Context, name: str, case: str, skip: Optional[str] = None) -> 
 
 
 def run_facts(
-    ctx: Context, root: Path, case: str, out: Path, relative: bool = False
+    ctx: Context,
+    root: Path,
+    case: str,
+    out: Path,
+    relative: bool = False,
+    relative_skill: bool = False,
 ) -> subprocess.CompletedProcess:
-    """Runs facts.py on a kept run; `relative` passes --python-dir relative to the folder it runs in."""
+    """Runs facts.py on a kept run; `relative` passes --python-dir, and `relative_skill`
+    --skill, relative to the suite folder it then runs in."""
     return subprocess.run(
         [
             PYTHON,
@@ -82,7 +95,7 @@ def run_facts(
             "--python-dir",
             ctx.python_dir.name if relative else str(ctx.python_dir),
             "--skill",
-            str(ctx.skill),
+            ctx.skill.name if relative_skill else str(ctx.skill),
             "--out",
             str(out),
             "--version",
@@ -94,7 +107,7 @@ def run_facts(
         ],
         capture_output=True,
         text=True,
-        cwd=ctx.python_dir.parent if relative else None,
+        cwd=ctx.python_dir.parent if relative or relative_skill else None,
     )
 
 
@@ -196,6 +209,67 @@ def check_relative_python_dir(ctx: Context) -> List[str]:
     done = run_facts(ctx, root, "pg-tz", ctx.scratch / "review-relative", relative=True)
     if done.returncode != 0:
         return [f"exited {done.returncode}: {done.stderr.strip()[-200:]}"]
+    return []
+
+
+def check_relative_skill(ctx: Context) -> List[str]:
+    """facts.py with a relative --skill does not replace each period with `<suite>`."""
+    root = fake_run(ctx, "run-relative-skill", "pg-tz")
+    out = ctx.scratch / "review-relative-skill"
+    done = run_facts(ctx, root, "pg-tz", out, relative_skill=True)
+    if done.returncode != 0:
+        return [f"exited {done.returncode}: {done.stderr.strip()[-200:]}"]
+    prompt = (out / "task" / "prompt.md").read_text("utf-8")
+    if "<suite>" in prompt or "reply.md" not in prompt:
+        return [f"task/prompt.md has periods replaced: {prompt[:120]!r}"]
+    return []
+
+
+def check_existing_out(ctx: Context) -> List[str]:
+    """facts.py exits 2 when --out already holds another run's folder."""
+    out = ctx.scratch / "review-existing"
+    first = run_facts(
+        ctx, fake_run(ctx, "run-existing-1", "spark-kafka"), "spark-kafka", out
+    )
+    if first.returncode != 0:
+        return [f"first run exited {first.returncode}"]
+    root = fake_run(ctx, "run-existing-2", "spark-kafka", skip="run.sh")
+    done = run_facts(ctx, root, "spark-kafka", out)
+    if done.returncode != 2 or done.stdout.strip():
+        return [
+            f"second run into the same --out exited {done.returncode} with output "
+            f"{done.stdout.strip()!r}, want 2 and none"
+        ]
+    return []
+
+
+def check_hidden_needs_folders(ctx: Context) -> List[str]:
+    """check_hidden.py exits 2 for a name that is no folder and for a file."""
+    a_file = ctx.scratch / "not-a-folder.txt"
+    a_file.write_text("text\n", "utf-8")
+    wrong = []
+    for path in [ctx.scratch / "no-such-folder", a_file]:
+        done = subprocess.run(
+            [PYTHON, str(EVALS / "check_hidden.py"), str(path)],
+            capture_output=True,
+            text=True,
+        )
+        if done.returncode != 2:
+            wrong.append(f"{path.name}: exited {done.returncode}, want 2")
+    return wrong
+
+
+def check_zero_count(ctx: Context) -> List[str]:
+    """review_cases/check.py finds no kind on a line with count 0, as summarise.py scores it."""
+    reply = ctx.scratch / "zero-count.jsonl"
+    rows = [
+        {"task": "pg-tz", "kind": "A8", "count": 0},
+        {"task": "pg-tz", "kind": "REVIEWED", "count": 0},
+    ]
+    reply.write_text("".join(json.dumps(row) + "\n" for row in rows), "utf-8")
+    kinds, problems = _found(reply)
+    if kinds or problems:
+        return [f"found {sorted(kinds)} with problems {problems}, want none"]
     return []
 
 
@@ -328,10 +402,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "facts takes a relative --python-dir",
                 lambda: check_relative_python_dir(ctx),
             ),
+            ("facts takes a relative --skill", lambda: check_relative_skill(ctx)),
+            ("facts refuses an existing --out", lambda: check_existing_out(ctx)),
             (
                 "check_hidden catches a suite and a version",
                 lambda: check_hidden_catches(ctx),
             ),
+            (
+                "check_hidden refuses what is not a folder",
+                lambda: check_hidden_needs_folders(ctx),
+            ),
+            ("check.py skips a count of 0", lambda: check_zero_count(ctx)),
             ("summarise", lambda: check_summarise(ctx)),
         ]
         for name, check in checks:

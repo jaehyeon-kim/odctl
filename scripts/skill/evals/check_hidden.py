@@ -8,8 +8,9 @@ Each FOLDER is searched through, every file in it read as text (a `.gz` file unp
 file fails when it names a suite or a version: `suite-a` or `suite-b` as a word, an odctl
 version such as `1.9.0` after `odctl` or `TAG=`, or `before` or `after` as a part of a path
 (`before/`, `/after`). The script prints each file and line that does, and exits 1 when there
-is one. `facts.py` writes the folders this checks (`--out`), and `run_task.md` step 6 runs it
-on all of them.
+is one. It exits 2 when a FOLDER is not a folder, because a wrong name would otherwise
+search nothing and pass. `facts.py` writes the folders this checks (`--out`), and
+`run_task.md` step 6 runs it on all of them.
 """
 
 import gzip
@@ -49,10 +50,15 @@ def leaks(folder: Path) -> List[str]:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Checks each folder given; returns 1 when a file names a version."""
+    """Checks each folder given; returns 1 when a file names a version, 2 when one is not a folder."""
     folders = [Path(a) for a in (sys.argv[1:] if argv is None else argv)]
     if not folders:
         print(__doc__)
+        return 2
+    absent = [folder for folder in folders if not folder.is_dir()]
+    for folder in absent:
+        print(f"check_hidden.py: {folder} is not a folder", file=sys.stderr)
+    if absent:
         return 2
     found = []
     for folder in folders:
