@@ -158,7 +158,8 @@
         "docker.getcollate.io/openmetadata/server",
         "docker.getcollate.io/openmetadata/ingestion"
       ],
-      "groupName": "OpenMetadata Ecosystem"
+      "groupName": "OpenMetadata Ecosystem",
+      "minimumGroupSize": 2
     },
     {
       "description": "Elasticsearch moves only by hand, with OpenMetadata, to the version OpenMetadata's own docker/docker-compose-quickstart/docker-compose.yml uses at the new release tag. OpenMetadata runs only against the Elasticsearch version it was built for, so Renovate opens no pull request for it alone.",

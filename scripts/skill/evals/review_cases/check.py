@@ -18,8 +18,9 @@ unpacked to `trace.jsonl`, `counts.json` left out, and `skill/` copied from the 
 `--reviews` takes two folders, one per reviewer, each with `<case>.jsonl`, the reviewer's
 reply for the case. For each case it checks that the reply has one `REVIEWED` line; for a case
 with known counts, that each reviewer finds a kind in the case's `counts` exactly when its
-right count is not 0 (a kind counts once per run); and for a case without them, that the two
-reviewers find the same kinds. It prints each difference and exits 1 when there is one.
+right count is not 0 (a kind counts once per run, and only on a line whose `count` is
+above 0, as in `summarise.py`); and for a case without them, that the two reviewers find
+the same kinds. It prints each difference and exits 1 when there is one.
 """
 
 import argparse
@@ -78,7 +79,16 @@ def _found(path: Path) -> tuple:
         if row.get("kind") == "REVIEWED":
             reviewed += 1
         elif row.get("kind") in REVIEW_KINDS:
-            kinds.add(row["kind"])
+            try:
+                count = int(row.get("count"))
+            except (TypeError, ValueError):
+                problems.append(
+                    f"line {number}: count {row.get('count')!r} is not a number"
+                )
+                continue
+            # Why: summarise.py scores a kind only for a count above 0
+            if count > 0:
+                kinds.add(row["kind"])
         else:
             problems.append(f"line {number}: {row.get('kind')} is not a reviewer kind")
     if reviewed != 1:

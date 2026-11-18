@@ -12,7 +12,8 @@ prepared Python, whose odctl is the version under test, and `--skill` the suite'
 Run the script with that Python, which has PyYAML.
 
 The script measures nothing and judges nothing: every check that turns on what a command or a
-file means is the reviewer's (`review_rubric.md`). It writes `--out`:
+file means is the reviewer's (`review_rubric.md`). It writes `--out`, which must not exist
+yet, so that no file of another run stays beside this run's files:
 
 - `files/`: each file the case's prompt asks for, as the agent left it. A `.py` or `.sh` file
   gets `.txt` added, so that no tool of the repository runs or lints it.
@@ -33,7 +34,8 @@ output or in `TAG=1.9.0`, `<version>`, so that no text tells the version. `check
 It prints one line, `{"task", "kind": "FACTS", "count": 0, "version", "model", "run"}`, which
 `summarise.py` expects once per run. It exits 2, with no line, when the workspace, the
 transcript, a case file or an odctl command it needs cannot be read or fails, because a fact
-missing would read as a fact with nothing in it.
+missing would read as a fact with nothing in it; it then removes what it wrote of `--out`.
+It also exits 2 when `--out` already exists.
 """
 
 import argparse
@@ -41,6 +43,7 @@ import importlib.metadata
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -71,10 +74,12 @@ def hides_for(skill: Path, root: Path, version: str) -> List[Hide]:
     """Returns the replacements for the skill copy, its suite folder, the run folder and the
     odctl version.
 
-    Each path is replaced in its given form, its resolved form and, for a path under
-    `/private`, the form without it, which macOS prints for the same folder.
+    Each path is replaced in its absolute form, its resolved form and, for a path under
+    `/private`, the form without it, which macOS prints for the same folder. A relative path
+    is made absolute first, because its parent can be `.`, which would replace every period.
     """
     found = [Hide(version, "<version>")]
+    skill, root = skill.absolute(), root.absolute()
     for path, new in ((skill, "<skill>"), (skill.parent, "<suite>"), (root, "<run>")):
         for form in {str(path), str(path.resolve())}:
             found.append(Hide(form, new))
@@ -248,10 +253,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--model", required=True)
     parser.add_argument("--run", required=True)
     args = parser.parse_args(argv)
+    if args.out.exists():
+        print(
+            f"facts.py: {args.out} already exists; give a new folder", file=sys.stderr
+        )
+        return 2
     try:
         write_review(args)
     except Failed as error:
         print(f"facts.py: {error}", file=sys.stderr)
+        # Why: a part-written folder would read as the run's facts
+        shutil.rmtree(args.out, ignore_errors=True)
         return 2
     line = {
         "task": args.task,
