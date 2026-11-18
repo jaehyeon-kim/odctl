@@ -13,6 +13,12 @@
           ],
           "profiles": [
             "evidently"
+          ],
+          "healthcheck_test": [
+            "CMD",
+            "python",
+            "-c",
+            "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/projects', timeout=5)"
           ]
         },
         "feast-serve": {
@@ -25,6 +31,10 @@
           ],
           "profiles": [
             "feast"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:6566/health || exit 1"
           ]
         },
         "feast-ui": {
@@ -37,6 +47,10 @@
           ],
           "profiles": [
             "feast"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8888/api/v1/projects || exit 1"
           ]
         },
         "label-studio": {
@@ -49,6 +63,10 @@
           ],
           "profiles": [
             "label-studio"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8080/health/ || exit 1"
           ]
         },
         "mlflow": {
@@ -61,6 +79,10 @@
           ],
           "profiles": [
             "mlflow"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:5000/health || exit 1"
           ]
         },
         "mlflow-serve": {
@@ -73,6 +95,10 @@
           ],
           "profiles": [
             "mlflow"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "[ -z \"$${MODEL_URI}\" ] || curl -f http://localhost:5003/ping || exit 1"
           ]
         }
       },
@@ -87,6 +113,10 @@
           ],
           "profiles": [
             "airflow"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -fs http://localhost:8080/api/v2/monitor/health || exit 1"
           ]
         },
         "temporal": {
@@ -100,6 +130,15 @@
           ],
           "profiles": [
             "temporal"
+          ],
+          "healthcheck_test": [
+            "CMD",
+            "temporal",
+            "operator",
+            "cluster",
+            "health",
+            "--address",
+            "127.0.0.1:7233"
           ]
         }
       }

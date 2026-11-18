@@ -157,6 +157,9 @@ def compose_facts(path: Path) -> Dict[str, dict]:
             "ports": [str(port) for port in service.get("ports") or []],
             "expose": [str(port) for port in service.get("expose") or []],
             "healthcheck": "healthcheck" in service,
+            # Why: a probe of another port or endpoint than this test is not a repeat of
+            # the wait `up` does, so the reviewer needs the test itself
+            "healthcheck_test": (service.get("healthcheck") or {}).get("test"),
             "profiles": service.get("profiles") or [],
         }
     return facts

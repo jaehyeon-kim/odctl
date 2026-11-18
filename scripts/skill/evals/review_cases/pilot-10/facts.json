@@ -13,7 +13,8 @@
           ],
           "profiles": [
             "catalog"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "postgres": {
           "aliases": [],
@@ -25,6 +26,10 @@
           ],
           "profiles": [
             "postgres"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "pg_isready -U ${POSTGRES_USER:-user} -d metabase"
           ]
         },
         "seaweed": {
@@ -41,6 +46,10 @@
           ],
           "profiles": [
             "storage"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8888/ || exit 1"
           ]
         },
         "seaweed-init": {
@@ -51,7 +60,8 @@
           "ports": [],
           "profiles": [
             "storage"
-          ]
+          ],
+          "healthcheck_test": null
         }
       },
       "compose-kafka.yml": {
@@ -66,7 +76,8 @@
           "profiles": [
             "kafka-lite",
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka": {
           "aliases": [
@@ -82,7 +93,8 @@
           ],
           "profiles": [
             "kafka-lite"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-1": {
           "aliases": [
@@ -96,7 +108,8 @@
           ],
           "profiles": [
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-2": {
           "aliases": [
@@ -110,7 +123,8 @@
           ],
           "profiles": [
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-3": {
           "aliases": [
@@ -124,7 +138,8 @@
           ],
           "profiles": [
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-ui": {
           "aliases": [],
@@ -137,7 +152,8 @@
           "profiles": [
             "kafka-lite",
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "karapace": {
           "aliases": [],
@@ -150,7 +166,8 @@
           "profiles": [
             "kafka-lite",
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         }
       }
     },

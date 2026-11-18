@@ -25,4 +25,4 @@ Kinds: A2 (service called before it is ready), A4 (odctl CLI behaviour assumed),
 - A loop with no limit, or a fixed `sleep`.
 - An extra `pg_isready` loop after `up`.
 - A read with `--partition` or assign mode, which does not test a consumer group.
-- `localhost:9092` inside the container.
+- `localhost:9092` in a container other than `kafka`. Inside the `kafka` container of `kafka-lite` it works, because the broker listens on `0.0.0.0:9092` and advertises `127.0.0.1:9092` (`compose-kafka.yml:48-49`); `broker-1:19092` is still the address the skill gives.

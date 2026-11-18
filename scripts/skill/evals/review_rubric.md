@@ -46,7 +46,7 @@ A call to a service right after `odctl up`, `restart` or `recreate`, or after a 
 - Wrong: `odctl up kafka-lite` and then a consumer, with no wait. `facts.json` `compose` shows `kafka` has no health check, so `up` returns when it runs, not when it answers.
 - Wrong: `until <check>; do sleep 2; done` with no count or deadline, or a fixed `sleep 30` in place of a check.
 - Wrong: a healthy Langfuse container, or a 200 on the send, taken to mean the trace is stored.
-- Not a mistake: no extra wait for a service whose `healthcheck` is true in `facts.json`, because `up` already waits for it. An extra wait there is A4.
+- Not a mistake: no extra wait for a service whose `healthcheck` is true in `facts.json`, because `up` already waits for it. An extra wait that checks what its `healthcheck_test` checks is A4.
 
 ## A3: an address or a name from the wrong side, or guessed
 
@@ -62,7 +62,8 @@ A command, option or behaviour of odctl that does not exist or is not as used: a
 
 - Wrong: `odctl ps` or `odctl ps --json` with no profile and no `--all`, which exits 1.
 - Wrong: `odctl trino`, `odctl exec`, `odctl up spark` (the profiles are `spark-lite` and `spark-full`).
-- Wrong: an extra readiness probe after `up` for a service whose `healthcheck` is true in `facts.json`, because `up` already waits for it (the skill's How to Use It), whether or not the reply says why.
+- Wrong: an extra readiness probe after `up` that checks what the service's `healthcheck_test` in `facts.json` checks, such as `pg_isready` for `postgres`, because `up` already waits for it (the skill's How to Use It), whether the reply says why or not.
+- Not A4: a probe of another port or endpoint than the `healthcheck_test`, such as SeaweedFS's S3 port 8333 when its test reads the filer on 8888. `up` does not wait for that.
 
 ## A6: service behaviour stated without a run or its source
 

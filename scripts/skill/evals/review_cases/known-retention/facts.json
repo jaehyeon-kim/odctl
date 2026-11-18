@@ -14,7 +14,8 @@
           "profiles": [
             "kafka-lite",
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka": {
           "aliases": [
@@ -30,7 +31,8 @@
           ],
           "profiles": [
             "kafka-lite"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-1": {
           "aliases": [
@@ -44,7 +46,8 @@
           ],
           "profiles": [
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-2": {
           "aliases": [
@@ -58,7 +61,8 @@
           ],
           "profiles": [
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-3": {
           "aliases": [
@@ -72,7 +76,8 @@
           ],
           "profiles": [
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "kafka-ui": {
           "aliases": [],
@@ -85,7 +90,8 @@
           "profiles": [
             "kafka-lite",
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         },
         "karapace": {
           "aliases": [],
@@ -98,7 +104,8 @@
           "profiles": [
             "kafka-lite",
             "kafka-full"
-          ]
+          ],
+          "healthcheck_test": null
         }
       }
     },

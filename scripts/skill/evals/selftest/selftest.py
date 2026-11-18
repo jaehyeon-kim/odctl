@@ -130,6 +130,14 @@ def check_case(ctx: Context, case: str) -> List[str]:
         wrong.append("list is empty")
     if profiles and not facts["odctl"]["compose"]:
         wrong.append("compose is empty")
+    tests = [
+        service["healthcheck_test"]
+        for services in facts["odctl"]["compose"].values()
+        for service in services.values()
+        if service["healthcheck"]
+    ]
+    if not all(tests):
+        wrong.append("a service with a health check has no healthcheck_test")
     if profiles and not facts["odctl"].get("dry_run"):
         wrong.append("dry_run is empty")
     hidden = subprocess.run(
