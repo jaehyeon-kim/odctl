@@ -805,6 +805,9 @@ def test_down_dry_run_names_the_volumes(
         ]
 
     monkeypatch.setattr("odctl.main.get_managed_containers", containers_of)
+    # Why: the fake containers carry the project `odctl`, and the packaged files
+    # each name their own
+    monkeypatch.setattr("odctl.main.get_project_name", lambda file: "odctl")
     monkeypatch.setattr(
         "odctl.main.get_volume_names",
         lambda: {"spark-events-data", "odctl-shared-deps"} - missing,
@@ -1432,6 +1435,7 @@ def test_shared_deps_are_not_idle_while_another_deps_file_profile_runs(
         "odctl.main.get_stack_details",
         lambda f, p: _stack(["kafka"] if "kafka-lite" in p else [], []),
     )
+    monkeypatch.setattr("odctl.main.get_project_name", lambda file: "odctl")
     shared = fake_container("deps-shared", "deps-shared", "running", None, {})
     monkeypatch.setattr(
         "odctl.main.get_managed_containers",
@@ -1441,3 +1445,36 @@ def test_shared_deps_are_not_idle_while_another_deps_file_profile_runs(
     )
 
     assert _shared_deps_are_idle({"compose-x.yml": ["kafka-lite"]}, stopped) is expected
+
+
+def test_shared_deps_are_not_idle_for_a_service_of_the_same_name_in_another_file(
+    monkeypatch,
+):
+    """A service is named within its project: stopping kafka-lite's `kafka` does not
+    stop a deps-shared service also named `kafka`, which still holds the volume."""
+    from odctl.main import _shared_deps_are_idle
+
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-x.yml": ["kafka-lite"],
+            "compose-deps.yml": ["deps", "deps-shared"],
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details", lambda f, p: _stack(["kafka"], [])
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_project_name",
+        lambda file: "odctl-x" if file == "compose-x.yml" else "odctl-deps",
+    )
+    other = fake_container("deps-kafka", "kafka", "running", None, {})
+    other.config.labels["com.docker.compose.project"] = "odctl-deps"
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers",
+        lambda plan: (
+            [other] if "deps-shared" in plan.get("compose-deps.yml", []) else []
+        ),
+    )
+
+    assert _shared_deps_are_idle({"compose-x.yml": ["kafka-lite"]}) is False

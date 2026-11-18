@@ -9,10 +9,12 @@ from typer.core import TyperGroup
 
 from odctl import config, reports, ui
 from odctl.docker import (
+    compose_project,
     compose_service,
     find_unpublished_images,
     get_declared_volumes,
     get_managed_containers,
+    get_project_name,
     get_stack_details,
     get_volume_names,
     is_docker_running,
@@ -529,8 +531,9 @@ def _shared_deps_are_idle(
     if _DEPS_FILE in torn_down:
         return False
 
+    # Why: a service is named within its project, and two files can share a name
     stopping = {
-        service
+        (get_project_name(file), service)
         for file, profs in torn_down.items()
         for service in get_stack_details(file, profs).names
     }
@@ -544,7 +547,7 @@ def _shared_deps_are_idle(
     if deps_running:
         others[_DEPS_FILE] = deps_running
     for container in get_managed_containers(others):
-        if compose_service(container) not in stopping:
+        if (compose_project(container), compose_service(container)) not in stopping:
             return False
     return True
 
