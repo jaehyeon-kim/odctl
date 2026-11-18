@@ -501,7 +501,9 @@ def up(
 _DEPS_FILE = "compose-deps.yml"
 
 
-def _shared_deps_are_idle(torn_down: dict) -> bool:
+def _shared_deps_are_idle(
+    torn_down: dict, deps_stopped: Optional[List[str]] = None
+) -> bool:
     """Report whether the shared deps project is safe to remove.
 
     The deps project owns the ``odctl`` network and the shared JAR volume, so it
@@ -510,14 +512,19 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
     use, and deps itself is excluded because its init container always exits.
 
     The services of ``torn_down`` do not count, so the answer is the same before
-    their containers are removed, as in a dry run, and after.
+    their containers are removed, as in a dry run, and after. A container of another
+    profile of the deps file, such as a deps-shared a workspace adds, counts unless
+    the teardown stops that profile too.
 
     Args:
         torn_down (dict): The plan being stopped, or just stopped. Its services are
             not counted, and its files are not consulted.
+        deps_stopped (Optional[List[str]]): The deps file's profiles other than deps
+            that the teardown stops; None is none.
 
     Returns:
-        bool: True when nothing outside deps and ``torn_down`` has a container.
+        bool: True when nothing outside deps, ``torn_down`` and ``deps_stopped``
+        has a container.
     """
     if _DEPS_FILE in torn_down:
         return False
@@ -529,6 +536,13 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
     }
     declared = build_execution_plan(None, True, resolve_deps=False)
     others = {file: profs for file, profs in declared.items() if file != _DEPS_FILE}
+    deps_running = [
+        p
+        for p in declared.get(_DEPS_FILE, [])
+        if p != "deps" and p not in (deps_stopped or [])
+    ]
+    if deps_running:
+        others[_DEPS_FILE] = deps_running
     for container in get_managed_containers(others):
         if compose_service(container) not in stopping:
             return False
@@ -621,7 +635,9 @@ def removes_everything(profiles: List[str]) -> bool:
 _DEPS_UNCHECKED = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
 
 
-def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
+def _deps_join_note(
+    plan: dict, all: bool, reachable: bool, deps_stopped: Optional[List[str]] = None
+) -> Optional[str]:
     """Decide whether a dry run of a teardown with `--volumes` adds the deps file.
 
     A named teardown also removes the shared jar volume once no other profile has a
@@ -633,6 +649,8 @@ def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
         plan (dict): The teardown plan, without the deps file unless `all` is set.
         all (bool): True for `--all`, whose plan already holds the deps file.
         reachable (bool): Whether Docker answers.
+        deps_stopped (Optional[List[str]]): The deps file's profiles other than deps
+            that the teardown stops, as `_shared_deps_are_idle` takes them.
 
     Returns:
         Optional[str]: None when the deps file does not join, "" when it does, and
@@ -642,7 +660,7 @@ def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
         return None
     if not reachable:
         return _DEPS_UNCHECKED
-    return "" if _shared_deps_are_idle(plan) else None
+    return "" if _shared_deps_are_idle(plan, deps_stopped) else None
 
 
 def _own_volume_profiles(deps_others: List[str], rest: List[str]) -> List[str]:
@@ -863,7 +881,7 @@ def down(
         removed = None
         if volumes:
             reachable = is_docker_running()
-            note = _deps_join_note(plan, all, reachable)
+            note = _deps_join_note(plan, all, reachable, deps_others)
             groups: List[Tuple[List[str], str]] = []
             if all:
                 groups.append((plan.get(_DEPS_FILE, []), ""))
@@ -897,7 +915,7 @@ def down(
     # network and the shared JAR volume behind: a wipe that did not wipe. Remove
     # them here, but only once nothing else is running, since every other profile
     # attaches to that network and mounts that volume.
-    idle = volumes and not all and _shared_deps_are_idle(plan)
+    idle = volumes and not all and _shared_deps_are_idle(plan, deps_others)
     if idle or deps_profiles:
         calls = []
         if own and not idle:

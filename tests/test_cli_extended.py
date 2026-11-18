@@ -1045,7 +1045,9 @@ def test_down_stops_every_named_profile_of_the_deps_file(
             for f, p in plan.items()
         },
     )
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: idle)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: idle
+    )
 
     result = runner.invoke(app, ["down", *names, *volumes])
 
@@ -1088,7 +1090,9 @@ def test_down_dry_run_lists_the_volumes_of_the_deps_files_other_profiles(
         lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
     )
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: idle)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: idle
+    )
     monkeypatch.setattr(
         "odctl.main.get_declared_volumes",
         lambda file: {
@@ -1167,7 +1171,9 @@ def test_down_dry_run_names_deps_beside_its_other_profiles(monkeypatch, idle):
         },
     )
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: idle)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: idle
+    )
     monkeypatch.setattr("odctl.main.get_declared_volumes", lambda file: {})
     monkeypatch.setattr("odctl.main.get_volume_names", lambda: set())
     keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
@@ -1239,7 +1245,9 @@ def test_down_splits_the_deps_file_by_each_profiles_volumes(
         return out
 
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", expand)
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: False)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: False
+    )
     monkeypatch.setattr(
         "odctl.main.get_declared_volumes",
         lambda file: {
@@ -1270,7 +1278,9 @@ def test_down_dry_run_lists_the_unnamed_volumes_of_a_deps_file_profile(monkeypat
         lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
     )
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: False)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: False
+    )
     monkeypatch.setattr(
         "odctl.main.get_declared_volumes",
         lambda file: {
@@ -1318,7 +1328,9 @@ def test_down_keeps_a_volume_the_other_deps_call_still_holds(monkeypatch):
         lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
     )
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: False)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: False
+    )
     monkeypatch.setattr(
         "odctl.main.get_declared_volumes",
         lambda file: {"shared-deps": "odctl-shared-deps", "c": "odctl_c"},
@@ -1395,3 +1407,37 @@ def test_removes_everything_counts_a_deps_file_profile_with_data(
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
 
     assert removes_everything(names) is expected
+
+
+@pytest.mark.parametrize(
+    "stopped, expected",
+    [([], False), (["deps-shared"], True)],
+    ids=["another deps file profile runs", "the teardown stops it"],
+)
+def test_shared_deps_are_not_idle_while_another_deps_file_profile_runs(
+    monkeypatch, stopped, expected
+):
+    """A deps-shared a workspace adds mounts the shared jar volume, so the volume
+    is not idle while its container exists, unless the teardown stops it too."""
+    from odctl.main import _shared_deps_are_idle
+
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-x.yml": ["kafka-lite"],
+            "compose-deps.yml": ["deps", "deps-shared"],
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack(["kafka"] if "kafka-lite" in p else [], []),
+    )
+    shared = fake_container("deps-shared", "deps-shared", "running", None, {})
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers",
+        lambda plan: (
+            [shared] if "deps-shared" in plan.get("compose-deps.yml", []) else []
+        ),
+    )
+
+    assert _shared_deps_are_idle({"compose-x.yml": ["kafka-lite"]}, stopped) is expected
