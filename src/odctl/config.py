@@ -222,6 +222,19 @@ def _construct_go_null(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> None:
 _ComposeLoader.add_constructor("tag:yaml.org,2002:null", _construct_go_null)
 
 
+def _construct_timestamp(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
+    # Why: PyYAML raises AttributeError for `!!timestamp` on text that is not one
+    try:
+        return yaml.SafeLoader.construct_yaml_timestamp(loader, node)
+    except (AttributeError, ValueError) as e:
+        raise yaml.constructor.ConstructorError(
+            None, None, f"cannot read {node.value!r} as {node.tag}", node.start_mark
+        ) from e
+
+
+_ComposeLoader.add_constructor("tag:yaml.org,2002:timestamp", _construct_timestamp)
+
+
 _RESET = object()
 
 

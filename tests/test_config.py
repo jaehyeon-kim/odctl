@@ -178,9 +178,11 @@ def test_read_yaml_reads_tagged_and_large_numbers_as_go_yaml(tmp_path, text, exp
         "a: !!bool yes\n",
         "a: !!bool 1\n",
         "a: !!null abc\n",
+        "a: !!timestamp abc\n",
+        "a: !!timestamp 2026-13-40\n",
     ],
 )
-def test_read_yaml_refuses_a_number_tag_go_yaml_refuses(tmp_path, text):
+def test_read_yaml_refuses_a_tagged_value_go_yaml_refuses(tmp_path, text):
     path = tmp_path / "compose.yml"
     path.write_text(text)
     with pytest.raises(UnreadableFileError):
