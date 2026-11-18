@@ -599,7 +599,12 @@ def removes_everything(profiles: List[str]) -> bool:
     return bool(every_profile) and every_profile <= named_profiles
 
 
-def _dry_run_volumes(plan: dict, all: bool, deps_named: bool = False) -> dict:
+def _dry_run_volumes(
+    plan: dict,
+    all: bool,
+    deps_named: bool = False,
+    deps_others: Optional[List[str]] = None,
+) -> dict:
     """List the volumes a teardown with `--volumes` removes, for the dry run.
 
     These are the named volumes of the plan's services, which `stop_stack` removes
@@ -620,6 +625,8 @@ def _dry_run_volumes(plan: dict, all: bool, deps_named: bool = False) -> dict:
         all (bool): True for `--all`, whose plan already holds the deps file.
         deps_named (bool): True when the teardown names deps, which the real run
             stops whatever else has containers.
+        deps_others (Optional[List[str]]): The other profiles of the deps file the
+            teardown names, such as deps-extra, whose volumes go with deps' volume.
 
     Returns:
         dict: Compose file to the volumes to remove, each as the text printed after
@@ -641,7 +648,8 @@ def _dry_run_volumes(plan: dict, all: bool, deps_named: bool = False) -> dict:
         suffix = note if file == _DEPS_FILE else ""
         # Services mount a volume by its key, and Docker lists it by its name.
         declared = get_declared_volumes(file)
-        keys = get_stack_details(file, ["deps"] if file == _DEPS_FILE else profs)[3]
+        deps_profs = ["deps", *(deps_others or [])]
+        keys = get_stack_details(file, deps_profs if file == _DEPS_FILE else profs)[3]
         names = [declared.get(key, key) for key in keys]
         if existing is not None:
             names = [name for name in names if name in existing]
@@ -768,7 +776,9 @@ def down(
     deps_others = [p for p in deps_profiles if p != "deps"]
 
     if dry_run:
-        removed = _dry_run_volumes(plan, all, deps_named) if volumes else None
+        removed = (
+            _dry_run_volumes(plan, all, deps_named, deps_others) if volumes else None
+        )
         if deps_named and _DEPS_FILE not in plan:
             plan[_DEPS_FILE] = ["deps"]
         if deps_others:

@@ -1045,3 +1045,42 @@ def test_down_dry_run_lists_the_other_profiles_of_the_deps_file(monkeypatch):
     lines = [line.strip() for line in result.stdout.splitlines()]
     assert "└─ 💥 Stop Profile: deps" in lines, lines
     assert "└─ 💥 Stop Profile: deps-extra" in lines, lines
+
+
+@pytest.mark.parametrize("idle", [True, False])
+def test_down_dry_run_lists_the_volumes_of_the_deps_files_other_profiles(
+    monkeypatch, idle
+):
+    """`down deps-extra -v` on an idle stack removes the deps file's volumes, deps-extra's
+    included, so the dry run lists them; with other profiles running it removes none."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: idle)
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {
+            "shared-deps": "odctl-shared-deps",
+            "extra-data": "odctl_extra-data",
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_volume_names", lambda: {"odctl-shared-deps", "odctl_extra-data"}
+    )
+
+    def details(file, profiles):
+        keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
+        return [], [], [], [k for p in profiles for k in keys.get(p, [])]
+
+    monkeypatch.setattr("odctl.main.get_stack_details", details)
+
+    result = runner.invoke(
+        app, ["down", "deps-extra", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert ("odctl_extra-data" in result.stdout) is idle, result.stdout
+    assert ("odctl-shared-deps" in result.stdout) is idle, result.stdout
