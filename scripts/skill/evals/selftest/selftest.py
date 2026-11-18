@@ -27,6 +27,7 @@ It prints `ok <check>` or `FAIL <check>: <reason>` for each, and exits 1 when on
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -95,7 +96,10 @@ def run_facts(
             "--python-dir",
             ctx.python_dir.name if relative else str(ctx.python_dir),
             "--skill",
-            ctx.skill.name if relative_skill else str(ctx.skill),
+            # Why: the skill need not sit next to the venv
+            os.path.relpath(ctx.skill, ctx.python_dir.parent)
+            if relative_skill
+            else str(ctx.skill),
             "--out",
             str(out),
             "--version",
@@ -239,6 +243,32 @@ def check_existing_out(ctx: Context) -> List[str]:
         return [
             f"second run into the same --out exited {done.returncode} with output "
             f"{done.stdout.strip()!r}, want 2 and none"
+        ]
+    return []
+
+
+def check_missing_odctl(ctx: Context) -> List[str]:
+    """facts.py exits 2 and removes its part-written --out when bin/odctl is missing."""
+    no_odctl = ctx.scratch / "venv-without-odctl"
+    no_odctl.mkdir(exist_ok=True)
+    out = ctx.scratch / "review-missing-odctl"
+    root = fake_run(ctx, "run-missing-odctl", "pg-tz")
+    done = subprocess.run(
+        [
+            PYTHON,
+            str(EVALS / "facts.py"),
+            str(root),
+            *("--task", "pg-tz", "--python-dir", str(no_odctl)),
+            *("--skill", str(ctx.skill), "--out", str(out)),
+            *("--version", "a", "--model", "haiku", "--run", "1"),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode != 2 or out.exists():
+        return [
+            f"exited {done.returncode} with --out left {out.exists()}, want 2 and "
+            f"removed: {done.stderr.strip()[-200:]}"
         ]
     return []
 
@@ -404,6 +434,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             ),
             ("facts takes a relative --skill", lambda: check_relative_skill(ctx)),
             ("facts refuses an existing --out", lambda: check_existing_out(ctx)),
+            ("facts cleans up when odctl is missing", lambda: check_missing_odctl(ctx)),
             (
                 "check_hidden catches a suite and a version",
                 lambda: check_hidden_catches(ctx),

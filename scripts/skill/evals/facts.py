@@ -260,7 +260,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
     try:
         write_review(args)
-    except Failed as error:
+    except (Failed, OSError) as error:
+        # Why: a missing bin/odctl or an unreadable file raises OSError, not Failed
         print(f"facts.py: {error}", file=sys.stderr)
         # Why: a part-written folder would read as the run's facts
         shutil.rmtree(args.out, ignore_errors=True)
