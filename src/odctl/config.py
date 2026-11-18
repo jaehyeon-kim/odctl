@@ -119,6 +119,13 @@ class _ComposeLoader(yaml.SafeLoader):
             resolved = super().resolve(kind, value, implicit)
             if resolved in _GO_TAGS:
                 return "tag:yaml.org,2002:str"
+            if resolved == _TIMESTAMP:
+                # Why: go-yaml keeps a plain value as text when time.Parse rejects
+                # it, such as 2026-02-30
+                try:
+                    self.construct_yaml_timestamp(yaml.ScalarNode(resolved, value))
+                except (AttributeError, ValueError):
+                    return "tag:yaml.org,2002:str"
             return resolved
         return super().resolve(kind, value, implicit)
 
@@ -126,6 +133,7 @@ class _ComposeLoader(yaml.SafeLoader):
 _BOOL = "tag:yaml.org,2002:bool"
 _INT = "tag:yaml.org,2002:int"
 _FLOAT = "tag:yaml.org,2002:float"
+_TIMESTAMP = "tag:yaml.org,2002:timestamp"
 _GO_TAGS = {_BOOL, _INT, _FLOAT}
 _GO_WORDS: Dict[str, Any] = {
     **dict.fromkeys(["true", "True", "TRUE"], True),
@@ -232,7 +240,7 @@ def _construct_timestamp(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
         ) from e
 
 
-_ComposeLoader.add_constructor("tag:yaml.org,2002:timestamp", _construct_timestamp)
+_ComposeLoader.add_constructor(_TIMESTAMP, _construct_timestamp)
 
 
 _RESET = object()

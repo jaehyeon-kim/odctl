@@ -187,3 +187,12 @@ def test_read_yaml_refuses_a_tagged_value_go_yaml_refuses(tmp_path, text):
     path.write_text(text)
     with pytest.raises(UnreadableFileError):
         read_yaml(path, "compose.yml")
+
+
+def test_read_yaml_keeps_a_plain_invalid_date_as_text(tmp_path):
+    """go-yaml keeps a plain value as text when Go's time.Parse rejects it."""
+    path = tmp_path / "compose.yml"
+    path.write_text("a: 2026-02-30\nb: 2026-01-02T25:00:00\nc: 2026-01-02\n")
+    data = read_yaml(path, "compose.yml")
+    assert data["a"] == "2026-02-30" and data["b"] == "2026-01-02T25:00:00"
+    assert str(data["c"]) == "2026-01-02" and not isinstance(data["c"], str)
