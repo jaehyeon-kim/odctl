@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Why: each batch of a release goes to the release branch in its own pull request, so
+# that one review stays under the per-review file limit; CodeRabbit reviews only the
+# default branch unless a base branch is listed here.
+reviews:
+  auto_review:
+    base_branches:
+      - "release-.*"
