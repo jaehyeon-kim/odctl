@@ -8,8 +8,9 @@ It builds kept runs by hand in a temporary folder, in the layout `claude plugin 
 --keep-temp` leaves (`ROOT/sealed/home/cwd` and `ROOT/out/trace.jsonl`), and checks:
 
 - `facts.py` on a run of every case writes each file the prompt asks for, the transcript, the
-  task files and the skill, lists no missing file, and gives the explain, compose and dry-run
-  facts of every profile in the case's `task.yaml`; and `check_hidden.py` passes on the result.
+  task files and the skill, lists no missing file, and gives the explain, compose, dry-run
+  and teardown dry-run facts of every profile in the case's `task.yaml`; and
+  `check_hidden.py` passes on the result.
 - A file the run did not write is listed in `missing`, and `facts.py` works with a relative
   `--python-dir`, and with a relative `--skill` without replacing every period.
 - `facts.py` exits 2 with no line when the transcript, the workspace or the case's
@@ -165,6 +166,8 @@ def check_case(ctx: Context, case: str) -> List[str]:
         wrong.append("a service with a health check has no healthcheck_test")
     if profiles and not facts["odctl"].get("dry_run"):
         wrong.append("dry_run is empty")
+    if profiles and not facts["odctl"].get("down_dry_run"):
+        wrong.append("down_dry_run is empty")
     hidden = subprocess.run(
         [PYTHON, str(EVALS / "check_hidden.py"), str(out)],
         capture_output=True,
@@ -363,13 +366,13 @@ def check_counts(ctx: Context) -> List[str]:
     reviewed = {"task": "pg-tz", "kind": "REVIEWED", "count": 0}
     cases = [
         # (the kind's line, whether the kind is found, the problems wanted)
-        ({"task": "pg-tz", "kind": "A8", "count": 1}, True, 0),
-        ({"task": "pg-tz", "kind": "A8", "count": 0}, False, 1),
-        ({"task": "pg-tz", "kind": "A8", "count": -1}, False, 1),
-        ({"task": "pg-tz", "kind": "A8", "count": True}, True, 1),
-        ({"task": "pg-tz", "kind": "A8", "count": "1"}, True, 1),
-        ({"task": "pg-tz", "kind": "A8", "count": 1.0}, True, 1),
-        (["A8", 1], False, 1),
+        ({"task": "pg-tz", "kind": "A7", "count": 1}, True, 0),
+        ({"task": "pg-tz", "kind": "A7", "count": 0}, False, 1),
+        ({"task": "pg-tz", "kind": "A7", "count": -1}, False, 1),
+        ({"task": "pg-tz", "kind": "A7", "count": True}, True, 1),
+        ({"task": "pg-tz", "kind": "A7", "count": "1"}, True, 1),
+        ({"task": "pg-tz", "kind": "A7", "count": 1.0}, True, 1),
+        (["A7", 1], False, 1),
     ]
     wrong = []
     for number, (row, found, wanted) in enumerate(cases):
@@ -383,7 +386,7 @@ def check_counts(ctx: Context) -> List[str]:
         if bool(kinds) != found or len(problems) != wanted:
             wrong.append(
                 f"{row!r}: found {sorted(kinds)} with problems {problems}, want "
-                f"{'A8' if found else 'no kind'} and {wanted} problem"
+                f"{'A7' if found else 'no kind'} and {wanted} problem"
             )
     return wrong
 
@@ -424,8 +427,8 @@ def check_summarise(ctx: Context) -> List[str]:
 
     grades = [line("pg-tz", "FACTS"), line("spark-kafka", "FACTS")]
     reviews = [
-        line("pg-tz", "A8", 1),
-        line("pg-tz", "A8", 1),
+        line("pg-tz", "A7", 1),
+        line("pg-tz", "A7", 1),
         line("pg-tz", "REVIEWED"),
         line("spark-kafka", "REVIEWED"),
     ]
@@ -454,8 +457,8 @@ def check_summarise(ctx: Context) -> List[str]:
 
     wrong = []
     done = run(grades, reviews)
-    # Why: A8 is in one of two tasks, once, though the reviewer wrote it twice
-    if done.returncode != 0 or "| A8 | 0.50 | 0.00 |" not in done.stdout:
+    # Why: A7 is in one of two tasks, once, though the reviewer wrote it twice
+    if done.returncode != 0 or "| A7 | 0.50 | 0.00 |" not in done.stdout:
         wrong.append(
             f"complete lines: exit {done.returncode}, output {done.stdout[:200]!r}"
         )

@@ -22,8 +22,9 @@ yet, so that no file of another run stays beside this run's files:
 - `facts.json`: the files the prompt asks for that the run did not write (`missing`); and for
   the profiles of `tasks/CASE/task.yaml`, what odctl itself says about them, run from the
   suite's Python with no Docker: `odctl list --json` (`list`), `odctl explain <profile>
-  --json` (`explain`), `odctl up <profiles> --dry-run` (`dry_run`), and from each of their
-  compose files every service's container name, network aliases, ports, `expose`, whether
+  --json` (`explain`), `odctl up <profiles> --dry-run` (`dry_run`), `odctl down <profiles>
+  --volumes --dry-run` (`down_dry_run`), and from each of their compose files every
+  service's container name, network aliases, ports, `expose`, whether
   it has a health check and its test (`healthcheck`, `healthcheck_test`, null when it has
   none) (`compose`), which the JSON leaves out.
 - `skill/`: the skill copy's `SKILL.md` and `references/*.md`.
@@ -195,6 +196,9 @@ def odctl_facts(python_dir: Path, profiles: List[str]) -> dict:
     }
     if profiles:
         facts["dry_run"] = odctl(python_dir, ["up", *profiles, "--dry-run"])
+        facts["down_dry_run"] = odctl(
+            python_dir, ["down", *profiles, "--volumes", "--dry-run"]
+        )
     return facts
 
 

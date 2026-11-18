@@ -1,6 +1,6 @@
 # Rubric of the blind reviewer
 
-An Opus reviewer reads the folder of one run and lists each mistake of the kinds below with its file and line. The kinds are those of the plan's Kinds table that a run with no containers can show: every kind except A5, output that only an image shows. `facts.py` measures nothing; it writes the facts below, and the reviewer judges every kind from them, the run's files and its full transcript. The reviewer is not told which version of the skill, which model or which run number made the run. It reads, runs nothing, and changes no file.
+An Opus reviewer reads the folder of one run and lists each mistake of the kinds below with its file and line. The kinds are the six of the plan's Kinds table that are about odctl's container lifecycle and the dependencies between containers: A1, A2, A3, A4, A7 and A9. A mistake of any other kind, such as how a service behaves or a number with no reason, is not listed. `facts.py` measures nothing; it writes the facts below, and the reviewer judges every kind from them, the run's files and its full transcript. The reviewer is not told which version of the skill, which model or which run number made the run. It reads, runs nothing, and changes no file.
 
 ## What the reviewer gets
 
@@ -10,7 +10,7 @@ One folder, which `facts.py` writes from the run that `claude plugin eval --keep
 - `trace.jsonl`: the run's full transcript, one JSON object per line as `claude -p --output-format stream-json` writes it. A line of `"type": "assistant"` holds the agent's text and its tool calls (`"type": "tool_use"`, with `name`, `input` and `id`); a line of `"type": "user"` holds the result of each call (`"type": "tool_result"`, with the call's id as `tool_use_id`), that is, what the command printed or the file the agent read. The reviewer reads it in full. Docker was not available in the run, so a command that needs it failed there; that failure is not a mistake.
 - `task/prompt.md`: the request as the agent got it, after a settings block.
 - `task/answer.md`: the case's answer sheet, written from odctl's sources before any run: the records the case comes from, its kinds, the right answer with its sources, and wrong answers seen or expected. It guides the judgement; a run that meets the request another way that works is not a mistake.
-- `facts.json`: `missing`, the files the prompt asks for that the run did not write; and under `odctl`, what odctl itself says about the profiles the right answer starts: `list` (`odctl list --json`), `explain` (`odctl explain <profile> --json`, with each service's container name, host ports, usage text and role), `dry_run` (the start order of `odctl up <profiles> --dry-run`), and `compose`, each service of their compose files with its container name, network aliases, ports (host side first), `expose`, whether it has a health check and its test (`healthcheck`, `healthcheck_test`, null when it has none).
+- `facts.json`: `missing`, the files the prompt asks for that the run did not write; and under `odctl`, what odctl itself says about the profiles the right answer starts: `list` (`odctl list --json`), `explain` (`odctl explain <profile> --json`, with each service's container name, host ports, usage text and role), `dry_run` (the start order of `odctl up <profiles> --dry-run`), `down_dry_run` (the teardown plan of `odctl down <profiles> --volumes --dry-run`, with the volumes it removes), and `compose`, each service of their compose files with its container name, network aliases, ports (host side first), `expose`, whether it has a health check and its test (`healthcheck`, `healthcheck_test`, null when it has none).
 - `skill/`: the `SKILL.md` and `references/` pages of the skill copy the run had, so that a claim about odctl can be checked against what the agent could read. A run without the skill has no `skill/` folder.
 
 ## Output
@@ -69,14 +69,6 @@ A command, option or behaviour of odctl that does not exist or is not as used: a
 - Not A4: a probe the request itself asks for, such as a bounded `pg_isready` after `odctl recreate postgres`.
 - Not A4: a probe of another port or endpoint than the `healthcheck_test`, such as SeaweedFS's S3 port 8333 when its test reads the filer on 8888. `up` does not wait for that.
 
-## A6: service behaviour stated without a run or its source
-
-A statement in a file or `reply.md` about how a service behaves (what an API needs, what a setting does, why something failed), or code that depends on it, where no tool result in `trace.jsonl`, no page of `skill/` and no fact in `facts.json` shows it, and `answer.md` shows it is wrong or does not show it.
-
-- Wrong: "ClickHouse's async inserts make the read racy, so the test sleeps 2 seconds", when the run never read the stack's ClickHouse settings.
-- Wrong: "Langfuse's read needs a time range".
-- Not a mistake: a behaviour the run showed, or one the skill states.
-
 ## A7: what a command keeps or removes
 
 A teardown, recreate or reset that removes more than the task started, or keeps less than the request needs, or a statement about what it keeps that is wrong.
@@ -88,14 +80,6 @@ A teardown, recreate or reset that removes more than the task started, or keeps 
 - Right: `odctl down kafka-lite --volumes --dry-run`, then `odctl down kafka-lite --volumes`.
 - Not a mistake: a true description of what a wider command stops, such as "`odctl down --all` stops everything", given beside the scoped command. It is A7 when the run uses it, or gives it as the teardown to run.
 
-## A8: a stack setting, image content or workspace file assumed
-
-Code or a statement that relies on a setting, a file in an image or a workspace file without reading it, where `answer.md`, `facts.json` or the stack shows otherwise.
-
-- Wrong: `odctl recreate postgres` after an edit of `TZ`, stated to change PostgreSQL's zone, when PostgreSQL reads `TZ` only when it creates its data folder.
-- Wrong: `--packages org.apache.spark:spark-sql-kafka...` because the Spark image is assumed not to hold the connector.
-- Wrong: an edit of the packaged compose file in place of `.odctl/.env` or the workspace copy.
-
 ## A9: state from an earlier run breaks the next
 
 A setup or test that fails, or passes on old values, when it runs a second time on the same stack.
@@ -103,27 +87,3 @@ A setup or test that fails, or passes on old values, when it runs a second time 
 - Wrong: `CREATE TABLE t` with no `IF NOT EXISTS` and no drop first; rows appended again on every run.
 - Wrong: `feast teardown` as the cleanup, or a DAG left unpaused in the bucket.
 - Right: each step is safe to run twice, and what the script registered is removed or reused.
-
-## A10: a check that cannot fail
-
-A check whose test passes whatever the thing it checks is, or that hides a failure.
-
-- Wrong: `grep -q 'retention.ms=86400000'`, which also matches `delete.retention.ms=86400000`.
-- Wrong: `|| true` after a step that must succeed, or a pipe without `pipefail` whose first command fails.
-- Wrong: a check against a document or a file the script wrote, not the running service.
-- Not A10: a check that passes on a second run only because the first run left its result behind, such as a wait for a DAG that an earlier run registered. That is A9.
-
-## A11: host environment assumed
-
-A file that needs a host tool, a Python version or a time zone it does not name or pin.
-
-- Wrong: `uv venv .venv` with no `--python`, for Feast, which needs Python 3.11 or newer.
-- Wrong: a script that needs `uv`, `jq` or `curl` on the host and neither checks for it nor says so in `reply.md`.
-- Wrong: a time filter written in the host's local time against containers in UTC.
-
-## A12: a number given with no reason
-
-A retry count, a wait limit, a timeout or a delay the agent chose, written with no comment or sentence that says why.
-
-- Wrong: `retry 30 5 ...` with no reason. Right: the same line with a comment that says where the limit comes from, such as the start time the agent measured or one the skill gives.
-- Not a mistake: a number the prompt gives, a port, a resource size such as Spark's `--driver-memory`, or a number that is clear from the line beside it. A12 counts only retry counts, wait limits, timeouts and delays.
