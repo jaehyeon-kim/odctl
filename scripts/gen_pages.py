@@ -23,8 +23,9 @@ from pydantic import TypeAdapter
 
 from odctl.config import INTERNAL_RESOURCES_DIR
 from odctl.models import Info, ProfileDetails, ProfileInfo, PsReport
-from odctl.planner import resolve_dependencies
-from odctl.registry import Registry, StackConfig
+from odctl.planner import get_profile_map, resolve_dependencies
+from odctl.registry import Registry, StackConfig, load_registry
+from odctl.workspace import ENV_FILE
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -32,28 +33,6 @@ REPO = Path(__file__).resolve().parent.parent
 # CLI version once `odctl init` has run.
 _TAG_PATTERN = re.compile(r"\$\{TAG(?::?-[^}]*)?\}")
 CLI_VERSION_TEXT = "<CLI version>"
-
-
-def load_registry(resources: Path) -> Registry:
-    """
-    Read registry.yml from a resources directory into odctl's own model.
-
-    Args:
-        resources (Path): The folder that holds registry.yml.
-
-    Returns:
-        Registry: The parsed registry.
-    """
-    return Registry(**yaml.safe_load((resources / "registry.yml").read_text()))
-
-
-def _profile_map(registry: Registry) -> Dict[str, dict]:
-    """Build the profile lookup in the shape odctl's planner expects."""
-    return {
-        profile: {"stack_id": stack_id, "file": stack.file}
-        for stack_id, stack in registry.stacks.items()
-        for profile in stack.profiles
-    }
 
 
 def _image(raw: str) -> str:
@@ -270,8 +249,8 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
     Returns:
         Dict[str, str]: Page content keyed by its path under the docs directory.
     """
-    registry = load_registry(resources)
-    profile_map = _profile_map(registry)
+    registry = load_registry(resources / "registry.yml")
+    profile_map = get_profile_map(registry)
     pages: Dict[str, str] = {}
 
     index = [
@@ -507,10 +486,9 @@ def env_keys() -> List[str]:
     List the keys `odctl init` writes to `.odctl/.env`, in the order it writes them.
 
     Returns:
-        List[str]: The key names, read from `workspace.py`.
+        List[str]: The key names, from `workspace.ENV_FILE`.
     """
-    source = (REPO / "src" / "odctl" / "workspace.py").read_text()
-    return re.findall(r"""f\.write\(f?["']([A-Z_]+)=""", source)
+    return [key for group in ENV_FILE for _, key, _ in group]
 
 
 def _command_tables() -> List[str]:
@@ -562,8 +540,8 @@ def skill(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
     Returns:
         str: The skill's Markdown.
     """
-    registry = load_registry(resources)
-    profile_map = _profile_map(registry)
+    registry = load_registry(resources / "registry.yml")
+    profile_map = get_profile_map(registry)
     lines = [
         "---",
         "name: odctl",

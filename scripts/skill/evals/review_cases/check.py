@@ -16,11 +16,12 @@ unpacked to `trace.jsonl`, `counts.json` left out, and `skill/` copied from the 
 `DIR` (`SKILL.md` and `references/*.md`).
 
 `--reviews` takes two folders, one per reviewer, each with `<case>.jsonl`, the reviewer's
-reply for the case. For each case it checks that the reply has one `REVIEWED` line; for a case
-with known counts, that each reviewer finds a kind in the case's `counts` exactly when its
-right count is not 0 (a kind counts once per run, and only on a line whose `count` is
-above 0, as in `summarise.py`); and for a case without them, that the two reviewers find
-the same kinds. It prints each difference and exits 1 when there is one.
+reply for the case. For each case it checks that the reply has one `REVIEWED` line and that
+each line of a kind has `count` 1, as the rubric's Output section sets out; for a case with
+known counts, that each reviewer finds a kind in the case's `counts` exactly when its right
+count is not 0 (a kind counts once per run, and only on a line whose `count` is above 0, as
+in `summarise.py`); and for a case without them, that the two reviewers find the same kinds.
+It prints each difference and exits 1 when there is one.
 """
 
 import argparse
@@ -29,7 +30,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 HERE = Path(__file__).resolve().parent
 REVIEW_KINDS = ["A1", "A2", "A3", "A4", "A6", "A7", "A8", "A9", "A10", "A11", "A12"]
@@ -76,12 +77,18 @@ def _found(path: Path) -> tuple:
         except json.JSONDecodeError:
             problems.append(f"line {number} is not JSON")
             continue
+        if not isinstance(row, dict):
+            problems.append(f"line {number} is not a JSON object")
+            continue
         if row.get("kind") == "REVIEWED":
             reviewed += 1
         elif row.get("kind") in REVIEW_KINDS:
+            # Why: a JSON value has no static type, and int() checks it below
+            raw: Any = row.get("count")
             try:
-                count = int(row.get("count"))
-            except (TypeError, ValueError):
+                count = int(raw)
+            # Why: json.loads reads Infinity, and int() of it raises OverflowError
+            except (TypeError, ValueError, OverflowError):
                 problems.append(
                     f"line {number}: count {row.get('count')!r} is not a number"
                 )
@@ -89,6 +96,11 @@ def _found(path: Path) -> tuple:
             # Why: summarise.py scores a kind only for a count above 0
             if count > 0:
                 kinds.add(row["kind"])
+            # Why: the rubric says 1; a bool or a text passes int() but breaks that rule
+            if type(row["count"]) is not int or row["count"] != 1:
+                problems.append(
+                    f"line {number}: count {row['count']!r}, the rubric says 1"
+                )
         else:
             problems.append(f"line {number}: {row.get('kind')} is not a reviewer kind")
     if reviewed != 1:

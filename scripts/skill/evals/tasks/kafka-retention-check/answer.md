@@ -20,4 +20,4 @@ Kinds: A10 (a check that cannot fail), A3 (address from the wrong side).
 - An unanchored `grep retention.ms=86400000`.
 - `--describe` without `--all` on a topic with no override, which prints no `retention.ms`.
 - `kafka-configs` without the path and `.sh`.
-- `localhost:9092` in a container other than `kafka`. Inside the `kafka` container of `kafka-lite` it works while `DOCKER_HOST_IP` is unset, the default, because the broker listens on `0.0.0.0:9092` and advertises `127.0.0.1:9092` (`compose-kafka.yml:48-49`). With `DOCKER_HOST_IP` set, the broker advertises that address instead, which the container may not reach, so `broker-1:19092` is the address the skill gives.
+- `localhost:9092` in a container other than `kafka`. Inside the `kafka` container of `kafka-lite` it works, and is not A3, while `DOCKER_HOST_IP` is unset, the default, because the broker listens on `0.0.0.0:9092` and advertises `127.0.0.1:9092` (`compose-kafka.yml:48-49`). With `DOCKER_HOST_IP` set, the broker advertises that address instead, which the container may not reach, so `broker-1:19092` is the address the skill gives.

@@ -15,6 +15,7 @@ Kinds: A3 (address from the wrong side), A1 (a step needs an earlier step), A8 (
 - From a container the bootstrap address is `broker-1:19092`: the `kafka` container has the network aliases `broker-1`, `broker-2` and `broker-3` (`compose-kafka.yml:38-44`), and its internal listener advertises `broker-1:19092` (`compose-kafka.yml:49`, `registry.yml:81`).
 - The job runs in the container `spark-master`: `docker cp read_orders.py spark-master:/tmp/`, then `docker exec spark-master /opt/spark/bin/spark-submit /tmp/read_orders.py` (`commands.sh` section `kafka-read`; `smoke.sh` `smoke_spark`, lines 434 to 442).
 - No `--packages` option: the Kafka connector is in the shared jar volume (`docs/guides/spark.md:55`).
+- The job prints every message: `show()` prints 20 rows unless given a count, so the job passes a count (`show(rows.count(), truncate=False)`) or prints each row another way, such as `collect()` or `toLocalIterator()`. No kind counts a job that prints only 20 rows.
 
 ## Wrong answers seen or expected
 

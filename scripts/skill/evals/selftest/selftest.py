@@ -14,10 +14,16 @@ It builds kept runs by hand in a temporary folder, in the layout `claude plugin 
   `--python-dir`, and with a relative `--skill` without replacing every period.
 - `facts.py` exits 2 with no line when the transcript, the workspace or the case's
   `task.yaml` cannot be read, because a fact that reads nothing must fail, not count nothing;
-  and when `--out` already exists, so that no file of another run stays in it.
+  and when `--out` already exists, so that no file of another run stays in it, leaving the
+  first run's folder as it was.
+- `facts.py` removes what it wrote of `--out` when odctl is missing and when the case's
+  `prompt.md` is not UTF-8, which fail only after it wrote the transcript, and a second run
+  into the same `--out` then works.
 - `check_hidden.py` exits 1 when a file names a suite or an odctl version, and 2 when a
-  folder it is given is not a folder.
-- `review_cases/check.py` finds no kind on a line whose `count` is 0.
+  folder it is given is not a folder, holds no file, or holds a file or a folder that cannot
+  be read.
+- `review_cases/check.py` finds no kind on a line whose `count` is 0, and reports each line
+  whose `count` is not the number 1, or that is not a JSON object.
 - `summarise.py` exits 0 on complete lines, counts a kind once per run, and exits 1 for a
   missing `REVIEWED` line, a repeated `FACTS` line, a run not in the plan, a run twice in
   the plan and a kind the reviewer does not judge.
@@ -26,6 +32,7 @@ It prints `ok <check>` or `FAIL <check>: <reason>` for each, and exits 1 when on
 """
 
 import argparse
+import gzip
 import json
 import os
 import shutil
@@ -83,9 +90,10 @@ def run_facts(
     out: Path,
     relative: bool = False,
     relative_skill: bool = False,
+    skill: Optional[Path] = None,
 ) -> subprocess.CompletedProcess:
     """Runs facts.py on a kept run; `relative` passes --python-dir, and `relative_skill`
-    --skill, relative to the suite folder it then runs in."""
+    --skill, relative to the suite folder it then runs in; `skill` replaces the suite's."""
     return subprocess.run(
         [
             PYTHON,
@@ -99,7 +107,7 @@ def run_facts(
             # Why: the skill need not sit next to the venv
             os.path.relpath(ctx.skill, ctx.python_dir.parent)
             if relative_skill
-            else str(ctx.skill),
+            else str(skill or ctx.skill),
             "--out",
             str(out),
             "--version",
@@ -244,6 +252,10 @@ def check_existing_out(ctx: Context) -> List[str]:
             f"second run into the same --out exited {done.returncode} with output "
             f"{done.stdout.strip()!r}, want 2 and none"
         ]
+    # Why: the second run skipped run.sh, so a write into the folder would show here
+    missing = json.loads((out / "facts.json").read_text("utf-8"))["missing"]
+    if not (out / "files" / "run.sh.txt").is_file() or missing != []:
+        return [f"the first run's folder changed: missing is {missing}"]
     return []
 
 
@@ -265,42 +277,115 @@ def check_missing_odctl(ctx: Context) -> List[str]:
         capture_output=True,
         text=True,
     )
-    if done.returncode != 2 or out.exists():
+    if done.returncode != 2 or out.exists() or done.stdout.strip():
         return [
             f"exited {done.returncode} with --out left {out.exists()}, want 2 and "
             f"removed: {done.stderr.strip()[-200:]}"
+        ]
+    # Why: odctl runs only after the transcript and task/ are written, so a failure that
+    # names it shows that a part-written folder was removed
+    if "bin/odctl" not in done.stderr:
+        return [f"failed before odctl ran: {done.stderr.strip()[-200:]}"]
+    return []
+
+
+def check_bad_prompt(ctx: Context) -> List[str]:
+    """facts.py exits 2 and removes --out when a case's prompt.md is not UTF-8, and a second
+    run into the same --out then works."""
+    skill = ctx.scratch / "skill-bad-prompt"
+    shutil.copytree(ctx.skill, skill)
+    with (skill / "evals" / "pg-tz" / "prompt.md").open("ab") as f:
+        f.write(b"\xff\n")
+    root = fake_run(ctx, "run-bad-prompt", "pg-tz")
+    out = ctx.scratch / "review-bad-prompt"
+    done = run_facts(ctx, root, "pg-tz", out, skill=skill)
+    if done.returncode != 2 or out.exists() or done.stdout.strip():
+        return [
+            f"exited {done.returncode} with --out left {out.exists()} and output "
+            f"{done.stdout.strip()!r}, want 2, removed and none: "
+            f"{done.stderr.strip()[-200:]}"
+        ]
+    # Why: prompt.md is copied into --out before it is read strictly
+    if "UnicodeDecodeError" not in done.stderr:
+        return [f"failed before prompt.md was read: {done.stderr.strip()[-200:]}"]
+    again = run_facts(ctx, root, "pg-tz", out)
+    if again.returncode != 0:
+        return [
+            f"the second run exited {again.returncode}: {again.stderr.strip()[-200:]}"
         ]
     return []
 
 
 def check_hidden_needs_folders(ctx: Context) -> List[str]:
-    """check_hidden.py exits 2 for a name that is no folder and for a file."""
+    """check_hidden.py exits 2 for a name that is no folder, a file, a folder with no file,
+    a gzip file cut short and a folder it cannot list."""
     a_file = ctx.scratch / "not-a-folder.txt"
     a_file.write_text("text\n", "utf-8")
+    # Why: a folder that holds only a folder still holds no file
+    (ctx.scratch / "no-file" / "inner").mkdir(parents=True)
+    cut = ctx.scratch / "cut-gzip"
+    cut.mkdir()
+    (cut / "trace.jsonl.gz").write_bytes(gzip.compress(b"odctl 1.9.0\n")[:15])
+    closed = ctx.scratch / "closed"
+    (closed / "inner").mkdir(parents=True)
+    (closed / "a.txt").write_text("text\n", "utf-8")
+    (closed / "inner" / "b.txt").write_text("odctl 1.9.0\n", "utf-8")
+    (closed / "inner").chmod(0)
+    # Why: root reads a folder of mode 000, so there the case tests nothing
+    unreadable = [] if os.access(closed / "inner", os.R_OK) else [closed]
+    if not unreadable:
+        print("note: the unreadable folder case is skipped, as this user can read it")
     wrong = []
-    for path in [ctx.scratch / "no-such-folder", a_file]:
-        done = subprocess.run(
-            [PYTHON, str(EVALS / "check_hidden.py"), str(path)],
-            capture_output=True,
-            text=True,
-        )
-        if done.returncode != 2:
-            wrong.append(f"{path.name}: exited {done.returncode}, want 2")
+    try:
+        for path in [
+            ctx.scratch / "no-such-folder",
+            a_file,
+            ctx.scratch / "no-file",
+            cut,
+            *unreadable,
+        ]:
+            done = subprocess.run(
+                [PYTHON, str(EVALS / "check_hidden.py"), str(path)],
+                capture_output=True,
+                text=True,
+            )
+            if done.returncode != 2:
+                wrong.append(f"{path.name}: exited {done.returncode}, want 2")
+    finally:
+        # Why: the temporary folder is removed at the end, which needs the mode back
+        (closed / "inner").chmod(0o700)
     return wrong
 
 
-def check_zero_count(ctx: Context) -> List[str]:
-    """review_cases/check.py finds no kind on a line with count 0, as summarise.py scores it."""
-    reply = ctx.scratch / "zero-count.jsonl"
-    rows = [
-        {"task": "pg-tz", "kind": "A8", "count": 0},
-        {"task": "pg-tz", "kind": "REVIEWED", "count": 0},
+def check_counts(ctx: Context) -> List[str]:
+    """review_cases/check.py finds no kind on a line with count 0, as summarise.py scores it,
+    and reports each line whose count is not the number 1 or that is not a JSON object."""
+    reviewed = {"task": "pg-tz", "kind": "REVIEWED", "count": 0}
+    cases = [
+        # (the kind's line, whether the kind is found, the problems wanted)
+        ({"task": "pg-tz", "kind": "A8", "count": 1}, True, 0),
+        ({"task": "pg-tz", "kind": "A8", "count": 0}, False, 1),
+        ({"task": "pg-tz", "kind": "A8", "count": -1}, False, 1),
+        ({"task": "pg-tz", "kind": "A8", "count": True}, True, 1),
+        ({"task": "pg-tz", "kind": "A8", "count": "1"}, True, 1),
+        ({"task": "pg-tz", "kind": "A8", "count": 1.0}, True, 1),
+        (["A8", 1], False, 1),
     ]
-    reply.write_text("".join(json.dumps(row) + "\n" for row in rows), "utf-8")
-    kinds, problems = _found(reply)
-    if kinds or problems:
-        return [f"found {sorted(kinds)} with problems {problems}, want none"]
-    return []
+    wrong = []
+    for number, (row, found, wanted) in enumerate(cases):
+        reply = ctx.scratch / f"count-{number}.jsonl"
+        reply.write_text(json.dumps(row) + "\n" + json.dumps(reviewed) + "\n", "utf-8")
+        try:
+            kinds, problems = _found(reply)
+        except Exception as error:
+            wrong.append(f"{row!r}: raised {type(error).__name__}")
+            continue
+        if bool(kinds) != found or len(problems) != wanted:
+            wrong.append(
+                f"{row!r}: found {sorted(kinds)} with problems {problems}, want "
+                f"{'A8' if found else 'no kind'} and {wanted} problem"
+            )
+    return wrong
 
 
 def check_hidden_catches(ctx: Context) -> List[str]:
@@ -436,14 +521,18 @@ def main(argv: Optional[List[str]] = None) -> int:
             ("facts refuses an existing --out", lambda: check_existing_out(ctx)),
             ("facts cleans up when odctl is missing", lambda: check_missing_odctl(ctx)),
             (
+                "facts cleans up when prompt.md is not UTF-8",
+                lambda: check_bad_prompt(ctx),
+            ),
+            (
                 "check_hidden catches a suite and a version",
                 lambda: check_hidden_catches(ctx),
             ),
             (
-                "check_hidden refuses what is not a folder",
+                "check_hidden refuses a folder it cannot search",
                 lambda: check_hidden_needs_folders(ctx),
             ),
-            ("check.py skips a count of 0", lambda: check_zero_count(ctx)),
+            ("check.py checks each count", lambda: check_counts(ctx)),
             ("summarise", lambda: check_summarise(ctx)),
         ]
         for name, check in checks:

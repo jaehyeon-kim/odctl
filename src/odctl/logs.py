@@ -60,7 +60,7 @@ def _files_with_service(
     """
     selected: Dict[str, List[str]] = {}
     for file, profiles in execution_plan.items():
-        services = get_stack_details(file, profiles)[0]
+        services = get_stack_details(file, profiles).names
         if service in services:
             selected[file] = profiles
     if not selected:

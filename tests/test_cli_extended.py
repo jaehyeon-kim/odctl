@@ -4,11 +4,16 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
 from typer.testing import CliRunner
-from odctl.docker import get_stack_details
+from odctl.docker import ServiceDetails, StackDetails, get_stack_details
 from odctl.main import app
 from cli_workspace import fake_container, fake_containers, write_workspace
 
 runner = CliRunner()
+
+
+def _stack(names, volumes=()):
+    """A get_stack_details result with these service names and named volumes."""
+    return StackDetails([ServiceDetails(n, None, []) for n in names], list(volumes))
 
 
 def test_down_command(monkeypatch):
@@ -19,12 +24,10 @@ def test_down_command(monkeypatch):
     # Mock get_managed_containers to return a fake container so down --all proceeds
     mock_container = MagicMock()
     mock_container.config.labels = {"com.docker.compose.service": "kafka"}
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda x: [mock_container])
     monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda x: [mock_container]
-    )
-    monkeypatch.setattr(
-        "odctl.docker.get_stack_details",
-        lambda x, y: (["kafka"], [], [], []),
+        "odctl.main.get_stack_details",
+        lambda x, y: _stack(["kafka"]),
     )
 
     result = runner.invoke(app, ["down", "--all"])
@@ -433,8 +436,6 @@ def test_down_named_profile_with_volumes_also_removes_shared_deps(monkeypatch):
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     # Nothing else is left running, so deps is safe to remove.
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
-    # The question of a teardown that names every profile reads them here.
-    monkeypatch.setattr("odctl.docker.get_managed_containers", lambda plan: [])
 
     result = runner.invoke(app, ["down", "kafka-lite", "-v"])
 
@@ -456,10 +457,6 @@ def test_down_named_profile_keeps_shared_deps_while_others_run(monkeypatch):
     other_profile = fake_container("spark-master", "spark-master", "running", None, {})
     monkeypatch.setattr(
         "odctl.main.get_managed_containers", lambda plan: [other_profile]
-    )
-    # The question of a teardown that names every profile reads them here.
-    monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda plan: [other_profile]
     )
 
     result = runner.invoke(app, ["down", "kafka-lite", "-v"])
@@ -492,11 +489,11 @@ def test_down_all_with_volumes_removes_deps_exactly_once(monkeypatch):
     mock_container = MagicMock()
     mock_container.config.labels = {"com.docker.compose.service": "init-deps"}
     monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda plan: [mock_container]
+        "odctl.main.get_managed_containers", lambda plan: [mock_container]
     )
     monkeypatch.setattr(
-        "odctl.docker.get_stack_details",
-        lambda f, p: (["init-deps"], [], [], ["odctl-shared-deps"]),
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack(["init-deps"], ["odctl-shared-deps"]),
     )
 
     result = runner.invoke(app, ["down", "--all", "-v"])
@@ -514,7 +511,7 @@ def _every_service_has_a_container(monkeypatch):
     from odctl.planner import build_execution_plan
 
     def services(plan):
-        return {s for f, p in plan.items() for s in get_stack_details(f, p)[0]}
+        return {s for f, p in plan.items() for s in get_stack_details(f, p).names}
 
     every = services(build_execution_plan(None, True, resolve_deps=False))
     containers = [fake_container(s, s, "running", None, {}) for s in sorted(every)]
@@ -525,7 +522,6 @@ def _every_service_has_a_container(monkeypatch):
 
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     monkeypatch.setattr("odctl.main.get_managed_containers", managed)
-    monkeypatch.setattr("odctl.docker.get_managed_containers", managed)
     stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", stop)
     return stop
@@ -591,7 +587,6 @@ def test_naming_deps_keeps_the_shared_volume_while_others_run(monkeypatch):
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
     other = fake_container("spark-master", "spark-master", "running", None, {})
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [other])
-    monkeypatch.setattr("odctl.docker.get_managed_containers", lambda plan: [other])
 
     result = runner.invoke(app, ["down", "deps", "-v"], env={"COLUMNS": "200"})
 
@@ -601,7 +596,6 @@ def test_naming_deps_keeps_the_shared_volume_while_others_run(monkeypatch):
 
     stop.reset_mock()
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
-    monkeypatch.setattr("odctl.docker.get_managed_containers", lambda plan: [])
     assert runner.invoke(app, ["down", "deps", "-v"]).exit_code == 0
     stop.assert_called_once_with("compose-deps.yml", ["deps"], remove_volumes=True)
 
@@ -613,11 +607,9 @@ def _down_all_mocks(monkeypatch):
     mock_container = MagicMock()
     mock_container.config.labels = {"com.docker.compose.service": "kafka"}
     monkeypatch.setattr(
-        "odctl.docker.get_managed_containers", lambda plan: [mock_container]
+        "odctl.main.get_managed_containers", lambda plan: [mock_container]
     )
-    monkeypatch.setattr(
-        "odctl.docker.get_stack_details", lambda f, p: (["kafka"], [], [], [])
-    )
+    monkeypatch.setattr("odctl.main.get_stack_details", lambda f, p: _stack(["kafka"]))
     return mock_stop
 
 
@@ -748,11 +740,12 @@ SPARK_VOLUMES = ["Remove Volume: spark-events-data", "Remove Volume: odctl-share
             [
                 "Remove Volume: odctl-shared-deps",
                 "Remove Volume: 1 unnamed volume(s) of kafka",
+                "Remove Volume: 1 unnamed volume(s) of init-deps",
             ],
-            ["of init-deps"],
+            [],
             ["compose-deps.yml", "Remove Volume: odctl-shared-deps"],
             set(),
-            id="all removes the shared volume and never lists unnamed volumes for deps",
+            id="all removes the shared volume and the unnamed volumes of deps",
         ),
         pytest.param(
             ["--all"],
@@ -803,7 +796,7 @@ def test_down_dry_run_names_the_volumes(
 
     def containers_of(plan):
         services = {
-            s for f, profs in plan.items() for s in get_stack_details(f, profs)[0]
+            s for f, profs in plan.items() for s in get_stack_details(f, profs).names
         }
         return [
             c
@@ -812,7 +805,9 @@ def test_down_dry_run_names_the_volumes(
         ]
 
     monkeypatch.setattr("odctl.main.get_managed_containers", containers_of)
-    monkeypatch.setattr("odctl.docker.get_managed_containers", containers_of)
+    # Why: the fake containers carry the project `odctl`, and the packaged files
+    # each name their own
+    monkeypatch.setattr("odctl.main.get_project_name", lambda file: "odctl")
     monkeypatch.setattr(
         "odctl.main.get_volume_names",
         lambda: {"spark-events-data", "odctl-shared-deps"} - missing,
@@ -978,7 +973,7 @@ def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
     plan = {"compose-spark.yml": ["spark-lite"]}
     monkeypatch.setattr(main, "is_docker_running", lambda: True)
     monkeypatch.setattr(
-        main, "get_stack_details", lambda f, p: (["spark"], [], [], ["events"])
+        main, "get_stack_details", lambda f, p: _stack(["spark"], ["events"])
     )
     monkeypatch.setattr(
         main, "get_declared_volumes", lambda f: {"events": "custom-event-data"}
@@ -988,26 +983,56 @@ def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
     container = SimpleNamespace(name="spark", mounts=[mount])
     monkeypatch.setattr(main, "get_managed_containers", lambda p: [container])
 
-    assert main._dry_run_volumes(plan, all=True) == {
+    assert main._dry_run_volumes(plan, reachable=True) == {
         "compose-spark.yml": ["custom-event-data"]
     }
 
 
 @pytest.mark.parametrize(
-    "names, volumes, idle, expected",
+    "names, volumes, idle, shared, expected",
     [
-        (["deps-extra"], ["-v"], False, (["deps-extra"], False)),
-        (["deps", "deps-extra"], [], False, (["deps", "deps-extra"], False)),
-        (["deps-extra"], ["-v"], True, (["deps", "deps-extra"], True)),
+        (["deps-extra"], ["-v"], False, False, [(["deps-extra"], True)]),
+        (["deps-extra"], ["-v"], False, True, [(["deps-extra"], False)]),
+        (["deps", "deps-extra"], [], False, False, [(["deps", "deps-extra"], False)]),
+        (
+            ["deps", "deps-extra"],
+            ["-v"],
+            False,
+            False,
+            [(["deps-extra"], True), (["deps"], False)],
+        ),
+        (["deps-extra"], ["-v"], True, False, [(["deps", "deps-extra"], True)]),
+        (
+            ["deps", "deps-extra"],
+            ["-v"],
+            False,
+            "depends",
+            [(["deps", "deps-extra"], False)],
+        ),
     ],
-    ids=["extra, others run", "deps and extra", "extra, nothing else runs"],
+    ids=[
+        "extra, others run",
+        "extra mounts deps' volume, others run",
+        "deps and extra",
+        "deps and extra with volumes, others run",
+        "extra, nothing else runs",
+        "extra depends on deps, others run",
+    ],
 )
 def test_down_stops_every_named_profile_of_the_deps_file(
-    monkeypatch, names, volumes, idle, expected
+    monkeypatch, names, volumes, idle, shared, expected
 ):
     """A workspace can add a profile such as deps-extra to compose-deps.yml, and the
-    teardown dropped it with deps. It follows deps' rule for volumes, because
-    `down --volumes` on that file removes every volume the file declares."""
+    teardown dropped it with deps. `down --volumes` removes only the volumes of the
+    profiles it is given (Compose v5), so deps-extra's own volumes go with `-v`; it
+    follows deps' rule for the shared jar volume only when it mounts one of deps'."""
+    # Why: "depends" is a deps-extra whose service depends on init-deps, so
+    # Compose refuses a call that names deps-extra without deps
+    extra = ["shared-deps"] if shared is True else ["extra-data"]
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], ["shared-deps"] if p == ["deps"] else extra),
+    )
     mock_stop = MagicMock()
     monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
     monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
@@ -1016,8 +1041,16 @@ def test_down_stops_every_named_profile_of_the_deps_file(
         "odctl.main.build_execution_plan",
         lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
     )
-    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
-    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: idle)
+    monkeypatch.setattr(
+        "odctl.main.expand_plan_dependencies",
+        lambda plan: {
+            f: (["deps", *p] if shared == "depends" and "deps" not in p else p)
+            for f, p in plan.items()
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: idle
+    )
 
     result = runner.invoke(app, ["down", *names, *volumes])
 
@@ -1025,7 +1058,7 @@ def test_down_stops_every_named_profile_of_the_deps_file(
     assert [
         (c.args[0], c.args[1], c.kwargs["remove_volumes"])
         for c in mock_stop.call_args_list
-    ] == [("compose-deps.yml", expected[0], expected[1])]
+    ] == [("compose-deps.yml", profiles, remove) for profiles, remove in expected]
 
 
 def test_down_dry_run_lists_the_other_profiles_of_the_deps_file(monkeypatch):
@@ -1045,3 +1078,403 @@ def test_down_dry_run_lists_the_other_profiles_of_the_deps_file(monkeypatch):
     lines = [line.strip() for line in result.stdout.splitlines()]
     assert "└─ 💥 Stop Profile: deps" in lines, lines
     assert "└─ 💥 Stop Profile: deps-extra" in lines, lines
+
+
+@pytest.mark.parametrize("idle", [True, False])
+def test_down_dry_run_lists_the_volumes_of_the_deps_files_other_profiles(
+    monkeypatch, idle
+):
+    """`down deps-extra -v` removes deps-extra's own volume, so the dry run lists it;
+    the shared jar volume is listed only on an idle stack, when the real run removes
+    it too."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: idle
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {
+            "shared-deps": "odctl-shared-deps",
+            "extra-data": "odctl_extra-data",
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_volume_names", lambda: {"odctl-shared-deps", "odctl_extra-data"}
+    )
+
+    def details(file, profiles):
+        keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
+        return _stack([], [k for p in profiles for k in keys.get(p, [])])
+
+    monkeypatch.setattr("odctl.main.get_stack_details", details)
+
+    result = runner.invoke(
+        app, ["down", "deps-extra", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "odctl_extra-data" in result.stdout, result.stdout
+    assert ("odctl-shared-deps" in result.stdout) is idle, result.stdout
+
+
+def test_down_all_dry_run_lists_the_volumes_of_every_deps_file_profile(monkeypatch):
+    """`down --all -v` stops every profile of the deps file with `--volumes`, so the
+    dry run lists deps-extra's volume beside the shared jar volume."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-deps.yml": ["deps", "deps-extra"]
+        },
+    )
+    monkeypatch.setattr("odctl.main._teardown_of_all", lambda plan, volumes: plan)
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {
+            "shared-deps": "odctl-shared-deps",
+            "extra-data": "odctl_extra-data",
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_volume_names", lambda: {"odctl-shared-deps", "odctl_extra-data"}
+    )
+    keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+
+    result = runner.invoke(
+        app, ["down", "--all", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "odctl_extra-data" in result.stdout, result.stdout
+    assert "odctl-shared-deps" in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize("idle", [True, False], ids=["idle", "others run"])
+def test_down_dry_run_names_deps_beside_its_other_profiles(monkeypatch, idle):
+    """`down kafka-lite deps deps-extra -v` stops deps in every case, so the dry run
+    names it beside deps-extra, also when deps-extra's volumes go on their own."""
+    printed = MagicMock()
+    monkeypatch.setattr("odctl.main.ui.print_dry_run", printed)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-kafka.yml": ["kafka-lite"],
+            "compose-deps.yml": ["deps", "deps-extra"],
+        },
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: idle
+    )
+    monkeypatch.setattr("odctl.main.get_declared_volumes", lambda file: {})
+    monkeypatch.setattr("odctl.main.get_volume_names", lambda: set())
+    keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+
+    result = runner.invoke(
+        app, ["down", "kafka-lite", "deps", "deps-extra", "-v", "--dry-run"]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    plan = printed.call_args.args[0]
+    assert plan["compose-deps.yml"] == ["deps", "deps-extra"]
+
+
+_DEPS_KEYS = {
+    "deps": ["shared-deps"],
+    "deps-extra": ["extra-data"],
+    "deps-shared": ["shared-deps"],
+    "deps-alias": ["alias"],
+}
+
+
+@pytest.mark.parametrize(
+    "names, needs, expected",
+    [
+        (["deps-alias"], {}, [(["deps-alias"], False)]),
+        (
+            ["deps-extra", "deps-shared"],
+            {},
+            [(["deps-extra"], True), (["deps-shared"], False)],
+        ),
+        (
+            ["deps", "deps-extra"],
+            {"deps": ["deps-extra"]},
+            [(["deps", "deps-extra"], False)],
+        ),
+    ],
+    ids=[
+        "a key that names the shared volume",
+        "each profile on its own",
+        "deps depends on extra",
+    ],
+)
+def test_down_splits_the_deps_file_by_each_profiles_volumes(
+    monkeypatch, names, needs, expected
+):
+    """With other profiles running, `down -v` removes the volumes of each deps file
+    profile that mounts none of deps' volumes, compared by Docker name, in a call
+    Compose accepts: no profile in it depends on one outside it, or the reverse."""
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: False)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+
+    def expand(plan):
+        out = {}
+        for f, profs in plan.items():
+            seen = list(profs)
+            for p in profs:
+                seen += [q for q in needs.get(p, []) if q not in seen]
+            out[f] = seen
+        return out
+
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", expand)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: False
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {
+            "shared-deps": "odctl-shared-deps",
+            "alias": "odctl-shared-deps",
+            "extra-data": "odctl_extra-data",
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in _DEPS_KEYS.get(q, [])]),
+    )
+
+    result = runner.invoke(app, ["down", *names, "-v"])
+
+    assert result.exit_code == 0, result.stdout
+    assert [
+        (c.args[1], c.kwargs["remove_volumes"]) for c in mock_stop.call_args_list
+    ] == expected
+
+
+def test_down_dry_run_lists_the_unnamed_volumes_of_a_deps_file_profile(monkeypatch):
+    """The call that stops deps-extra with `--volumes` also removes its containers'
+    unnamed volumes, so the dry run lists them."""
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: False
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {
+            "shared-deps": "odctl-shared-deps",
+            "extra-data": "odctl_extra-data",
+        },
+    )
+    monkeypatch.setattr("odctl.main.get_volume_names", lambda: {"odctl_extra-data"})
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack(
+            ["extra-svc"] if "deps-extra" in p else [],
+            [k for q in p for k in _DEPS_KEYS.get(q, [])],
+        ),
+    )
+    extra = fake_container(
+        "extra-svc", "extra-svc", "running", None, {}, [("volume", "5e5e5e")]
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers",
+        lambda plan: (
+            [extra] if "deps-extra" in plan.get("compose-deps.yml", []) else []
+        ),
+    )
+
+    result = runner.invoke(
+        app, ["down", "deps-extra", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "1 unnamed volume(s) of extra-svc" in result.stdout, result.stdout
+
+
+def test_down_keeps_a_volume_the_other_deps_call_still_holds(monkeypatch):
+    """e1 and e2 share a volume and e2 also mounts the shared jar volume, so e2 is
+    stopped without `--volumes`; Docker keeps a volume a container still holds, so
+    e1 goes in e2's call and the dry run does not list the shared volume `c`."""
+    keys = {"deps": ["shared-deps"], "e1": ["c"], "e2": ["c", "shared-deps"]}
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: False)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr(
+        "odctl.main._shared_deps_are_idle", lambda plan, stopped=None: False
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {"shared-deps": "odctl-shared-deps", "c": "odctl_c"},
+    )
+    monkeypatch.setattr("odctl.main.get_volume_names", lambda: {"odctl_c"})
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+
+    result = runner.invoke(app, ["down", "e1", "e2", "-v"])
+    dry = runner.invoke(
+        app, ["down", "e1", "e2", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert [
+        (c.args[1], c.kwargs["remove_volumes"]) for c in mock_stop.call_args_list
+    ] == [(["e1", "e2"], False)]
+    assert dry.exit_code == 0 and "odctl_c" not in dry.stdout, dry.stdout
+
+
+@pytest.mark.parametrize(
+    "names, extra, expected",
+    [
+        (["kafka-lite", "deps-extra"], ["extra-data"], True),
+        (["deps"], ["extra-data"], False),
+        (["kafka-lite"], ["extra-data"], False),
+        (["kafka-lite"], ["shared-deps"], True),
+    ],
+    ids=[
+        "names the profile with data",
+        "names deps alone",
+        "leaves out the profile with data",
+        "a profile with only the shared volume and no container owns nothing",
+    ],
+)
+def test_removes_everything_counts_a_deps_file_profile_with_data(
+    monkeypatch, names, extra, expected
+):
+    """A deps-extra that owns a volume must be named for `down -v` to remove the same
+    data as `down --all -v`; one with no container and only the shared jar volume
+    owns nothing, so it is left out, as deps is."""
+    from odctl.main import removes_everything
+
+    keys = {"deps": ["shared-deps"], "deps-extra": extra, "kafka-lite": ["k"]}
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: (
+            {
+                "compose-x.yml": ["kafka-lite"],
+                "compose-deps.yml": ["deps", "deps-extra"],
+            }
+            if all
+            else {
+                f: [
+                    p for p in profiles if (p == "kafka-lite") == (f == "compose-x.yml")
+                ]
+                for f in ("compose-x.yml", "compose-deps.yml")
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {"shared-deps": "odctl-shared-deps", "extra-data": "odctl_extra"},
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
+    monkeypatch.setattr("odctl.main._teardown_of_all", lambda plan, volumes: plan)
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+
+    assert removes_everything(names) is expected
+
+
+@pytest.mark.parametrize(
+    "stopped, expected",
+    [([], False), (["deps-shared"], True)],
+    ids=["another deps file profile runs", "the teardown stops it"],
+)
+def test_shared_deps_are_not_idle_while_another_deps_file_profile_runs(
+    monkeypatch, stopped, expected
+):
+    """A deps-shared a workspace adds mounts the shared jar volume, so the volume
+    is not idle while its container exists, unless the teardown stops it too."""
+    from odctl.main import _shared_deps_are_idle
+
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-x.yml": ["kafka-lite"],
+            "compose-deps.yml": ["deps", "deps-shared"],
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack(["kafka"] if "kafka-lite" in p else [], []),
+    )
+    monkeypatch.setattr("odctl.main.get_project_name", lambda file: "odctl")
+    shared = fake_container("deps-shared", "deps-shared", "running", None, {})
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers",
+        lambda plan: (
+            [shared] if "deps-shared" in plan.get("compose-deps.yml", []) else []
+        ),
+    )
+
+    assert _shared_deps_are_idle({"compose-x.yml": ["kafka-lite"]}, stopped) is expected
+
+
+def test_shared_deps_are_not_idle_for_a_service_of_the_same_name_in_another_file(
+    monkeypatch,
+):
+    """A service is named within its project: stopping kafka-lite's `kafka` does not
+    stop a deps-shared service also named `kafka`, which still holds the volume."""
+    from odctl.main import _shared_deps_are_idle
+
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {
+            "compose-x.yml": ["kafka-lite"],
+            "compose-deps.yml": ["deps", "deps-shared"],
+        },
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details", lambda f, p: _stack(["kafka"], [])
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_project_name",
+        lambda file: "odctl-x" if file == "compose-x.yml" else "odctl-deps",
+    )
+    other = fake_container("deps-kafka", "kafka", "running", None, {})
+    other.config.labels["com.docker.compose.project"] = "odctl-deps"
+    monkeypatch.setattr(
+        "odctl.main.get_managed_containers",
+        lambda plan: (
+            [other] if "deps-shared" in plan.get("compose-deps.yml", []) else []
+        ),
+    )
+
+    assert _shared_deps_are_idle({"compose-x.yml": ["kafka-lite"]}) is False

@@ -23,8 +23,9 @@ yet, so that no file of another run stays beside this run's files:
   the profiles of `tasks/CASE/task.yaml`, what odctl itself says about them, run from the
   suite's Python with no Docker: `odctl list --json` (`list`), `odctl explain <profile>
   --json` (`explain`), `odctl up <profiles> --dry-run` (`dry_run`), and from each of their
-  compose files every service's container name, network aliases, ports, `expose` and whether
-  it has a health check (`compose`), which the JSON leaves out.
+  compose files every service's container name, network aliases, ports, `expose`, whether
+  it has a health check and its test (`healthcheck`, `healthcheck_test`, null when it has
+  none) (`compose`), which the JSON leaves out.
 - `skill/`: the skill copy's `SKILL.md` and `references/*.md`.
 
 In every file the skill copy's path reads `<skill>`, the suite folder `<suite>`, the run
@@ -32,10 +33,11 @@ folder `<run>` and the odctl version the suite installs, such as `1.9.0` in odct
 output or in `TAG=1.9.0`, `<version>`, so that no text tells the version. `check_hidden.py` checks the result.
 
 It prints one line, `{"task", "kind": "FACTS", "count": 0, "version", "model", "run"}`, which
-`summarise.py` expects once per run. It exits 2, with no line, when the workspace, the
-transcript, a case file or an odctl command it needs cannot be read or fails, because a fact
-missing would read as a fact with nothing in it; it then removes what it wrote of `--out`.
-It also exits 2 when `--out` already exists.
+`summarise.py` expects once per run. It exits 2, with no line, when anything it reads or runs
+fails, such as the workspace, the transcript, a case file that cannot be read or parsed, or an
+odctl command, because a fact missing would read as a fact with nothing in it. It then
+removes what it wrote of `--out`, as it also does when it is stopped with Ctrl-C. It also
+exits 2 when `--out` already exists.
 """
 
 import argparse
@@ -239,7 +241,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         argv: The command line without the program name; None reads `sys.argv`.
 
     Returns:
-        0, or 2 when a file or a command the facts need failed.
+        0, or 2 when anything the facts need failed or `--out` exists.
     """
     parser = argparse.ArgumentParser(
         description="Writes the reviewer's folder of a run."
@@ -253,18 +255,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--model", required=True)
     parser.add_argument("--run", required=True)
     args = parser.parse_args(argv)
-    if args.out.exists():
+    # Why: a link that points nowhere does not exist, but writing into it would follow it
+    if args.out.exists() or args.out.is_symlink():
         print(
             f"facts.py: {args.out} already exists; give a new folder", file=sys.stderr
         )
         return 2
     try:
         write_review(args)
-    except (Failed, OSError) as error:
-        # Why: a missing bin/odctl or an unreadable file raises OSError, not Failed
-        print(f"facts.py: {error}", file=sys.stderr)
-        # Why: a part-written folder would read as the run's facts
+    except BaseException as error:
+        # Why: any failure, Ctrl-C included, leaves a part-written folder, which would
+        # read as the run's facts and make the retry refuse an existing --out
         shutil.rmtree(args.out, ignore_errors=True)
+        if args.out.exists():
+            print(f"facts.py: could not remove {args.out}", file=sys.stderr)
+        if not isinstance(error, Exception):
+            raise
+        name = "" if isinstance(error, Failed) else f"{type(error).__name__}: "
+        print(f"facts.py: {name}{error}", file=sys.stderr)
         return 2
     line = {
         "task": args.task,

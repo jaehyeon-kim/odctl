@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 from odctl import logs
+from odctl.docker import ServiceDetails, StackDetails
 
 
 def test_get_managed_logs(monkeypatch, capsys):
@@ -20,7 +21,11 @@ def test_get_managed_logs(monkeypatch, capsys):
 def test_logs_of_one_service_ask_only_its_file(monkeypatch):
     services = {"compose-infra.yml": ["seaweed"], "compose-kafka.yml": ["kafka"]}
     monkeypatch.setattr(
-        logs, "get_stack_details", lambda f, p: (services[f], [], [], [])
+        logs,
+        "get_stack_details",
+        lambda f, p: StackDetails(
+            [ServiceDetails(s, None, []) for s in services[f]], []
+        ),
     )
     asked = []
 
