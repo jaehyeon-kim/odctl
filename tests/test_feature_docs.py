@@ -43,7 +43,7 @@ def _features(gen_pages):
             f"option {command + ' ' if command else ''}{flags.split(', ')[0]}",
             [where + rf"(?<![\w-]){f}(?![\w-])" for f in forms],
         )
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR / "registry.yml")
     for stack in registry.stacks.values():
         for profile in stack.profiles:
             yield (

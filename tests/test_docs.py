@@ -26,7 +26,7 @@ def _techs(gen_pages):
 
 
 def test_every_profile_is_on_exactly_one_page(gen_pages):
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR / "registry.yml")
     placed = [p for _, profiles in _techs(gen_pages) for p in profiles]
     for stack in registry.stacks.values():
         for profile in stack.profiles:
@@ -358,7 +358,7 @@ def test_skill_is_generated_from_the_registry(gen_pages):
     assert committed == gen_pages.skill(INTERNAL_RESOURCES_DIR), (
         "skills/odctl/SKILL.md is out of date; run uv run python scripts/gen_pages.py"
     )
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR / "registry.yml")
     for stack in registry.stacks.values():
         for profile in stack.profiles:
             assert f"\n### {profile}\n" in committed, (

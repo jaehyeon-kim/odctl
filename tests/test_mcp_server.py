@@ -276,7 +276,7 @@ def test_down_refuses_every_profile_but_deps(monkeypatch, tmp_path):
     every = build_execution_plan(None, True, resolve_deps=False)
 
     def services(plan):
-        return {s for f, p in plan.items() for s in get_stack_details(f, p)[0]}
+        return {s for f, p in plan.items() for s in get_stack_details(f, p).names}
 
     containers = [
         fake_container(s, s, "running", None, {}) for s in sorted(services(every))

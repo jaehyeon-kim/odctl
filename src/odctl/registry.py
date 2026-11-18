@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
@@ -13,7 +14,8 @@ class StackConfig(BaseModel):
         file (str): The docker-compose filename.
         description (str): A brief description of the stack's purpose.
         profiles (List[str]): A list of compose profiles provided by this stack.
-        depends_on (List[str]): Other stack profiles required for this stack to function.
+        depends_on (Dict[str, List[str]]): Each profile of the stack to the profiles it
+            needs, of this stack or another.
         parent (Optional[str]): An optional grouping identifier.
         role (Optional[str]): A detailed explanation of the stack's architectural role.
         usage (Optional[Union[str, Dict[str, str]]]): Usage instructions, which can be a
@@ -85,9 +87,13 @@ class Registry(BaseModel):
         return self
 
 
-def load_registry() -> Registry:
+def load_registry(path: Optional[Path] = None) -> Registry:
     """
     Load and validate the `registry.yml` file from the active directory.
+
+    Args:
+        path (Optional[Path]): Another `registry.yml` to read, such as the packaged
+            one; None reads the active directory's.
 
     Returns:
         Registry: A validated Pydantic model containing the entire stack configuration.
@@ -97,7 +103,8 @@ def load_registry() -> Registry:
             valid YAML, or is not a registry, such as an empty file or a stack with no
             `file`.
     """
-    path = get_registry_path()
+    if path is None:
+        path = get_registry_path()
     data = read_yaml(path, str(path))
     if not isinstance(data, dict):
         raise UnreadableFileError(

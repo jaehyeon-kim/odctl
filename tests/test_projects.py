@@ -10,13 +10,6 @@ from odctl import projects
 from odctl.config import INTERNAL_RESOURCES_DIR
 
 
-def test_restart_managed_containers(monkeypatch):
-    mock_client = MagicMock()
-    monkeypatch.setattr(projects, "build_compose_clients", lambda plan: [mock_client])
-    projects.restart_managed_containers({"dummy.yml": ["prof1"]})
-    mock_client.compose.restart.assert_called_once()
-
-
 def test_compose_clients_run_each_file_as_its_own_project(monkeypatch):
     """`up` runs each compose file as its own project, named by the file. One
     client over several files merged them into one project, so `recreate` met

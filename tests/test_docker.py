@@ -1,6 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 
+from python_on_whales.client_config import ClientNotFoundError
+from python_on_whales.exceptions import DockerException
+
 from odctl import docker
 
 
@@ -13,9 +16,35 @@ def test_is_docker_running_success(monkeypatch):
 
 def test_is_docker_running_fail(monkeypatch):
     mock_client = MagicMock()
-    mock_client.system.info.side_effect = Exception("error")
+    mock_client.system.info.side_effect = DockerException(["docker", "info"], 1)
     monkeypatch.setattr(docker, "client", mock_client)
     assert docker.is_docker_running() is False
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ClientNotFoundError("no docker"),
+        PermissionError("not executable"),
+        ValueError("bad JSON"),
+    ],
+)
+def test_is_docker_running_is_false_when_the_docker_call_cannot_answer(
+    monkeypatch, error
+):
+    """A missing or unusable binary, or a reply that does not parse, means no Docker."""
+    mock_client = MagicMock()
+    mock_client.system.info.side_effect = error
+    monkeypatch.setattr(docker, "client", mock_client)
+    assert docker.is_docker_running() is False
+
+
+def test_is_docker_running_lets_a_programming_error_through(monkeypatch):
+    mock_client = MagicMock()
+    mock_client.system.info.side_effect = TypeError("a bug in odctl")
+    monkeypatch.setattr(docker, "client", mock_client)
+    with pytest.raises(TypeError):
+        docker.is_docker_running()
 
 
 def test_get_stack_details(tmp_path, monkeypatch):
@@ -34,13 +63,11 @@ services:
 """)
     monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
 
-    services, ports, images, volumes = docker.get_stack_details(
-        "compose-test.yml", ["prof1"]
-    )
-    assert services == ["test-service"]
-    assert ports == ["test-service:8080:80"]
-    assert images == ["test-service -> test-image:latest"]
-    assert volumes == ["my-vol"]
+    details = docker.get_stack_details("compose-test.yml", ["prof1"])
+    assert details.services == [
+        docker.ServiceDetails("test-service", "test-image:latest", ["8080:80"])
+    ]
+    assert details.volumes == ["my-vol"]
 
 
 @pytest.mark.parametrize(
@@ -106,7 +133,7 @@ def test_a_compose_file_without_services_reads_as_none(tmp_path, monkeypatch, te
     monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
     monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
 
-    assert docker.get_stack_details("compose-test.yml", ["prof1"]) == ([], [], [], [])
+    assert docker.get_stack_details("compose-test.yml", ["prof1"]) == ([], [])
 
 
 def test_a_short_volume_is_read_after_interpolation(tmp_path, monkeypatch):
@@ -127,7 +154,7 @@ def test_a_short_volume_is_read_after_interpolation(tmp_path, monkeypatch):
     for name in ("PG_VOLUME", "LOGS_VOLUME", "NO_VOLUME"):
         monkeypatch.delenv(name, raising=False)
 
-    keys = docker.get_stack_details("compose-x.yml", ["x"])[3]
+    keys = docker.get_stack_details("compose-x.yml", ["x"]).volumes
     declared = docker.get_declared_volumes("compose-x.yml")
     # The names the dry run of `down --volumes` prints, as `_dry_run_volumes` builds them.
     # A long form source that interpolates to nothing is an anonymous volume.
@@ -148,7 +175,7 @@ def test_a_service_without_profiles_belongs_to_every_profile(tmp_path, monkeypat
     monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
     monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
 
-    services = docker.get_stack_details("compose-x.yml", ["x"])[0]
+    services = docker.get_stack_details("compose-x.yml", ["x"]).names
     assert services == ["a", "sidecar"]
 
 
@@ -291,12 +318,11 @@ def test_a_file_without_a_name_gets_the_name_compose_gives_it(tmp_path, monkeypa
 DEPS_IMAGE = "ghcr.io/jaehyeon-kim/odctl/deps"
 
 
-class FakeDockerException(Exception):
-    """A stand-in for python_on_whales' exception, which carries stderr."""
+class FakeDockerException(DockerException):
+    """python_on_whales' exception of a failed `docker manifest inspect`, with its stderr."""
 
     def __init__(self, stderr: str):
-        super().__init__("The command executed was `docker manifest inspect`.")
-        self.stderr = stderr
+        super().__init__(["docker", "manifest", "inspect"], 1, None, stderr.encode())
 
 
 def _preflight_plan(tmp_path, monkeypatch) -> dict:
@@ -438,7 +464,9 @@ def test_docker_names_an_absent_tag_no_such_manifest(monkeypatch):
 def test_find_unpublished_images_survives_a_broken_local_lookup(monkeypatch):
     """A daemon error on the local lookup must not hide the registry answer."""
     mock_client = _mock_preflight_client(monkeypatch, local=False)
-    mock_client.image.exists.side_effect = Exception("cannot connect to the daemon")
+    mock_client.image.exists.side_effect = DockerException(
+        ["docker", "image", "inspect"], 1, None, b"cannot connect to the daemon"
+    )
     mock_client.manifest.inspect.side_effect = FakeDockerException("manifest unknown\n")
 
     assert docker.find_unpublished_images({"compose-test.yml": ["prof1"]}) == [
@@ -478,8 +506,10 @@ services:
     monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
     monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
     monkeypatch.setenv("TAG", "1.0.1")
-    _, _, images, _ = docker.get_stack_details("compose-test.yml", ["postgres"])
-    assert images == ["db -> ghcr.io/jaehyeon-kim/odctl/postgres:1.0.1"]
+    services = docker.get_stack_details("compose-test.yml", ["postgres"]).services
+    assert [(s.name, s.image) for s in services] == [
+        ("db", "ghcr.io/jaehyeon-kim/odctl/postgres:1.0.1")
+    ]
 
 
 @pytest.mark.parametrize(
@@ -677,7 +707,35 @@ def test_a_file_reads_compose_project_name_as_its_own_project(tmp_path, monkeypa
     monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
     monkeypatch.setenv("COMPOSE_PROJECT_NAME", "from-shell")
 
-    _, _, images, _ = docker.get_stack_details("compose-test.yml", ["p"])
+    services = docker.get_stack_details("compose-test.yml", ["p"]).services
 
-    assert images == ["db -> x/team-a:1"]
+    assert [(s.name, s.image) for s in services] == [("db", "x/team-a:1")]
     assert docker.interpolation_env()["COMPOSE_PROJECT_NAME"] == "from-shell"
+
+
+def test_stack_details_skip_an_unpublished_port_and_a_long_form_bind(
+    tmp_path, monkeypatch
+):
+    """A port with no published side and a bind mount give no port and no volume."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text(
+        "services:\n"
+        "  api:\n"
+        "    image: x\n"
+        "    ports:\n"
+        "      - target: 80\n"
+        "      - published: 8080\n"
+        "        target: 80\n"
+        "        protocol: udp\n"
+        "    volumes:\n"
+        "      - type: bind\n"
+        "        source: ./data\n"
+        "        target: /data\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+    details = docker.get_stack_details("compose-test.yml", ["p"])
+
+    assert details.services == [docker.ServiceDetails("api", "x", ["8080:80/udp"])]
+    assert details.volumes == []

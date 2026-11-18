@@ -1,9 +1,11 @@
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from python_on_whales import DockerClient
+from python_on_whales.client_config import ClientNotFoundError, ParsingError
+from python_on_whales.exceptions import DockerException
 
 from odctl.config import (
     UnreadableFileError,
@@ -55,6 +57,19 @@ def create_client(
 # Global client used for basic checks
 client = create_client()
 
+# What a python-on-whales call raises when Docker cannot answer it (0.81.0): each runs
+# the docker binary and parses its JSON. DockerException is a non-zero exit,
+# ClientNotFoundError a missing binary and OSError one that cannot run (utils.run,
+# client_config.py); ValueError is JSON or a pydantic model that does not parse, and
+# ParsingError the same for an inspect result.
+_DOCKER_ERRORS = (
+    DockerException,
+    ClientNotFoundError,
+    OSError,
+    ValueError,
+    ParsingError,
+)
+
 
 def is_docker_running() -> bool:
     """
@@ -64,10 +79,10 @@ def is_docker_running() -> bool:
         bool: True if the Docker engine responds to system info requests, False otherwise.
     """
     try:
-        # Changed from client.ping() to client.system.info()
+        # Why: python-on-whales has no ping call; info needs a reply from the daemon
         client.system.info()
         return True
-    except Exception:
+    except _DOCKER_ERRORS:
         return False
 
 
@@ -130,9 +145,44 @@ def get_project_name(compose_filename: str) -> str:
     return re.sub(r"[^a-z0-9_-]", "", name.lower()).lstrip("_-")
 
 
-def get_stack_details(
-    compose_filename: str, profiles: List[str]
-) -> Tuple[List[str], List[str], List[str], List[str]]:
+class ServiceDetails(NamedTuple):
+    """
+    One service of a compose file, as `get_stack_details` reads it.
+
+    Attributes:
+        name (str): The service name.
+        image (Optional[str]): The image with compose variables expanded, or None
+            when the service has no `image`.
+        ports (List[str]): Its host port mappings as the file writes them, sorted,
+            such as `${KAFKA_PORT:-9092}:9092`; a long-form entry is written as
+            `published:target[/protocol]`.
+    """
+
+    name: str
+    image: Optional[str]
+    ports: List[str]
+
+
+class StackDetails(NamedTuple):
+    """
+    The services and named volumes of some profiles of a compose file.
+
+    Attributes:
+        services (List[ServiceDetails]): The services, sorted by name.
+        volumes (List[str]): The named volumes they mount, sorted, without the
+            ones the file declares as external.
+    """
+
+    services: List[ServiceDetails]
+    volumes: List[str]
+
+    @property
+    def names(self) -> List[str]:
+        """The service names, sorted."""
+        return [service.name for service in self.services]
+
+
+def get_stack_details(compose_filename: str, profiles: List[str]) -> StackDetails:
     """
     Resolve services, host port mappings, images, and volumes via direct YAML parsing.
 
@@ -144,8 +194,8 @@ def get_stack_details(
         profiles (List[str]): The active profiles to filter services by.
 
     Returns:
-        Tuple[List[str], List[str], List[str], List[str]]: A tuple containing four sorted lists:
-            services, exposed host ports, container images, and named volumes.
+        StackDetails: The services, each with its image and ports, and the named
+            volumes they mount.
 
     Raises:
         ValueError: If the compose file cannot be read.
@@ -154,8 +204,6 @@ def get_stack_details(
     env = interpolation_env(compose_filename)
 
     services = []
-    ports = []
-    images = []
     volumes = []
 
     # Parse the raw dictionary directly
@@ -163,38 +211,39 @@ def get_stack_details(
         svc_profiles = svc_data.get("profiles")
 
         # Check if this service belongs to the profiles we are querying
-        if not svc_profiles or any(p in profiles for p in svc_profiles):
-            services.append(svc_name)
+        if svc_profiles and not any(p in profiles for p in svc_profiles):
+            continue
 
-            if "image" in svc_data:
-                # Shown as it will run: `${TAG:-latest}` resolves the way compose
-                # resolves it, which is the CLI version without a workspace.
-                image = expand(svc_data["image"], env)
-                images.append(f"{svc_name} -> {image}")
+        # Shown as it will run: `${TAG:-latest}` resolves the way compose
+        # resolves it, which is the CLI version without a workspace.
+        image = expand(svc_data["image"], env) if "image" in svc_data else None
 
-            if "ports" in svc_data:
-                for p in svc_data["ports"]:
-                    if isinstance(p, str):
-                        ports.append(f"{svc_name}:{p}")
-                    elif isinstance(p, dict) and "published" in p:
-                        target = p.get("target", p["published"])
-                        protocol = f"/{p['protocol']}" if p.get("protocol") else ""
-                        ports.append(f"{svc_name}:{p['published']}:{target}{protocol}")
+        ports = []
+        if "ports" in svc_data:
+            for p in svc_data["ports"]:
+                if isinstance(p, str):
+                    ports.append(p)
+                elif isinstance(p, dict) and "published" in p:
+                    target = p.get("target", p["published"])
+                    protocol = f"/{p['protocol']}" if p.get("protocol") else ""
+                    ports.append(f"{p['published']}:{target}{protocol}")
 
-            if "volumes" in svc_data:
-                for v in svc_data["volumes"]:
-                    if isinstance(v, str):
-                        # Compose interpolates the entry before it splits it, so
-                        # `${PG_VOLUME:-pgdata}:/data` mounts the volume `pgdata`.
-                        vol_name = expand(v, env).split(":")[0]
-                        # Only track named volumes, ignore local host bind mounts (./, / or ~)
-                        if not vol_name.startswith((".", "/", "~")):
-                            volumes.append(vol_name)
-                    elif isinstance(v, dict) and v.get("type") == "volume":
-                        source = v.get("source")
-                        source = expand(source, env) if isinstance(source, str) else ""
-                        if source:
-                            volumes.append(source)
+        if "volumes" in svc_data:
+            for v in svc_data["volumes"]:
+                if isinstance(v, str):
+                    # Compose interpolates the entry before it splits it, so
+                    # `${PG_VOLUME:-pgdata}:/data` mounts the volume `pgdata`.
+                    vol_name = expand(v, env).split(":")[0]
+                    # Only track named volumes, ignore local host bind mounts (./, / or ~)
+                    if not vol_name.startswith((".", "/", "~")):
+                        volumes.append(vol_name)
+                elif isinstance(v, dict) and v.get("type") == "volume":
+                    source = v.get("source")
+                    source = expand(source, env) if isinstance(source, str) else ""
+                    if source:
+                        volumes.append(source)
+
+        services.append(ServiceDetails(svc_name, image, sorted(set(ports))))
 
     # Drop volumes the file declares as external. Compose never removes
     # those, so mounting one is not a reason to tear a profile down. Counting
@@ -208,11 +257,8 @@ def get_stack_details(
     }
     volumes = [v for v in volumes if v not in external]
 
-    return (
-        sorted(list(set(services))),
-        sorted(list(set(ports))),
-        sorted(list(set(images))),
-        sorted(list(set(volumes))),
+    return StackDetails(
+        sorted(services, key=lambda service: service.name), sorted(set(volumes))
     )
 
 
@@ -280,13 +326,9 @@ def get_versioned_images(execution_plan: Dict[str, List[str]]) -> List[str]:
     references = set()
 
     for file, profiles in execution_plan.items():
-        env = interpolation_env(file)
-        _, _, images, _ = get_stack_details(file, profiles)
-        for entry in images:
-            _, _, raw = entry.partition(" -> ")
-            reference = expand(raw, env)
-            if reference.startswith(ODCTL_IMAGE_PREFIX):
-                references.add(reference)
+        for service in get_stack_details(file, profiles).services:
+            if service.image and service.image.startswith(ODCTL_IMAGE_PREFIX):
+                references.add(service.image)
 
     return sorted(references)
 
@@ -303,7 +345,7 @@ def image_is_local(reference: str) -> bool:
     """
     try:
         return bool(client.image.exists(reference))
-    except Exception:
+    except _DOCKER_ERRORS:
         return False
 
 
@@ -322,7 +364,7 @@ def _registry_has_image(reference: str) -> Optional[bool]:
     try:
         client.manifest.inspect(reference)
         return True
-    except Exception as exc:
+    except _DOCKER_ERRORS as exc:
         text = f"{getattr(exc, 'stderr', '') or ''} {exc}".lower()
         if any(marker in text for marker in _ABSENT_MARKERS):
             return False
@@ -511,6 +553,38 @@ def get_volume_names() -> set:
     return {volume.name for volume in client.volume.list()}
 
 
+def _labels(container: Any) -> Dict[str, str]:
+    """A container's labels; python-on-whales gives `config` or `labels` as None when absent."""
+    config = container.config
+    return config.labels if config and config.labels else {}
+
+
+def compose_service(container: Any) -> str:
+    """
+    Name the Compose service a container runs.
+
+    Args:
+        container (Any): A python-on-whales container.
+
+    Returns:
+        str: Its `com.docker.compose.service` label, or "" when it has none.
+    """
+    return _labels(container).get("com.docker.compose.service", "")
+
+
+def compose_project(container: Any) -> str:
+    """
+    Name the Compose project a container belongs to.
+
+    Args:
+        container (Any): A python-on-whales container.
+
+    Returns:
+        str: Its `com.docker.compose.project` label, or "" when it has none.
+    """
+    return _labels(container).get("com.docker.compose.project", "")
+
+
 def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     """
     Fetch Docker containers matching the requested execution plan.
@@ -533,21 +607,15 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     for file, profs in execution_plan.items():
         project = get_project_name(file)
         # Re-using your existing parser to know exactly which services to look for
-        services, _, _, _ = get_stack_details(file, profs)
+        services = get_stack_details(file, profs).names
         targets.update((project, service) for service in services)
 
     all_containers = client.container.list(all=True)
     managed_containers = []
 
     for c in all_containers:
-        # Safely access labels via the Container's Config block
-        labels = c.config.labels if c.config and c.config.labels else {}
-
-        project = labels.get("com.docker.compose.project", "")
-        service = labels.get("com.docker.compose.service", "")
-
         # The project and the service must both be those of one file of the plan.
-        if (project, service) in targets:
+        if (compose_project(c), compose_service(c)) in targets:
             managed_containers.append(c)
 
     return managed_containers

@@ -28,9 +28,6 @@ def mock_registry_data():
 def mock_workspace(tmp_path, monkeypatch):
     """Mocks workspace directories to use an isolated temporary path."""
     monkeypatch.setattr("odctl.config.get_workspace_dir", lambda: tmp_path / ".odctl")
-    monkeypatch.setattr(
-        "odctl.config.get_internal_resources_dir", lambda: tmp_path / "resources"
-    )
 
     # Create the fake directories
     (tmp_path / ".odctl").mkdir(parents=True, exist_ok=True)

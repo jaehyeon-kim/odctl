@@ -62,33 +62,27 @@ def _read_stack(
     Raises:
         ValueError: If the compose file cannot be read.
     """
-    names, specs, images, volumes = docker.get_stack_details(compose_file, [profile])
-
-    image_of: Dict[str, str] = {}
-    for entry in images:
-        name, _, image = entry.partition(" -> ")
-        image_of[name] = image
+    details = docker.get_stack_details(compose_file, [profile])
 
     # Compose expands variables in a port before it reads it.
     env = docker.interpolation_env(compose_file)
-    ports_of: Dict[str, List[Port]] = {name: [] for name in names}
-    for entry in specs:
-        name, _, spec = entry.partition(":")
-        port = _parse_port(docker.expand(spec, env))
-        if port is not None and name in ports_of:
-            ports_of[name].append(port)
-
-    services = [
-        ServiceInfo(
-            name=name,
-            image=image_of.get(name),
-            ports=sorted(
-                ports_of[name], key=lambda p: (p.host, p.container, p.protocol)
-            ),
+    services = []
+    for service in details.services:
+        parsed = [_parse_port(docker.expand(spec, env)) for spec in service.ports]
+        ports = [port for port in parsed if port is not None]
+        services.append(
+            ServiceInfo(
+                name=service.name,
+                image=service.image,
+                ports=sorted(ports, key=lambda p: (p.host, p.container, p.protocol)),
+            )
         )
-        for name in names
-    ]
-    return services, specs, volumes
+    specs = sorted(
+        f"{service.name}:{spec}"
+        for service in details.services
+        for spec in service.ports
+    )
+    return services, specs, details.volumes
 
 
 def _starts(
@@ -176,7 +170,7 @@ def build_profiles(for_json: bool, with_services: bool = True) -> List[ProfileIn
             set and the registry lists an unknown dependency.
     """
     registry = load_registry()
-    profile_map = planner.get_profile_map()
+    profile_map = planner.get_profile_map(registry)
     profiles = []
     for stack in registry.stacks.values():
         for profile in stack.profiles:
@@ -213,7 +207,7 @@ def build_profile_details(profile: str) -> ProfileDetails:
             registry lists an unknown dependency.
     """
     registry = load_registry()
-    profile_map = planner.get_profile_map()
+    profile_map = planner.get_profile_map(registry)
     if profile not in profile_map:
         raise UnknownProfileError(profile)
 
@@ -248,8 +242,7 @@ def _container_info(container) -> ContainerInfo:
     Returns:
         ContainerInfo: The container's name, service, state, health and ports.
     """
-    labels = container.config.labels if container.config else None
-    service = (labels or {}).get("com.docker.compose.service") or None
+    service = docker.compose_service(container) or None
     health = container.state.health.status if container.state.health else None
 
     ports: List[Port] = []
@@ -333,9 +326,8 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
 
     running_services = set()
     for c in containers:
-        labels = c.config.labels if c.config and c.config.labels else {}
-        project = labels.get("com.docker.compose.project", "")
-        service = labels.get("com.docker.compose.service", "")
+        project = docker.compose_project(c)
+        service = docker.compose_service(c)
         state = c.state
         finished = (
             state.status == "exited"
@@ -348,7 +340,7 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
     active: Dict[str, set] = {}
     for file, profiles in plan.items():
         for profile in profiles:
-            services = docker.get_stack_details(file, [profile])[0]
+            services = docker.get_stack_details(file, [profile]).names
             if services and all(
                 (projects[file], s) in running_services for s in services
             ):

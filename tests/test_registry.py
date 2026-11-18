@@ -79,6 +79,16 @@ class TestUsageTextMatchesCompose:
         return root, registry, composes
 
     @staticmethod
+    def _usage_entries(stack: dict) -> list:
+        """Each usage text with the profiles it is for; a string is for every profile."""
+        usage = stack.get("usage")
+        if isinstance(usage, str):
+            return [(list(stack.get("profiles") or []), usage)]
+        if isinstance(usage, dict):
+            return [([profile], text) for profile, text in usage.items()]
+        return []
+
+    @staticmethod
     def _published_ports(compose: dict, profile: str) -> set:
         """Host ports the compose file publishes for services in this profile."""
         ports = set()
@@ -102,17 +112,18 @@ class TestUsageTextMatchesCompose:
         _, registry, composes = self._load()
         wrong = []
         for stack in registry["stacks"].values():
-            usage = stack.get("usage")
-            if not isinstance(usage, dict):
-                continue
             compose = composes.get(stack["file"])
             if compose is None:
                 continue
-            for profile, text in usage.items():
-                published = self._published_ports(compose, profile)
+            for profiles, text in self._usage_entries(stack):
+                published = set().union(
+                    *(self._published_ports(compose, p) for p in profiles)
+                )
                 for port in re.findall(r"127\.0\.0\.1:(\d+)", text or ""):
                     if int(port) not in published:
-                        wrong.append(f"{profile}: usage says 127.0.0.1:{port}")
+                        wrong.append(
+                            f"{', '.join(profiles)}: usage says 127.0.0.1:{port}"
+                        )
         assert not wrong, (
             "usage text names ports the profile does not publish: " + "; ".join(wrong)
         )
@@ -137,10 +148,8 @@ class TestUsageTextMatchesCompose:
 
         unknown = []
         for stack in registry["stacks"].values():
-            usage = stack.get("usage")
-            if not isinstance(usage, dict):
-                continue
-            for profile, text in usage.items():
+            for profiles, text in self._usage_entries(stack):
+                profile = ", ".join(profiles)
                 for host in re.findall(
                     r"(?:https?://)?([a-z][a-z0-9.-]*):\d+", text or ""
                 ):

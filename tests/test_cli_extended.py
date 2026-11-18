@@ -4,11 +4,16 @@ from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock
 from typer.testing import CliRunner
-from odctl.docker import get_stack_details
+from odctl.docker import ServiceDetails, StackDetails, get_stack_details
 from odctl.main import app
 from cli_workspace import fake_container, fake_containers, write_workspace
 
 runner = CliRunner()
+
+
+def _stack(names, volumes=()):
+    """A get_stack_details result with these service names and named volumes."""
+    return StackDetails([ServiceDetails(n, None, []) for n in names], list(volumes))
 
 
 def test_down_command(monkeypatch):
@@ -24,7 +29,7 @@ def test_down_command(monkeypatch):
     )
     monkeypatch.setattr(
         "odctl.docker.get_stack_details",
-        lambda x, y: (["kafka"], [], [], []),
+        lambda x, y: _stack(["kafka"]),
     )
 
     result = runner.invoke(app, ["down", "--all"])
@@ -496,7 +501,7 @@ def test_down_all_with_volumes_removes_deps_exactly_once(monkeypatch):
     )
     monkeypatch.setattr(
         "odctl.docker.get_stack_details",
-        lambda f, p: (["init-deps"], [], [], ["odctl-shared-deps"]),
+        lambda f, p: _stack(["init-deps"], ["odctl-shared-deps"]),
     )
 
     result = runner.invoke(app, ["down", "--all", "-v"])
@@ -514,7 +519,7 @@ def _every_service_has_a_container(monkeypatch):
     from odctl.planner import build_execution_plan
 
     def services(plan):
-        return {s for f, p in plan.items() for s in get_stack_details(f, p)[0]}
+        return {s for f, p in plan.items() for s in get_stack_details(f, p).names}
 
     every = services(build_execution_plan(None, True, resolve_deps=False))
     containers = [fake_container(s, s, "running", None, {}) for s in sorted(every)]
@@ -616,7 +621,7 @@ def _down_all_mocks(monkeypatch):
         "odctl.docker.get_managed_containers", lambda plan: [mock_container]
     )
     monkeypatch.setattr(
-        "odctl.docker.get_stack_details", lambda f, p: (["kafka"], [], [], [])
+        "odctl.docker.get_stack_details", lambda f, p: _stack(["kafka"])
     )
     return mock_stop
 
@@ -803,7 +808,7 @@ def test_down_dry_run_names_the_volumes(
 
     def containers_of(plan):
         services = {
-            s for f, profs in plan.items() for s in get_stack_details(f, profs)[0]
+            s for f, profs in plan.items() for s in get_stack_details(f, profs).names
         }
         return [
             c
@@ -978,7 +983,7 @@ def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
     plan = {"compose-spark.yml": ["spark-lite"]}
     monkeypatch.setattr(main, "is_docker_running", lambda: True)
     monkeypatch.setattr(
-        main, "get_stack_details", lambda f, p: (["spark"], [], [], ["events"])
+        main, "get_stack_details", lambda f, p: _stack(["spark"], ["events"])
     )
     monkeypatch.setattr(
         main, "get_declared_volumes", lambda f: {"events": "custom-event-data"}
@@ -1073,7 +1078,7 @@ def test_down_dry_run_lists_the_volumes_of_the_deps_files_other_profiles(
 
     def details(file, profiles):
         keys = {"deps": ["shared-deps"], "deps-extra": ["extra-data"]}
-        return [], [], [], [k for p in profiles for k in keys.get(p, [])]
+        return _stack([], [k for p in profiles for k in keys.get(p, [])])
 
     monkeypatch.setattr("odctl.main.get_stack_details", details)
 

@@ -8,6 +8,7 @@ from typer.core import TyperGroup
 
 from odctl import config, reports, ui
 from odctl.docker import (
+    compose_service,
     find_unpublished_images,
     get_declared_volumes,
     get_managed_containers,
@@ -514,17 +515,12 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
     stopping = {
         service
         for file, profs in torn_down.items()
-        for service in get_stack_details(file, profs)[0]
+        for service in get_stack_details(file, profs).names
     }
     declared = build_execution_plan(None, True, resolve_deps=False)
     others = {file: profs for file, profs in declared.items() if file != _DEPS_FILE}
     for container in get_managed_containers(others):
-        labels = (
-            container.config.labels
-            if container.config and container.config.labels
-            else {}
-        )
-        if labels.get("com.docker.compose.service", "") not in stopping:
+        if compose_service(container) not in stopping:
             return False
     return True
 
@@ -545,8 +541,7 @@ def _teardown_of_all(plan: dict, volumes: bool) -> dict:
 
     existing_services = set()
     for c in get_managed_containers(plan):
-        labels = c.config.labels if c.config and c.config.labels else {}
-        svc = labels.get("com.docker.compose.service", "")
+        svc = compose_service(c)
         if svc:
             existing_services.add(svc)
 
@@ -554,9 +549,9 @@ def _teardown_of_all(plan: dict, volumes: bool) -> dict:
     for file, profs in plan.items():
         active_profs = []
         for p in profs:
-            services, _, _, named_vols = get_stack_details(file, [p])
-            if any(s in existing_services for s in services) or (
-                volumes and named_vols
+            details = get_stack_details(file, [p])
+            if any(s in existing_services for s in details.names) or (
+                volumes and details.volumes
             ):
                 active_profs.append(p)
         if active_profs:
@@ -649,7 +644,9 @@ def _dry_run_volumes(
         # Services mount a volume by its key, and Docker lists it by its name.
         declared = get_declared_volumes(file)
         deps_profs = ["deps", *(deps_others or [])]
-        keys = get_stack_details(file, deps_profs if file == _DEPS_FILE else profs)[3]
+        keys = get_stack_details(
+            file, deps_profs if file == _DEPS_FILE else profs
+        ).volumes
         names = [declared.get(key, key) for key in keys]
         if existing is not None:
             names = [name for name in names if name in existing]
