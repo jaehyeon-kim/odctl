@@ -1340,3 +1340,29 @@ def test_down_keeps_a_volume_the_other_deps_call_still_holds(monkeypatch):
         (c.args[1], c.kwargs["remove_volumes"]) for c in mock_stop.call_args_list
     ] == [(["e1", "e2"], False)]
     assert dry.exit_code == 0 and "odctl_c" not in dry.stdout, dry.stdout
+
+
+@pytest.mark.parametrize(
+    "names, expected",
+    [(["deps-extra"], True), (["deps"], False)],
+    ids=["names the profile with data", "names deps alone"],
+)
+def test_removes_everything_counts_a_deps_file_profile_with_data(
+    monkeypatch, names, expected
+):
+    """A workspace with only deps and a deps-extra that mounts its own volume:
+    `down deps-extra -v` removes the same data as `down --all -v`, so it asks."""
+    from odctl.main import removes_everything
+
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: (
+            {"compose-deps.yml": ["deps", "deps-extra"]}
+            if all
+            else {"compose-deps.yml": list(profiles)}
+        ),
+    )
+    monkeypatch.setattr("odctl.main._teardown_of_all", lambda plan, volumes: plan)
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+
+    assert removes_everything(names) is expected

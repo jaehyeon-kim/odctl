@@ -574,9 +574,10 @@ def removes_everything(profiles: List[str]) -> bool:
     `odctl down <profiles> --volumes` asks the same question when this holds, and a
     caller that cannot ask, such as the MCP server, refuses the call.
 
-    The deps file is left out of both sides. `--all` always keeps it, because it
+    The deps profile is left out of both sides. `--all` always keeps it, because it
     declares the shared jar volume, while a named teardown with `--volumes` removes
-    it anyway once no other profile has a container.
+    it anyway once no other profile has a container. Another profile of the deps
+    file, such as a deps-extra a workspace adds, can own data, so it counts.
 
     Args:
         profiles (List[str]): The profiles the teardown names.
@@ -593,12 +594,8 @@ def removes_everything(profiles: List[str]) -> bool:
     named = expand_plan_dependencies(
         build_execution_plan(profiles, False, resolve_deps=False)
     )
-    every_profile = {
-        p for file, profs in every.items() if file != _DEPS_FILE for p in profs
-    }
-    named_profiles = {
-        p for file, profs in named.items() if file != _DEPS_FILE for p in profs
-    }
+    every_profile = {p for profs in every.values() for p in profs if p != "deps"}
+    named_profiles = {p for profs in named.values() for p in profs if p != "deps"}
     return bool(every_profile) and every_profile <= named_profiles
 
 

@@ -240,8 +240,16 @@ def test_a_warning_stays_off_the_protocol_stream(tmp_path):
         (["kafka-lite"], True, True),
         (["kafka-lite"], False, False),
         (["kafka-lite", "valkey"], True, False),
+        ({"compose-deps.yml": ["deps"]}, True, True),
+        ({"compose-deps.yml": ["deps", "deps-extra"]}, True, False),
     ],
-    ids=["covers every profile with data", "without volumes", "leaves a profile"],
+    ids=[
+        "covers every profile with data",
+        "without volumes",
+        "leaves a profile",
+        "deps alone is left out",
+        "leaves a deps file profile with data",
+    ],
 )
 def test_down_refuses_names_that_remove_every_profiles_data(
     fixed_state, monkeypatch, with_data, volumes, refused
@@ -253,7 +261,11 @@ def test_down_refuses_names_that_remove_every_profiles_data(
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
     monkeypatch.setattr(
         "odctl.main._teardown_of_all",
-        lambda plan, volumes: {"compose-x.yml": with_data},
+        lambda plan, volumes: (
+            {"compose-x.yml": ["kafka-lite"], **with_data}
+            if isinstance(with_data, dict)
+            else {"compose-x.yml": with_data}
+        ),
     )
 
     result = _call("down", {"profiles": ["kafka-lite"], "volumes": volumes}, True)
