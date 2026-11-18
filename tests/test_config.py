@@ -139,3 +139,30 @@ def test_read_yaml_gives_go_yaml_number_types(tmp_path):
     data = read_yaml(path, "compose.yml")
     assert [type(data[k]) for k in "abcd"] == [float, float, int, float]
     assert str(data["a"]) == "-0.0" and data["c"] == 15
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("a: !!float 5\n", 5.0),
+        ("a: !!int 017\n", 15),
+        ("a: 1e999\n", "1e999"),
+    ],
+    ids=["float tag on an int", "int tag", "float past the range"],
+)
+def test_read_yaml_reads_tagged_and_large_numbers_as_go_yaml(tmp_path, text, expected):
+    path = tmp_path / "compose.yml"
+    path.write_text(text)
+    value = read_yaml(path, "compose.yml")["a"]
+    assert (type(value), value) == (type(expected), expected)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["a: !!int 0930\n", "a: !!int true\n", "a: !!float 1e999\n", "a: !!float yes\n"],
+)
+def test_read_yaml_refuses_a_number_tag_go_yaml_refuses(tmp_path, text):
+    path = tmp_path / "compose.yml"
+    path.write_text(text)
+    with pytest.raises(UnreadableFileError):
+        read_yaml(path, "compose.yml")

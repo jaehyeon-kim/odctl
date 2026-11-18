@@ -184,14 +184,20 @@ def _go_scalar(text: str) -> Tuple[Optional[str], Any]:
         number = -number if sign == "-" else number
         if -(2**63) <= number < 2**64:
             return _INT, number
-    if _GO_FLOAT.fullmatch(plain):
+    # Why: Go's ParseFloat reports a value past the float range as an error, and
+    # go-yaml then keeps the text as a string
+    if _GO_FLOAT.fullmatch(plain) and abs(float(plain)) != float("inf"):
         return _FLOAT, float(plain)
     return None, None
 
 
 def _construct_go_number(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
     tag, value = _go_scalar(loader.construct_scalar(node))
-    if tag is None:
+    # Why: go-yaml gives a float for `!!float 5`, and refuses an `!!int` value that
+    # is not an int (resolver.go, the deferred check in `resolve`)
+    if tag == _INT and node.tag == _FLOAT:
+        return float(value)
+    if tag != node.tag:
         raise yaml.constructor.ConstructorError(
             None, None, f"cannot read {node.value!r} as {node.tag}", node.start_mark
         )
