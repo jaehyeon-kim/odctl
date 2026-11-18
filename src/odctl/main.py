@@ -577,7 +577,8 @@ def removes_everything(profiles: List[str]) -> bool:
     The deps profile is left out of both sides. `--all` always keeps it, because it
     declares the shared jar volume, while a named teardown with `--volumes` removes
     it anyway once no other profile has a container. Another profile of the deps
-    file, such as a deps-extra a workspace adds, can own data, so it counts.
+    file, such as a deps-extra a workspace adds, counts when it owns something of its
+    own: a container, or a named volume other than deps', by Docker name.
 
     Args:
         profiles (List[str]): The profiles the teardown names.
@@ -594,8 +595,24 @@ def removes_everything(profiles: List[str]) -> bool:
     named = expand_plan_dependencies(
         build_execution_plan(profiles, False, resolve_deps=False)
     )
-    every_profile = {p for profs in every.values() for p in profs if p != "deps"}
-    named_profiles = {p for profs in named.values() for p in profs if p != "deps"}
+    left_out = {"deps"}
+    others = [p for p in every.get(_DEPS_FILE, []) if p != "deps"]
+    if others:
+        declared = get_declared_volumes(_DEPS_FILE)
+
+        def volume_names(profs: List[str]) -> set:
+            keys = get_stack_details(_DEPS_FILE, profs).volumes
+            return {declared.get(k, k) for k in keys}
+
+        shared = volume_names(["deps"])
+        left_out |= {
+            p
+            for p in others
+            if volume_names([p]) <= shared
+            and not get_managed_containers({_DEPS_FILE: [p]})
+        }
+    every_profile = {p for profs in every.values() for p in profs if p not in left_out}
+    named_profiles = {p for profs in named.values() for p in profs if p not in left_out}
     return bool(every_profile) and every_profile <= named_profiles
 
 

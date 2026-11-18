@@ -1343,25 +1343,54 @@ def test_down_keeps_a_volume_the_other_deps_call_still_holds(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "names, expected",
-    [(["deps-extra"], True), (["deps"], False)],
-    ids=["names the profile with data", "names deps alone"],
+    "names, extra, expected",
+    [
+        (["kafka-lite", "deps-extra"], ["extra-data"], True),
+        (["deps"], ["extra-data"], False),
+        (["kafka-lite"], ["extra-data"], False),
+        (["kafka-lite"], ["shared-deps"], True),
+    ],
+    ids=[
+        "names the profile with data",
+        "names deps alone",
+        "leaves out the profile with data",
+        "a profile with only the shared volume and no container owns nothing",
+    ],
 )
 def test_removes_everything_counts_a_deps_file_profile_with_data(
-    monkeypatch, names, expected
+    monkeypatch, names, extra, expected
 ):
-    """A workspace with only deps and a deps-extra that mounts its own volume:
-    `down deps-extra -v` removes the same data as `down --all -v`, so it asks."""
+    """A deps-extra that owns a volume must be named for `down -v` to remove the same
+    data as `down --all -v`; one with no container and only the shared jar volume
+    owns nothing, so it is left out, as deps is."""
     from odctl.main import removes_everything
 
+    keys = {"deps": ["shared-deps"], "deps-extra": extra, "kafka-lite": ["k"]}
     monkeypatch.setattr(
         "odctl.main.build_execution_plan",
         lambda profiles, all, resolve_deps: (
-            {"compose-deps.yml": ["deps", "deps-extra"]}
+            {
+                "compose-x.yml": ["kafka-lite"],
+                "compose-deps.yml": ["deps", "deps-extra"],
+            }
             if all
-            else {"compose-deps.yml": list(profiles)}
+            else {
+                f: [
+                    p for p in profiles if (p == "kafka-lite") == (f == "compose-x.yml")
+                ]
+                for f in ("compose-x.yml", "compose-deps.yml")
+            }
         ),
     )
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {"shared-deps": "odctl-shared-deps", "extra-data": "odctl_extra"},
+    )
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
     monkeypatch.setattr("odctl.main._teardown_of_all", lambda plan, volumes: plan)
     monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
 

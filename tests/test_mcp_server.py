@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import anyio
@@ -14,6 +15,7 @@ mcp = pytest.importorskip("mcp")
 from mcp import Client, StdioServerParameters  # noqa: E402
 
 from cli_workspace import fake_container, fake_containers, write_workspace  # noqa: E402
+import odctl.main  # noqa: E402
 from odctl.main import app  # noqa: E402
 from odctl.mcp_server import build_server  # noqa: E402
 
@@ -267,6 +269,21 @@ def test_down_refuses_names_that_remove_every_profiles_data(
             else {"compose-x.yml": with_data}
         ),
     )
+
+    if isinstance(with_data, dict):
+        # Why: the fixture workspace has no deps file, and deps-extra owns a volume
+        monkeypatch.setattr("odctl.main.get_declared_volumes", lambda file: {})
+        real = odctl.main.get_stack_details
+        monkeypatch.setattr(
+            "odctl.main.get_stack_details",
+            lambda f, p: (
+                SimpleNamespace(
+                    volumes=["extra-data"] if "deps-extra" in p else ["shared-deps"]
+                )
+                if f == "compose-deps.yml"
+                else real(f, p)
+            ),
+        )
 
     result = _call("down", {"profiles": ["kafka-lite"], "volumes": volumes}, True)
 
