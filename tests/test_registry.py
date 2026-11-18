@@ -115,15 +115,14 @@ class TestUsageTextMatchesCompose:
             compose = composes.get(stack["file"])
             if compose is None:
                 continue
+            # Why: `odctl explain` prints a string usage for every profile of its
+            # stack, so each profile must publish every port it names
             for profiles, text in self._usage_entries(stack):
-                published = set().union(
-                    *(self._published_ports(compose, p) for p in profiles)
-                )
-                for port in re.findall(r"127\.0\.0\.1:(\d+)", text or ""):
-                    if int(port) not in published:
-                        wrong.append(
-                            f"{', '.join(profiles)}: usage says 127.0.0.1:{port}"
-                        )
+                for profile in profiles:
+                    published = self._published_ports(compose, profile)
+                    for port in re.findall(r"127\.0\.0\.1:(\d+)", text or ""):
+                        if int(port) not in published:
+                            wrong.append(f"{profile}: usage says 127.0.0.1:{port}")
         assert not wrong, (
             "usage text names ports the profile does not publish: " + "; ".join(wrong)
         )

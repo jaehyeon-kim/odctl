@@ -631,28 +631,43 @@ def _deps_join_note(plan: dict, all: bool, reachable: bool) -> Optional[str]:
     return "" if _shared_deps_are_idle(plan) else None
 
 
-def _own_volumes_only(deps_others: List[str]) -> bool:
-    """Tell whether the deps file's other profiles can be stopped with their volumes.
+def _own_volume_profiles(deps_others: List[str], rest: List[str]) -> List[str]:
+    """Pick the deps file's other profiles that are stopped with their volumes.
 
     `down --volumes` removes only the volumes of the active profiles' services
     (Compose v5, `WithoutUnnecessaryResources`), so for such profiles, such as a
     deps-extra a workspace adds, it never removes the shared jar volume. They are
-    stopped by a call of their own, which Compose refuses when one of their
-    services depends on a service of deps.
+    stopped by a call of their own, which Compose refuses when a profile in it
+    depends on one left out of it, or one left out depends on it.
 
     Args:
         deps_others (List[str]): Profiles of the deps file other than deps.
+        rest (List[str]): The profiles of the deps file the other call stops.
 
     Returns:
-        bool: True when there are some, none of them depends on deps, and none of
-        their volumes is one of deps'.
+        List[str]: Those of `deps_others` that mount none of deps' volumes, by
+        Docker name, and that no profile outside them depends on or is needed by.
     """
-    if not deps_others:
-        return False
-    if "deps" in expand_plan_dependencies({_DEPS_FILE: deps_others})[_DEPS_FILE]:
-        return False
-    shared = set(get_stack_details(_DEPS_FILE, ["deps"]).volumes)
-    return not shared & set(get_stack_details(_DEPS_FILE, deps_others).volumes)
+
+    def needs(profiles: List[str]) -> set:
+        if not profiles:
+            return set()
+        return set(expand_plan_dependencies({_DEPS_FILE: profiles})[_DEPS_FILE])
+
+    declared = get_declared_volumes(_DEPS_FILE)
+
+    def names(profiles: List[str]) -> set:
+        keys = get_stack_details(_DEPS_FILE, profiles).volumes
+        return {declared.get(key, key) for key in keys}
+
+    shared = names(["deps"])
+    own = {p for p in deps_others if not names([p]) & shared}
+    while True:
+        others = rest + [p for p in deps_others if p not in own]
+        kept = {p for p in own if needs([p]) <= own and p not in needs(others)}
+        if kept == own:
+            return [p for p in deps_others if p in own]
+        own = kept
 
 
 def _dry_run_volumes(
@@ -665,10 +680,10 @@ def _dry_run_volumes(
     These are the named volumes of the plan's services, which `stop_stack` removes
     for each file, and the unnamed volumes of the containers it stops, which
     `docker compose down --volumes` removes too. Docker names each container's
-    mounts, so a container with unnamed volumes gets one line with their number,
-    and the deps file never gets one. Only the named volumes that exist are listed.
-    When Docker is not reachable, each file other than the deps file says its
-    unnamed volumes were not checked.
+    mounts, so a container with unnamed volumes gets one line with their number; in
+    the deps file these are the containers of `deps_groups`. Only the named volumes
+    that exist are listed. When Docker is not reachable, each file with containers
+    to stop says its unnamed volumes were not checked.
 
     Args:
         plan (dict): The teardown plan, with the deps file when the teardown stops it.
@@ -694,15 +709,17 @@ def _dry_run_volumes(
             if existing is not None:
                 names = [name for name in names if name in existing]
             lines += [f"{n}{suffix}" for n in names if f"{n}{suffix}" not in lines]
-        if not reachable:
-            if file != _DEPS_FILE:
-                lines.append(
-                    "the unnamed volumes of the stopped containers, if any "
-                    "(Docker is not reachable, so this was not checked)"
-                )
-        elif file != _DEPS_FILE:
+        # Why: Compose removes the unnamed volumes of every container it removes
+        # with `--volumes`, which in the deps file are those of the groups
+        stopped = list(dict.fromkeys(p for group, _ in groups for p in group))
+        if stopped and not reachable:
+            lines.append(
+                "the unnamed volumes of the stopped containers, if any "
+                "(Docker is not reachable, so this was not checked)"
+            )
+        elif stopped:
             for container in sorted(
-                get_managed_containers({file: profs}), key=lambda c: c.name
+                get_managed_containers({file: stopped}), key=lambda c: c.name
             ):
                 unnamed = [
                     m
@@ -814,7 +831,12 @@ def down(
     deps_profiles: List[str] = [] if all else plan.pop(_DEPS_FILE, [])
     deps_named = "deps" in deps_profiles
     deps_others = [p for p in deps_profiles if p != "deps"]
-    own = volumes and _own_volumes_only(deps_others)
+    own = (
+        _own_volume_profiles(deps_others, ["deps"] if deps_named else [])
+        if volumes and deps_others
+        else []
+    )
+    shared_others = [p for p in deps_others if p not in own]
 
     if dry_run:
         removed = None
@@ -828,9 +850,9 @@ def down(
                 # A named deps is stopped in every case, so only its volume carries
                 # the note.
                 plan[_DEPS_FILE] = ["deps"] if deps_named else [f"deps{note}"]
-                groups.append((["deps"] + ([] if own else deps_others), note))
+                groups.append((["deps"] + shared_others, note))
             if own:
-                groups.append((deps_others, ""))
+                groups.append((own, ""))
             if own and _DEPS_FILE not in plan:
                 plan[_DEPS_FILE] = ["deps"] if deps_named else []
             removed = _dry_run_volumes(plan, reachable, groups)
@@ -858,8 +880,8 @@ def down(
     if idle or deps_profiles:
         calls = []
         if own and not idle:
-            calls.append((deps_others, True))
-            rest = ["deps"] if deps_named else []
+            calls.append((own, True))
+            rest = (["deps"] if deps_named else []) + shared_others
         else:
             rest = (["deps"] if idle or deps_named else []) + deps_others
         if rest:
