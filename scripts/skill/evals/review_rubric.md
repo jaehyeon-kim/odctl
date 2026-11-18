@@ -46,7 +46,7 @@ A call to a service right after `odctl up`, `restart` or `recreate`, or after a 
 - Wrong: `odctl up kafka-lite` and then a consumer, with no wait. `facts.json` `compose` shows `kafka` has no health check, so `up` returns when it runs, not when it answers.
 - Wrong: `until <check>; do sleep 2; done` with no count or deadline, or a fixed `sleep 30` in place of a check.
 - Wrong: a healthy Langfuse container, or a 200 on the send, taken to mean the trace is stored.
-- Not a mistake: no extra wait, after `odctl up` or `odctl recreate`, for what a service's `healthcheck_test` in `facts.json` checks, because both wait for it. An extra wait for that is A4.
+- Not a mistake: no extra wait, after `odctl up` or `odctl recreate`, for what a service's `healthcheck_test` in `facts.json` checks, because both wait for it. An extra wait for that is A4, unless the request asks for it.
 - Wrong: no wait after `odctl restart` before the service is used. `restart` runs `docker compose restart`, which does not wait for health, so a wait such as `pg_isready` there is needed and is not A4.
 - Wrong: no wait for a capability the `healthcheck_test` does not check, such as S3 on port 8333 right after `odctl up storage`, whose test reads the filer on 8888. odctl's own test waits for S3 before it uses it (`smoke.sh:550`).
 
@@ -55,6 +55,7 @@ A call to a service right after `odctl up`, `restart` or `recreate`, or after a 
 An address used from the side that cannot reach it, or a host name, port or login that `facts.json`, the skill or a tool result does not give.
 
 - Wrong: `localhost:9092` in code that runs in a container; `broker-1:19092` or `catalog:8181` in code that runs on the host.
+- Not A3: `localhost:9092` inside the `kafka` container of `kafka-lite` while `DOCKER_HOST_IP` is unset, because that broker listens on `0.0.0.0:9092` and advertises `127.0.0.1:9092`, which is itself (`compose-kafka.yml:48-49`). It is A3 inside `kafka-1` of `kafka-full`, because the other brokers are advertised as `127.0.0.1:9093` and `127.0.0.1:9094`, which that container does not serve (`compose-kafka.yml:102`, 123).
 - Wrong: `iceberg-rest:8181`, `storage:8333` (a profile name used as a host name), `admin/admin`.
 - Right: from a container, a name from `compose` `container_name` or `aliases` with the container port; from the host, `127.0.0.1` with the host side of `ports`.
 
@@ -65,6 +66,7 @@ A command, option or behaviour of odctl that does not exist or is not as used: a
 - Wrong: `odctl ps` or `odctl ps --json` with no profile and no `--all`, which exits 1.
 - Wrong: `odctl trino`, `odctl exec`, `odctl up spark` (the profiles are `spark-lite` and `spark-full`).
 - Wrong: an extra readiness probe after `up` or `recreate` that checks what the service's `healthcheck_test` in `facts.json` checks, such as `pg_isready` for `postgres`, because `up` already waits for it (the skill's How to Use It), whether the reply says why or not.
+- Not A4: a probe the request itself asks for, such as a bounded `pg_isready` after `odctl recreate postgres`.
 - Not A4: a probe of another port or endpoint than the `healthcheck_test`, such as SeaweedFS's S3 port 8333 when its test reads the filer on 8888. `up` does not wait for that.
 
 ## A6: service behaviour stated without a run or its source
