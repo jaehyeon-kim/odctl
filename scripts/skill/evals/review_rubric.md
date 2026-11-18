@@ -46,7 +46,8 @@ A call to a service right after `odctl up`, `restart` or `recreate`, or after a 
 - Wrong: `odctl up kafka-lite` and then a consumer, with no wait. `facts.json` `compose` shows `kafka` has no health check, so `up` returns when it runs, not when it answers.
 - Wrong: `until <check>; do sleep 2; done` with no count or deadline, or a fixed `sleep 30` in place of a check.
 - Wrong: a healthy Langfuse container, or a 200 on the send, taken to mean the trace is stored.
-- Not a mistake: no extra wait for a service whose `healthcheck` is true in `facts.json`, because `up` already waits for it. An extra wait that checks what its `healthcheck_test` checks is A4.
+- Not a mistake: no extra wait for what a service's `healthcheck_test` in `facts.json` checks, because `up` already waits for it. An extra wait for that is A4.
+- Wrong: no wait for a capability the `healthcheck_test` does not check, such as S3 on port 8333 right after `odctl up storage`, whose test reads the filer on 8888. odctl's own test waits for S3 before it uses it (`smoke.sh:550`).
 
 ## A3: an address or a name from the wrong side, or guessed
 
