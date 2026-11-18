@@ -805,3 +805,39 @@ def test_a_service_counts_only_in_its_own_project(monkeypatch, tmp_path, b_state
     plan = {"compose-a.yml": ["pa"], "compose-b.yml": ["pb"]}
 
     assert reports._active_profiles(plan, containers) == ["pa"]
+
+
+@pytest.mark.parametrize(
+    "condition",
+    ["service_completed_successfully", "${WAIT_FOR:-service_completed_successfully}"],
+    ids=["as written", "with a variable"],
+)
+def test_a_one_shot_condition_is_read_after_expansion(monkeypatch, tmp_path, condition):
+    """Compose expands a `depends_on` condition before it reads it, so a condition
+    from a variable made `init` a one-shot for Compose but not for `ps`."""
+    from types import SimpleNamespace
+
+    from odctl import docker, reports
+
+    (tmp_path / "compose-a.yml").write_text(
+        "name: a\nservices:\n  init:\n    profiles: [pa]\n"
+        "  app:\n    profiles: [pa]\n"
+        f"    depends_on:\n      init:\n        condition: {condition}\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: tmp_path / x)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.delenv("WAIT_FOR", raising=False)
+
+    def container(service, status):
+        labels = {
+            "com.docker.compose.project": "a",
+            "com.docker.compose.service": service,
+        }
+        return SimpleNamespace(
+            config=SimpleNamespace(labels=labels),
+            state=SimpleNamespace(status=status, exit_code=0),
+        )
+
+    containers = [container("init", "exited"), container("app", "running")]
+
+    assert reports._active_profiles({"compose-a.yml": ["pa"]}, containers) == ["pa"]

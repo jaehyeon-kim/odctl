@@ -151,7 +151,7 @@ def get_stack_details(
         ValueError: If the compose file cannot be read.
     """
     compose_dict = read_compose(compose_filename)
-    env = interpolation_env()
+    env = interpolation_env(compose_filename)
 
     services = []
     ports = []
@@ -169,7 +169,7 @@ def get_stack_details(
             if "image" in svc_data:
                 # Shown as it will run: `${TAG:-latest}` resolves the way compose
                 # resolves it, which is the CLI version without a workspace.
-                image = expand(svc_data["image"], interpolation_env())
+                image = expand(svc_data["image"], env)
                 images.append(f"{svc_name} -> {image}")
 
             if "ports" in svc_data:
@@ -228,19 +228,31 @@ ODCTL_IMAGE_PREFIX = "ghcr.io/jaehyeon-kim/odctl/"
 _ABSENT_MARKERS = ("manifest unknown", "no such manifest")
 
 
-def interpolation_env() -> Dict[str, str]:
+def interpolation_env(compose_filename: Optional[str] = None) -> Dict[str, str]:
     """
     Build the variable mapping compose uses to interpolate the compose files.
 
     Compose reads `.env` from the project directory, which is the directory
-    holding the compose file, and lets the shell environment override it.
+    holding the compose file, and lets the shell environment override it. For
+    the values of a file, it also sets `COMPOSE_PROJECT_NAME` to the project the
+    file runs as, over any value in the shell (compose-go loader/loader.go,
+    `projectName`).
+
+    Args:
+        compose_filename (str, optional): The compose file whose values are
+            expanded. Defaults to None, for a value that belongs to no file.
 
     Returns:
         Dict[str, str]: Variables from the active directory's `.env`, overridden
         by the current process environment.
+
+    Raises:
+        UnreadableFileError: If the compose file cannot be read.
     """
     env = read_env_file(get_active_dir() / ".env")
     env.update(os.environ)
+    if compose_filename:
+        env["COMPOSE_PROJECT_NAME"] = get_project_name(compose_filename)
     return env
 
 
@@ -265,10 +277,10 @@ def get_versioned_images(execution_plan: Dict[str, List[str]]) -> List[str]:
         List[str]: Sorted, deduplicated references to images built by this
         project, with their variables already substituted.
     """
-    env = interpolation_env()
     references = set()
 
     for file, profiles in execution_plan.items():
+        env = interpolation_env(file)
         _, _, images, _ = get_stack_details(file, profiles)
         for entry in images:
             _, _, raw = entry.partition(" -> ")
@@ -474,7 +486,7 @@ def get_declared_volumes(compose_filename: str) -> Dict[str, str]:
         ValueError: If the compose file cannot be read.
     """
     compose = read_compose(compose_filename)
-    env = interpolation_env()
+    env = interpolation_env(compose_filename)
     project = get_project_name(compose_filename)
     names = {}
     for key, spec in (compose.get("volumes") or {}).items():

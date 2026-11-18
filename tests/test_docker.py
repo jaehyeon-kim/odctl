@@ -662,3 +662,22 @@ def test_a_line_compose_rejects_does_not_hide_the_others(tmp_path, monkeypatch):
     monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
 
     assert docker.resolve_image_tag() == "1.9.0"
+
+
+def test_a_file_reads_compose_project_name_as_its_own_project(tmp_path, monkeypatch):
+    """Compose sets COMPOSE_PROJECT_NAME to the project a file runs as, over the
+    shell's value, before it expands the file (compose-go loader/loader.go,
+    `projectName`). odctl expanded it from the shell or left it empty."""
+    compose_path = tmp_path / "compose-test.yml"
+    compose_path.write_text(
+        "name: Team-A\nservices:\n  db:\n"
+        "    image: x/${COMPOSE_PROJECT_NAME:-none}:1\n    profiles: [p]\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: compose_path)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+    monkeypatch.setenv("COMPOSE_PROJECT_NAME", "from-shell")
+
+    _, _, images, _ = docker.get_stack_details("compose-test.yml", ["p"])
+
+    assert images == ["db -> x/team-a:1"]
+    assert docker.interpolation_env()["COMPOSE_PROJECT_NAME"] == "from-shell"

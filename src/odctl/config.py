@@ -91,6 +91,52 @@ class UnreadableFileError(ValueError):
     """A file odctl needs cannot be read. The message names the file and the reason."""
 
 
+class _ComposeLoader(yaml.SafeLoader):
+    """PyYAML's safe loader with the two tags a compose file may use.
+
+    Compose drops a node tagged `!reset` and keeps a node tagged `!override` as
+    written (compose-go loader/reset.go, `resolveReset`). `safe_load` refuses
+    both tags, so a file Compose runs would not be readable.
+    """
+
+
+_RESET = object()
+
+
+def _construct_reset(loader: yaml.SafeLoader, node: yaml.Node) -> object:
+    return _RESET
+
+
+def _construct_override(loader: yaml.SafeLoader, node: yaml.Node) -> Any:
+    # Why: a copy with the plain tag, because the tagged node is still being built
+    scalar = isinstance(node, yaml.ScalarNode)
+    value = node.value if scalar else None
+    # A quoted scalar stays a string, as it does without the tag
+    implicit = (not (isinstance(node, yaml.ScalarNode) and node.style), False)
+    plain = type(node)(
+        loader.resolve(type(node), value, implicit),
+        node.value,
+        node.start_mark,
+        node.end_mark,
+    )
+    return loader.construct_object(plain, deep=True)
+
+
+_ComposeLoader.add_constructor("!reset", _construct_reset)
+_ComposeLoader.add_constructor("!override", _construct_override)
+
+
+def _drop_reset(value: Any) -> Any:
+    """Returns the value without the nodes tagged `!reset`, at any depth."""
+    if value is _RESET:
+        return None
+    if isinstance(value, dict):
+        return {k: _drop_reset(v) for k, v in value.items() if v is not _RESET}
+    if isinstance(value, list):
+        return [_drop_reset(v) for v in value if v is not _RESET]
+    return value
+
+
 def read_yaml(path: Path, name: str) -> Any:
     """
     Read a YAML file that odctl needs, such as a compose file or `registry.yml`.
@@ -100,7 +146,8 @@ def read_yaml(path: Path, name: str) -> Any:
         name (str): How the error message names the file.
 
     Returns:
-        Any: The file's content, as PyYAML's `safe_load` gives it.
+        Any: The file's content, as PyYAML's `safe_load` gives it, with the
+        nodes Compose's `!reset` tag drops left out.
 
     Raises:
         UnreadableFileError: As `Cannot read <name>: <reason>`, when the file is
@@ -108,7 +155,7 @@ def read_yaml(path: Path, name: str) -> Any:
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            return _drop_reset(yaml.load(f, Loader=_ComposeLoader))
     except FileNotFoundError as e:
         raise UnreadableFileError(
             f"Cannot read {name}: the file does not exist."

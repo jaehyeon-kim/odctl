@@ -760,13 +760,19 @@ def down(
     plan = dict(reversed(list(plan.items())))
 
     # A named deps follows the rule of a named teardown below: its shared jar volume
-    # goes only once no other profile has a container.
-    deps_named = not all and plan.pop(_DEPS_FILE, None) is not None
+    # goes only once no other profile has a container. Another profile a workspace
+    # adds to the deps file, such as deps-extra, follows the same rule, because
+    # `down --volumes` on that file removes every volume it declares.
+    deps_profiles: List[str] = [] if all else plan.pop(_DEPS_FILE, [])
+    deps_named = "deps" in deps_profiles
+    deps_others = [p for p in deps_profiles if p != "deps"]
 
     if dry_run:
         removed = _dry_run_volumes(plan, all, deps_named) if volumes else None
         if deps_named and _DEPS_FILE not in plan:
             plan[_DEPS_FILE] = ["deps"]
+        if deps_others:
+            plan[_DEPS_FILE] = plan.get(_DEPS_FILE, []) + deps_others
         ui.print_dry_run(plan, is_teardown=True, volumes=removed)
         return
 
@@ -784,10 +790,11 @@ def down(
     # them here, but only once nothing else is running, since every other profile
     # attaches to that network and mounts that volume.
     idle = volumes and not all and _shared_deps_are_idle(plan)
-    if idle or deps_named:
-        ui.print_info("🛑 Stopping [cyan]deps[/cyan]...")
+    if idle or deps_profiles:
+        stopped = (["deps"] if idle or deps_named else []) + deps_others
+        ui.print_info(f"🛑 Stopping [cyan]{ui.plain(', '.join(stopped))}[/cyan]...")
         try:
-            stop_stack(_DEPS_FILE, ["deps"], remove_volumes=idle)
+            stop_stack(_DEPS_FILE, stopped, remove_volumes=idle)
         except Exception as e:
             ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
             raise typer.Exit(1)

@@ -991,3 +991,57 @@ def test_dry_run_names_a_volume_by_its_docker_name(monkeypatch):
     assert main._dry_run_volumes(plan, all=True) == {
         "compose-spark.yml": ["custom-event-data"]
     }
+
+
+@pytest.mark.parametrize(
+    "names, volumes, idle, expected",
+    [
+        (["deps-extra"], ["-v"], False, (["deps-extra"], False)),
+        (["deps", "deps-extra"], [], False, (["deps", "deps-extra"], False)),
+        (["deps-extra"], ["-v"], True, (["deps", "deps-extra"], True)),
+    ],
+    ids=["extra, others run", "deps and extra", "extra, nothing else runs"],
+)
+def test_down_stops_every_named_profile_of_the_deps_file(
+    monkeypatch, names, volumes, idle, expected
+):
+    """A workspace can add a profile such as deps-extra to compose-deps.yml, and the
+    teardown dropped it with deps. It follows deps' rule for volumes, because
+    `down --volumes` on that file removes every volume the file declares."""
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: False)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: idle)
+
+    result = runner.invoke(app, ["down", *names, *volumes])
+
+    assert result.exit_code == 0, result.stdout
+    assert [
+        (c.args[0], c.args[1], c.kwargs["remove_volumes"])
+        for c in mock_stop.call_args_list
+    ] == [("compose-deps.yml", expected[0], expected[1])]
+
+
+def test_down_dry_run_lists_the_other_profiles_of_the_deps_file(monkeypatch):
+    monkeypatch.setattr("odctl.main.stop_stack", MagicMock())
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: False)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+
+    result = runner.invoke(
+        app, ["down", "deps", "deps-extra", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    lines = [line.strip() for line in result.stdout.splitlines()]
+    assert "└─ 💥 Stop Profile: deps" in lines, lines
+    assert "└─ 💥 Stop Profile: deps-extra" in lines, lines

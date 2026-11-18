@@ -70,7 +70,7 @@ def _read_stack(
         image_of[name] = image
 
     # Compose expands variables in a port before it reads it.
-    env = docker.interpolation_env()
+    env = docker.interpolation_env(compose_file)
     ports_of: Dict[str, List[Port]] = {name: [] for name in names}
     for entry in specs:
         name, _, spec = entry.partition(":")
@@ -277,6 +277,22 @@ def _container_info(container) -> ContainerInfo:
     )
 
 
+def _waits_for_completion(condition: Any, env: Dict[str, str]) -> bool:
+    """Tell whether a `depends_on` entry waits for its service to exit with code 0.
+
+    Args:
+        condition (Any): The entry's value, a mapping in the long syntax.
+        env (Dict[str, str]): The variables its file is interpolated with.
+
+    Returns:
+        bool: True when its `condition`, expanded, is `service_completed_successfully`.
+    """
+    if not isinstance(condition, dict) or condition.get("condition") is None:
+        return False
+    expanded = docker.expand(str(condition["condition"]), env)
+    return expanded == "service_completed_successfully"
+
+
 def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[str]:
     """
     Find the profiles whose services are all running.
@@ -304,14 +320,15 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
     projects = {file: docker.get_project_name(file) for file in plan}
     one_shots: Set[Tuple[str, str]] = set()
     for file in plan:
+        # Compose expands variables in a condition before it reads it.
+        env = docker.interpolation_env(file)
         for service in (docker.read_compose(file).get("services") or {}).values():
             depends_on = service.get("depends_on")
             if isinstance(depends_on, dict):
                 one_shots.update(
                     (projects[file], name)
                     for name, condition in depends_on.items()
-                    if isinstance(condition, dict)
-                    and condition.get("condition") == "service_completed_successfully"
+                    if _waits_for_completion(condition, env)
                 )
 
     running_services = set()
