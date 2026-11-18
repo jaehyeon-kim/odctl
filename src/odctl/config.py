@@ -162,9 +162,12 @@ def _go_scalar(text: str) -> Tuple[Optional[str], Any]:
         return (_BOOL if isinstance(value, bool) else _FLOAT), value
     if text[:1] == ".":
         try:
-            return _FLOAT, float(text)
+            number = float(text)
         except ValueError:
             return None, None
+        # Why: Go's ParseFloat reports a value past the float range as an error, and
+        # go-yaml then keeps the text as a string
+        return (_FLOAT, number) if abs(number) != float("inf") else (None, None)
     if text[:1] not in set("+-0123456789"):
         return None, None
     plain = text.replace("_", "")
@@ -184,8 +187,6 @@ def _go_scalar(text: str) -> Tuple[Optional[str], Any]:
         number = -number if sign == "-" else number
         if -(2**63) <= number < 2**64:
             return _INT, number
-    # Why: Go's ParseFloat reports a value past the float range as an error, and
-    # go-yaml then keeps the text as a string
     if _GO_FLOAT.fullmatch(plain) and abs(float(plain)) != float("inf"):
         return _FLOAT, float(plain)
     return None, None
@@ -204,8 +205,21 @@ def _construct_go_number(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
     return value
 
 
+_ComposeLoader.add_constructor(_BOOL, _construct_go_number)
 _ComposeLoader.add_constructor(_INT, _construct_go_number)
 _ComposeLoader.add_constructor(_FLOAT, _construct_go_number)
+
+
+def _construct_go_null(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> None:
+    # Why: go-yaml reads only these words as null, and refuses `!!null` on others
+    if loader.construct_scalar(node) not in ("", "~", "null", "Null", "NULL"):
+        raise yaml.constructor.ConstructorError(
+            None, None, f"cannot read {node.value!r} as {node.tag}", node.start_mark
+        )
+    return None
+
+
+_ComposeLoader.add_constructor("tag:yaml.org,2002:null", _construct_go_null)
 
 
 _RESET = object()

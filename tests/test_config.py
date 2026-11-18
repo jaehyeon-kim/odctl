@@ -147,8 +147,18 @@ def test_read_yaml_gives_go_yaml_number_types(tmp_path):
         ("a: !!float 5\n", 5.0),
         ("a: !!int 017\n", 15),
         ("a: 1e999\n", "1e999"),
+        ("a: .1e999\n", ".1e999"),
+        ("a: !!bool TRUE\n", True),
+        ("a: !!null ~\n", None),
     ],
-    ids=["float tag on an int", "int tag", "float past the range"],
+    ids=[
+        "float tag on an int",
+        "int tag",
+        "float past the range",
+        "dot float past the range",
+        "bool tag",
+        "null tag",
+    ],
 )
 def test_read_yaml_reads_tagged_and_large_numbers_as_go_yaml(tmp_path, text, expected):
     path = tmp_path / "compose.yml"
@@ -159,7 +169,16 @@ def test_read_yaml_reads_tagged_and_large_numbers_as_go_yaml(tmp_path, text, exp
 
 @pytest.mark.parametrize(
     "text",
-    ["a: !!int 0930\n", "a: !!int true\n", "a: !!float 1e999\n", "a: !!float yes\n"],
+    [
+        "a: !!int 0930\n",
+        "a: !!int true\n",
+        "a: !!float 1e999\n",
+        "a: !!float yes\n",
+        "a: !!float .1e999\n",
+        "a: !!bool yes\n",
+        "a: !!bool 1\n",
+        "a: !!null abc\n",
+    ],
 )
 def test_read_yaml_refuses_a_number_tag_go_yaml_refuses(tmp_path, text):
     path = tmp_path / "compose.yml"
