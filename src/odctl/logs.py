@@ -19,6 +19,10 @@ from odctl.projects import build_compose_clients
 _stdout_lock = threading.Lock()
 
 
+class UnknownServiceError(ValueError):
+    """No compose file of the plan defines the service `logs --service` names."""
+
+
 class LogsError(Exception):
     """`docker compose logs` failed for one compose file of the plan."""
 
@@ -51,7 +55,7 @@ def _files_with_service(
         Dict[str, List[str]]: The entries of `execution_plan` whose file defines `service`.
 
     Raises:
-        ValueError: If no file of the plan defines `service`, which Compose would
+        UnknownServiceError: If no file of the plan defines `service`, which Compose would
             refuse, so the logs would be empty with no reason given.
     """
     selected: Dict[str, List[str]] = {}
@@ -61,7 +65,7 @@ def _files_with_service(
             selected[file] = profiles
     if not selected:
         named = ", ".join(p for profiles in execution_plan.values() for p in profiles)
-        raise ValueError(f"No service '{service}' in the profiles {named}.")
+        raise UnknownServiceError(f"No service '{service}' in the profiles {named}.")
     return selected
 
 
@@ -104,14 +108,17 @@ def _follow_all(
     """Stream every project's logs at once, one thread per project.
 
     The threads are daemons, joined with a timeout, so Ctrl+C reaches the main
-    thread at once and the process can exit while a stream still blocks.
+    thread at once and the process can exit while a stream still blocks. A failed
+    stream ends the command at once, while the others still follow, and Ctrl+C
+    after a failure still reports it. The other streams' `docker compose logs`
+    end when they next write, because their output pipe closes with odctl.
 
     Args:
         compose_clients (List[Tuple[str, DockerClient]]): Each compose file with its client.
         options (Dict[str, Any]): Keyword arguments for `compose.logs`.
 
     Raises:
-        LogsError: The first stream that failed, once every stream has ended.
+        LogsError: The first stream that failed, as soon as it fails.
     """
     errors: List[LogsError] = []
     threads = [
@@ -122,9 +129,16 @@ def _follow_all(
     ]
     for thread in threads:
         thread.start()
-    while any(thread.is_alive() for thread in threads):
-        for thread in threads:
-            thread.join(timeout=0.5)
+    try:
+        while any(thread.is_alive() for thread in threads):
+            for thread in threads:
+                thread.join(timeout=0.5)
+                if errors:
+                    raise errors[0]
+    except KeyboardInterrupt:
+        if errors:
+            raise errors[0] from None
+        raise
     if errors:
         raise errors[0]
 
@@ -151,7 +165,8 @@ def get_managed_logs(
         service (str, optional): Restrict logs to a specific compose service name. Defaults to None.
 
     Raises:
-        ValueError: If `service` is set and no compose file of the plan defines it.
+        UnknownServiceError: If `service` is set and no compose file of the plan
+            defines it.
         LogsError: If `docker compose logs` fails for a compose file.
     """
     options: Dict[str, Any] = {}

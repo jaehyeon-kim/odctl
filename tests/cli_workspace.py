@@ -133,7 +133,13 @@ def fake_container(
     Returns:
         SimpleNamespace: The fake container.
     """
-    labels = {"com.docker.compose.service": service} if service else {}
+    # The fixed workspace's files have no `name:`, so each runs as the project
+    # named after their folder, `.odctl`, which Compose normalises to `odctl`.
+    labels = (
+        {"com.docker.compose.project": "odctl", "com.docker.compose.service": service}
+        if service
+        else {}
+    )
     return SimpleNamespace(
         name=name,
         config=SimpleNamespace(labels=labels),

@@ -19,7 +19,7 @@ from odctl.docker import (
     resolve_image_tag,
     stop_stack,
 )
-from odctl.logs import LogsError, get_managed_logs
+from odctl.logs import LogsError, UnknownServiceError, get_managed_logs
 from odctl.projects import recreate_managed_containers, restart_managed_containers
 from odctl.planner import (
     build_execution_plan,
@@ -42,8 +42,9 @@ def _stops_on_unreadable_files(command: Callable) -> Callable:
     """
     Make a command report a file it cannot read, and exit 1.
 
-    `load_registry` and `read_compose` raise ValueError with a message that names the
-    file and the reason, so the command prints that message instead of a traceback.
+    `load_registry` and `read_compose` raise UnreadableFileError with a message that
+    names the file and the reason, so the command prints that message instead of a
+    traceback. Any other exception raises as itself.
     The MCP server calls the command functions directly, and gets the same exit.
 
     Args:
@@ -57,7 +58,7 @@ def _stops_on_unreadable_files(command: Callable) -> Callable:
     def run(*args, **kwargs):
         try:
             return command(*args, **kwargs)
-        except ValueError as e:
+        except config.UnreadableFileError as e:
             ui.print_error(str(e))
             raise typer.Exit(1)
 
@@ -199,8 +200,9 @@ def list_profiles(
         json_output (bool): Print the profiles as JSON, always with their services and ports.
 
     Raises:
-        typer.Exit: With code 1 when the registry cannot be read, or, with `--json`, when
-            a compose file cannot be read or the registry lists an unknown dependency.
+        typer.Exit: With code 1 when the registry cannot be read, when a compose file
+            cannot be read with `--details` or `--json`, or, with `--json`, when the
+            registry lists an unknown dependency.
     """
     try:
         profiles = reports.build_profiles(
@@ -242,7 +244,7 @@ def explain(
 
     Raises:
         typer.Exit: With code 1 when the registry has no such profile or lists an unknown
-            dependency, or, with `--json`, when the compose file cannot be read.
+            dependency, or when the compose file cannot be read.
     """
     try:
         details = reports.build_profile_details(profile)
@@ -359,7 +361,9 @@ def pull(
     ui.print_info("📥 Pre-fetching Docker images...")
 
     for file, profs in execution_plan.items():
-        ui.print_info(f"Fetching images for [yellow]{file}[/yellow]...", style="white")
+        ui.print_info(
+            f"Fetching images for [yellow]{ui.plain(file)}[/yellow]...", style="white"
+        )
         try:
             pull_stack_images(file, profs)
         except Exception as e:
@@ -467,7 +471,9 @@ def up(
                 )
                 raise typer.Exit(1)
 
-        ui.print_info(f"⚙️  Launching {prefix} ([cyan]{', '.join(profs)}[/cyan])...")
+        ui.print_info(
+            f"⚙️  Launching {prefix} ([cyan]{ui.plain(', '.join(profs))}[/cyan])..."
+        )
         try:
             launch_stack(file, profs)
         except Exception as e:
@@ -593,7 +599,7 @@ def removes_everything(profiles: List[str]) -> bool:
     return bool(every_profile) and every_profile <= named_profiles
 
 
-def _dry_run_volumes(plan: dict, all: bool) -> dict:
+def _dry_run_volumes(plan: dict, all: bool, deps_named: bool = False) -> dict:
     """List the volumes a teardown with `--volumes` removes, for the dry run.
 
     These are the named volumes of the plan's services, which `stop_stack` removes
@@ -605,12 +611,15 @@ def _dry_run_volumes(plan: dict, all: bool) -> dict:
     container, so the plan gains the deps file when that holds. When Docker is not
     reachable the answer is not known, so the plan gains the deps file with that
     said, since a dry run of a named teardown needs no Docker, and each other file
-    says its unnamed volumes were not checked.
+    says its unnamed volumes were not checked. A named deps is stopped in every
+    case, so only its volume carries that note.
 
     Args:
         plan (dict): The teardown plan. It gains the deps file when the real run
             would stop it, or might.
         all (bool): True for `--all`, whose plan already holds the deps file.
+        deps_named (bool): True when the teardown names deps, which the real run
+            stops whatever else has containers.
 
     Returns:
         dict: Compose file to the volumes to remove, each as the text printed after
@@ -620,7 +629,7 @@ def _dry_run_volumes(plan: dict, all: bool) -> dict:
     if not all and _DEPS_FILE not in plan:
         if not is_docker_running():
             note = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
-            plan[_DEPS_FILE] = [f"deps{note}"]
+            plan[_DEPS_FILE] = ["deps"] if deps_named else [f"deps{note}"]
         elif _shared_deps_are_idle(plan):
             plan[_DEPS_FILE] = ["deps"]
 
@@ -755,14 +764,14 @@ def down(
     deps_named = not all and plan.pop(_DEPS_FILE, None) is not None
 
     if dry_run:
-        removed = _dry_run_volumes(plan, all) if volumes else None
+        removed = _dry_run_volumes(plan, all, deps_named) if volumes else None
         if deps_named and _DEPS_FILE not in plan:
             plan[_DEPS_FILE] = ["deps"]
         ui.print_dry_run(plan, is_teardown=True, volumes=removed)
         return
 
     for file, profs in plan.items():
-        ui.print_info(f"🛑 Stopping [cyan]{', '.join(profs)}[/cyan]...")
+        ui.print_info(f"🛑 Stopping [cyan]{ui.plain(', '.join(profs))}[/cyan]...")
         try:
             stop_stack(file, profs, remove_volumes=volumes)
         except Exception as e:
@@ -853,7 +862,7 @@ def info(
     """
     try:
         report = reports.build_info(include_images=json_output)
-    except ValueError as e:
+    except config.UnreadableFileError as e:
         ui.print_error(str(e))
         raise typer.Exit(1)
     if json_output:
@@ -934,6 +943,9 @@ def logs(
             until=until,
             service=service,
         )
+    except UnknownServiceError as e:
+        ui.print_error(str(e))
+        raise typer.Exit(1)
     except LogsError as e:
         ui.print_error(str(e), details=ui.format_docker_error(e.error))
         raise typer.Exit(1)
@@ -960,7 +972,7 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Restarting containers...")
     for file, profs in plan.items():
-        ui.print_info(f"Restarting [yellow]{file}[/yellow]...", style="white")
+        ui.print_info(f"Restarting [yellow]{ui.plain(file)}[/yellow]...", style="white")
         try:
             restart_managed_containers({file: profs})
         except Exception as e:
@@ -1000,7 +1012,7 @@ def recreate(
         style="yellow",
     )
     for file, profs in plan.items():
-        ui.print_info(f"Recreating [yellow]{file}[/yellow]...", style="white")
+        ui.print_info(f"Recreating [yellow]{ui.plain(file)}[/yellow]...", style="white")
         try:
             recreate_managed_containers({file: profs}, pull=pull)
         except Exception as e:

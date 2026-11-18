@@ -1,6 +1,8 @@
+import os
+import re
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
@@ -85,6 +87,10 @@ def get_compose_path(filename: str) -> Path:
     return get_active_dir() / filename
 
 
+class UnreadableFileError(ValueError):
+    """A file odctl needs cannot be read. The message names the file and the reason."""
+
+
 def read_yaml(path: Path, name: str) -> Any:
     """
     Read a YAML file that odctl needs, such as a compose file or `registry.yml`.
@@ -97,17 +103,295 @@ def read_yaml(path: Path, name: str) -> Any:
         Any: The file's content, as PyYAML's `safe_load` gives it.
 
     Raises:
-        ValueError: As `Cannot read <name>: <reason>`, when the file is missing, cannot
-            be opened, or is not valid YAML.
+        UnreadableFileError: As `Cannot read <name>: <reason>`, when the file is
+            missing, cannot be opened, is not UTF-8 text, or is not valid YAML.
     """
     try:
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
     except FileNotFoundError as e:
-        raise ValueError(f"Cannot read {name}: the file does not exist.") from e
+        raise UnreadableFileError(
+            f"Cannot read {name}: the file does not exist."
+        ) from e
     except OSError as e:
-        raise ValueError(f"Cannot read {name}: {e.strerror}.") from e
+        raise UnreadableFileError(f"Cannot read {name}: {e.strerror}.") from e
+    except UnicodeDecodeError as e:
+        raise UnreadableFileError(f"Cannot read {name}: it is not UTF-8 text.") from e
     except yaml.YAMLError as e:
         mark = getattr(e, "problem_mark", None)
         where = f" (line {mark.line + 1})" if mark else ""
-        raise ValueError(f"Cannot read {name}: it is not valid YAML{where}.") from e
+        raise UnreadableFileError(
+            f"Cannot read {name}: it is not valid YAML{where}."
+        ) from e
+
+
+# Compose interpolation, in every form the Compose specification and Docker's docs
+# list, because a workspace file may use any of them: $VAR, ${VAR}, the operators
+# :- - :? ? :+ +, a word that holds another reference, and $$ for a literal $.
+_VARIABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_BRACED_REFERENCE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?+])(.*))?", re.S)
+
+# What compose-go's dotenv parser treats as a space within a line (`isSpace` in
+# dotenv/parser.go): every space character but the line break.
+_ENV_SPACES = "\t\v\f\r \x85\xa0"
+
+# The escapes Compose applies in a double-quoted value (`escapeSeqRegex`).
+_ENV_ESCAPE = re.compile(r'\\(?:[abcfnrtv$"\\]|0\d{0,3})')
+_ENV_ESCAPED = {
+    "a": "\a",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+    "v": "\v",
+    "$": "$$",
+    '"': '"',
+    "\\": "\\",
+}
+
+
+class _EnvLineError(Exception):
+    """A statement of a `.env` file that Compose rejects."""
+
+
+def _env_escape(match: re.Match) -> str:
+    """
+    Apply one escape of a double-quoted `.env` value, as `expandEscapes` does.
+
+    Args:
+        match (re.Match): A match of `_ENV_ESCAPE`.
+
+    Returns:
+        str: The character. `\\$` gives `$$`, which interpolation turns into `$`. An
+        octal escape needs `\\0` and three octal digits, at most `\\0377`; any other
+        loses its `0`, because Compose rewrites `\\0` to `\\` before Go's
+        `strconv.UnquoteChar` rejects it. `\\c`, which UnquoteChar also rejects, is
+        kept as written.
+    """
+    text = match.group(0)
+    if text[1] != "0":
+        return _ENV_ESCAPED.get(text[1], text)
+    digits = text[2:]
+    if len(digits) == 3 and all(d in "01234567" for d in digits):
+        if int(digits, 8) <= 0o377:
+            return chr(int(digits, 8))
+    return "\\" + digits
+
+
+def _env_key(src: str) -> Tuple[str, str, bool]:
+    """
+    Read the key that starts a `.env` statement, as `locateKeyName` does.
+
+    Args:
+        src (str): The file from the start of the statement.
+
+    Returns:
+        Tuple[str, str, bool]: The key; the text after its `=`, `:` or line break, with
+        the spaces before the value removed; and True when the key stands alone on
+        its line, so its value comes from the environment.
+
+    Raises:
+        _EnvLineError: When the key holds a character other than letters, digits,
+            `_`, `.`, `-`, `[` and `]`.
+    """
+    if re.match(r"export[\t\n\f\r ]", src):
+        src = src[len("export") :].lstrip(_ENV_SPACES)
+    for index, char in enumerate(src):
+        if char in _ENV_SPACES:
+            continue
+        if char in "=:\n":
+            rest = src[index + 1 :].lstrip(_ENV_SPACES)
+            return src[:index].rstrip(), rest, char == "\n"
+        if not (char in "_.-[]" or char.isalpha() or char.isnumeric()):
+            raise _EnvLineError(char)
+    return src.rstrip(), "", True
+
+
+def _env_value(src: str, env: Dict[str, str]) -> Tuple[str, str]:
+    """
+    Read the value of a `.env` statement, as `extractVarValue` does.
+
+    An unquoted value ends at the line break, loses an inline comment that follows a
+    space, and is interpolated. A single-quoted value is kept as written, and a
+    double-quoted one gets its escapes and is interpolated; both can span lines,
+    and a backslash before the quote keeps it in the value.
+
+    Args:
+        src (str): The file from the start of the value.
+        env (Dict[str, str]): The variables interpolation reads.
+
+    Returns:
+        Tuple[str, str]: The value, and the text after it.
+
+    Raises:
+        _EnvLineError: When a quoted value has no closing quote.
+    """
+    if not src or src[0] not in "\"'":
+        value, _, rest = src.partition("\n")
+        value = value.split(" #", 1)[0].rstrip()
+        return expand(value, env), rest
+
+    quote = src[0]
+    chars = []
+    escaped = False
+    for index in range(1, len(src)):
+        char = src[index]
+        if char != quote:
+            if not escaped and char == "\\":
+                escaped = True
+                continue
+            if escaped:
+                escaped = False
+                chars.append("\\")
+            chars.append(char)
+            continue
+        if escaped:
+            escaped = False
+            chars.append(char)
+            continue
+        value = "".join(chars)
+        if quote == '"':
+            value = expand(_ENV_ESCAPE.sub(_env_escape, value), env)
+        return value, src[index + 1 :]
+    raise _EnvLineError(quote)
+
+
+def read_env_file(path: Path) -> Dict[str, str]:
+    """
+    Parse a compose `.env` file into a plain dictionary, as Compose reads it.
+
+    The rules are those of compose-go's dotenv parser (dotenv/parser.go), the code
+    Compose runs. `#` starts a comment line. A key is followed by `=` or `:`, and
+    `export ` before it is dropped. A later line overrides an earlier one. Values
+    are read by `_env_value`, and interpolation reads the shell environment first,
+    then the lines above (dotenv/godotenv.go, `expandVariables`). A key alone on
+    its line takes its value from the shell environment. Compose stops at a line it
+    rejects; odctl reads the file only to show and check what Compose will run, so
+    it skips that line and reads on, and Compose reports the line when it runs.
+
+    Args:
+        path (Path): Path to the `.env` file. A missing file, or one that cannot be
+            read, yields an empty mapping.
+
+    Returns:
+        Dict[str, str]: The declared variables, with their values as Compose reads them.
+    """
+    values: Dict[str, str] = {}
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return values
+
+    # compose-go reads bytes and drops a UTF-8 byte order mark (dotenv/godotenv.go,
+    # parseWithLookup); a byte that is not UTF-8 stays inside its value.
+    src = data.decode("utf-8", errors="replace").removeprefix("﻿")
+    while True:
+        src = src.lstrip()
+        while src.startswith("#"):
+            _, newline, src = src.partition("\n")
+            src = src.lstrip() if newline else ""
+        if not src:
+            return values
+        try:
+            key, rest, inherited = _env_key(src)
+            if not key or " " in key:
+                raise _EnvLineError(key)
+            if inherited:
+                if key in os.environ:
+                    values[key] = os.environ[key]
+            else:
+                values[key], rest = _env_value(rest, {**values, **os.environ})
+            src = rest
+        except _EnvLineError:
+            src = src.partition("\n")[2]
+
+
+def expand(value: str, env: Dict[str, str]) -> str:
+    """
+    Substitute compose variables in a string.
+
+    Args:
+        value (str): A raw value from a compose file, such as an image reference.
+        env (Dict[str, str]): The variables to substitute.
+
+    Returns:
+        str: The value with every variable reference replaced. A reference that is
+            not valid Compose syntax is kept as written.
+    """
+    parts = []
+    i = 0
+    while i < len(value):
+        if value[i] != "$":
+            parts.append(value[i])
+            i += 1
+        elif value.startswith("$$", i):
+            parts.append("$")
+            i += 2
+        elif value.startswith("${", i):
+            end = _closing_brace(value, i + 2)
+            if end is None:
+                parts.append(value[i:])
+                break
+            parts.append(_substitute(value[i + 2 : end], env))
+            i = end + 1
+        elif name := _VARIABLE_NAME.match(value, i + 1):
+            parts.append(env.get(name.group(0)) or "")
+            i = name.end()
+        else:
+            parts.append("$")
+            i += 1
+    return "".join(parts)
+
+
+def _closing_brace(value: str, start: int) -> Optional[int]:
+    """
+    Find the brace that closes a `${` reference, past any reference nested in it.
+
+    Args:
+        value (str): The string being expanded.
+        start (int): The index just after the opening `${`.
+
+    Returns:
+        Optional[int]: The index of the closing brace, or None when there is none.
+    """
+    depth = 1
+    for index in range(start, len(value)):
+        if value[index] == "{":
+            depth += 1
+        elif value[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _substitute(reference: str, env: Dict[str, str]) -> str:
+    """
+    Return the value of one braced reference, the text between `${` and `}`.
+
+    The `:?` and `?` forms make Compose stop with an error when they do not hold.
+    odctl only shows the value, so it shows an empty one instead.
+
+    Args:
+        reference (str): The name, then optionally an operator and its word.
+        env (Dict[str, str]): The variables to substitute.
+
+    Returns:
+        str: The value the operator selects. The word is expanded too, so it can
+            hold another reference.
+    """
+    match = _BRACED_REFERENCE.fullmatch(reference)
+    if not match:
+        return "${" + reference + "}"
+    name, operator, word = match.groups()
+    current = env.get(name)
+    # The operators with a colon test for a non-empty value, the others for a set one.
+    holds = (
+        bool(current) if operator is None or ":" in operator else current is not None
+    )
+    if operator in (None, ":?", "?"):
+        return (current or "") if holds else ""
+    if operator in (":-", "-"):
+        return (current or "") if holds else expand(word, env)
+    return expand(word, env) if holds else ""

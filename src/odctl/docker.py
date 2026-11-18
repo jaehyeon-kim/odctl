@@ -1,12 +1,18 @@
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from python_on_whales import DockerClient
 
-from odctl.config import get_active_dir, get_compose_path, read_yaml
+from odctl.config import (
+    UnreadableFileError,
+    expand,
+    get_active_dir,
+    get_compose_path,
+    read_env_file,
+    read_yaml,
+)
 
 
 def create_client(
@@ -77,22 +83,24 @@ def read_compose(compose_filename: str) -> Dict[str, Any]:
         each service name to a mapping.
 
     Raises:
-        ValueError: As `Cannot read <file>: <reason>`, when the file is missing, is not
+        UnreadableFileError: As `Cannot read <file>: <reason>`, when the file is missing, is not
             valid YAML, or its top level, its services or one of them is not a mapping.
     """
     compose = read_yaml(get_compose_path(compose_filename), compose_filename)
     if not isinstance(compose, dict):
-        raise ValueError(
+        raise UnreadableFileError(
             f"Cannot read {compose_filename}: its top level is not a mapping."
         )
-    services = compose.get("services") or {}
+    services = compose.get("services")
+    if services is None:
+        services = {}
     if not isinstance(services, dict):
-        raise ValueError(
+        raise UnreadableFileError(
             f"Cannot read {compose_filename}: its services are not a mapping."
         )
     for name, service in services.items():
         if not isinstance(service, dict):
-            raise ValueError(
+            raise UnreadableFileError(
                 f"Cannot read {compose_filename}: the service '{name}' is not a mapping."
             )
     return compose
@@ -184,7 +192,8 @@ def get_stack_details(
                             volumes.append(vol_name)
                     elif isinstance(v, dict) and v.get("type") == "volume":
                         source = v.get("source")
-                        if isinstance(source, str):
+                        source = expand(source, env) if isinstance(source, str) else ""
+                        if source:
                             volumes.append(source)
 
     # Drop volumes the file declares as external. Compose never removes
@@ -213,184 +222,10 @@ def get_stack_details(
 # upstream version, and those are never checked here.
 ODCTL_IMAGE_PREFIX = "ghcr.io/jaehyeon-kim/odctl/"
 
-# Compose interpolation, in every form the Compose specification and Docker's docs
-# list, because a workspace file may use any of them: $VAR, ${VAR}, the operators
-# :- - :? ? :+ +, a word that holds another reference, and $$ for a literal $.
-_VARIABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_BRACED_REFERENCE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?+])(.*))?", re.S)
-
 # Registry replies that mean the tag is genuinely absent. Anything else, a DNS
 # failure, a refused connection or a missing credential helper for instance,
 # leaves the answer unknown, and an unknown answer must not stop a launch.
 _ABSENT_MARKERS = ("manifest unknown", "no such manifest")
-
-
-# What compose-go's dotenv parser treats as a space within a line (`isSpace` in
-# dotenv/parser.go): every space character but the line break.
-_ENV_SPACES = "\t\v\f\r \x85\xa0"
-
-# The escapes Compose applies in a double-quoted value (`escapeSeqRegex`).
-_ENV_ESCAPE = re.compile(r'\\(?:[abcfnrtv$"\\]|0\d{0,3})')
-_ENV_ESCAPED = {
-    "a": "\a",
-    "b": "\b",
-    "f": "\f",
-    "n": "\n",
-    "r": "\r",
-    "t": "\t",
-    "v": "\v",
-    "$": "$$",
-    '"': '"',
-    "\\": "\\",
-}
-
-
-class _EnvLineError(Exception):
-    """A statement of a `.env` file that Compose rejects."""
-
-
-def _env_escape(match: re.Match) -> str:
-    """
-    Apply one escape of a double-quoted `.env` value, as `expandEscapes` does.
-
-    Args:
-        match (re.Match): A match of `_ENV_ESCAPE`.
-
-    Returns:
-        str: The character. `\\$` gives `$$`, which interpolation turns into `$`. An
-        octal escape needs `\\0` and three octal digits; any other is kept as written.
-    """
-    text = match.group(0)
-    if text[1] != "0":
-        return _ENV_ESCAPED[text[1]]
-    digits = text[2:]
-    if len(digits) == 3 and all(d in "01234567" for d in digits):
-        if int(digits, 8) <= 0o377:
-            return chr(int(digits, 8))
-    return text
-
-
-def _env_key(src: str) -> Tuple[str, str, bool]:
-    """
-    Read the key that starts a `.env` statement, as `locateKeyName` does.
-
-    Args:
-        src (str): The file from the start of the statement.
-
-    Returns:
-        Tuple[str, str, bool]: The key; the text after its `=`, `:` or line break, with
-        the spaces before the value removed; and True when the key stands alone on
-        its line, so its value comes from the environment.
-
-    Raises:
-        _EnvLineError: When the key holds a character other than letters, digits,
-            `_`, `.`, `-`, `[` and `]`.
-    """
-    if re.match(r"export[\t\n\f\r ]", src):
-        src = src[len("export") :].lstrip(_ENV_SPACES)
-    for index, char in enumerate(src):
-        if char in _ENV_SPACES:
-            continue
-        if char in "=:\n":
-            rest = src[index + 1 :].lstrip(_ENV_SPACES)
-            return src[:index].rstrip(), rest, char == "\n"
-        if not (char in "_.-[]" or char.isalpha() or char.isnumeric()):
-            raise _EnvLineError(char)
-    return src.rstrip(), "", True
-
-
-def _env_value(src: str, env: Dict[str, str]) -> Tuple[str, str]:
-    """
-    Read the value of a `.env` statement, as `extractVarValue` does.
-
-    An unquoted value ends at the line break, loses an inline comment that follows a
-    space, and is interpolated. A single-quoted value is kept as written, and a
-    double-quoted one gets its escapes and is interpolated; both can span lines,
-    and a backslash before the quote keeps it in the value.
-
-    Args:
-        src (str): The file from the start of the value.
-        env (Dict[str, str]): The variables interpolation reads.
-
-    Returns:
-        Tuple[str, str]: The value, and the text after it.
-
-    Raises:
-        _EnvLineError: When a quoted value has no closing quote.
-    """
-    if not src or src[0] not in "\"'":
-        value, _, rest = src.partition("\n")
-        value = value.split(" #", 1)[0].rstrip()
-        return expand(value, env), rest
-
-    quote = src[0]
-    chars = []
-    escaped = False
-    for index in range(1, len(src)):
-        char = src[index]
-        if char != quote:
-            if not escaped and char == "\\":
-                escaped = True
-                continue
-            if escaped:
-                escaped = False
-                chars.append("\\")
-            chars.append(char)
-            continue
-        if escaped:
-            escaped = False
-            chars.append(char)
-            continue
-        value = "".join(chars)
-        if quote == '"':
-            value = expand(_ENV_ESCAPE.sub(_env_escape, value), env)
-        return value, src[index + 1 :]
-    raise _EnvLineError(quote)
-
-
-def _read_env_file(path: Path) -> Dict[str, str]:
-    """
-    Parse a compose `.env` file into a plain dictionary, as Compose reads it.
-
-    The rules are those of compose-go's dotenv parser (dotenv/parser.go), the code
-    Compose runs. `#` starts a comment line. A key is followed by `=` or `:`, and
-    `export ` before it is dropped. A later line overrides an earlier one. Values
-    are read by `_env_value`, and interpolation reads the shell environment first,
-    then the lines above (dotenv/godotenv.go, `expandVariables`). A key alone on
-    its line takes its value from the shell environment. Compose stops at a line it
-    rejects; odctl reads the file only to show and check what Compose will run, so
-    it skips that line and reads on, and Compose reports the line when it runs.
-
-    Args:
-        path (Path): Path to the `.env` file. A missing file yields an empty mapping.
-
-    Returns:
-        Dict[str, str]: The declared variables, with their values as Compose reads them.
-    """
-    values: Dict[str, str] = {}
-    if not path.exists():
-        return values
-
-    src = path.read_text()
-    while True:
-        src = src.lstrip()
-        while src.startswith("#"):
-            _, newline, src = src.partition("\n")
-            src = src.lstrip() if newline else ""
-        if not src:
-            return values
-        try:
-            key, rest, inherited = _env_key(src)
-            if not key or " " in key:
-                raise _EnvLineError(key)
-            if inherited:
-                if key in os.environ:
-                    values[key] = os.environ[key]
-            else:
-                values[key], rest = _env_value(rest, {**values, **os.environ})
-            src = rest
-        except _EnvLineError:
-            src = src.partition("\n")[2]
 
 
 def interpolation_env() -> Dict[str, str]:
@@ -404,99 +239,9 @@ def interpolation_env() -> Dict[str, str]:
         Dict[str, str]: Variables from the active directory's `.env`, overridden
         by the current process environment.
     """
-    env = _read_env_file(get_active_dir() / ".env")
+    env = read_env_file(get_active_dir() / ".env")
     env.update(os.environ)
     return env
-
-
-def expand(value: str, env: Dict[str, str]) -> str:
-    """
-    Substitute compose variables in a string.
-
-    Args:
-        value (str): A raw value from a compose file, such as an image reference.
-        env (Dict[str, str]): The variables to substitute.
-
-    Returns:
-        str: The value with every variable reference replaced. A reference that is
-            not valid Compose syntax is kept as written.
-    """
-    parts = []
-    i = 0
-    while i < len(value):
-        if value[i] != "$":
-            parts.append(value[i])
-            i += 1
-        elif value.startswith("$$", i):
-            parts.append("$")
-            i += 2
-        elif value.startswith("${", i):
-            end = _closing_brace(value, i + 2)
-            if end is None:
-                parts.append(value[i:])
-                break
-            parts.append(_substitute(value[i + 2 : end], env))
-            i = end + 1
-        elif name := _VARIABLE_NAME.match(value, i + 1):
-            parts.append(env.get(name.group(0)) or "")
-            i = name.end()
-        else:
-            parts.append("$")
-            i += 1
-    return "".join(parts)
-
-
-def _closing_brace(value: str, start: int) -> Optional[int]:
-    """
-    Find the brace that closes a `${` reference, past any reference nested in it.
-
-    Args:
-        value (str): The string being expanded.
-        start (int): The index just after the opening `${`.
-
-    Returns:
-        Optional[int]: The index of the closing brace, or None when there is none.
-    """
-    depth = 1
-    for index in range(start, len(value)):
-        if value[index] == "{":
-            depth += 1
-        elif value[index] == "}":
-            depth -= 1
-            if depth == 0:
-                return index
-    return None
-
-
-def _substitute(reference: str, env: Dict[str, str]) -> str:
-    """
-    Return the value of one braced reference, the text between `${` and `}`.
-
-    The `:?` and `?` forms make Compose stop with an error when they do not hold.
-    odctl only shows the value, so it shows an empty one instead.
-
-    Args:
-        reference (str): The name, then optionally an operator and its word.
-        env (Dict[str, str]): The variables to substitute.
-
-    Returns:
-        str: The value the operator selects. The word is expanded too, so it can
-            hold another reference.
-    """
-    match = _BRACED_REFERENCE.fullmatch(reference)
-    if not match:
-        return "${" + reference + "}"
-    name, operator, word = match.groups()
-    current = env.get(name)
-    # The operators with a colon test for a non-empty value, the others for a set one.
-    holds = (
-        bool(current) if operator is None or ":" in operator else current is not None
-    )
-    if operator in (None, ":?", "?"):
-        return (current or "") if holds else ""
-    if operator in (":-", "-"):
-        return (current or "") if holds else expand(word, env)
-    return expand(word, env) if holds else ""
 
 
 def resolve_image_tag() -> str:
@@ -635,6 +380,29 @@ def wait_for_one_shot_containers():
             client.container.wait(name)
 
 
+def check_exit_codes(stack_client: DockerClient) -> None:
+    """
+    Fail when a container of an attached `compose up` exited with a code other than 0.
+
+    Attached, Compose returns 0 whatever code a container exits with, unless it is
+    told to abort on an exit (docker/compose v5.8.0 pkg/compose/up.go: the exit code
+    is set only by the listeners of `--abort-on-container-exit`,
+    `--abort-on-container-failure` and `--exit-code-from`). Those flags stop every
+    other container of the file when the first one exits, so the exit codes are read
+    from the containers instead.
+
+    Args:
+        stack_client (DockerClient): The client of the compose file just started.
+
+    Raises:
+        RuntimeError: Naming the container and its exit code.
+    """
+    for container in stack_client.compose.ps(all=True):
+        state = container.state
+        if not state.running and state.exit_code:
+            raise RuntimeError(f"{container.name} exited with code {state.exit_code}.")
+
+
 def launch_stack(compose_filename: str, profiles: List[str]):
     """
     Start the stack via docker compose up.
@@ -653,6 +421,7 @@ def launch_stack(compose_filename: str, profiles: List[str]):
     if "deps" in profiles:
         # detach=False blocks until the init container gracefully finishes its job
         stack_client.compose.up(detach=False)
+        check_exit_codes(stack_client)
     else:
         # For all other long-running services, we detach and wait for healthchecks
         wait_for_one_shot_containers()
@@ -692,8 +461,8 @@ def get_declared_volumes(compose_filename: str) -> Dict[str, str]:
 
     The name is the entry's `name:`, interpolated as Compose does, because a
     workspace file can build it from variables. Without `name:`, Compose names the
-    volume `<project>_<key>`, from the file's top-level `name:`, or `<key>` when
-    the volume is external.
+    volume `<project>_<key>`, from the project name `get_project_name` gives, or
+    `<key>` when the volume is external.
 
     Args:
         compose_filename (str): The name of the compose file to parse.
@@ -706,7 +475,7 @@ def get_declared_volumes(compose_filename: str) -> Dict[str, str]:
     """
     compose = read_compose(compose_filename)
     env = interpolation_env()
-    project = expand(str(compose.get("name") or ""), env)
+    project = get_project_name(compose_filename)
     names = {}
     for key, spec in (compose.get("volumes") or {}).items():
         name = spec.get("name") if isinstance(spec, dict) else None
@@ -738,7 +507,7 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
         execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
 
     A container counts when its Compose project is the project of one of the plan's
-    files, as `get_project_name` names it, and its service is one of theirs. A
+    files, as `get_project_name` names it, and its service is one of that file's. A
     workspace file can set its own `name:`, so the project need not start with
     `odctl-`.
 
@@ -748,13 +517,12 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     Raises:
         ValueError: If a compose file of the plan cannot be read.
     """
-    target_services = set()
-    projects = set()
+    targets: Set[Tuple[str, str]] = set()
     for file, profs in execution_plan.items():
+        project = get_project_name(file)
         # Re-using your existing parser to know exactly which services to look for
         services, _, _, _ = get_stack_details(file, profs)
-        target_services.update(services)
-        projects.add(get_project_name(file))
+        targets.update((project, service) for service in services)
 
     all_containers = client.container.list(all=True)
     managed_containers = []
@@ -766,8 +534,8 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
         project = labels.get("com.docker.compose.project", "")
         service = labels.get("com.docker.compose.service", "")
 
-        # Strictly enforce that the container belongs to a ODCTL stack AND the requested profile
-        if project in projects and service in target_services:
+        # The project and the service must both be those of one file of the plan.
+        if (project, service) in targets:
             managed_containers.append(c)
 
     return managed_containers

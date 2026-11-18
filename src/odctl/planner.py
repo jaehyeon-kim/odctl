@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Set, Tuple
 import typer
 
 from odctl import ui
+from odctl.config import UnreadableFileError
 from odctl.docker import read_compose
 from odctl.registry import load_registry
 
@@ -31,7 +32,7 @@ def find_unreachable_profiles() -> List[Tuple[str, str, str]]:
         # A file that cannot be read is reported by the command that reads it.
         try:
             compose = read_compose(config.file)
-        except ValueError:
+        except UnreadableFileError:
             continue
 
         for svc_name, svc_data in (compose.get("services") or {}).items():

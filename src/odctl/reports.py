@@ -281,8 +281,9 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
     """
     Find the profiles whose services are all running.
 
-    A service runs when its container is running. A one-shot service, one that
-    another service of its file waits on with `condition:
+    A service runs when its container, of the file's own Compose project, is
+    running. A one-shot service, one that another service of its file waits on with
+    `condition:
     service_completed_successfully`, as the packaged files mark one, counts once it
     has exited with code 0. A profile whose services are a strict subset of another
     active profile's is left out, so `kafka-lite` does not also list the profiles it
@@ -298,13 +299,16 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
     Raises:
         ValueError: If a compose file of the plan cannot be read.
     """
-    one_shots: Set[str] = set()
+    # A service is known by its project and its name, because two files can each
+    # have a service of the same name.
+    projects = {file: docker.get_project_name(file) for file in plan}
+    one_shots: Set[Tuple[str, str]] = set()
     for file in plan:
         for service in (docker.read_compose(file).get("services") or {}).values():
             depends_on = service.get("depends_on")
             if isinstance(depends_on, dict):
                 one_shots.update(
-                    name
+                    (projects[file], name)
                     for name, condition in depends_on.items()
                     if isinstance(condition, dict)
                     and condition.get("condition") == "service_completed_successfully"
@@ -313,20 +317,25 @@ def _active_profiles(plan: Dict[str, List[str]], containers: List[Any]) -> List[
     running_services = set()
     for c in containers:
         labels = c.config.labels if c.config and c.config.labels else {}
+        project = labels.get("com.docker.compose.project", "")
         service = labels.get("com.docker.compose.service", "")
         state = c.state
         finished = (
-            state.status == "exited" and state.exit_code == 0 and service in one_shots
+            state.status == "exited"
+            and state.exit_code == 0
+            and (project, service) in one_shots
         )
         if service and (state.status == "running" or finished):
-            running_services.add(service)
+            running_services.add((project, service))
 
     active: Dict[str, set] = {}
     for file, profiles in plan.items():
         for profile in profiles:
             services = docker.get_stack_details(file, [profile])[0]
-            if services and all(s in running_services for s in services):
-                active[profile] = set(services)
+            if services and all(
+                (projects[file], s) in running_services for s in services
+            ):
+                active[profile] = {(projects[file], s) for s in services}
 
     outermost = set()
     for profile, profile_services in active.items():

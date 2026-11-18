@@ -109,4 +109,10 @@ def test_a_key_matches_whole_path_segments():
     assert container_role("localhost:5000/apache/kafka:4.3.2") == (
         "Event Broker / Kafka Connect"
     )
+    digest = "@sha256:" + "a" * 64
+    for image in (
+        f"apache/kafka{digest}",
+        f"localhost:5000/apache/kafka:4.3.2{digest}",
+    ):
+        assert container_role(image) == "Event Broker / Kafka Connect", image
     assert container_role("example/unknown:1") is None

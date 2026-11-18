@@ -14,6 +14,24 @@ _error_console = Console(stderr=True)
 
 _json_output = False
 
+
+def plain(text: str) -> str:
+    """
+    Escape text for Rich, so that `[...]` in it prints as written.
+
+    Registry fields, compose names and Docker's messages are plain text, and Rich
+    reads `[bold]` or `[/fast]` in them as markup, which hides the text or raises
+    MarkupError.
+
+    Args:
+        text (str): The text to print.
+
+    Returns:
+        str: The text with every markup tag escaped.
+    """
+    return escape(text)
+
+
 # Each image's role in `odctl explain`. A key matches an image whose repository, the
 # image without its tag, is the key or ends with `/` and the key, so the order of the
 # keys does not matter (`container_role`). Every image of the packaged compose files
@@ -57,8 +75,9 @@ def container_role(image: str) -> Optional[str]:
     """
     Name the role of an image, from `CONTAINER_ROLES`.
 
-    The tag is everything after the first `:` that follows the last `/`, so a
-    registry with a port, such as `localhost:5000/x`, keeps its port. Matching whole
+    A digest, from `@` on, is dropped first. The tag is everything after the first
+    `:` that follows the last `/`, so a registry with a port, such as
+    `localhost:5000/x`, keeps its port. Matching whole
     path segments keeps `marquez-web` from taking the role of `marquezproject/marquez`
     and `alpine` from matching `clickhouse-server:25.12-alpine`.
 
@@ -68,6 +87,7 @@ def container_role(image: str) -> Optional[str]:
     Returns:
         Optional[str]: The role, or None when no key matches.
     """
+    image = image.split("@", 1)[0]
     slash = image.rfind("/")
     colon = image.find(":", slash + 1)
     repository = image if colon == -1 else image[:colon]
@@ -143,15 +163,15 @@ def print_profile_table(profiles: List[ProfileInfo], details: bool):
 
         # Registry text is plain: escape it, or Rich reads `[...]` in it as markup.
         row = [
-            escape(info.profile),
-            escape(info.stack) if starts_group else "",
-            escape(info.description) if starts_group else "",
+            plain(info.profile),
+            plain(info.stack) if starts_group else "",
+            plain(info.description) if starts_group else "",
         ]
 
         if details:
             services = [s.name for s in info.services]
-            row.append(", ".join(services) if services else "N/A")
-            row.append(", ".join(info.port_specs) if info.port_specs else "N/A")
+            row.append(plain(", ".join(services)) if services else "N/A")
+            row.append(plain(", ".join(info.port_specs)) if info.port_specs else "N/A")
 
         table.add_row(*row)
 
@@ -178,31 +198,33 @@ def print_explain_panel(details: ProfileDetails):
         details (ProfileDetails): The profile to describe.
     """
     # Registry and compose text is plain: escape it, or Rich reads `[...]` as markup.
-    profile = escape(details.profile)
-    deps = [escape(p) for p in details.starts if p != details.profile] or ["None"]
+    profile = plain(details.profile)
+    deps = [plain(p) for p in details.starts if p != details.profile] or ["None"]
     deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
     services = details.services
     volumes = details.volumes
     usage = details.usage
     if details.usage_missing:
         usage = f"• No specific usage guide for profile: {details.profile}"
-    role = escape(details.role) if details.role else None
+    role = plain(details.role) if details.role else None
 
     # A service built from source has no image, and its file still starts it.
     services_list = []
     for svc in services:
-        shown = escape(svc.image) if svc.image else "built locally"
+        shown = plain(svc.image) if svc.image else "built locally"
         role_desc = (container_role(svc.image) if svc.image else None) or (
             "Service Container"
         )
         services_list.append(
-            f"  📦 [magenta]{escape(svc.name.ljust(22, ' '))}[/magenta] ([green]{shown}[/green])\n      ↳ [dim]{role_desc}[/dim]"
+            f"  📦 [magenta]{plain(svc.name.ljust(22, ' '))}[/magenta] ([green]{shown}[/green])\n      ↳ [dim]{role_desc}[/dim]"
         )
     services_str = "\n".join(services_list) if services_list else "  None"
 
     # Volumes Context
     volumes_str = (
-        "\n".join(f"  💾 [green]{v}[/green]" for v in volumes) if volumes else "  None"
+        "\n".join(f"  💾 [green]{plain(v)}[/green]" for v in volumes)
+        if volumes
+        else "  None"
     )
     if volumes:
         volumes_str += (
@@ -221,7 +243,7 @@ def print_explain_panel(details: ProfileDetails):
                 container_port += f"/{port.protocol}"
             host_port = str(port.host)
             spec = f"{svc.name}:{host_port}:{container_port}"
-            mappings.append((spec, escape(svc.name), host_port, container_port))
+            mappings.append((spec, plain(svc.name), host_port, container_port))
     ports_list = [
         f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] → Container [cyan]{svc_name}:{container_port}[/cyan]"
         for _, svc_name, host_port, container_port in sorted(mappings)
@@ -232,17 +254,17 @@ def print_explain_panel(details: ProfileDetails):
     role_section = f"\n[bold]Architecture Role:[/bold]\n{role}\n" if role else ""
     usage_section = (
         # Usage text is plain: escape it, or Rich reads feast[duckdb,...] as markup.
-        f"\n[bold green]🚀 How to Use It:[/bold green]\n{escape(usage)}\n"
+        f"\n[bold green]🚀 How to Use It:[/bold green]\n{plain(usage)}\n"
         if usage
         else ""
     )
 
     body = f"""
-[bold]Parent Stack:[/bold] {escape(details.stack)}
-[bold]Compose File:[/bold] {escape(details.compose_file)}
+[bold]Parent Stack:[/bold] {plain(details.stack)}
+[bold]Compose File:[/bold] {plain(details.compose_file)}
 
 [bold]Description:[/bold]
-{escape(details.description)}
+{plain(details.description)}
 {role_section}
 [bold]Requires Dependencies:[/bold]
   {deps_str}
@@ -290,20 +312,22 @@ def print_dry_run(
     volumes = volumes or {}
     for file, profs in execution_plan.items():
         if is_teardown:
-            console.print(f"🛑 [cyan]{file}[/cyan]")
+            console.print(f"🛑 [cyan]{plain(file)}[/cyan]")
             for p in profs:
-                console.print(f"  └─ 💥 Stop Profile: [bold red]{p}[/bold red]")
+                console.print(f"  └─ 💥 Stop Profile: [bold red]{plain(p)}[/bold red]")
             for name in volumes.get(file, []):
-                console.print(f"  └─ 🗑  Remove Volume: [bold red]{name}[/bold red]")
+                console.print(
+                    f"  └─ 🗑  Remove Volume: [bold red]{plain(name)}[/bold red]"
+                )
         else:
             layer = (
                 "Infrastructure Layer"
                 if any(x in profs for x in ["deps", "postgres", "storage", "catalog"])
                 else "Target Stack"
             )
-            console.print(f"📦 [cyan]{file}[/cyan] ({layer})")
+            console.print(f"📦 [cyan]{plain(file)}[/cyan] ({layer})")
             for p in profs:
-                console.print(f"  └─ 🚀 Profile: [bold green]{p}[/bold green]")
+                console.print(f"  └─ 🚀 Profile: [bold green]{plain(p)}[/bold green]")
 
 
 def format_docker_error(exc: Exception, max_lines: int = 10) -> str:
@@ -347,9 +371,9 @@ def print_error(message: str, details: Optional[str] = None, show_tip: bool = Fa
     out = _message_console()
     # The message and details are plain text, such as Docker's stderr: escape them,
     # or Rich reads `[/data]` in them as markup.
-    out.print(f"[bold red]Error:[/bold red] {escape(message)}")
+    out.print(f"[bold red]Error:[/bold red] {plain(message)}")
     if details:
-        out.print(f"[red]Details:[/red] {escape(details)}")
+        out.print(f"[red]Details:[/red] {plain(details)}")
     if show_tip:
         out.print(
             "\n[yellow]Tip:[/yellow] Docker's own message is printed above this error."

@@ -10,7 +10,11 @@ from typing import Dict, List
 
 from python_on_whales import DockerClient
 
-from odctl.docker import create_client, wait_for_one_shot_containers
+from odctl.docker import (
+    check_exit_codes,
+    create_client,
+    wait_for_one_shot_containers,
+)
 
 
 def build_compose_clients(execution_plan: Dict[str, List[str]]) -> List[DockerClient]:
@@ -58,7 +62,9 @@ def recreate_managed_containers(
     for. Files are recreated in the plan's order, which puts the infrastructure
     first, as `up` does. The deps file starts attached and without `wait`, as
     `launch_stack` starts it, because its init container exits once it has copied
-    the jars and `--wait` fails on a container that exits, even with code 0.
+    the jars and `--wait` fails on a container that exits, even with code 0. A
+    container of the deps file that exits with another code stops the command
+    before the next file.
 
     Args:
         execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
@@ -69,6 +75,7 @@ def recreate_managed_containers(
     for profiles, compose_client in zip(execution_plan.values(), clients):
         if "deps" in profiles:
             compose_client.compose.up(detach=False, force_recreate=True, pull=policy)
+            check_exit_codes(compose_client)
             continue
         wait_for_one_shot_containers()
         compose_client.compose.up(

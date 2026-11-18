@@ -197,6 +197,21 @@ def test_an_address_with_a_placeholder_stays_code():
     assert "<a " not in out
 
 
+def test_an_address_with_a_query_string_becomes_a_link():
+    """Markdown renders `&` as `&amp;`, so stopping at every `&` left an address
+    with two query parameters unlinked."""
+    import markdown
+
+    hook = load("local_links", REPO / "scripts" / "local_links.py")
+    out = hook.link_local_addresses(
+        markdown.markdown("`http://127.0.0.1:8123/?a=1&b=2`")
+    )
+    assert (
+        '<a href="http://127.0.0.1:8123/?a=1&amp;b=2" rel="nofollow">'
+        "<code>http://127.0.0.1:8123/?a=1&amp;b=2</code></a>" in out
+    )
+
+
 def test_home_page_table_comes_from_the_area_list(gen_pages):
     """The home page holds the marker, and the table built for it has one row per
     area linking that area's profile page, so the two can never disagree."""

@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Optional
 from importlib.metadata import PackageNotFoundError, version
 
-from odctl.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
-from odctl.docker import _read_env_file
+from odctl.config import INTERNAL_RESOURCES_DIR, get_workspace_dir, read_env_file
 
 
 def get_cli_version() -> str:
@@ -40,7 +39,7 @@ def default_tag_to_cli_version() -> None:
     if "TAG" in os.environ:
         return
     workspace = get_workspace_dir()
-    if workspace.exists() and _read_env_file(workspace / ".env").get("TAG"):
+    if workspace.exists() and read_env_file(workspace / ".env").get("TAG"):
         return
     os.environ["TAG"] = get_cli_version()
 
@@ -62,7 +61,7 @@ def stale_workspace_tag() -> Optional[str]:
     """
     if os.environ.get("TAG"):
         return None
-    tag = _read_env_file(get_workspace_dir() / ".env").get("TAG")
+    tag = read_env_file(get_workspace_dir() / ".env").get("TAG")
     cli = get_cli_version()
     return tag if tag and cli != "latest" and tag != cli else None
 
@@ -119,8 +118,12 @@ def init_workspace(force: bool = False):
         workspace.mkdir(parents=True)
         print(f"📁 Created workspace at {workspace}/")
 
-    # Iterate over everything in the internal resources
-    for item in INTERNAL_RESOURCES_DIR.iterdir():
+    # registry.yml goes first: it is what marks a folder as a workspace, so a copy
+    # that fails part way leaves a folder that `init` and `init --force` still take.
+    items = sorted(
+        INTERNAL_RESOURCES_DIR.iterdir(), key=lambda i: i.name != "registry.yml"
+    )
+    for item in items:
         dest = workspace / item.name
 
         # Only copy if it doesn't exist (or was just deleted by force)

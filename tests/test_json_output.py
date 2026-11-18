@@ -304,8 +304,12 @@ COMMANDS_READING_COMPOSE = [
 
 @pytest.mark.parametrize(
     "compose, reason",
-    [(None, "the file does not exist"), ("services: [\n", "it is not valid YAML")],
-    ids=["missing", "invalid"],
+    [
+        (None, "the file does not exist"),
+        ("services: [\n", "it is not valid YAML"),
+        (b"services:\n  valkey:\n    image: caf\xe9\n", "it is not UTF-8 text"),
+    ],
+    ids=["missing", "invalid", "not UTF-8"],
 )
 @pytest.mark.parametrize("args", COMMANDS_READING_COMPOSE, ids=" ".join)
 def test_an_unreadable_compose_file_stops_every_command(
@@ -320,6 +324,8 @@ def test_an_unreadable_compose_file_stops_every_command(
     cache = tmp_path / ".odctl" / "compose-cache.yml"
     if compose is None:
         cache.unlink()
+    elif isinstance(compose, bytes):
+        cache.write_bytes(compose)
     else:
         cache.write_text(compose)
 
@@ -400,12 +406,22 @@ services:
             "the profile 'base' is listed under the stacks 'base' and 'cache'",
         ),
         (
+            "profiles: [valkey]",
+            "profiles: [valkey, valkey]",
+            "the stack 'cache' lists the profile 'valkey' twice",
+        ),
+        (
             "      valkey: [kafka-lite]",
             "      valkey: [kafka-lite]\n      kafka-lite: [base]",
             "the stack 'cache' lists dependencies for 'kafka-lite', which is not one of its profiles",
         ),
     ],
-    ids=["unknown dependency", "profile in two stacks", "key of another stack"],
+    ids=[
+        "unknown dependency",
+        "profile in two stacks",
+        "profile twice in one stack",
+        "key of another stack",
+    ],
 )
 def test_a_registry_whose_profiles_do_not_resolve_stops_every_command(
     monkeypatch, tmp_path, old, new, message
@@ -512,8 +528,9 @@ COMMANDS_READING_THE_REGISTRY = [
             "stacks:\n  kafka:\n    file: compose-kafka.yml\n",
             "stacks.kafka.description",
         ),
+        (b"stacks:\n  caf\xe9: {}\n", "it is not UTF-8 text"),
     ],
-    ids=["missing", "invalid", "empty", "incomplete"],
+    ids=["missing", "invalid", "empty", "incomplete", "not UTF-8"],
 )
 @pytest.mark.parametrize("args", COMMANDS_READING_THE_REGISTRY, ids=" ".join)
 def test_an_unreadable_registry_stops_every_command(
@@ -528,6 +545,8 @@ def test_an_unreadable_registry_stops_every_command(
     path = tmp_path / ".odctl" / "registry.yml"
     if registry is None:
         path.unlink()
+    elif isinstance(registry, bytes):
+        path.write_bytes(registry)
     else:
         path.write_text(registry)
 
@@ -536,6 +555,95 @@ def test_an_unreadable_registry_stops_every_command(
     _failed_with(result, f"Cannot read {path}: {reason}")
     if "--json" in args:
         assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "target, args",
+    [
+        ("odctl.main.build_execution_plan", ["restart", "kafka-lite"]),
+        ("odctl.reports.build_info", ["info"]),
+        ("odctl.planner.read_compose", ["up", "kafka-lite", "--dry-run"]),
+    ],
+    ids=["decorated command", "info", "unreachable profile check"],
+)
+def test_a_value_error_from_a_bug_is_not_reported_as_a_file_error(
+    monkeypatch, tmp_path, target, args
+):
+    """Only a file that cannot be read becomes a message and exit 1, or is skipped by
+    the check for unreachable profiles; any other ValueError raises as itself, so a
+    bug shows its traceback."""
+    _fixed_workspace(monkeypatch, tmp_path)
+    _no_containers(monkeypatch)
+
+    def bug(*args, **kwargs):
+        raise ValueError("a bug")
+
+    monkeypatch.setattr(target, bug)
+
+    result = runner.invoke(app, args)
+
+    assert isinstance(result.exception, ValueError), result.exception
+    assert "a bug" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["up", "valkey", "--dry-run"],
+        ["down", "valkey", "--dry-run"],
+        ["restart", "valkey"],
+        ["recreate", "valkey"],
+    ],
+    ids=" ".join,
+)
+def test_registry_names_are_printed_as_written(monkeypatch, tmp_path, args):
+    """The dry run and the progress lines print the registry's file and profile
+    names through the same escaping as `list` and `explain`."""
+    _fixed_workspace(monkeypatch, tmp_path)
+    _no_containers(monkeypatch)
+    monkeypatch.setattr("odctl.projects.create_client", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr("odctl.projects.wait_for_one_shot_containers", lambda: None)
+    workspace = tmp_path / ".odctl"
+    (workspace / "compose-cache.yml").rename(workspace / "compose-[bold]cache.yml")
+    registry = workspace / "registry.yml"
+    registry.write_text(
+        registry.read_text().replace(
+            "file: compose-cache.yml", "file: compose-[bold]cache.yml"
+        )
+    )
+
+    result = runner.invoke(app, args, env={"COLUMNS": "200"})
+
+    assert result.exit_code == 0, (result.stdout, result.exception)
+    assert "compose-[bold]cache.yml" in result.stdout, result.stdout
+
+
+def test_compose_names_are_printed_as_written(monkeypatch, tmp_path):
+    """`list -d` prints the services and ports and `explain` the volumes as the
+    compose file names them."""
+    _fixed_workspace(monkeypatch, tmp_path)
+    _write_compose_cache(
+        tmp_path,
+        """\
+services:
+  valkey[bold]x:
+    image: valkey/valkey-bundle:9
+    ports:
+      - "127.0.0.1:${VK_PORT:-6379}:6379[bold]"
+    volumes:
+      - cache[bold]data:/data
+    profiles: [valkey]
+volumes:
+  cache[bold]data: {}
+""",
+    )
+
+    listed = runner.invoke(app, ["list", "-d"], env={"COLUMNS": "300"})
+    explained = runner.invoke(app, ["explain", "valkey"], env={"COLUMNS": "300"})
+
+    assert "valkey[bold]x" in listed.stdout, listed.stdout
+    assert "6379[bold]" in listed.stdout, listed.stdout
+    assert "cache[bold]data" in explained.stdout, explained.stdout
 
 
 def test_registry_text_is_printed_as_written(monkeypatch, tmp_path):
@@ -646,3 +754,54 @@ def test_an_unreachable_profile_warning_goes_to_stderr_with_json(monkeypatch, ca
     assert printed.out == ""
     assert "ch-keeper" in printed.err
     assert "It will never start." in printed.err
+
+
+@pytest.mark.parametrize(
+    "b_states",
+    [
+        {"init": ("exited", 0), "db": ("running", 0)},
+        {"init": ("running", 0), "db": ("exited", 1)},
+    ],
+    ids=["one-shot of another file", "running service of another file"],
+)
+def test_a_service_counts_only_in_its_own_project(monkeypatch, tmp_path, b_states):
+    """Services were matched by name across files: a one-shot `init` of one file let
+    another file's plain `init` count once it exited, and a running `db` of one file
+    counted for another file's stopped `db`."""
+    from types import SimpleNamespace
+
+    from odctl import docker, reports
+
+    (tmp_path / "compose-a.yml").write_text(
+        "name: a\nservices:\n  init:\n    profiles: [pa]\n"
+        "  app:\n    profiles: [pa]\n"
+        "    depends_on:\n      init:\n        condition: service_completed_successfully\n"
+        "  db:\n    profiles: [pa]\n"
+    )
+    (tmp_path / "compose-b.yml").write_text(
+        "name: b\nservices:\n  init:\n    profiles: [pb]\n  db:\n    profiles: [pb]\n"
+        "  cache:\n    profiles: [pb]\n"
+    )
+    monkeypatch.setattr(docker, "get_compose_path", lambda x: tmp_path / x)
+    monkeypatch.setattr(docker, "get_active_dir", lambda: tmp_path)
+
+    def container(project, service, status, exit_code=0):
+        labels = {
+            "com.docker.compose.project": project,
+            "com.docker.compose.service": service,
+        }
+        return SimpleNamespace(
+            config=SimpleNamespace(labels=labels),
+            state=SimpleNamespace(status=status, exit_code=exit_code),
+        )
+
+    containers = [
+        container("a", "init", "exited"),
+        container("a", "app", "running"),
+        container("a", "db", "running"),
+        *(container("b", name, *state) for name, state in b_states.items()),
+        container("b", "cache", "running"),
+    ]
+    plan = {"compose-a.yml": ["pa"], "compose-b.yml": ["pb"]}
+
+    assert reports._active_profiles(plan, containers) == ["pa"]

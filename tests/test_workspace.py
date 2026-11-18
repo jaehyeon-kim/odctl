@@ -50,6 +50,48 @@ def test_init_workspace(tmp_path, monkeypatch):
     assert (workspace / "test_file.txt").read_text() == "hello"
 
 
+@pytest.mark.parametrize("force", [False, True], ids=["init", "init --force"])
+def test_an_interrupted_init_can_be_run_again(tmp_path, monkeypatch, force):
+    """`init` refuses a folder with files and no registry.yml, so a copy that failed
+    after the first file and before registry.yml left a folder that neither `init`
+    nor `init --force` would repair."""
+    import shutil
+    from pathlib import Path
+
+    from odctl import workspace as ws
+
+    workspace = tmp_path / ".odctl"
+    monkeypatch.setattr(ws, "get_workspace_dir", lambda: workspace)
+    internal = tmp_path / "internal"
+    internal.mkdir()
+    for name in ("a.yml", "b.yml", "registry.yml"):
+        (internal / name).write_text("x: 1\n")
+    monkeypatch.setattr(ws, "INTERNAL_RESOURCES_DIR", internal)
+    # A file system that lists the folder in name order.
+    listing = Path.iterdir
+    monkeypatch.setattr(Path, "iterdir", lambda self: iter(sorted(listing(self))))
+    copy = shutil.copy2
+
+    def disk_full(src, dst, **kwargs):
+        if Path(src).name == "b.yml":
+            raise OSError(28, "No space left on device")
+        return copy(src, dst, **kwargs)
+
+    monkeypatch.setattr(ws.shutil, "copy2", disk_full)
+    with pytest.raises(OSError):
+        init_workspace()
+    monkeypatch.setattr(ws.shutil, "copy2", copy)
+
+    init_workspace(force=force)
+
+    assert sorted(p.name for p in workspace.iterdir()) == [
+        ".env",
+        "a.yml",
+        "b.yml",
+        "registry.yml",
+    ]
+
+
 def _workspace_with_tag(tmp_path, monkeypatch, tag):
     workspace = tmp_path / ".odctl"
     workspace.mkdir()

@@ -6,12 +6,13 @@ rel="nofollow", which Google documents as the value for a link it should not
 crawl from this site; a 127.0.0.1 address only exists on the reader's machine.
 Code blocks are left alone, because their code element is not bare. An address
 with a placeholder, such as `http://127.0.0.1:<port>`, which the HTML holds as
-`&lt;port&gt;`, stays code, because no browser can open it.
+`&lt;port&gt;`, stays code, because no browser can open it. The `&amp;` of a
+query string, such as `?a=1&b=2`, stays part of the address.
 """
 
 import re
 
-_LOCAL = re.compile(r"(?<!<pre>)<code>(http://127\.0\.0\.1[^<\s&]*)</code>")
+_LOCAL = re.compile(r"(?<!<pre>)<code>(http://127\.0\.0\.1(?:[^<\s&]|&amp;)*)</code>")
 
 
 def link_local_addresses(html: str) -> str:

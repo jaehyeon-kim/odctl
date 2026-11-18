@@ -298,3 +298,24 @@ def test_down_refuses_every_profile_but_deps(monkeypatch, tmp_path):
     assert result.is_error
     assert "odctl down --all --volumes" in result.content[0].text
     mock_stop.assert_not_called()
+
+
+def test_down_stops_nothing_when_the_guard_holds_only_inside_the_command(
+    fixed_state, monkeypatch
+):
+    """The tool checks the guard, then `odctl down` checks it again and asks. The
+    server's stdin gives no answer, so the question aborts, and the tool returns the
+    command's text as an error instead of a bare Abort."""
+    import io
+
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    answers = iter([False, True])
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: next(answers))
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+
+    result = _call("down", {"profiles": ["kafka-lite"], "volumes": True}, True)
+
+    assert result.is_error
+    assert "WIPE ALL DATA" in result.content[0].text, result.content[0].text
+    mock_stop.assert_not_called()

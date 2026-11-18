@@ -830,6 +830,28 @@ def test_down_dry_run_names_the_volumes(
     mock_stop.assert_not_called()
 
 
+@pytest.mark.parametrize("volumes", [["-v"], []], ids=["volumes", "no volumes"])
+def test_down_deps_dry_run_without_docker_stops_deps_in_every_case(
+    monkeypatch, volumes
+):
+    """The real run stops a named deps whatever else runs; only its shared jar
+    volume waits until no other profile has a container."""
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: False)
+
+    result = runner.invoke(
+        app, ["down", "deps", *volumes, "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    lines = [line.strip() for line in result.stdout.splitlines()]
+    assert any(line.endswith("Stop Profile: deps") for line in lines), lines
+    volume = "Remove Volume: odctl-shared-deps" + NOT_CHECKED
+    assert any(line.endswith(volume) for line in lines) == bool(volumes), lines
+    mock_stop.assert_not_called()
+
+
 def test_mcp_without_the_extra_names_the_install(monkeypatch):
     """The CLI runs without the mcp package, and `odctl mcp` says how to install it, on
     stderr like every message of `odctl mcp`."""
