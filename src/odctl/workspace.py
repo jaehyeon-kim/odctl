@@ -1,9 +1,11 @@
 import os
 import shutil
+from pathlib import Path
 from typing import Optional
 from importlib.metadata import PackageNotFoundError, version
 
 from odctl.config import INTERNAL_RESOURCES_DIR, get_workspace_dir
+from odctl.docker import _read_env_file
 
 
 def get_cli_version() -> str:
@@ -29,11 +31,16 @@ def default_tag_to_cli_version() -> None:
     The compose files tag odctl's own images `${TAG:-latest}`. Without a
     workspace there is no `.env` to set TAG, so the images ran as `latest`, and
     Docker does not pull an image it already has: after an upgrade an older
-    `latest` kept running (#127). Setting TAG here, as `odctl init` writes it,
+    `latest` kept running (#127). A workspace whose `.env` has no TAG, or an empty
+    one, ran `latest` the same way. Setting TAG here, as `odctl init` writes it,
     reaches both Docker Compose, which inherits the environment, and
-    `resolve_image_tag`. A TAG already set in the shell is left alone.
+    `resolve_image_tag`. A TAG already set in the shell is left alone, and so is a
+    non-empty TAG in the workspace `.env`, read as Compose reads it.
     """
-    if "TAG" in os.environ or get_workspace_dir().exists():
+    if "TAG" in os.environ:
+        return
+    workspace = get_workspace_dir()
+    if workspace.exists() and _read_env_file(workspace / ".env").get("TAG"):
         return
     os.environ["TAG"] = get_cli_version()
 
@@ -46,22 +53,46 @@ def stale_workspace_tag() -> Optional[str]:
     leaves the workspace starting the old images and compose files, with no sign
     of it. A TAG set in the shell is an explicit choice and is not reported.
 
+    The workspace's TAG is read as Compose reads `.env`, by the same parser as
+    `resolve_image_tag`, so the warning names the tag Compose runs.
+
     Returns:
         Optional[str]: The stale TAG, or None when there is no workspace, no TAG,
         a shell override, or a match.
     """
     if os.environ.get("TAG"):
         return None
-    env_file = get_workspace_dir() / ".env"
-    if not env_file.exists():
-        return None
-    for line in env_file.read_text().splitlines():
-        key, _, value = line.strip().partition("=")
-        if key == "TAG":
-            tag = value.strip().strip('"').strip("'")
-            cli = get_cli_version()
-            return tag if tag and cli != "latest" and tag != cli else None
-    return None
+    tag = _read_env_file(get_workspace_dir() / ".env").get("TAG")
+    cli = get_cli_version()
+    return tag if tag and cli != "latest" and tag != cli else None
+
+
+def check_workspace_path(workspace: Path) -> None:
+    """
+    Refuse a workspace path that `odctl init` must not write into or remove.
+
+    `init --force` removes the workspace folder with every file in it, so a folder
+    that holds files but no `registry.yml`, which every workspace has, is not taken
+    for one. An empty folder, or one that does not exist yet, is a new workspace.
+
+    Args:
+        workspace (Path): The workspace folder, from `--workspace` or `./.odctl`.
+
+    Raises:
+        ValueError: If the path is a file, or a folder that is not empty and holds no
+            `registry.yml`.
+    """
+    if workspace.is_file():
+        raise ValueError(f"{workspace} is a file. Name a folder for the workspace.")
+    if (
+        workspace.is_dir()
+        and any(workspace.iterdir())
+        and not (workspace / "registry.yml").exists()
+    ):
+        raise ValueError(
+            f"{workspace} is not an odctl workspace: it holds files and no "
+            "registry.yml. Name a new or empty folder, or an existing workspace."
+        )
 
 
 def init_workspace(force: bool = False):
@@ -71,8 +102,13 @@ def init_workspace(force: bool = False):
     Args:
         force (bool, optional): If True, completely deletes the existing workspace and
                                 recreates it from scratch. Defaults to False.
+
+    Raises:
+        ValueError: If the workspace path is a file, or a folder that is not a
+            workspace (`check_workspace_path`).
     """
     workspace = get_workspace_dir()
+    check_workspace_path(workspace)
 
     # Nuke the existing workspace if force is True
     if force and workspace.exists():

@@ -14,6 +14,68 @@ _error_console = Console(stderr=True)
 
 _json_output = False
 
+# Each image's role in `odctl explain`. A key matches an image whose repository, the
+# image without its tag, is the key or ends with `/` and the key, so the order of the
+# keys does not matter (`container_role`). Every image of the packaged compose files
+# needs a key (tests/test_ui.py).
+CONTAINER_ROLES: Dict[str, str] = {
+    "odctl/postgres": "PostgreSQL with pgvector, pg_textsearch and PostGIS",
+    "seaweedfs": "Object Storage (S3 API)",
+    "zulu-openjdk": "Iceberg REST Catalog",
+    "odctl/deps": "Dependency Initializer",
+    "flink": "Flink Stream Processing Node",
+    "apache/kafka": "Event Broker / Kafka Connect",
+    "karapace": "Schema Registry",
+    "kafka-ui": "Kafka Dashboard",
+    "elasticsearch": "OpenMetadata Search Backend",
+    "openmetadata/server": "OpenMetadata Server",
+    "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
+    "odctl/airflow": "Airflow Orchestrator",
+    "odctl/mlflow": "MLflow Tracking and Model Server",
+    "evidently-service": "ML Monitoring (Evidently UI)",
+    "temporalio/temporal": "Temporal Development Server and Web UI",
+    "marquez-web": "Lineage Dashboard",
+    "marquezproject/marquez": "Lineage API Server",
+    "otel-lgtm": "Telemetry: OTLP, Prometheus, Tempo, Loki, Grafana",
+    "odctl/spark": "Spark Processing Node",
+    "clickhouse-keeper": "Consensus Node",
+    "clickhouse-server": "Analytical Database (OLAP)",
+    "fluss": "Streaming Storage Engine",
+    "valkey-bundle": "In-Memory Cache & Vector DB",
+    "trinodb/trino": "Federated SQL Engine",
+    "metabase": "BI Dashboard",
+    "langfuse/langfuse-worker": "Langfuse Background Worker",
+    "langfuse/langfuse": "LLM Tracing (Langfuse Web and API)",
+    "feastdev/feature-server": "Feast Feature Server and UI",
+    "label-studio": "Data Labelling (Label Studio)",
+    "zookeeper": "Fluss Coordination (ZooKeeper)",
+    "alpine": "Placeholder for the missing ClickHouse shard 2",
+}
+
+
+def container_role(image: str) -> Optional[str]:
+    """
+    Name the role of an image, from `CONTAINER_ROLES`.
+
+    The tag is everything after the first `:` that follows the last `/`, so a
+    registry with a port, such as `localhost:5000/x`, keeps its port. Matching whole
+    path segments keeps `marquez-web` from taking the role of `marquezproject/marquez`
+    and `alpine` from matching `clickhouse-server:25.12-alpine`.
+
+    Args:
+        image (str): An image reference, such as `apache/kafka:4.3.2`.
+
+    Returns:
+        Optional[str]: The role, or None when no key matches.
+    """
+    slash = image.rfind("/")
+    colon = image.find(":", slash + 1)
+    repository = image if colon == -1 else image[:colon]
+    for key, role in CONTAINER_ROLES.items():
+        if repository == key or repository.endswith("/" + key):
+            return role
+    return None
+
 
 def set_json_output(enabled: bool) -> None:
     """
@@ -79,10 +141,11 @@ def print_profile_table(profiles: List[ProfileInfo], details: bool):
             table.add_section()
         previous_stack_id = info.stack_id
 
+        # Registry text is plain: escape it, or Rich reads `[...]` in it as markup.
         row = [
-            info.profile,
-            info.stack if starts_group else "",
-            info.description if starts_group else "",
+            escape(info.profile),
+            escape(info.stack) if starts_group else "",
+            escape(info.description) if starts_group else "",
         ]
 
         if details:
@@ -114,66 +177,28 @@ def print_explain_panel(details: ProfileDetails):
     Args:
         details (ProfileDetails): The profile to describe.
     """
-    profile = details.profile
-    deps = [p for p in details.starts if p != profile] or ["None"]
+    # Registry and compose text is plain: escape it, or Rich reads `[...]` as markup.
+    profile = escape(details.profile)
+    deps = [escape(p) for p in details.starts if p != details.profile] or ["None"]
     deps_str = ", ".join(f"[yellow]{d}[/yellow]" for d in deps)
     services = details.services
     volumes = details.volumes
     usage = details.usage
     if details.usage_missing:
-        usage = f"• No specific usage guide for profile: {profile}"
-    role = details.role
+        usage = f"• No specific usage guide for profile: {details.profile}"
+    role = escape(details.role) if details.role else None
 
-    # Container Context (Substring matching)
-    container_roles = {
-        "odctl/postgres": "PostgreSQL with pgvector, pg_textsearch and PostGIS",
-        "seaweedfs": "Object Storage (S3 API)",
-        "zulu-openjdk": "Iceberg REST Catalog",
-        "odctl/deps": "Dependency Initializer",
-        "flink": "Flink Stream Processing Node",
-        "apache/kafka": "Event Broker / Kafka Connect",
-        "karapace": "Schema Registry",
-        "kafka-ui": "Kafka Dashboard",
-        "elasticsearch": "OpenMetadata Search Backend",
-        "openmetadata/server": "OpenMetadata Server",
-        "openmetadata/ingestion": "OpenMetadata Ingestion Pipeline",
-        "odctl/airflow": "Airflow Orchestrator",
-        "odctl/mlflow": "MLflow Tracking and Model Server",
-        "evidently-service": "ML Monitoring (Evidently UI)",
-        "temporalio/temporal": "Temporal Development Server and Web UI",
-        "marquez-web": "Lineage Dashboard",
-        "marquezproject/marquez": "Lineage API Server",
-        "otel-lgtm": "Telemetry: OTLP, Prometheus, Tempo, Loki, Grafana",
-        "odctl/spark": "Spark Processing Node",
-        "clickhouse-keeper": "Consensus Node",
-        "clickhouse-server": "Analytical Database (OLAP)",
-        "fluss": "Streaming Storage Engine",
-        "valkey": "In-Memory Cache & Vector DB",
-        "trinodb/trino": "Federated SQL Engine",
-        "metabase": "BI Dashboard",
-    }
-
-    with_images = [svc for svc in services if svc.image]
-    if with_images:
-        services_list = []
-        for svc in with_images:
-            img = svc.image or ""
-            role_desc = "Service Container"
-            for key, desc in container_roles.items():
-                if key in img:
-                    role_desc = desc
-                    break
-
-            services_list.append(
-                f"  📦 [magenta]{svc.name.ljust(22, ' ')}[/magenta] ([green]{img}[/green])\n      ↳ [dim]{role_desc}[/dim]"
-            )
-        services_str = "\n".join(services_list)
-    else:
-        services_str = (
-            "\n".join(f"  📦 [magenta]{svc.name}[/magenta]" for svc in services)
-            if services
-            else "  None"
+    # A service built from source has no image, and its file still starts it.
+    services_list = []
+    for svc in services:
+        shown = escape(svc.image) if svc.image else "built locally"
+        role_desc = (container_role(svc.image) if svc.image else None) or (
+            "Service Container"
         )
+        services_list.append(
+            f"  📦 [magenta]{escape(svc.name.ljust(22, ' '))}[/magenta] ([green]{shown}[/green])\n      ↳ [dim]{role_desc}[/dim]"
+        )
+    services_str = "\n".join(services_list) if services_list else "  None"
 
     # Volumes Context
     volumes_str = (
@@ -184,25 +209,23 @@ def print_explain_panel(details: ProfileDetails):
             "\n  [dim italic](Use 'odctl down -v' to wipe these volumes)[/dim italic]"
         )
 
-    # Port Context (Host vs Internal Routing)
-    ports_list = []
-    for spec in details.port_specs:
-        parts = spec.split(":")
-        svc_name = parts[0]
-
-        # Parse Host vs Container mapping (for example, flink-sql-gateway:127.0.0.1:8084:8083)
-        if len(parts) >= 3:
-            host_port = parts[-2]
-            container_port = parts[-1]
-        elif len(parts) == 2:
-            host_port = parts[1]
-            container_port = parts[1]
-        else:
-            continue
-
-        ports_list.append(
-            f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] → Container [cyan]{svc_name}:{container_port}[/cyan]"
-        )
+    # Port Context (Host vs Internal Routing), from the ports `reports._parse_port`
+    # read, with variables expanded. A port with no host part is published on a
+    # random host port, so it has no line. The order is that of the specs as
+    # written, `service:127.0.0.1:host:container`, sorted as text.
+    mappings = []
+    for svc in services:
+        for port in svc.ports:
+            container_port = str(port.container)
+            if port.protocol != "tcp":
+                container_port += f"/{port.protocol}"
+            host_port = str(port.host)
+            spec = f"{svc.name}:{host_port}:{container_port}"
+            mappings.append((spec, escape(svc.name), host_port, container_port))
+    ports_list = [
+        f"  🔌 Host [bold blue]{host_port.ljust(5, ' ')}[/bold blue] → Container [cyan]{svc_name}:{container_port}[/cyan]"
+        for _, svc_name, host_port, container_port in sorted(mappings)
+    ]
     ports_str = "\n".join(ports_list) if ports_list else "  None"
 
     # Constructing the Output
@@ -215,11 +238,11 @@ def print_explain_panel(details: ProfileDetails):
     )
 
     body = f"""
-[bold]Parent Stack:[/bold] {details.stack}
-[bold]Compose File:[/bold] {details.compose_file}
+[bold]Parent Stack:[/bold] {escape(details.stack)}
+[bold]Compose File:[/bold] {escape(details.compose_file)}
 
 [bold]Description:[/bold]
-{details.description}
+{escape(details.description)}
 {role_section}
 [bold]Requires Dependencies:[/bold]
   {deps_str}
@@ -322,9 +345,11 @@ def print_error(message: str, details: Optional[str] = None, show_tip: bool = Fa
         show_tip (bool, optional): If True, appends a troubleshooting tip regarding Docker logs. Defaults to False.
     """
     out = _message_console()
-    out.print(f"[bold red]Error:[/bold red] {message}")
+    # The message and details are plain text, such as Docker's stderr: escape them,
+    # or Rich reads `[/data]` in them as markup.
+    out.print(f"[bold red]Error:[/bold red] {escape(message)}")
     if details:
-        out.print(f"[red]Details:[/red] {details}")
+        out.print(f"[red]Details:[/red] {escape(details)}")
     if show_tip:
         out.print(
             "\n[yellow]Tip:[/yellow] Docker's own message is printed above this error."

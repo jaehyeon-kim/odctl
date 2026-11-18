@@ -1,9 +1,9 @@
+import functools
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import typer
-from rich.markup import escape
 from typer.core import TyperGroup
 
 from odctl import config, reports, ui
@@ -19,7 +19,7 @@ from odctl.docker import (
     resolve_image_tag,
     stop_stack,
 )
-from odctl.logs import get_managed_logs
+from odctl.logs import LogsError, get_managed_logs
 from odctl.projects import recreate_managed_containers, restart_managed_containers
 from odctl.planner import (
     build_execution_plan,
@@ -27,6 +27,7 @@ from odctl.planner import (
     warn_unreachable_profiles,
 )
 from odctl.workspace import (
+    check_workspace_path,
     get_cli_version,
     get_workspace_dir,
     init_workspace,
@@ -35,6 +36,32 @@ from odctl.workspace import (
 )
 
 _JSON_HELP = "Print the output as JSON, for scripts and AI assistants."
+
+
+def _stops_on_unreadable_files(command: Callable) -> Callable:
+    """
+    Make a command report a file it cannot read, and exit 1.
+
+    `load_registry` and `read_compose` raise ValueError with a message that names the
+    file and the reason, so the command prints that message instead of a traceback.
+    The MCP server calls the command functions directly, and gets the same exit.
+
+    Args:
+        command (Callable): The command function.
+
+    Returns:
+        Callable: The command, with the same signature for Typer.
+    """
+
+    @functools.wraps(command)
+    def run(*args, **kwargs):
+        try:
+            return command(*args, **kwargs)
+        except ValueError as e:
+            ui.print_error(str(e))
+            raise typer.Exit(1)
+
+    return run
 
 
 class _OdctlGroup(TyperGroup):
@@ -218,7 +245,7 @@ def explain(
             dependency, or, with `--json`, when the compose file cannot be read.
     """
     try:
-        details = reports.build_profile_details(profile, for_json=json_output)
+        details = reports.build_profile_details(profile)
     except reports.UnknownProfileError:
         ui.print_error(f"Profile '{profile}' not found in registry.")
         raise typer.Exit(1)
@@ -267,10 +294,21 @@ def init(
     Args:
         force (bool): Replace an existing workspace with a fresh copy, which resets local edits.
         yes (bool): Skip the confirmation prompt of `--force`.
+
+    Raises:
+        typer.Exit: With code 1 when the workspace path is a file, or a folder that
+            holds files and no `registry.yml`.
     """
-    if force and not yes and get_workspace_dir().exists():
+    workspace = get_workspace_dir()
+    try:
+        check_workspace_path(workspace)
+    except ValueError as e:
+        ui.print_error(str(e))
+        raise typer.Exit(1)
+    if force and not yes and workspace.exists():
         typer.confirm(
-            "⚠️  This will wipe out local modifications. Are you sure?", abort=True
+            f"⚠️  This will remove {workspace}/ and wipe out local modifications. Are you sure?",
+            abort=True,
         )
     init_workspace(force=force)
     ui.print_success(
@@ -288,6 +326,7 @@ def init(
   $ [bold cyan]odctl pull flink-lite kafka-lite[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def pull(
     profiles: Optional[List[str]] = typer.Argument(
         None, help="Specific profiles to pull images for."
@@ -344,6 +383,7 @@ def pull(
   $ [bold cyan]odctl up kafka-lite --pull[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def up(
     profiles: List[str] = typer.Argument(
         ...,
@@ -418,7 +458,14 @@ def up(
             ui.print_info(
                 f"📥 Pulling images for {prefix} ([cyan]{', '.join(profs)}[/cyan])..."
             )
-            pull_stack_images(file, profs)
+            try:
+                pull_stack_images(file, profs)
+            except Exception as e:
+                ui.print_error(
+                    f"Failed to pull images for {file}",
+                    details=ui.format_docker_error(e),
+                )
+                raise typer.Exit(1)
 
         ui.print_info(f"⚙️  Launching {prefix} ([cyan]{', '.join(profs)}[/cyan])...")
         try:
@@ -515,15 +562,20 @@ def removes_everything(profiles: List[str]) -> bool:
     """Tell whether a named teardown with `--volumes` removes all that `--all --volumes` does.
 
     `odctl down --all --volumes` asks before it removes the data of every profile.
-    A caller that cannot ask, such as the MCP server, refuses a named teardown that
-    reaches the same result.
+    `odctl down <profiles> --volumes` asks the same question when this holds, and a
+    caller that cannot ask, such as the MCP server, refuses the call.
+
+    The deps file is left out of both sides. `--all` always keeps it, because it
+    declares the shared jar volume, while a named teardown with `--volumes` removes
+    it anyway once no other profile has a container.
 
     Args:
         profiles (List[str]): The profiles the teardown names.
 
     Returns:
         bool: True when the named profiles, with their dependencies, include every
-            profile `--all --volumes` would stop, and that is at least one.
+            profile `--all --volumes` would stop, other than deps, and that is at
+            least one.
 
     Raises:
         typer.Exit: With code 1 when a profile is unknown.
@@ -532,8 +584,12 @@ def removes_everything(profiles: List[str]) -> bool:
     named = expand_plan_dependencies(
         build_execution_plan(profiles, False, resolve_deps=False)
     )
-    every_profile = {p for profs in every.values() for p in profs}
-    named_profiles = {p for profs in named.values() for p in profs}
+    every_profile = {
+        p for file, profs in every.items() if file != _DEPS_FILE for p in profs
+    }
+    named_profiles = {
+        p for file, profs in named.items() if file != _DEPS_FILE for p in profs
+    }
     return bool(every_profile) and every_profile <= named_profiles
 
 
@@ -618,6 +674,7 @@ def _dry_run_volumes(plan: dict, all: bool) -> dict:
   $ [bold cyan]odctl down --all -v --yes[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def down(
     profiles: Optional[List[str]] = typer.Argument(
         None, help="Specific profiles to stop."
@@ -654,7 +711,8 @@ def down(
         volumes (bool): Also remove the volumes of the stopped services.
         dry_run (bool): Print the teardown plan, with the volumes `--volumes`
             would remove, without stopping anything.
-        yes (bool): Skip the confirmation prompt of `--all --volumes`.
+        yes (bool): Skip the confirmation prompt of `--all --volumes`, and of
+            `--volumes` with profiles that cover every profile with data.
 
     Raises:
         typer.Exit: With code 1 when Docker is not reachable, except for a dry run of
@@ -667,7 +725,13 @@ def down(
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
-    if all and volumes and not dry_run and not yes:
+    # Naming every profile with `--volumes` removes the same data as `--all --volumes`.
+    if (
+        volumes
+        and not dry_run
+        and not yes
+        and (all or removes_everything(profiles or []))
+    ):
         typer.confirm(
             "⚠️  This will destroy ALL profiles and WIPE ALL DATA. Are you sure?",
             abort=True,
@@ -686,8 +750,14 @@ def down(
 
     plan = dict(reversed(list(plan.items())))
 
+    # A named deps follows the rule of a named teardown below: its shared jar volume
+    # goes only once no other profile has a container.
+    deps_named = not all and plan.pop(_DEPS_FILE, None) is not None
+
     if dry_run:
         removed = _dry_run_volumes(plan, all) if volumes else None
+        if deps_named and _DEPS_FILE not in plan:
+            plan[_DEPS_FILE] = ["deps"]
         ui.print_dry_run(plan, is_teardown=True, volumes=removed)
         return
 
@@ -704,13 +774,20 @@ def down(
     # network and the shared JAR volume behind: a wipe that did not wipe. Remove
     # them here, but only once nothing else is running, since every other profile
     # attaches to that network and mounts that volume.
-    if volumes and not all and _shared_deps_are_idle(plan):
+    idle = volumes and not all and _shared_deps_are_idle(plan)
+    if idle or deps_named:
         ui.print_info("🛑 Stopping [cyan]deps[/cyan]...")
         try:
-            stop_stack(_DEPS_FILE, ["deps"], remove_volumes=True)
+            stop_stack(_DEPS_FILE, ["deps"], remove_volumes=idle)
         except Exception as e:
             ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
             raise typer.Exit(1)
+        if volumes and not idle:
+            ui.print_info(
+                "The shared jar volume odctl-shared-deps stays, because other "
+                "profiles still have containers that use it.",
+                style="yellow",
+            )
 
     ui.print_success("Teardown complete.")
 
@@ -726,6 +803,7 @@ def down(
   $ [bold cyan]odctl ps kafka-lite spark-lite[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def ps(
     profiles: Optional[List[str]] = typer.Argument(
         None, help="Specific profiles to inspect."
@@ -770,11 +848,12 @@ def info(
         json_output (bool): Print the report as JSON, with the tag, the workspace and the images.
 
     Raises:
-        typer.Exit: With code 1 when `--json` is set and the workspace has no `registry.yml`.
+        typer.Exit: With code 1 when `--json` is set and the registry or a compose file
+            cannot be read.
     """
     try:
         report = reports.build_info(include_images=json_output)
-    except FileNotFoundError as e:
+    except ValueError as e:
         ui.print_error(str(e))
         raise typer.Exit(1)
     if json_output:
@@ -796,6 +875,7 @@ def info(
   $ [bold cyan]odctl logs kafka-lite --since 10m -t[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def logs(
     profiles: List[str] = typer.Argument(..., help="Profiles to fetch logs for."),
     service: Optional[str] = typer.Option(
@@ -836,25 +916,31 @@ def logs(
         until (Optional[str]): Show lines before this time, absolute or relative.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable.
+        typer.Exit: With code 1 when Docker is not reachable, no compose file of the
+            profiles defines `service`, or `docker compose logs` fails.
     """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
         raise typer.Exit(1)
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
-    get_managed_logs(
-        execution_plan=plan,
-        follow=follow,
-        tail=tail,
-        timestamps=timestamps,
-        since=since,
-        until=until,
-        service=service,
-    )
+    try:
+        get_managed_logs(
+            execution_plan=plan,
+            follow=follow,
+            tail=tail,
+            timestamps=timestamps,
+            since=since,
+            until=until,
+            service=service,
+        )
+    except LogsError as e:
+        ui.print_error(str(e), details=ui.format_docker_error(e.error))
+        raise typer.Exit(1)
 
 
 @app.command(name="restart", rich_help_panel="Management")
+@_stops_on_unreadable_files
 def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.")):
     """
     Restart one or more specific profiles.
@@ -864,7 +950,8 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
         profiles (List[str]): The profiles whose containers to restart.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable.
+        typer.Exit: With code 1 when Docker is not reachable or a compose file fails
+            to restart.
     """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -872,11 +959,20 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Restarting containers...")
-    restart_managed_containers(plan)
+    for file, profs in plan.items():
+        ui.print_info(f"Restarting [yellow]{file}[/yellow]...", style="white")
+        try:
+            restart_managed_containers({file: profs})
+        except Exception as e:
+            ui.print_error(
+                f"Failed to restart {file}", details=ui.format_docker_error(e)
+            )
+            raise typer.Exit(1)
     ui.print_success("Restart complete.")
 
 
 @app.command(name="recreate", rich_help_panel="Management")
+@_stops_on_unreadable_files
 def recreate(
     profiles: List[str] = typer.Argument(..., help="Profiles to recreate."),
     pull: bool = typer.Option(False, "--pull", help="Pull images before recreating."),
@@ -890,7 +986,8 @@ def recreate(
         pull (bool): Pull the images again before replacing the containers.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable.
+        typer.Exit: With code 1 when Docker is not reachable or a compose file fails
+            to recreate. The files printed before it were already replaced.
     """
     if not is_docker_running():
         ui.print_error("Docker is not reachable.")
@@ -902,7 +999,15 @@ def recreate(
         "Recreating replaces the containers. Data inside them is lost; PostgreSQL, SeaweedFS, ClickHouse with its Keeper, and Fluss's ZooKeeper keep their volumes.",
         style="yellow",
     )
-    recreate_managed_containers(plan, pull=pull)
+    for file, profs in plan.items():
+        ui.print_info(f"Recreating [yellow]{file}[/yellow]...", style="white")
+        try:
+            recreate_managed_containers({file: profs}, pull=pull)
+        except Exception as e:
+            ui.print_error(
+                f"Failed to recreate {file}", details=ui.format_docker_error(e)
+            )
+            raise typer.Exit(1)
     ui.print_success("Recreate complete.")
 
 
@@ -933,7 +1038,7 @@ def mcp(
         from odctl.mcp_server import build_server
     except ImportError:
         ui.print_error(
-            escape('The MCP server needs the mcp extra: uv tool install "odctl[mcp]"')
+            'The MCP server needs the mcp extra: uv tool install "odctl[mcp]"'
         )
         raise typer.Exit(1)
 

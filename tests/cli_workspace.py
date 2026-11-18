@@ -44,6 +44,14 @@ services:
   init-base:
     image: example/base:1.0
     profiles: [base]
+  # Waits for init-base to finish, which marks init-base as a one-shot container. Its
+  # profile is in no stack, so it is never started or listed.
+  base-user:
+    image: example/base:1.0
+    profiles: [base-user]
+    depends_on:
+      init-base:
+        condition: service_completed_successfully
 """
 
 COMPOSE_KAFKA = """\
@@ -72,7 +80,7 @@ volumes:
 COMPOSE_CACHE = """\
 services:
   valkey:
-    image: valkey/valkey:8
+    image: valkey/valkey-bundle:9
     ports:
       - "127.0.0.1:6379:6379"
       - "127.0.0.1:16379:6380/udp"
@@ -106,6 +114,7 @@ def fake_container(
     health,
     ports,
     mounts=(),
+    exit_code: int = 0,
 ):
     """
     Build an object with the attributes of a python-on-whales container that odctl reads.
@@ -118,6 +127,8 @@ def fake_container(
         ports: The `network_settings.ports` map, from container port to bindings.
         mounts: The `(type, name)` of each mount, such as `("volume", "abc123")`.
             Defaults to none.
+        exit_code (int): The exit code Docker reports, which matters once the
+            container has exited. Defaults to 0.
 
     Returns:
         SimpleNamespace: The fake container.
@@ -128,6 +139,7 @@ def fake_container(
         config=SimpleNamespace(labels=labels),
         state=SimpleNamespace(
             status=state,
+            exit_code=exit_code,
             health=SimpleNamespace(status=health) if health else None,
         ),
         network_settings=SimpleNamespace(ports=ports),

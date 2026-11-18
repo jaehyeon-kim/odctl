@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+import yaml
 
 # Workspace directory requested via the global `--workspace` flag (set in main.py).
 _workspace_override: Optional[Path] = None
@@ -81,3 +83,31 @@ def get_compose_path(filename: str) -> Path:
         Path: The path to the requested file within the active directory.
     """
     return get_active_dir() / filename
+
+
+def read_yaml(path: Path, name: str) -> Any:
+    """
+    Read a YAML file that odctl needs, such as a compose file or `registry.yml`.
+
+    Args:
+        path (Path): The file to read.
+        name (str): How the error message names the file.
+
+    Returns:
+        Any: The file's content, as PyYAML's `safe_load` gives it.
+
+    Raises:
+        ValueError: As `Cannot read <name>: <reason>`, when the file is missing, cannot
+            be opened, or is not valid YAML.
+    """
+    try:
+        with open(path, "r") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError as e:
+        raise ValueError(f"Cannot read {name}: the file does not exist.") from e
+    except OSError as e:
+        raise ValueError(f"Cannot read {name}: {e.strerror}.") from e
+    except yaml.YAMLError as e:
+        mark = getattr(e, "problem_mark", None)
+        where = f" (line {mark.line + 1})" if mark else ""
+        raise ValueError(f"Cannot read {name}: it is not valid YAML{where}.") from e

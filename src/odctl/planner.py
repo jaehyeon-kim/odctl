@@ -1,14 +1,10 @@
 from typing import Dict, List, Optional, Set, Tuple
 
 import typer
-import yaml
-from rich.console import Console
 
 from odctl import ui
-from odctl.config import get_compose_path
+from odctl.docker import read_compose
 from odctl.registry import load_registry
-
-console = Console()
 
 
 def find_unreachable_profiles() -> List[Tuple[str, str, str]]:
@@ -32,18 +28,13 @@ def find_unreachable_profiles() -> List[Tuple[str, str, str]]:
 
     unreachable = []
     for config in registry.stacks.values():
-        path = get_compose_path(config.file)
-        if not path.exists():
-            continue
+        # A file that cannot be read is reported by the command that reads it.
         try:
-            with open(path, "r") as f:
-                compose = yaml.safe_load(f) or {}
-        except yaml.YAMLError:
+            compose = read_compose(config.file)
+        except ValueError:
             continue
 
         for svc_name, svc_data in (compose.get("services") or {}).items():
-            if not isinstance(svc_data, dict):
-                continue
             for profile in svc_data.get("profiles") or []:
                 # An unknown profile is a different problem, caught by
                 # validate_profiles when someone asks for it by name.
@@ -58,9 +49,11 @@ def warn_unreachable_profiles() -> None:
     Print a warning for every service whose declared profile is unreachable.
     """
     for file, service, profile in find_unreachable_profiles():
-        console.print(
-            f"[yellow]Warning:[/yellow] {file} service '{service}' declares profile "
-            f"'{profile}', which the registry maps to another file. It will never start."
+        # Through `ui`, so the warning goes to stderr under `--json` and `odctl mcp`.
+        ui.print_info(
+            f"Warning: {file} service '{service}' declares profile "
+            f"'{profile}', which the registry maps to another file. It will never start.",
+            style="yellow",
         )
 
 
@@ -178,11 +171,29 @@ def build_execution_plan(
         list(final_profiles), key=lambda p: (order_weights.get(p, 99), p)
     )
 
+    by_file: Dict[str, List[str]] = {}
     for p in sorted_profiles:
-        file = profile_map[p]["file"]
-        if file not in execution_plan:
-            execution_plan[file] = []
-        execution_plan[file].append(p)
+        by_file.setdefault(profile_map[p]["file"], []).append(p)
+
+    # Each file starts after the files of the profiles its profiles depend on. Of
+    # the files free to start, the one first in weight order goes next, so when the
+    # weight order already respects every dependency the plan keeps that order. A
+    # cycle across files leaves none free, and then weight order decides.
+    needs = {
+        file: {
+            profile_map[dep]["file"]
+            for p in profs
+            for dep in registry.stacks[profile_map[p]["stack_id"]].depends_on.get(p, [])
+            if dep in final_profiles and profile_map[dep]["file"] != file
+        }
+        for file, profs in by_file.items()
+    }
+    waiting = list(by_file)
+    while waiting:
+        free = [file for file in waiting if not needs[file] & set(waiting)]
+        file = (free or waiting)[0]
+        waiting.remove(file)
+        execution_plan[file] = by_file[file]
 
     return execution_plan
 

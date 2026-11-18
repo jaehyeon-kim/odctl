@@ -1,6 +1,6 @@
 ---
 name: odctl
-description: Start a local open data stack with odctl and reach its services. Use when a task needs Kafka, Flink, Spark, Iceberg, Trino, ClickHouse, PostgreSQL, SeaweedFS, MLflow, Feast, Evidently, Airflow, Temporal, Marquez, OpenMetadata, Valkey, Fluss, Langfuse or Grafana running locally in Docker.
+description: Start a local open data stack with odctl and reach its services. Use when a task needs Kafka, Flink, Spark, Iceberg, Trino, ClickHouse, Metabase, PostgreSQL, SeaweedFS, MLflow, Feast, Evidently, Label Studio, Airflow, Temporal, Marquez, OpenMetadata, Valkey, Fluss, Langfuse or Grafana running locally in Docker.
 ---
 
 # odctl

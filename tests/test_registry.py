@@ -42,12 +42,56 @@ def test_registry_validation_missing_fields():
         Registry(**bad_data)
 
 
+def _stack(profiles, depends_on=None):
+    return {
+        "file": "compose-x.yml",
+        "description": "d",
+        "profiles": profiles,
+        "depends_on": depends_on or {},
+    }
+
+
+@pytest.mark.parametrize(
+    "stacks, message",
+    [
+        (
+            {"one": _stack(["web"]), "two": _stack(["web"])},
+            "the profile 'web' is listed under the stacks 'one' and 'two'",
+        ),
+        (
+            {"base": _stack(["db"], {"web": ["db"]}), "app": _stack(["web"])},
+            "the stack 'base' lists dependencies for 'web', which is not one of its profiles",
+        ),
+        (
+            {"a": _stack(["a"], {"a": ["postgress"]})},
+            "the profile 'a' depends on 'postgress', which no stack lists",
+        ),
+    ],
+    ids=["profile in two stacks", "key of another stack", "unknown dependency"],
+)
+def test_a_registry_whose_profiles_do_not_resolve_is_refused(stacks, message):
+    """Each of these loaded before 1.10.0: a duplicate went to the last stack, a key
+    of another stack was ignored, and an unknown dependency raised KeyError while
+    the plan was built."""
+    with pytest.raises(ValidationError, match=message):
+        Registry.model_validate({"stacks": stacks})
+
+
+def test_the_packaged_registry_resolves():
+    from odctl.config import INTERNAL_RESOURCES_DIR
+    import yaml
+
+    data = yaml.safe_load((INTERNAL_RESOURCES_DIR / "registry.yml").read_text())
+    Registry.model_validate(data)
+
+
 def test_load_registry_file_not_found(mock_workspace, monkeypatch):
-    """Should raise standard FileNotFoundError if registry file is missing entirely."""
-    monkeypatch.setattr(
-        "odctl.config.get_registry_path", lambda: mock_workspace / "ghost_registry.yml"
-    )
-    with pytest.raises(FileNotFoundError):
+    """A missing registry file gives the one error every command reports."""
+    path = mock_workspace / "ghost_registry.yml"
+    monkeypatch.setattr("odctl.registry.get_registry_path", lambda: path)
+    with pytest.raises(
+        ValueError, match=f"^Cannot read {path}: the file does not exist"
+    ):
         load_registry()
 
 
