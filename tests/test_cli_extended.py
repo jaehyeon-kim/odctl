@@ -1302,3 +1302,41 @@ def test_down_dry_run_lists_the_unnamed_volumes_of_a_deps_file_profile(monkeypat
 
     assert result.exit_code == 0, result.stdout
     assert "1 unnamed volume(s) of extra-svc" in result.stdout, result.stdout
+
+
+def test_down_keeps_a_volume_the_other_deps_call_still_holds(monkeypatch):
+    """e1 and e2 share a volume and e2 also mounts the shared jar volume, so e2 is
+    stopped without `--volumes`; Docker keeps a volume a container still holds, so
+    e1 goes in e2's call and the dry run does not list the shared volume `c`."""
+    keys = {"deps": ["shared-deps"], "e1": ["c"], "e2": ["c", "shared-deps"]}
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: False)
+    monkeypatch.setattr(
+        "odctl.main.build_execution_plan",
+        lambda profiles, all, resolve_deps: {"compose-deps.yml": list(profiles)},
+    )
+    monkeypatch.setattr("odctl.main.expand_plan_dependencies", lambda plan: plan)
+    monkeypatch.setattr("odctl.main._shared_deps_are_idle", lambda plan: False)
+    monkeypatch.setattr(
+        "odctl.main.get_declared_volumes",
+        lambda file: {"shared-deps": "odctl-shared-deps", "c": "odctl_c"},
+    )
+    monkeypatch.setattr("odctl.main.get_volume_names", lambda: {"odctl_c"})
+    monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
+    monkeypatch.setattr(
+        "odctl.main.get_stack_details",
+        lambda f, p: _stack([], [k for q in p for k in keys.get(q, [])]),
+    )
+
+    result = runner.invoke(app, ["down", "e1", "e2", "-v"])
+    dry = runner.invoke(
+        app, ["down", "e1", "e2", "-v", "--dry-run"], env={"COLUMNS": "200"}
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert [
+        (c.args[1], c.kwargs["remove_volumes"]) for c in mock_stop.call_args_list
+    ] == [(["e1", "e2"], False)]
+    assert dry.exit_code == 0 and "odctl_c" not in dry.stdout, dry.stdout

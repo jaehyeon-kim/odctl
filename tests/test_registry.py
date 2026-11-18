@@ -69,13 +69,11 @@ class TestUsageTextMatchesCompose:
         return Path(config.__file__).parent / "resources"
 
     def _load(self):
-        import yaml
+        from odctl.config import read_yaml
 
         root = self._resources()
-        registry = yaml.safe_load((root / "registry.yml").read_text())
-        composes = {
-            p.name: yaml.safe_load(p.read_text()) for p in root.glob("compose-*.yml")
-        }
+        registry = read_yaml(root / "registry.yml", "registry.yml")
+        composes = {p.name: read_yaml(p, p.name) for p in root.glob("compose-*.yml")}
         return root, registry, composes
 
     @staticmethod
@@ -97,7 +95,9 @@ class TestUsageTextMatchesCompose:
                 continue
             for entry in svc.get("ports") or []:
                 if isinstance(entry, str):
-                    host = entry.split(":")[-2]
+                    # Why: a port with no host part is published on a random port
+                    parts = entry.split(":")
+                    host = parts[-2] if len(parts) > 1 else ""
                 elif isinstance(entry, dict):
                     host = str(entry.get("published", ""))
                 else:

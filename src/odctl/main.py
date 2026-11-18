@@ -645,8 +645,10 @@ def _own_volume_profiles(deps_others: List[str], rest: List[str]) -> List[str]:
         rest (List[str]): The profiles of the deps file the other call stops.
 
     Returns:
-        List[str]: Those of `deps_others` that mount none of deps' volumes, by
-        Docker name, and that no profile outside them depends on or is needed by.
+        List[str]: Those of `deps_others` that mount no volume, by Docker name, that
+        deps or a profile of the other call mounts, since Docker keeps a volume a
+        container still holds, and that no profile outside them depends on or is
+        needed by.
     """
 
     def needs(profiles: List[str]) -> set:
@@ -664,7 +666,12 @@ def _own_volume_profiles(deps_others: List[str], rest: List[str]) -> List[str]:
     own = {p for p in deps_others if not names([p]) & shared}
     while True:
         others = rest + [p for p in deps_others if p not in own]
-        kept = {p for p in own if needs([p]) <= own and p not in needs(others)}
+        held = names(others) if others else set()
+        kept = {
+            p
+            for p in own
+            if needs([p]) <= own and p not in needs(others) and not names([p]) & held
+        }
         if kept == own:
             return [p for p in deps_others if p in own]
         own = kept
