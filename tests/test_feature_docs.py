@@ -105,7 +105,10 @@ def test_every_feature_has_its_docs(gen_pages, pages):
         "reference": gen_pages.cli_reference(),
         "profiles": "".join(pages.values()),
         "workspace": (REPO / "docs" / "how-it-works.md").read_text(),
-        "skill": (REPO / "skills" / "odctl" / "SKILL.md").read_text(),
+        "skill": "".join(
+            path.read_text()
+            for path in sorted((REPO / "skills" / "odctl").rglob("*.md"))
+        ),
         "readme": (REPO / "README.md").read_text(),
     }
     features = dict(_features(gen_pages))

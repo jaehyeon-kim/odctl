@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Copies the prepared Python of this suite into the run's workspace, then points its
+# scripts at the copy. `make_suite.py` writes the prepared copy's path into python-path,
+# beside the case folders; claude plugin eval runs this script by its full path, from
+# the workspace, before the sandbox starts.
+set -eu
+prepared=$(cat "$(dirname "$0")/../python-path")
+cp -R "$prepared" py
+# Why: the path is matched and replaced as literal text, so a character such as [ in it
+# cannot act as a pattern; perl reads both paths from the environment, so the single
+# quotes are meant
+# shellcheck disable=SC2016
+grep -lF "$prepared/" py/bin/* | PREP="$prepared/" NEW="$PWD/py/" xargs perl -pi -e 's/\Q$ENV{PREP}\E/$ENV{NEW}/g'
+# The request names tests the user already wrote; their content is not part of the task.
+mkdir -p tests
+printf '%s\n' '# Integration tests that call the Iceberg REST catalog at http://127.0.0.1:8181 (written by the user).' > tests/test_catalog.py
+printf '%s\n' 'pyiceberg==0.10.0' 'pytest==8.4.2' > requirements-test.txt

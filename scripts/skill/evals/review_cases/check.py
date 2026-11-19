@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 HERE = Path(__file__).resolve().parent
-REVIEW_KINDS = ["A1", "A2", "A3", "A4", "A6", "A7", "A8", "A9", "A10", "A11", "A12"]
+REVIEW_KINDS = ["A1", "A2", "A3", "A4", "A7", "A9"]
 
 
 def _cases() -> Dict[str, Path]:
@@ -127,6 +127,9 @@ def check(reviews: List[Path]) -> List[str]:
             seen.append(kinds)
             if spec["known"]:
                 for kind, count in spec["counts"].items():
+                    # Why: counts.json also holds kinds the narrowed rubric does not judge
+                    if kind not in REVIEW_KINDS:
+                        continue
                     if (kind in kinds) != bool(count):
                         found.append(
                             f"{reviewer.name}/{name}: {kind} "

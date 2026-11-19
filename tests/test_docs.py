@@ -340,7 +340,7 @@ _DESCRIBED_AS = {
 def test_the_skill_description_names_every_technology(gen_pages):
     """An assistant reads the description to decide whether to load the skill, and
     it left out Label Studio and Metabase."""
-    frontmatter = gen_pages.skill(INTERNAL_RESOURCES_DIR).split("---")[1]
+    frontmatter = gen_pages.skill().split("---")[1]
     description = next(
         line for line in frontmatter.splitlines() if line.startswith("description:")
     )
@@ -354,14 +354,19 @@ def test_the_skill_description_names_every_technology(gen_pages):
 
 
 def test_skill_is_generated_from_the_registry(gen_pages):
-    committed = (REPO / "skills" / "odctl" / "SKILL.md").read_text()
-    assert committed == gen_pages.skill(INTERNAL_RESOURCES_DIR), (
-        "skills/odctl/SKILL.md is out of date; run uv run python scripts/gen_pages.py"
+    folder = REPO / "skills" / "odctl"
+    committed = {
+        path.relative_to(folder).as_posix(): path.read_text()
+        for path in folder.rglob("*")
+        if path.is_file()
+    }
+    assert committed == gen_pages.skill_files(INTERNAL_RESOURCES_DIR), (
+        "skills/odctl/ is out of date; run uv run python scripts/gen_pages.py"
     )
     registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR / "registry.yml")
     for stack in registry.stacks.values():
         for profile in stack.profiles:
-            assert f"\n### {profile}\n" in committed, (
+            assert f"\n### {profile}\n" in committed["references/profiles.md"], (
                 f"{profile} missing from the skill"
             )
 

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: workspace-upgrade
+expected_outcome: >
+  The folder holds upgrade.sh, reply.md.
+context:
+  scaffold_script: setup.sh

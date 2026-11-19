@@ -31,8 +31,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-# The kinds the reviewer judges (review_rubric.md); A5 needs an image, which no run shows
-KINDS = ["A1", "A2", "A3", "A4", "A6", "A7", "A8", "A9", "A10", "A11", "A12"]
+# The kinds the reviewer judges (review_rubric.md): odctl's lifecycle and dependencies
+KINDS = ["A1", "A2", "A3", "A4", "A7", "A9"]
+# Why: reviews written before the rubric was narrowed hold these, which are not counted
+DROPPED = ["A6", "A8", "A10", "A11", "A12"]
 FACTS = "FACTS"
 REVIEWED = "REVIEWED"
 
@@ -91,7 +93,7 @@ def problems(plan: List[RunKey], grades: List[dict], reviews: List[dict]) -> Lis
     for row in reviews:
         if row["kind"] == REVIEWED:
             reviewed[run_key(row)] += 1
-        elif row["kind"] not in KINDS:
+        elif row["kind"] not in KINDS + DROPPED:
             found.append(
                 f"{run_key(row)}: reviewer line of kind {row['kind']}, which it does not judge"
             )

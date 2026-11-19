@@ -1,0 +1,2 @@
+# Profiles whose facts facts.py writes for the reviewer: those the right answer starts.
+profiles: [spark-full, catalog, storage]

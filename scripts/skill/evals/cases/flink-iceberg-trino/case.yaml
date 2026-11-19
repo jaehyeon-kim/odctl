@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: flink-iceberg-trino
+expected_outcome: >
+  The folder holds clicks.sql, run.sh, check.sh, reply.md.
+context:
+  scaffold_script: setup.sh
