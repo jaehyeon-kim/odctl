@@ -118,12 +118,16 @@ nav:
           - Label Studio: guides/label-studio.md
           - Hybrid Search: guides/hybrid-search.md
           - Valkey: guides/valkey.md
-          - MCP Server: guides/mcp-server.md
           - Langfuse: guides/langfuse.md
       - Metadata and Operations:
           - OpenLineage and Marquez: guides/lineage.md
           - OpenMetadata: guides/openmetadata.md
           - Telemetry: guides/telemetry.md
+  - AI Assistants:
+      - Overview: ai/index.md
+      - Plugin: ai/plugin.md
+      - Agent Skill: ai/agent-skill.md
+      - MCP Server: guides/mcp-server.md
   - CLI Reference: cli.md
   - JSON Output: json-output.md
   - Troubleshooting: troubleshooting.md

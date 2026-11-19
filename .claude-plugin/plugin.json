@@ -1,0 +1,26 @@
+{
+  "name": "odctl",
+  "version": "1.9.0",
+  "description": "Adds the odctl agent skill and a read-only MCP server, which need odctl installed: uv tool install 'odctl[mcp]'.",
+  "author": {
+    "name": "Jaehyeon Kim"
+  },
+  "homepage": "https://github.com/jaehyeon-kim/odctl",
+  "repository": "https://github.com/jaehyeon-kim/odctl",
+  "license": "Apache-2.0",
+  "keywords": [
+    "data-stack",
+    "docker-compose",
+    "mcp",
+    "skill"
+  ],
+  "icon": "docs/assets/logo.png",
+  "mcpServers": {
+    "odctl": {
+      "command": "odctl",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

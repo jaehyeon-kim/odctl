@@ -1,7 +1,6 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# Why: each batch of a release goes to the release branch in its own pull request, so
-# that one review stays under the per-review file limit; CodeRabbit reviews only the
-# default branch unless a base branch is listed here.
+# Why: CodeRabbit reviews only pull requests into the default branch unless a base
+# branch is listed here, so a release branch is listed for a pull request into it.
 reviews:
   auto_review:
     # Why: reviews run locally with the CodeRabbit CLI when the owner asks, so a

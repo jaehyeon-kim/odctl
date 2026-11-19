@@ -35,10 +35,11 @@ def section(path: Path, name: str) -> str:
     raise AssertionError(f"no section {name} in {path.relative_to(REPO)}")
 
 
-# Pages whose code blocks are copies of snippet files: the guides, and the two
-# pages that teach the commands.
+# Pages whose code blocks are copies of snippet files: the guides, the AI
+# Assistants pages, and the two pages that teach the commands.
 TAUGHT_PAGES = [
     *sorted((REPO / "docs" / "guides").glob("*.md")),
+    *sorted((REPO / "docs" / "ai").glob("*.md")),
     REPO / "docs" / "getting-started.md",
     REPO / "docs" / "how-it-works.md",
 ]

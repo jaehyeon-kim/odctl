@@ -13,6 +13,11 @@ A CLI that starts a local open data stack with Docker Compose profiles: Kafka, F
 
 - Show any Renovate config change to the owner before making it.
 - Real projects find defects the profile e2e tests miss, so run the benchtop projects on a released odctl from time to time, when the owner asks. It is not a release step: each project starts a full compose stack, which takes too long to do at every release.
+- Run the skill evaluation (`scripts/skill/evals/`) only when the owner asks, because each run is a model call that uses the owner's usage limits and takes minutes.
+
+## Generated Files
+
+- `skills/odctl/`, the plugin manifests and `mcp_config.json` are written by `scripts/gen_pages.py`. Edit its source or `scripts/skill/`, then run it; a test fails when a committed file differs.
 
 ## Git
 

@@ -1,0 +1,14 @@
+{
+  "name": "odctl",
+  "description": "Adds the odctl agent skill and a read-only MCP server, which need odctl installed: uv tool install 'odctl[mcp]'.",
+  "owner": {
+    "name": "Jaehyeon Kim"
+  },
+  "plugins": [
+    {
+      "name": "odctl",
+      "source": "./",
+      "description": "Adds the odctl agent skill and a read-only MCP server, which need odctl installed: uv tool install 'odctl[mcp]'."
+    }
+  ]
+}

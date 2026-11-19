@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "odctl": {
+      "command": "odctl",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

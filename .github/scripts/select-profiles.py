@@ -99,6 +99,8 @@ ALSO_RUNS = {
 # map runs everything, and a test fails until it is added.
 SNIPPET_PREFIX = "docs/snippets/"
 SNIPPET_GROUPS = {
+    # No group runs docs/snippets/ai: its commands install into the user's home folder.
+    "ai": [],
     "getting-started": ["kafka-lite kafka-full"],
     "how-it-works": [
         "storage",

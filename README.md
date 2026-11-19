@@ -39,22 +39,31 @@ odctl down --all
 
 ## Commands
 
-Each command has its own section in the CLI reference, with its options and examples. The Example column links to a page that runs the command and shows its output, and [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/) runs them in order on one profile.
+Each command has its own section in the CLI reference, with its options and examples. [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/) runs them in order on one profile.
 
-| Command | Use it to | Example |
-| --- | --- | --- |
-| [`odctl list`](https://jaehyeon.me/odctl/latest/cli/#odctl-list) | See every profile and what it runs, as a table or, with `--json`, as JSON | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
-| [`odctl explain`](https://jaehyeon.me/odctl/latest/cli/#odctl-explain) | See a profile's services, images, ports and the profiles it depends on, as a panel or, with `--json`, as JSON | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
-| [`odctl ps`](https://jaehyeon.me/odctl/latest/cli/#odctl-ps) | See the running containers, their health and their ports, as a table or, with `--json`, as JSON | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl info`](https://jaehyeon.me/odctl/latest/cli/#odctl-info) | Check the installed odctl version and whether Docker is reachable; with `--json`, also the image tag, the workspace and odctl's own images | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl init`](https://jaehyeon.me/odctl/latest/cli/#odctl-init) | Copy the compose files and settings into `.odctl`, so you can edit them | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#create-a-workspace) |
-| [`odctl pull`](https://jaehyeon.me/odctl/latest/cli/#odctl-pull) | Download a profile's images before you start it | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#which-images-run) |
-| [`odctl up`](https://jaehyeon.me/odctl/latest/cli/#odctl-up) | Start profiles and the profiles they depend on | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#start-a-profile) |
-| [`odctl down`](https://jaehyeon.me/odctl/latest/cli/#odctl-down) | Stop profiles and remove their containers | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#stop-a-profile) |
-| [`odctl logs`](https://jaehyeon.me/odctl/latest/cli/#odctl-logs) | Read the logs of a profile's containers | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#see-what-is-running) |
-| [`odctl restart`](https://jaehyeon.me/odctl/latest/cli/#odctl-restart) | Restart a profile's containers and keep them | [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#restart-a-profile) |
-| [`odctl recreate`](https://jaehyeon.me/odctl/latest/cli/#odctl-recreate) | Replace a profile's containers, to apply an edit to a compose file or `.env` | [How It Works](https://jaehyeon.me/odctl/latest/how-it-works/#examples) |
-| [`odctl mcp`](https://jaehyeon.me/odctl/latest/cli/#odctl-mcp) | Give an AI agent odctl's commands as MCP tools; needs the `mcp` extra | [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/) |
+- **See the stack:** [`odctl list`](https://jaehyeon.me/odctl/latest/cli/#odctl-list) shows every profile, [`odctl explain`](https://jaehyeon.me/odctl/latest/cli/#odctl-explain) shows one profile's services, images and ports, [`odctl ps`](https://jaehyeon.me/odctl/latest/cli/#odctl-ps) shows the running containers, [`odctl info`](https://jaehyeon.me/odctl/latest/cli/#odctl-info) checks the odctl version and Docker, and [`odctl logs`](https://jaehyeon.me/odctl/latest/cli/#odctl-logs) reads a profile's logs. The first four print JSON with `--json`.
+- **Run it:** [`odctl init`](https://jaehyeon.me/odctl/latest/cli/#odctl-init) copies the compose files and settings into `.odctl`, [`odctl pull`](https://jaehyeon.me/odctl/latest/cli/#odctl-pull) downloads images, [`odctl up`](https://jaehyeon.me/odctl/latest/cli/#odctl-up) starts profiles, [`odctl down`](https://jaehyeon.me/odctl/latest/cli/#odctl-down) stops them, [`odctl restart`](https://jaehyeon.me/odctl/latest/cli/#odctl-restart) restarts their containers, and [`odctl recreate`](https://jaehyeon.me/odctl/latest/cli/#odctl-recreate) replaces them to apply an edit.
+- **AI agents:** [`odctl mcp`](https://jaehyeon.me/odctl/latest/cli/#odctl-mcp) gives an AI agent odctl's commands as MCP tools; it needs the `mcp` extra.
+
+## AI Assistants
+
+odctl has a plugin for Claude Code, Codex and Antigravity. It installs an agent skill, which tells an assistant which profile to start and how to reach each service, and the `odctl mcp` server, which gives it odctl's commands as tools and starts read-only. The plugin does not install odctl, so install it with the `mcp` extra first:
+
+```bash
+uv tool install 'odctl[mcp]'
+# or, if you installed odctl with pipx
+pipx install --force 'odctl[mcp]'
+```
+
+Then install the plugin with the line of your tool:
+
+```bash
+claude plugin marketplace add jaehyeon-kim/odctl && claude plugin install odctl@odctl   # Claude Code
+codex plugin marketplace add jaehyeon-kim/odctl && codex plugin add odctl@odctl         # Codex
+agy plugin install https://github.com/jaehyeon-kim/odctl                                # Antigravity
+```
+
+[AI Assistants](https://jaehyeon.me/odctl/latest/ai/) covers the plugin, the skill, the MCP server and `llms.txt`.
 
 ## Roadmap
 

@@ -22,7 +22,7 @@ Results and errors:
 - A tool that fails returns the error message of the command.
 - Tools run one at a time.
 
-The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) says.
+The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The [plugin](../ai/plugin.md) starts the server without that option, so an assistant that uses the plugin gets the five tools that only read. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](../how-it-works.md#what-stays-stable-in-1x) says.
 
 This guide builds on [Getting Started](../getting-started.md) and [JSON Output](../json-output.md).
 

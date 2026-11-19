@@ -46,6 +46,58 @@ jobs:
       #     token: ${{ secrets.CODECOV_TOKEN }}
       #     file: ./coverage.xml
 
+  plugin:
+    # The manifests of the plugin for Claude Code, Codex and Antigravity.
+    # tests/test_plugin.py checks the Codex files, which have no
+    # validate command, and that every manifest carries pyproject.toml's version.
+    name: Plugin manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      # agy warns when the MCP server's command, odctl, is not on PATH.
+      - name: Install odctl
+        run: |
+          uv tool install .
+          echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
+
+      # Pinned to the version the manifests were checked with.
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code@2.1.326
+
+      # The documented installer takes no version, so this is the latest agy;
+      # the log records which version validated the manifests.
+      - name: Install agy
+        run: |
+          curl -fsSL https://antigravity.google/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/agy" --version
+
+      # --strict fails on a file Claude Code finds but does not load: CLAUDE.md,
+      # which a plugin does not load as project context. Each tool validates a
+      # copy of the tracked files, and Claude Code's copy has no CLAUDE.md.
+      - name: Stage a copy for each tool
+        run: |
+          for tool in claude agy; do
+            mkdir "$RUNNER_TEMP/$tool"
+            git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$RUNNER_TEMP/$tool"
+          done
+          rm "$RUNNER_TEMP/claude/CLAUDE.md"
+
+      - name: Validate the Claude Code plugin and marketplace
+        working-directory: ${{ runner.temp }}/claude
+        run: |
+          claude plugin validate --strict .claude-plugin/plugin.json
+          claude plugin validate --strict .
+
+      - name: Validate the Antigravity plugin
+        working-directory: ${{ runner.temp }}/agy
+        run: agy plugin validate --strict .
+
   lowest:
     # The suite at the lowest version of each dependency that pyproject.toml allows.
     # The locked versions pass while an older one that pip may install can break,
