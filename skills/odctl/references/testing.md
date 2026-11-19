@@ -15,7 +15,7 @@ Install a fixed odctl version, such as `uv tool install odctl==<version>`. Witho
 ## Stop
 
 - Tear down only the profiles the tests started, with `odctl down <profiles>`, which asks no question. It does not stop their dependencies, such as `postgres` under `trino`, so name those too when the job should stop them.
-- Add `--volumes` only on a CI runner, where the data is the tests' own. On a developer's machine the volumes can hold the developer's own data. `odctl down <profiles> --volumes` asks for confirmation when the named profiles and their dependencies cover every profile that has containers, as on a CI runner that ran only the tests, so a CI script passes `--yes`.
+- `odctl down` loses the data of the containers it removes, with or without `--volumes`, so a test never relies on data from an earlier `up`. `--volumes` also deletes the old volumes from disk; run `odctl down <profiles> --volumes --dry-run` first to see them. `odctl down <profiles> --volumes` asks for confirmation only when the named profiles and their dependencies cover every profile that has containers, as on a CI runner that ran only the tests, so a CI script passes `--yes`; while any other profile runs, it asks nothing.
 - `odctl down --all --volumes --yes` stops and removes everything odctl runs. Use it only on a CI runner that started with no containers.
 
 ## Run the Setup Twice

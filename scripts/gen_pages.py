@@ -15,7 +15,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest import mock
 
 import yaml
@@ -548,6 +548,38 @@ KEEPS_DATA_ON_RECREATE = {
     "fluss-zookeeper",
 }
 
+# The services that keep their data in a database of the postgres profile, from
+# their compose environment or the config file they mount, so a down or recreate of
+# their own profile keeps it while postgres runs. The generator fails when one is no
+# longer a service, so a rename reaches this list.
+POSTGRES_DATABASES = {
+    "airflow": "airflow",
+    "metabase": "metabase",
+    "marquez-api": "marquez",
+    "catalog": "iceberg",
+    "mlflow": "mlflow",
+    "feast-ui": "feast",
+    "feast-serve": "feast",
+    "evidently": "evidently",
+    "label-studio": "labelstudio",
+    "openmetadata-migrate": "omt",
+    "openmetadata-server": "omt",
+    "openmetadata-ingestion": "omt",
+    "langfuse-web": "langfuse",
+    "langfuse-worker": "langfuse",
+}
+
+# What a profile's notes leave out and a client needs: a login that is not the
+# usual user and password, or where a client writes.
+PROFILE_NOTES = {
+    "ch-lite": "Login: the user `default` with the password `password`, from the host and from a container (`CLICKHOUSE_PASSWORD` in `compose-analytics.yml`). A request with no password fails with `AUTHENTICATION_FAILED`.",
+    "ch-full": "Login: the user `default` with the password `password`, from the host and from a container (`CLICKHOUSE_PASSWORD` in `compose-analytics.yml`). A request with no password fails with `AUTHENTICATION_FAILED`.",
+    "airflow": 'DAGs: a new DAG starts paused (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION` in `compose-orch.yml`), and a run triggered on a paused DAG stays queued. After an upload, wait with a limit until Airflow lists the DAG, then unpause it (`airflow dags unpause <dag_id>`, or `PATCH /api/v2/dags/<dag_id>` with `{"is_paused": false}`) and trigger it. Unpausing a DAG that has a schedule also starts a scheduled run. On a stack where the DAG was uploaded before, Airflow lists the stored DAG before it parses the new file.',
+    "metadata": "Agents: after `POST /api/v1/services/ingestionPipelines/deploy/<id>`, the ingestion Airflow parses the new DAG before `POST .../trigger/<id>` works, so repeat the trigger every 5 seconds, with a limit, until it answers that the workflow has been triggered.",
+    "fluss": "Readiness: `fluss-tablet-1` registers in ZooKeeper a few seconds after it starts, and a `CREATE TABLE` before then fails. Wait, with a limit, until `docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids` prints a list that holds `0`.",
+    "feast": "Registry:the bundled `feature_store.yaml` keeps Feast's SQL registry in the `feast` database of `postgres`: `postgresql+psycopg://user:password@postgres:5432/feast` from a container, and `127.0.0.1:5432` from the host. The online store is `valkey`.",
+}
+
 # What each named volume holds. A profile's volume without a line here fails the
 # skill build. odctl-shared-deps is described only under deps, which fills it.
 VOLUME_NOTES = {
@@ -562,9 +594,62 @@ FIRST_CREATION_NOTES = {
 }
 
 
+# The services that do one job and exit, such as copying jars or creating buckets.
+# `odctl up` waits for them to finish, so the Health line leaves them out. The
+# generator fails when one is no longer a service, so a rename reaches this list.
+ONE_SHOT_SERVICES = {
+    "init-deps",
+    "seaweed-init",
+    "openmetadata-migrate",
+    "openmetadata-init",
+}
+
+
 def _joined(names: List[str]) -> str:
     """Names joined as a sentence lists them: "a", "a and b", "a, b and c"."""
     return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+def _health_test(service: dict) -> Optional[str]:
+    """The command of a service's health check as a shell would run it, or None."""
+    check = service.get("healthcheck") or {}
+    test = check.get("test")
+    if not test or check.get("disable"):
+        return None
+    if isinstance(test, list):
+        test = " ".join(test[1:]) if test[0] in ("CMD", "CMD-SHELL") else " ".join(test)
+    # Why: Compose reads `$$` as a literal `$`, which is what the container runs
+    return test.replace("$$", "$").removesuffix(" || exit 1")
+
+
+def _health_lines(compose: dict, profile: str) -> List[str]:
+    """Which services `odctl up` and `odctl recreate` wait for, and with what check."""
+    checked = []
+    unchecked = []
+    for name, service in (compose.get("services") or {}).items():
+        if profile not in (service.get("profiles") or []) or name in ONE_SHOT_SERVICES:
+            continue
+        test = _health_test(service)
+        if test:
+            checked.append(f"`{name}` (`{test}`)")
+        else:
+            unchecked.append(f"`{name}`")
+    text = []
+    if checked:
+        text.append(
+            f"`odctl up` and `odctl recreate` return once {_joined(checked)} "
+            f"{'passes its health check' if len(checked) == 1 else 'pass their health checks'}, "
+            "so call what the check tests with no wait loop."
+        )
+    if unchecked:
+        text.append(
+            f"{_joined(unchecked)} {'has' if len(unchecked) == 1 else 'have'} no health check: "
+            "the commands return once "
+            f"{'it runs' if len(unchecked) == 1 else 'they run'}, "
+            "so wait for what the task needs from "
+            f"{'it' if len(unchecked) == 1 else 'them'}, with a limit."
+        )
+    return [f"Health: {' '.join(text)}"] if text else []
 
 
 def _data_lines(compose: dict, profile: str) -> List[str]:
@@ -575,7 +660,23 @@ def _data_lines(compose: dict, profile: str) -> List[str]:
         if profile in (service.get("profiles") or [])
     ]
     kept = [name for name, _ in services if name in KEEPS_DATA_ON_RECREATE]
-    if kept:
+    in_postgres = [name for name, _ in services if name in POSTGRES_DATABASES]
+    if in_postgres:
+        databases = sorted({POSTGRES_DATABASES[n] for n in in_postgres})
+        text = (
+            f"{_joined([f'`{n}`' for n in in_postgres])} "
+            f"{'keeps its' if len(in_postgres) == 1 else 'keep their'} data in the "
+            f"{_joined([f'`{d}`' for d in databases])} "
+            f"{'database' if len(databases) == 1 else 'databases'} of the `postgres` profile, "
+            f"so `odctl down {profile}` and `odctl recreate {profile}` keep it while `postgres` runs, "
+            "and `odctl down postgres` loses it. "
+        )
+        text += (
+            "The other services keep their data inside their containers."
+            if len(in_postgres) < len(services)
+            else ""
+        )
+    elif kept:
         text = (
             f"{_joined([f'`{n}`' for n in kept])} "
             f"{'keeps its data in unnamed volumes that its image declares' if len(kept) == 1 else 'keep their data in unnamed volumes that their images declare'}: "
@@ -635,7 +736,8 @@ def profiles_reference(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
         str: The Markdown page, with a contents list and a section per profile.
 
     Raises:
-        ValueError: When a service of KEEPS_DATA_ON_RECREATE is in no compose file.
+        ValueError: When a service of KEEPS_DATA_ON_RECREATE, POSTGRES_DATABASES or
+            ONE_SHOT_SERVICES is in no compose file.
     """
     registry = load_registry(resources / "registry.yml")
     profile_map = get_profile_map(registry)
@@ -664,15 +766,24 @@ def profiles_reference(resources: Path = INTERNAL_RESOURCES_DIR) -> str:
                 if usage:
                     sections += ["```text", usage, "```", ""]
                 sections += _services_table(compose, profile, tags=False) + [""]
+                sections += _health_lines(compose, profile) + [""]
+                if profile in PROFILE_NOTES:
+                    sections += [PROFILE_NOTES[profile], ""]
                 sections += _data_lines(compose, profile) + [""]
         contents.append(f"- {group}: {', '.join(group_profiles)}")
-    missing = sorted(KEEPS_DATA_ON_RECREATE - services)
+    missing = sorted(
+        (KEEPS_DATA_ON_RECREATE | set(POSTGRES_DATABASES) | ONE_SHOT_SERVICES)
+        - services
+    )
     if missing:
-        raise ValueError(f"KEEPS_DATA_ON_RECREATE names no service: {missing}")
+        raise ValueError(
+            "KEEPS_DATA_ON_RECREATE, POSTGRES_DATABASES or ONE_SHOT_SERVICES "
+            f"names no service: {missing}"
+        )
     lines = [
         "# odctl Profiles",
         "",
-        "Each section gives a profile's addresses from the host and from a container, its logins, what `odctl up` also starts, its services with their images, ports and memory limits, and where its data lives. Every port is published on `127.0.0.1` only. This page is generated from odctl's `registry.yml` and compose files.",
+        "Each section gives a profile's addresses from the host and from a container, its logins, what `odctl up` also starts, its services with their images, ports and memory limits, which services `odctl up` waits for, and where its data lives. Every port is published on `127.0.0.1` only. This page is generated from odctl's `registry.yml` and compose files.",
         "",
         "## Contents",
         "",

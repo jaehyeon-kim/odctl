@@ -2,7 +2,7 @@
 
 Answer sheet of the case `ch-kafka-engine`, written from odctl's sources at commit `b8f3eed` before any run. The reviewer reads it beside the run; the agent never sees it, because it is not in the case folder that `make_suite.py` copies into the skill. Paths are in odctl at commit `b8f3eed`; a path that starts with `planning/` is in the owner's planning repository.
 
-Kinds: A3 (address from the wrong side), A6 (service behaviour stated without a run or its source), A2 (service called before it is ready), A12 (a number given with no reason), A10 (a check that cannot fail).
+Kinds: A3 (address from the wrong side), A6 (service behaviour stated without a run or its source), A2 (service called before it is ready), A12 (a number given with no reason), A10 (a check that cannot fail), A9 (state from an earlier run breaks the next).
 
 ## Records
 
@@ -19,7 +19,7 @@ Kinds: A3 (address from the wrong side), A6 (service behaviour stated without a 
 - Broker list, inside the `odctl` network: `kafka_broker_list = 'broker-1:19092,broker-2:19093,broker-3:19094'` (`registry.yml:91`; `docs/guides/kafka.md:74`), or `broker-1:19092` alone. The ClickHouse servers are on that network (`compose-analytics.yml:5-6`). `kafka_format = 'JSONEachRow'`, a `kafka_group_name` of the run's choice.
 - A Kafka engine table streams only while a materialized view reads from it (ClickHouse tag `v25.12.9.61-stable`, `src/Storages/Kafka/StorageKafka.cpp:570-582` and `StorageKafkaUtils.cpp:541-561`), and a direct `SELECT` from it is refused by default (`stream_like_engine_allow_direct_select` is false, `src/Core/Settings.cpp:716-719`). So: a target `MergeTree` (or `ReplicatedMergeTree`) table, the Kafka table, and a materialized view `TO` the target, the target first.
 - With no offset stored for the group, the engine starts at the earliest message (`src/Storages/Kafka/KafkaConfigLoader.cpp:476`), so the messages already in the topic are read with no extra setting.
-- Rows reach the target in blocks, flushed every `stream_flush_interval_ms` (7500 ms by default, `Settings.cpp:2319-2322`) unless `kafka_flush_interval_ms` is set (`KafkaSettings.cpp:40`; `StorageKafka.cpp:689-691`). The check repeats its count until it is above 0 (or reaches the number of messages in the topic, read with `kafka-get-offsets.sh` in `kafka-1`), with a limit longer than that interval and its reason, and exits 1 when the limit passes. A count that exits 0 when it returns 0 cannot fail.
+- Rows reach the target in blocks, flushed every `stream_flush_interval_ms` (7500 ms by default, `Settings.cpp:2319-2322`) unless `kafka_flush_interval_ms` is set (`KafkaSettings.cpp:40`; `StorageKafka.cpp:689-691`). The tables are kept between runs, so the check first reads the target's count, then repeats its count until it rises above that first count (or reaches the number of messages in the topic, read with `kafka-get-offsets.sh` in `kafka-1`), with a limit longer than that interval and its reason, and exits 1 when the limit passes. A count that exits 0 when it returns 0 cannot fail.
 - If the Kafka table is created on several servers with one group name, Kafka splits the topic's partitions between them (3 by default, `compose-kafka.yml:83`), so a count on one server's target table can miss rows; the check then counts on every server or through a `Distributed` table. Kafka's group assignment, not read in source here: inferred.
 
 ## Wrong answers seen or expected
@@ -30,4 +30,5 @@ Kinds: A3 (address from the wrong side), A6 (service behaviour stated without a 
 - A2: one count straight after the SQL; a wait with no limit.
 - A12: a wait limit or interval with no reason.
 - A10: a check that prints the count and exits 0.
+- A9: a check that passes once the target holds any row; on a second run the first run's rows pass it.
 - A6: the whole of `page_views.sql` posted to the HTTP interface in one request, which fails with "Multi-statements are not allowed".

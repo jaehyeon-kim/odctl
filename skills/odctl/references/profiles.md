@@ -1,6 +1,6 @@
 # odctl Profiles
 
-Each section gives a profile's addresses from the host and from a container, its logins, what `odctl up` also starts, its services with their images, ports and memory limits, and where its data lives. Every port is published on `127.0.0.1` only. This page is generated from odctl's `registry.yml` and compose files.
+Each section gives a profile's addresses from the host and from a container, its logins, what `odctl up` also starts, its services with their images, ports and memory limits, which services `odctl up` waits for, and where its data lives. Every port is published on `127.0.0.1` only. This page is generated from odctl's `registry.yml` and compose files.
 
 ## Contents
 
@@ -38,6 +38,8 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 | `karapace` | `ghcr.io/aiven-open/karapace` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui` | `8086:8080` | `512m` |
 
+Health: `kafka`, `connect`, `karapace` and `kafka-ui` have no health check: the commands return once they run, so wait for what the task needs from them, with a limit.
+
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
 ### kafka-full
@@ -64,6 +66,8 @@ Kafka: Distributed event streaming and schema registry. Lite uses 1 Broker; Full
 | `karapace` | `ghcr.io/aiven-open/karapace` | `8081:8081` | `512m` |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui` | `8086:8080` | `512m` |
 
+Health: `kafka-1`, `kafka-2`, `kafka-3`, `connect`, `karapace` and `kafka-ui` have no health check: the commands return once they run, so wait for what the task needs from them, with a limit.
+
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
 ## Stream and Batch Processing
@@ -86,6 +90,8 @@ Apache Flink: Stateful, real-time stream processing engine. Lite uses 1 TaskMana
 | `jobmanager` | `flink` | `8082:8081` | `1500m` |
 | `taskmanager-a` | `flink` | none | `3500m` |
 | `sql-gateway` | `flink` | `8084:8083` | `1g` |
+
+Health: `odctl up` and `odctl recreate` return once `jobmanager` (`curl -f http://localhost:8081/config`) passes its health check, so call what the check tests with no wait loop. `taskmanager-a` and `sql-gateway` have no health check: the commands return once they run, so wait for what the task needs from them, with a limit.
 
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
@@ -110,6 +116,8 @@ Apache Flink: Stateful, real-time stream processing engine. Lite uses 1 TaskMana
 | `taskmanager-c` | `flink` | none | `3500m` |
 | `sql-gateway` | `flink` | `8084:8083` | `1g` |
 
+Health: `odctl up` and `odctl recreate` return once `jobmanager` (`curl -f http://localhost:8081/config`) passes its health check, so call what the check tests with no wait loop. `taskmanager-a`, `taskmanager-b`, `taskmanager-c` and `sql-gateway` have no health check: the commands return once they run, so wait for what the task needs from them, with a limit.
+
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
 ### spark-lite
@@ -133,6 +141,8 @@ Apache Spark: Distributed batch and micro-batch data processing. Lite uses 1 Wor
 | `spark-master` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9080:8080`, `7077:7077` | `1g` |
 | `spark-worker-1` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9081:8081` | `2g` |
 | `spark-history` | `ghcr.io/jaehyeon-kim/odctl/spark` | `18080:18080` | `1g` |
+
+Health: `odctl up` and `odctl recreate` return once `spark-master` (`curl -f http://localhost:8080`) passes its health check, so call what the check tests with no wait loop. `spark-worker-1` and `spark-history` have no health check: the commands return once they run, so wait for what the task needs from them, with a limit.
 
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it. The named volume `spark-events-data` holds Spark's event logs in memory, so it holds nothing once the stack is down.
 
@@ -160,6 +170,8 @@ Apache Spark: Distributed batch and micro-batch data processing. Lite uses 1 Wor
 | `spark-worker-3` | `ghcr.io/jaehyeon-kim/odctl/spark` | `9083:8081` | `2g` |
 | `spark-history` | `ghcr.io/jaehyeon-kim/odctl/spark` | `18080:18080` | `1g` |
 
+Health: `odctl up` and `odctl recreate` return once `spark-master` (`curl -f http://localhost:8080`) passes its health check, so call what the check tests with no wait loop. `spark-worker-1`, `spark-worker-2`, `spark-worker-3` and `spark-history` have no health check: the commands return once they run, so wait for what the task needs from them, with a limit.
+
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it. The named volume `spark-events-data` holds Spark's event logs in memory, so it holds nothing once the stack is down.
 
 ## Analytics
@@ -181,6 +193,10 @@ ClickHouse: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), 
 | `ch-11` | `clickhouse/clickhouse-server` | `8123:8123`, `9000:9000` | `4g` |
 | `ch-12` | `clickhouse/clickhouse-server` | `8124:8123`, `9001:9000` | `4g` |
 
+Health: `odctl up` and `odctl recreate` return once `ch-keeper` (`echo ruok | nc 127.0.0.1 9181`), `ch-11` (`clickhouse-client --password password --query SELECT 1`) and `ch-12` (`clickhouse-client --password password --query SELECT 1`) pass their health checks, so call what the check tests with no wait loop. `ch-shard2-stub` has no health check: the commands return once it runs, so wait for what the task needs from it, with a limit.
+
+Login: the user `default` with the password `password`, from the host and from a container (`CLICKHOUSE_PASSWORD` in `compose-analytics.yml`). A request with no password fails with `AUTHENTICATION_FAILED`.
+
 Data: `ch-keeper`, `ch-11` and `ch-12` keep their data in unnamed volumes that their images declare: `odctl recreate` keeps it, and `odctl down` loses it. The other services keep their data inside their containers.
 
 ### ch-full
@@ -200,6 +216,10 @@ ClickHouse: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), 
 | `ch-12-full` | `clickhouse/clickhouse-server` | `8124:8123`, `9001:9000` | `4g` |
 | `ch-21` | `clickhouse/clickhouse-server` | `8125:8123`, `9002:9000` | `4g` |
 | `ch-22` | `clickhouse/clickhouse-server` | `8126:8123`, `9003:9000` | `4g` |
+
+Health: `odctl up` and `odctl recreate` return once `ch-keeper` (`echo ruok | nc 127.0.0.1 9181`), `ch-11-full` (`clickhouse-client --password password --query SELECT 1`), `ch-12-full` (`clickhouse-client --password password --query SELECT 1`), `ch-21` (`clickhouse-client --password password --query SELECT 1`) and `ch-22` (`clickhouse-client --password password --query SELECT 1`) pass their health checks, so call what the check tests with no wait loop.
+
+Login: the user `default` with the password `password`, from the host and from a container (`CLICKHOUSE_PASSWORD` in `compose-analytics.yml`). A request with no password fails with `AUTHENTICATION_FAILED`.
 
 Data: `ch-keeper`, `ch-11-full`, `ch-12-full`, `ch-21` and `ch-22` keep their data in unnamed volumes that their images declare: `odctl recreate` keeps it, and `odctl down` loses it.
 
@@ -226,6 +246,8 @@ Trino: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), and B
 | --- | --- | --- | --- |
 | `trino` | `trinodb/trino` | `8080:8080` | `4g` |
 
+Health: `odctl up` and `odctl recreate` return once `trino` (`curl -f http://localhost:8080/v1/info`) passes its health check, so call what the check tests with no wait loop.
+
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
 ### metabase
@@ -242,7 +264,9 @@ Metabase: Real-time OLAP database (ClickHouse), Federated SQL engine (Trino), an
 | --- | --- | --- | --- |
 | `metabase` | `metabase/metabase` | `3000:3000` | `1500m` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `metabase` (`curl -f http://localhost:3000/api/health`) passes its health check, so call what the check tests with no wait loop.
+
+Data: `metabase` keeps its data in the `metabase` database of the `postgres` profile, so `odctl down metabase` and `odctl recreate metabase` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
 ## Orchestration
 
@@ -263,7 +287,11 @@ Apache Airflow: Workflow orchestration and pipeline scheduling (Airflow), and du
 | --- | --- | --- | --- |
 | `airflow` | `ghcr.io/jaehyeon-kim/odctl/airflow` | `8085:8080` | `3g` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `airflow` (`curl -fs http://localhost:8080/api/v2/monitor/health`) passes its health check, so call what the check tests with no wait loop.
+
+DAGs: a new DAG starts paused (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION` in `compose-orch.yml`), and a run triggered on a paused DAG stays queued. After an upload, wait with a limit until Airflow lists the DAG, then unpause it (`airflow dags unpause <dag_id>`, or `PATCH /api/v2/dags/<dag_id>` with `{"is_paused": false}`) and trigger it. Unpausing a DAG that has a schedule also starts a scheduled run. On a stack where the DAG was uploaded before, Airflow lists the stored DAG before it parses the new file.
+
+Data: `airflow` keeps its data in the `airflow` database of the `postgres` profile, so `odctl down airflow` and `odctl recreate airflow` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
 ### temporal
 
@@ -288,6 +316,8 @@ Temporal: Workflow orchestration and pipeline scheduling (Airflow), and durable 
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
 | `temporal` | `temporalio/temporal` | `7233:7233`, `8233:8233` | `1g` |
+
+Health: `odctl up` and `odctl recreate` return once `temporal` (`temporal operator cluster health --address 127.0.0.1:7233`) passes its health check, so call what the check tests with no wait loop.
 
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
@@ -315,7 +345,9 @@ MLflow: Experiment tracking, model registry and model serving (MLflow), the feat
 | `mlflow` | `ghcr.io/jaehyeon-kim/odctl/mlflow` | `5004:5000` | `2500m` |
 | `mlflow-serve` | `ghcr.io/jaehyeon-kim/odctl/mlflow` | `5003:5003` | `1500m` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `mlflow` (`curl -f http://localhost:5000/health`) and `mlflow-serve` (`[ -z "${MODEL_URI}" ] || curl -f http://localhost:5003/ping`) pass their health checks, so call what the check tests with no wait loop.
+
+Data: `mlflow` keeps its data in the `mlflow` database of the `postgres` profile, so `odctl down mlflow` and `odctl recreate mlflow` keep it while `postgres` runs, and `odctl down postgres` loses it. The other services keep their data inside their containers.
 
 ### feast
 
@@ -345,7 +377,11 @@ Feast: Experiment tracking, model registry and model serving (MLflow), the featu
 | `feast-ui` | `quay.io/feastdev/feature-server` | `8890:8888` | `1g` |
 | `feast-serve` | `quay.io/feastdev/feature-server` | `6566:6566` | `1g` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `feast-ui` (`curl -f http://localhost:8888/api/v1/projects`) and `feast-serve` (`curl -f http://localhost:6566/health`) pass their health checks, so call what the check tests with no wait loop.
+
+Registry:the bundled `feature_store.yaml` keeps Feast's SQL registry in the `feast` database of `postgres`: `postgresql+psycopg://user:password@postgres:5432/feast` from a container, and `127.0.0.1:5432` from the host. The online store is `valkey`.
+
+Data: `feast-ui` and `feast-serve` keep their data in the `feast` database of the `postgres` profile, so `odctl down feast` and `odctl recreate feast` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
 ### evidently
 
@@ -368,7 +404,9 @@ Evidently: Experiment tracking, model registry and model serving (MLflow), the f
 | --- | --- | --- | --- |
 | `evidently` | `evidently/evidently-service` | `8089:8000` | `1g` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `evidently` (`python -c import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/projects', timeout=5)`) passes its health check, so call what the check tests with no wait loop.
+
+Data: `evidently` keeps its data in the `evidently` database of the `postgres` profile, so `odctl down evidently` and `odctl recreate evidently` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
 ### label-studio
 
@@ -389,7 +427,9 @@ Label Studio: Experiment tracking, model registry and model serving (MLflow), th
 | --- | --- | --- | --- |
 | `label-studio` | `heartexlabs/label-studio` | `8088:8080` | `768m` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `label-studio` (`curl -f http://localhost:8080/health/`) passes its health check, so call what the check tests with no wait loop.
+
+Data: `label-studio` keeps its data in the `labelstudio` database of the `postgres` profile, so `odctl down label-studio` and `odctl recreate label-studio` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
 ## Metadata and Lineage
 
@@ -422,7 +462,11 @@ OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metada
 | `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion` | `8087:8080` | `1500m` |
 | `openmetadata-init` | `docker.getcollate.io/openmetadata/ingestion` | none | `64m` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `openmetadata-es` (`curl -s http://localhost:9200/_cluster/health?pretty | grep status | grep -qE 'green|yellow'`), `openmetadata-server` (`wget -q --spider http://localhost:8586/healthcheck`) and `openmetadata-ingestion` (`curl -fs http://localhost:8080/pluginsv2/api/v2/openmetadata/health`) pass their health checks, so call what the check tests with no wait loop.
+
+Agents: after `POST /api/v1/services/ingestionPipelines/deploy/<id>`, the ingestion Airflow parses the new DAG before `POST .../trigger/<id>` works, so repeat the trigger every 5 seconds, with a limit, until it answers that the workflow has been triggered.
+
+Data: `openmetadata-migrate`, `openmetadata-server` and `openmetadata-ingestion` keep their data in the `omt` database of the `postgres` profile, so `odctl down metadata` and `odctl recreate metadata` keep it while `postgres` runs, and `odctl down postgres` loses it. The other services keep their data inside their containers.
 
 ### lineage
 
@@ -442,7 +486,9 @@ Marquez: System telemetry, monitoring, and data lineage. `odctl up lineage` also
 | `marquez-api` | `marquezproject/marquez` | `5002:5000`, `5001:5001` | `1g` |
 | `marquez-web` | `marquezproject/marquez-web` | `3003:3000` | `512m` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `marquez-api` (`curl -fsS http://localhost:5001/healthcheck`) passes its health check, so call what the check tests with no wait loop. `marquez-web` has no health check: the commands return once it runs, so wait for what the task needs from it, with a limit.
+
+Data: `marquez-api` keeps its data in the `marquez` database of the `postgres` profile, so `odctl down lineage` and `odctl recreate lineage` keep it while `postgres` runs, and `odctl down postgres` loses it. The other services keep their data inside their containers.
 
 ## Observability
 
@@ -471,6 +517,8 @@ Telemetry (grafana/otel-lgtm): System telemetry, monitoring, and data lineage. `
 | --- | --- | --- | --- |
 | `otel-lgtm` | `grafana/otel-lgtm` | `19090:9090`, `3004:3000`, `4317:4317`, `4318:4318` | `2g` |
 
+Health: `odctl up` and `odctl recreate` return once `otel-lgtm` (`test -f /tmp/ready && curl -fsS http://localhost:9090/-/ready`) passes its health check, so call what the check tests with no wait loop.
+
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
 ## Storage and Catalog
@@ -495,6 +543,8 @@ PostgreSQL: PostgreSQL metadata backend. `odctl up postgres` also starts: `deps`
 | --- | --- | --- | --- |
 | `postgres` | `ghcr.io/jaehyeon-kim/odctl/postgres` | `5432:5432` | `1g` |
 
+Health: `odctl up` and `odctl recreate` return once `postgres` (`pg_isready -U ${POSTGRES_USER:-user} -d metabase`) passes its health check, so call what the check tests with no wait loop.
+
 Data: `postgres` keeps its data in unnamed volumes that its image declares: `odctl recreate` keeps it, and `odctl down` loses it. `TZ` and `postgres/01-init-databases.sh`, which creates each service's database, take effect only when PostgreSQL creates its data folder. A recreate keeps that folder, so they change after `odctl down postgres` and `odctl up postgres`.
 
 ### storage
@@ -516,6 +566,8 @@ SeaweedFS: SeaweedFS S3-compatible object storage. `odctl up storage` also start
 | `seaweed` | `chrislusf/seaweedfs` | `8333:8333`, `8889:8888`, `9333:9333` | `1024m` |
 | `seaweed-init` | `chrislusf/seaweedfs` | none | not set |
 
+Health: `odctl up` and `odctl recreate` return once `seaweed` (`curl -f http://localhost:8888/`) passes its health check, so call what the check tests with no wait loop.
+
 Data: `seaweed` keeps its data in unnamed volumes that its image declares: `odctl recreate` keeps it, and `odctl down` loses it. The other services keep their data inside their containers.
 
 ### catalog
@@ -532,7 +584,9 @@ Iceberg REST Catalog: Iceberg REST Catalog. `odctl up catalog` also starts: `dep
 | --- | --- | --- | --- |
 | `catalog` | `azul/zulu-openjdk` | `8181:8181` | `512m` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `catalog` has no health check: the commands return once it runs, so wait for what the task needs from it, with a limit.
+
+Data: `catalog` keeps its data in the `iceberg` database of the `postgres` profile, so `odctl down catalog` and `odctl recreate catalog` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
 ### valkey
 
@@ -548,6 +602,8 @@ Valkey: Stream storage (Fluss) and multi-model data store (Valkey Bundle). Valke
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
 | `valkey` | `valkey/valkey-bundle` | `6379:6379` | `512m` |
+
+Health: `odctl up` and `odctl recreate` return once `valkey` (`VALKEYCLI_AUTH=password valkey-cli --user user ping | grep -q PONG`) passes its health check, so call what the check tests with no wait loop.
 
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
 
@@ -570,6 +626,10 @@ Apache Fluss: Stream storage (Fluss) and multi-model data store (Valkey Bundle).
 | `fluss-coordinator` | `apache/fluss` | `9123:9123` | `1g` |
 | `fluss-tablet-1` | `apache/fluss` | `9124:9123` | `2g` |
 
+Health: `odctl up` and `odctl recreate` return once `fluss-zookeeper` (`echo ruok | nc 127.0.0.1 2181 | grep -q imok`) and `fluss-coordinator` (`timeout 3 bash -c '</dev/tcp/fluss-coordinator/9123'`) pass their health checks, so call what the check tests with no wait loop. `fluss-tablet-1` has no health check: the commands return once it runs, so wait for what the task needs from it, with a limit.
+
+Readiness: `fluss-tablet-1` registers in ZooKeeper a few seconds after it starts, and a `CREATE TABLE` before then fails. Wait, with a limit, until `docker exec fluss-zookeeper zkCli.sh -server localhost:2181 ls /fluss/tabletservers/ids` prints a list that holds `0`.
+
 Data: `fluss-zookeeper` keeps its data in unnamed volumes that its image declares: `odctl recreate` keeps it, and `odctl down` loses it. The other services keep their data inside their containers.
 
 ### deps
@@ -584,6 +644,7 @@ Shared Dependencies: Shared dependencies, JARs, connectors, and Docker network `
 | Service | Image | Host:container ports | Memory limit |
 | --- | --- | --- | --- |
 | `init-deps` | `ghcr.io/jaehyeon-kim/odctl/deps` | none | not set |
+
 
 Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it. The named volume `odctl-shared-deps` holds only the jars `init-deps` copies, so `odctl down --volumes` removes it only once no other profile has a container.
 
@@ -611,4 +672,6 @@ Langfuse: Tracing and evaluation of LLM and agent applications. `odctl up langfu
 | `langfuse-web` | `langfuse/langfuse` | `3005:3000` | `2g` |
 | `langfuse-worker` | `langfuse/langfuse-worker` | none | `2g` |
 
-Data: Every service keeps its data inside its container, so `odctl recreate` and `odctl down` lose it, and `odctl restart` keeps it.
+Health: `odctl up` and `odctl recreate` return once `langfuse-web` (`wget -q --spider http://127.0.0.1:3000/api/public/health`) and `langfuse-worker` (`wget -q --spider http://127.0.0.1:3030/api/health`) pass their health checks, so call what the check tests with no wait loop.
+
+Data: `langfuse-web` and `langfuse-worker` keep their data in the `langfuse` database of the `postgres` profile, so `odctl down langfuse` and `odctl recreate langfuse` keep it while `postgres` runs, and `odctl down postgres` loses it.
