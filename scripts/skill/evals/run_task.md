@@ -13,10 +13,10 @@ This file holds the main session's steps, from the suite to the result table. `c
 ## Steps
 
 1. Create a new scratch folder and the folders the steps write into, with one `tree-` folder per version: `mkdir <scratch> && mkdir <scratch>/tree-a <scratch>/tree-b <scratch>/results <scratch>/review <scratch>/grades <scratch>/reviews`. `mkdir` without `-p` stops on a folder an earlier evaluation left, because `tar -x` would write over it and keep each file the new version deleted. Build the suite of each version from a copy of the repository at that version, into a folder whose name does not tell the version: `git archive <tag> | tar -x -C <scratch>/tree-a`, then `uv run --no-project python scripts/skill/evals/make_suite.py --tree <scratch>/tree-a --out <scratch>/suite-a`. Write down which suite is which in `<scratch>/versions.txt`; no file the reviewer reads names it. `make_suite.py` builds and installs with `--offline`, so uv's cache must already hold `hatchling`, the wheel's dependencies and `pytest`: run `uv python install 3.12`, then `uv sync --python 3.12` (which includes the `dev` group, where `pytest` is) and `uv build` once in the repository, online, before the first suite. `make_suite.py` installs into Python 3.12, and a `uv sync` on another Python would fill the cache with wheels for that version only.
-2. Run the cases from the suite's folder (`cd <scratch>/suite-a`), once per model:
+2. Run the cases from the suite's folder (`cd <scratch>/suite-a`), once per model. A counted round runs each case three times (`--runs 3`); the trial run and the pilot ran each once:
 
    ```bash
-   claude plugin eval ./odctl --model haiku --runs 1 --ablation none -j 3 \
+   claude plugin eval ./odctl --model haiku --runs 3 --ablation none -j 3 \
      --scaffold --keep-temp --allow-tools Bash Write Edit --no-publish --trust-plugin \
      --case '<glob>' --output-dir <scratch>/results/a-haiku \
      --report <scratch>/results/a-haiku.html --json <scratch>/results/a-haiku.json

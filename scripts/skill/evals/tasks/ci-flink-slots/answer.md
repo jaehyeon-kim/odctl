@@ -16,11 +16,11 @@ Kinds: A2 (service called before it is ready), A3 (address from the wrong side),
 - `odctl up flink-full kafka-lite` (`registry.yml:70`, `99`).
 - `flink-full` runs three TaskManagers (`compose-flink.yml:55-83`), each with 5 task slots (`flink/flink-conf.yml:8`), so 15 slots. "A Flink cluster needs exactly as many task slots as the highest parallelism used in the job" (Flink 2.2 docs, Flink Architecture), so a job of parallelism 12 needs 12 free slots, which only all three TaskManagers together give.
 - Only the JobManager has a health check (`compose-flink.yml:49-53`); the TaskManagers have none and start once it is healthy (`compose-flink.yml:61-63`). `odctl up` waits for health checks or running containers (`src/odctl/docker.py:482`), so it can return before the TaskManagers have registered.
-- The wait asks the JobManager from the CI host: `http://127.0.0.1:8082/overview` (`compose-flink.yml:47`; `registry.yml:111`; path `/overview`, apache/flink `release-2.2.0`, `ClusterOverviewHeaders.java:34`), until `slots-available` is at least 12 or `taskmanagers` is 3 (`ClusterOverview.java:38-40`), with a limit and its reason, and the step exits 1 when the limit passes.
+- The wait asks the JobManager from the CI host: `http://127.0.0.1:8082/overview` (`compose-flink.yml:47`; `registry.yml:111`; path `/overview`, apache/flink `release-2.2.0`, `ClusterOverviewHeaders.java:34`), until `slots-available` is at least 12 (`ClusterOverview.java:38-40`), with a limit and its reason, and the step exits 1 when the limit passes.
 
 ## Wrong answers seen or expected
 
 - A3: `http://127.0.0.1:8081` from the host, which is Karapace when `kafka-lite` runs (`compose-kafka.yml:196`); `http://jobmanager:8081` or `flink-jobmanager:8081` from the host.
 - A8: a statement that each TaskManager has one slot, so 12 slots cannot be reached or need 12 TaskManagers; a change of `taskmanager.numberOfTaskSlots` or of the TaskManager count described as needed.
-- A2: no wait after `odctl up`; a wait on `/config`, the health check or the container state only; a fixed `sleep`; a wait with no limit.
+- A2: no wait after `odctl up`; a wait on `/config`, the health check, the container state or the `taskmanagers` count only, because only `slots-available` shows that 12 slots are free; a fixed `sleep`; a wait with no limit.
 - A12: a wait limit or interval with no reason.

@@ -20,7 +20,7 @@ Kinds: A2 (service called before it is ready), A3 (address from the wrong side, 
 
 ## Wrong answers seen or expected
 
-- A2: a client that sends one request after the restart with no retry, or `reload.sh` that calls the server straight after `odctl restart mlflow`, or a reply that says the new version is served once `reload.sh` returns. A `reload.sh` that makes no call to the server, with a client that retries within a limit, is right.
+- A2: a client that sends one request after the restart with no retry, or `reload.sh` that calls the server straight after `odctl restart mlflow`, or a reply that says the new version is served once a `reload.sh` that uses `odctl restart mlflow` returns. The same claim is right for `odctl recreate mlflow`, which waits for the `/ping` health check of `mlflow-serve` (`src/odctl/projects.py:52-89`, `wait=True`; `compose-mlops.yml:185-189`). A `reload.sh` that makes no call to the server, with a client that retries within a limit, is right.
 - A3: `http://127.0.0.1:5004`, `localhost:5000` or `http://127.0.0.1:5003` in code that runs in a container; `http://mlflow:5004` or `http://mlflow-serve:5000`.
 - A6: no restart or recreate, on the claim that the server follows the alias by itself;
 - A4: a claim that `odctl restart mlflow` applies a changed `.env`.

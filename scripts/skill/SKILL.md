@@ -7,6 +7,8 @@ description: Starts a local open data stack with odctl, reaches its services fro
 
 odctl starts open source data services as Docker Compose profiles. Install it with `uv tool install odctl` or `pipx install odctl`; it needs Docker. The Commands, Options and Workspace Settings tables below and [references/profiles.md](references/profiles.md) are generated from odctl's CLI, `registry.yml` and compose files.
 
+The reference pages sit in `references/` beside this file. Read them at this skill's base directory followed by `references/<page>`, with nothing between the two: not `skills/odctl/references/` or `.claude/skills/odctl/references/`.
+
 - [references/profiles.md](references/profiles.md): each profile's addresses from the host and from a container, its logins, services and ports, what it also starts and where its data lives. Read the section of every profile the task uses.
 - [references/testing.md](references/testing.md): odctl in a project's tests and CI. Read it when a test, a CI job or a setup script starts the stack.
 
