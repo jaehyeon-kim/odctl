@@ -669,9 +669,20 @@ def _data_lines(compose: dict, profile: str) -> List[str]:
             f"{'keeps its' if len(in_postgres) == 1 else 'keep their'} data in the "
             f"{_joined([f'`{d}`' for d in databases])} "
             f"{'database' if len(databases) == 1 else 'databases'} of the `postgres` profile, "
-            f"so `odctl down {profile}` and `odctl recreate {profile}` keep it while `postgres` runs, "
-            "and `odctl down postgres` loses it. "
         )
+        if "postgres" in (compose.get("services") or {}):
+            # Why: down and recreate also act on the profiles of the same compose
+            # file that this one depends on (planner.expand_plan_dependencies)
+            text += (
+                "which shares its compose file, so `odctl down "
+                f"{profile}` also stops `postgres` and loses it, "
+                f"and `odctl recreate {profile}` also recreates `postgres`, which keeps it. "
+            )
+        else:
+            text += (
+                f"so `odctl down {profile}` and `odctl recreate {profile}` keep it while `postgres` runs, "
+                "and `odctl down postgres` loses it. "
+            )
         text += (
             "The other services keep their data inside their containers."
             if len(in_postgres) < len(services)

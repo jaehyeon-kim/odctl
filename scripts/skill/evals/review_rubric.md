@@ -86,4 +86,5 @@ A setup or test that fails, or passes on old values, when it runs a second time 
 
 - Wrong: `CREATE TABLE t` with no `IF NOT EXISTS` and no drop first; rows appended again on every run.
 - Wrong: `feast teardown` as the cleanup, or a DAG left unpaused in the bucket.
-- Right: each step is safe to run twice, and what the script registered is removed or reused.
+- Wrong: a check that rows from an earlier run pass, such as a count above 0 of a table the script keeps.
+- Right: each step is safe to run twice, and what the script registered is removed or reused. A check reads only what this run wrote or what arrived after it started, such as a count that must rise above the count read at the check's start.

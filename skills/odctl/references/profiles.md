@@ -332,7 +332,7 @@ MLflow: Experiment tracking, model registry and model serving (MLflow), the feat
   * External (host): http://127.0.0.1:5004
   * Internal (Docker): http://mlflow:5000
 • MLflow Model Scoring Server, idle until MODEL_URI in .env names a model;
-  run `odctl up mlflow` again after setting it. It loads the model once,
+  run `odctl recreate mlflow` after setting it. It loads the model once,
   when it starts, so a new version behind the same alias needs
   `odctl restart mlflow`, and the server answers nothing for about 16 seconds:
   * External (host): http://127.0.0.1:5003/invocations
@@ -586,7 +586,7 @@ Iceberg REST Catalog: Iceberg REST Catalog. `odctl up catalog` also starts: `dep
 
 Health: `catalog` has no health check: the commands return once it runs, so wait for what the task needs from it, with a limit.
 
-Data: `catalog` keeps its data in the `iceberg` database of the `postgres` profile, so `odctl down catalog` and `odctl recreate catalog` keep it while `postgres` runs, and `odctl down postgres` loses it.
+Data: `catalog` keeps its data in the `iceberg` database of the `postgres` profile, which shares its compose file, so `odctl down catalog` also stops `postgres` and loses it, and `odctl recreate catalog` also recreates `postgres`, which keeps it.
 
 ### valkey
 

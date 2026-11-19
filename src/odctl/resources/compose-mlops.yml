@@ -153,7 +153,7 @@ services:
   # MLflow Model Server: scores one registered model
   # ==========================================
   # Part of the mlflow profile. With MODEL_URI empty it waits and reports healthy;
-  # set MODEL_URI in .env and run `odctl up mlflow` again to serve that model.
+  # set MODEL_URI in .env and run `odctl recreate mlflow` to serve that model.
   # One model per container, because --model-uri is singular. To serve a second
   # model, copy this block, rename it, and give it another host port.
   mlflow-serve:

@@ -24,7 +24,7 @@ Kinds: A4 (odctl CLI behaviour assumed), A7 (what a command keeps or removes), A
 
 - A4: `odctl up catalog --yes` or another option `up` does not take; `odctl ps` with no profile and no `--all`.
 - A4: a named teardown with `--volumes` that covers every running profile, or `down --all --volumes`, without `--yes` (both ask, `main.py:844-853`), or a statement that it asks nothing.
-- A7: a teardown of `catalog` alone stated to remove everything the job started; `down catalog` leaves `postgres` and `storage` running (`docs/how-it-works.md:49`).
+- A7: a statement that `odctl down catalog` leaves `postgres` and `storage` running, or keeps the catalog's tables; it stops them too, because they share `compose-infra.yml` (`docs/how-it-works.md:51`; `src/odctl/planner.py:256-286`; `odctl down catalog --dry-run` lists `postgres`, `storage` and `catalog`).
 - A7: the teardown not under `if: always()`, so a failed test leaves the stack up, against the request.
 - A11: no Python version set for the tests, or `uv`, `pipx` or `jq` used without a step that installs it.
 - A11: odctl installed with no version.

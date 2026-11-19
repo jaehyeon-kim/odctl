@@ -25,5 +25,6 @@ A second run on the same stack starts from what the first run left, such as a ta
 - Create with `IF NOT EXISTS`, or the service's own form of it.
 - Delete what the step registers before it registers it again, such as a connector, a streaming job or a DAG run.
 - Check only what this run wrote, such as rows with this run's id, not a count that rows from an earlier run already pass.
+- Leave nothing scheduled at the end. Wrong: a setup that unpauses an Airflow DAG and leaves it unpaused, so its schedule keeps starting runs on the shared stack. Right: a test DAG with `schedule=None`, so only the runs this setup triggers start; once each of them has finished, `docker exec airflow airflow dags pause <dag_id>`, then delete the DAG file from `s3://airflow/dags`.
 
 Run the whole setup twice on one stack before relying on it.
