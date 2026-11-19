@@ -379,7 +379,7 @@ Feast: Experiment tracking, model registry and model serving (MLflow), the featu
 
 Health: `odctl up` and `odctl recreate` return once `feast-ui` (`curl -f http://localhost:8888/api/v1/projects`) and `feast-serve` (`curl -f http://localhost:6566/health`) pass their health checks, so call what the check tests with no wait loop.
 
-Registry:the bundled `feature_store.yaml` keeps Feast's SQL registry in the `feast` database of `postgres`: `postgresql+psycopg://user:password@postgres:5432/feast` from a container, and `127.0.0.1:5432` from the host. The online store is `valkey`.
+Registry: the bundled `feature_store.yaml` keeps Feast's SQL registry in the `feast` database of `postgres`: `postgresql+psycopg://user:password@postgres:5432/feast` from a container, and `127.0.0.1:5432` from the host. The online store is `valkey`.
 
 Data: `feast-ui` and `feast-serve` keep their data in the `feast` database of the `postgres` profile, so `odctl down feast` and `odctl recreate feast` keep it while `postgres` runs, and `odctl down postgres` loses it.
 
@@ -673,5 +673,7 @@ Langfuse: Tracing and evaluation of LLM and agent applications. `odctl up langfu
 | `langfuse-worker` | `langfuse/langfuse-worker` | none | `2g` |
 
 Health: `odctl up` and `odctl recreate` return once `langfuse-web` (`wget -q --spider http://127.0.0.1:3000/api/public/health`) and `langfuse-worker` (`wget -q --spider http://127.0.0.1:3030/api/health`) pass their health checks, so call what the check tests with no wait loop.
+
+Events: `langfuse-web` stores each event in the `langfuse` bucket of `seaweed` (`storage`) and queues it in `valkey`, and `langfuse-worker` writes it to the `langfuse` database of ClickHouse on `ch-11` (`ch-lite`) (`compose-aieng.yml`). `odctl down langfuse` and `odctl recreate langfuse` keep them while those profiles run; `odctl down storage`, `odctl down valkey` and `odctl down ch-lite` lose that part.
 
 Data: `langfuse-web` and `langfuse-worker` keep their data in the `langfuse` database of the `postgres` profile, so `odctl down langfuse` and `odctl recreate langfuse` keep it while `postgres` runs, and `odctl down postgres` loses it.
