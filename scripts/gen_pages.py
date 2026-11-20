@@ -258,6 +258,9 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
         "",
         "A profile is what `odctl up` starts. These pages are generated from `registry.yml` and the compose files when the site is built.",
         "",
+        # The tables of the groups line up with each other (docs/stylesheets/tables.css)
+        '<div class="same-columns" markdown>',
+        "",
     ]
     summary = ["- [Overview](index.md)"]
     for group, _, techs in TECH_GROUPS:
@@ -280,6 +283,7 @@ def profile_pages(resources: Path = INTERNAL_RESOURCES_DIR) -> Dict[str, str]:
         index.append("")
         pages[f"profiles/{path}"] = "\n".join(page)
 
+    index += ["</div>", ""]
     pages["profiles/index.md"] = "\n".join(index)
     pages["profiles/SUMMARY.md"] = "\n".join(summary) + "\n"
     return pages

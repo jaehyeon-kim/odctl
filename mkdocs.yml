@@ -32,6 +32,12 @@ theme:
     # Previous and next links at the foot of each page, so a reader can follow
     # the pages in nav order: each guide builds on the pages before it.
     - navigation.footer
+    # A section whose first page is index.md opens that page when its title is
+    # chosen, so Profiles, Guides and AI Assistants each open their overview.
+    - navigation.indexes
+    # Each page holds only the open part of the sidebar, and a closed section's title
+    # links to its first page, so About opens Why odctl.
+    - navigation.prune
 
 plugins:
   - search
@@ -95,6 +101,7 @@ nav:
   - How It Works: how-it-works.md
   - Profiles: profiles/
   - Guides:
+      - guides/index.md
       - Streaming:
           - Kafka: guides/kafka.md
           - Kafka Connect: guides/kafka-connect.md
@@ -124,7 +131,7 @@ nav:
           - OpenMetadata: guides/openmetadata.md
           - Telemetry: guides/telemetry.md
   - AI Assistants:
-      - Overview: ai/index.md
+      - ai/index.md
       - Plugin: ai/plugin.md
       - Agent Skill: ai/agent-skill.md
       - MCP Server: guides/mcp-server.md
