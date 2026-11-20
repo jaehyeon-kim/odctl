@@ -497,7 +497,7 @@ odctl down --all --volumes --yes
 
 ## Code in the Guides
 
-Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.9.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
+Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.10.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
 
 ## Use It with an AI Assistant
 
@@ -5574,7 +5574,7 @@ The collector answers `{"partialSuccess":{}}`. The collector passes metrics on i
 
 An alert rule is a query that Grafana runs against Prometheus every minute, and a limit it compares the result with. The rule fires when the result passes the limit. Grafana then shows one alert for each DAG, or other label set, that the query returns. odctl ships one rule, which fires when an Airflow DAG run fails. This section builds on [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md), which explains how to upload and run a DAG, and on [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md), which explains drift.
 
-The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/v1.9.0/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
+The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/v1.10.0/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
 
 ```bash
 # Title of each alert rule that Grafana loaded.
@@ -7360,9 +7360,7 @@ Now is the work being built, and Planned lists the rest in no order. Neither has
 
 ## Now
 
-Agent skill
-
-The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)
+Nothing is being built now. The next item comes from Planned.
 
 ## Planned
 
@@ -7427,6 +7425,12 @@ The odctl skill for AI agents gets a checklist, rules with examples, a check scr
 ## Released
 
 Newest first.
+
+1.10.0: Agent skill and plugin
+
+The odctl agent skill is rewritten around the container lifecycle, with a checklist, rules that each show a wrong and a right example, and reference pages, and a plugin installs it with the read-only MCP server in Claude Code, Codex and Antigravity ([AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md)). [#177](https://github.com/jaehyeon-kim/odctl/issues/177)
+
+A workspace compose file that cannot be read stops each command with an error that says why, `odctl explain` names the role of the Langfuse server and worker, Feast's feature server and Label Studio, and the Trino notes give a `docker exec` command that works without a terminal.
 
 1.9.0: Label Studio
 
