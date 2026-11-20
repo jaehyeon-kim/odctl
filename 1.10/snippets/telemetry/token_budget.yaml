@@ -1,0 +1,60 @@
+# A sample alert rule: it fires when the model calls of the last hour have used more
+# tokens than the budget set below. Copy it into .odctl/grafana/alerting/ and run
+# odctl restart telemetry to load it.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: model-calls
+    folder: odctl
+    interval: 1m
+    rules:
+      - uid: odctl-token-budget
+        title: Model call tokens over budget
+        condition: C
+        data:
+          # Tokens that gen_ai.client.token.usage recorded in the last hour, input
+          # and output together. Prometheus keeps the histogram's sum in the series
+          # gen_ai_client_token_usage_sum. A series that began within the last hour
+          # counts by its last value, which is all its tokens since it began, also
+          # when the application stopped sending more than 5 minutes ago, because
+          # increase() counts only the change after a series' first sample. A series
+          # more than an hour old counts by its increase over the hour, while the
+          # application exports at least every 5 minutes. When `telemetry` starts
+          # while the application is already running, the first hour counts all
+          # tokens since the application started.
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum((last_over_time(gen_ai_client_token_usage_sum[1h]) unless gen_ai_client_token_usage_sum offset 1h) or increase(gen_ai_client_token_usage_sum[1h]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    # The budget: change this number to your own limit.
+                    params: [1000000]
+        # No model calls in the last hour is under budget, not an alert.
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Model calls used more tokens in the last hour than the budget"
