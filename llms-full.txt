@@ -501,7 +501,7 @@ Every command and file in these pages is kept in the repository under [`docs/sni
 
 ## Use It with an AI Assistant
 
-The docs site publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for AI assistants, and `llms-full.txt` with every page in one file. The repository also has an odctl skill in [`skills/odctl/SKILL.md`](https://github.com/jaehyeon-kim/odctl/blob/v1.9.0/skills/odctl/SKILL.md), generated from the profiles, which tells an assistant which profile to start and how to reach each service. For Claude Code, copy the `skills/odctl` folder into `~/.claude/skills/`. With the `mcp` extra, `odctl mcp` gives an MCP client odctl's commands as tools, as [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) sets up.
+An AI coding assistant can start and use odctl for you. The [AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md) section explains the odctl [plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md), which installs the [agent skill](https://jaehyeon.me/odctl/latest/ai/agent-skill/index.md) and the [MCP server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) in Claude Code, Codex and Antigravity. The skill tells an assistant which profile to start and how to reach each service, and the server gives it odctl's commands as tools. The site also publishes [`llms.txt`](https://jaehyeon.me/odctl/llms.txt), an index of these pages for assistants.
 # How It Works
 
 # How It Works
@@ -535,7 +535,7 @@ It lists each compose file with its profiles, from `compose-deps.yml` with `deps
 
 Each profile lists the profiles it needs under `depends_on` in `registry.yml`. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: `deps` first, `postgres` and `storage` next, `catalog` and `valkey` after them, and every other profile last, in alphabetical order.
 
-The profiles are then grouped by compose file, in that order, and each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
+The profiles are then grouped by compose file, in that order, except that a file starts after the files that hold its profiles' dependencies. When the dependencies of two files point at each other, that order cannot hold, and the order above decides. Each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
 
 ### Before Anything Starts
 
@@ -548,7 +548,7 @@ The profiles are then grouped by compose file, in that order, and each file is s
 
 ### Which Containers a Command Touches
 
-`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name, not on their dependencies. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project name starts with `odctl-`, and the service belongs to one of the named profiles.
+`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name, not on their dependencies. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project is the one the compose file names in its top-level `name:`, such as `odctl-flink`, and the service belongs to one of the named profiles. odctl runs each file as that project, so a `COMPOSE_PROJECT_NAME` set in the shell or in `.env` does not change it.
 
 There is one exception. When a profile depends on another profile in the same compose file, both are included, because compose refuses a command on a service whose dependency is left out. `odctl down --volumes` removes the shared `deps` volume and the `odctl` network only when no other profile has a container left.
 
@@ -944,10 +944,10 @@ Depends on: `postgres`. `odctl up trino` also starts: `deps`, `postgres`.
   configured, so any username is accepted):
   * External (host): http://127.0.0.1:8080
   * Internal (Docker): http://trino:8080
-• Identities: `docker exec -it trino trino` connects as `trino`, the
-  CLI default. Pass `--user user` for the stack-wide convention, or
-  `--user analyst`, which trino/rules.json denies schema ownership
-  while leaving every table privilege in place.
+• Identities: `docker exec trino trino --execute '<query>'` runs the
+  query as `trino`, the CLI default. Pass `--user user` for the
+  stack-wide convention, or `--user analyst`, which trino/rules.json
+  denies schema ownership while leaving every table privilege in place.
 • Catalogs: postgres works with the trino profile alone. iceberg,
   kafka, clickhouse and valkey load without their backing services,
   so they appear in SHOW CATALOGS and then fail at query time unless
@@ -1058,10 +1058,10 @@ Depends on: `postgres`, `storage`. `odctl up metadata` also starts: `deps`, `pos
 | Service                  | Image                                                 | Host:container ports     | Memory limit |
 | ------------------------ | ----------------------------------------------------- | ------------------------ | ------------ |
 | `openmetadata-es`        | `docker.elastic.co/elasticsearch/elasticsearch:9.3.0` | `9200:9200`, `9300:9300` | `2g`         |
-| `openmetadata-migrate`   | `docker.getcollate.io/openmetadata/server:2.0.7`      | none                     | `1g`         |
-| `openmetadata-server`    | `docker.getcollate.io/openmetadata/server:2.0.7`      | `8585:8585`, `8586:8586` | `2g`         |
-| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.7`   | `8087:8080`              | `1500m`      |
-| `openmetadata-init`      | `docker.getcollate.io/openmetadata/ingestion:2.0.7`   | none                     | `64m`        |
+| `openmetadata-migrate`   | `docker.getcollate.io/openmetadata/server:2.0.8`      | none                     | `1g`         |
+| `openmetadata-server`    | `docker.getcollate.io/openmetadata/server:2.0.8`      | `8585:8585`, `8586:8586` | `2g`         |
+| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.8`   | `8087:8080`              | `1500m`      |
+| `openmetadata-init`      | `docker.getcollate.io/openmetadata/ingestion:2.0.8`   | none                     | `64m`        |
 
 ## Marquez
 
@@ -1100,7 +1100,7 @@ Depends on: `postgres`, `storage`. `odctl up mlflow` also starts: `deps`, `postg
   * External (host): http://127.0.0.1:5004
   * Internal (Docker): http://mlflow:5000
 • MLflow Model Scoring Server, idle until MODEL_URI in .env names a model;
-  run `odctl up mlflow` again after setting it. It loads the model once,
+  run `odctl recreate mlflow` after setting it. It loads the model once,
   when it starts, so a new version behind the same alias needs
   `odctl restart mlflow`, and the server answers nothing for about 16 seconds:
   * External (host): http://127.0.0.1:5003/invocations
@@ -1497,6 +1497,66 @@ Depends on: `catalog`. `odctl up spark-full` also starts: `catalog`, `deps`, `po
 | `spark-worker-3` | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `9083:8081`              | `2g`         |
 | `spark-history`  | `ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>` | `18080:18080`            | `1g`         |
 # Guides
+
+# Guides
+
+Each guide starts the profiles one task needs, then shows how to use their services from the host and from a container. The guides are in groups by area, in the same order as the sidebar. A guide may start from a stack that an earlier guide in its group set up, so the pages of a group read in order.
+
+______________________________________________________________________
+
+## Streaming
+
+| Guide                                                                               | What it shows                                                                                           |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [Kafka](https://jaehyeon.me/odctl/latest/guides/kafka/index.md)                     | the Kafka broker, the schema registry and Kafka UI of `kafka-lite`                                      |
+| [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md)     | the Kafka Connect worker and the connectors it comes with                                               |
+| [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md)             | a Flink SQL job, sent through the SQL Gateway, that reads a Kafka topic and writes totals to PostgreSQL |
+| [Rolling Windows](https://jaehyeon.me/odctl/latest/guides/rolling-windows/index.md) | features over the last 10 minutes, 1 hour and 1 day, with `OVER` windows                                |
+| [Fluss](https://jaehyeon.me/odctl/latest/guides/fluss/index.md)                     | Fluss tables that Flink writes and reads with low latency                                               |
+
+## Lakehouse and Batch
+
+| Guide                                                                                     | What it shows                                                                  |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [Ingest into Iceberg](https://jaehyeon.me/odctl/latest/guides/iceberg-ingestion/index.md) | Kafka Connect, Flink and Spark writing Iceberg tables through one REST catalog |
+| [Spark](https://jaehyeon.me/odctl/latest/guides/spark/index.md)                           | Spark jobs on the `iceberg` catalog, and the Spark History Server              |
+
+## Analytics
+
+| Guide                                                                                 | What it shows                                                                                    |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [ClickHouse](https://jaehyeon.me/odctl/latest/guides/clickhouse/index.md)             | a ClickHouse cluster with shards, replicas and ClickHouse Keeper                                 |
+| [Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md) | one SQL interface over PostgreSQL, Iceberg, ClickHouse, Kafka and Valkey, and charts in Metabase |
+
+## Orchestration
+
+| Guide                                                                                 | What it shows                                                                                      |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md) | Airflow reading DAG files that you upload to SeaweedFS                                             |
+| [Temporal Workers](https://jaehyeon.me/odctl/latest/guides/temporal-workers/index.md) | a worker of your own that runs workflows and activities, and a workflow that waits for an approval |
+
+## ML and AI
+
+| Guide                                                                                             | What it shows                                                                           |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [Feast with Iceberg](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/index.md)              | a feature store with its offline store on Iceberg and its online store on Valkey        |
+| [Feast Vector Retrieval](https://jaehyeon.me/odctl/latest/guides/feast-vector-retrieval/index.md) | the stored rows whose embeddings are nearest to a query embedding                       |
+| [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md)                                 | runs and models in the tracking server, and a registered model scored over HTTP         |
+| [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md)           | data drift and data quality reports pushed to the Evidently UI                          |
+| [Label Studio](https://jaehyeon.me/odctl/latest/guides/label-studio/index.md)                     | a labelling project, its tasks and labels, and the labels loaded into PostgreSQL        |
+| [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)                   | vector search and BM25 keyword ranking in PostgreSQL, and their rankings combined       |
+| [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)                                 | the Valkey Bundle, with its modules for JSON documents, Bloom filters and vector search |
+| [Langfuse](https://jaehyeon.me/odctl/latest/guides/langfuse/index.md)                             | traces and evaluations of an application built on an LLM                                |
+
+## Metadata and Operations
+
+| Guide                                                                               | What it shows                                                        |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [OpenLineage and Marquez](https://jaehyeon.me/odctl/latest/guides/lineage/index.md) | OpenLineage events from jobs, and the lineage graph Marquez draws    |
+| [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)       | a data catalogue of the stack's databases, tables and columns        |
+| [Telemetry](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md)             | metrics, traces and logs sent with OpenTelemetry and read in Grafana |
+
+The MCP server, which gives an AI assistant odctl's commands as tools, is in [AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md).
 
 # Produce and Consume with Kafka
 
@@ -2632,7 +2692,7 @@ This runs a query with no table:
 docker exec trino trino --execute "SELECT 1"
 ```
 
-It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec -it trino trino` connects as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Examples](https://jaehyeon.me/odctl/latest/how-it-works/#examples) on How It Works explains the rules in `trino/rules.json`.
+It prints `"1"`. Trino has no password authentication, so it accepts any user name. `docker exec trino trino --execute '<query>'` runs as `trino`. Pass `--user user` to use the name the rest of the stack uses. [Examples](https://jaehyeon.me/odctl/latest/how-it-works/#examples) on How It Works explains the rules in `trino/rules.json`.
 
 The Trino UI at `http://127.0.0.1:8080` asks only for a user name. It shows the cluster and the queries that ran in the last few minutes.
 
@@ -3831,7 +3891,7 @@ curl -X POST http://127.0.0.1:5003/invocations \
   -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}'
 ```
 
-The response is `{"predictions": [0, 0]}`, one prediction per input row. Check the body rather than the status code, because the server answers 200 with an error payload when scoring fails. `http://127.0.0.1:5003/ping` answers once the model is loaded.
+The response is `{"predictions": [0, 0]}`, one prediction per input row. Check that the body holds `predictions`: a scoring failure answers 400 with the error in the body, and `curl` without `--fail` still exits 0. `http://127.0.0.1:5003/ping` answers once the model is loaded.
 
 ## Move the Alias to a New Version
 
@@ -4559,297 +4619,6 @@ docker exec valkey valkey-cli --no-auth-warning -u "$vk" del 'model:1' 'model:2'
 ```
 
 It prints `PONG`, `OK`, the two values, `OK`, `[5]` for the `stars` field and `3` for the three deleted keys.
-
-# Connect an AI Agent with MCP
-
-MCP, the Model Context Protocol, lets an AI agent discover and call the tools of a server. A tool is a function with a name and named parameters.
-
-`odctl mcp` starts an MCP server that offers odctl's commands as tools. An MCP client, such as an AI assistant, starts `odctl mcp` as a process. It exchanges messages with the process over its standard input and output, which MCP calls stdio. The agent calls a tool and odctl runs the command.
-
-The server offers five tools that only read, each running the command of the same name:
-
-- `list` returns every profile with its services and ports.
-- `explain` takes `profile` and returns that profile's services, images, ports, volumes and usage.
-- `ps` takes `profiles` and returns their containers and the active profiles, or every container odctl manages when `profiles` is left out.
-- `info` returns the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's own images.
-- `logs` takes `profiles`, `service`, `tail`, `timestamps`, `since` and `until`, and returns the logs of the containers of those profiles.
-
-`tail` defaults to 100 lines, so one call cannot fill the agent's context with a long log. `odctl logs` prints all lines, and a call can pass another number.
-
-Results and errors:
-
-- `list`, `explain`, `ps` and `info` return the documents on the [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md) page, and `list`'s array arrives under the key `result` because a tool's structured result is an object.
-- `info` reports Docker as not reachable with `reachable: false`, not as an error.
-- `logs` returns the lines that `odctl logs` prints.
-- A tool that fails returns the error message of the command.
-- Tools run one at a time.
-
-The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) says.
-
-This guide builds on [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) and [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md).
-
-## Install
-
-The server needs the `mcp` extra of odctl. This installs odctl with it:
-
-```bash
-uv tool install "odctl[mcp]"
-```
-
-Without the extra, `odctl mcp` exits with an error that names this command. `uv tool install` keeps odctl in an environment of its own, so the client scripts below need the `mcp` package in an environment of their own. This makes one in the current folder: `python -m venv .venv`, then `source .venv/bin/activate` and `pip install "mcp>=2.3.0,<3"`. Keep it out of an environment that holds the client of the [Feast guide](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#connect-an-mcp-client), which needs `mcp` below 2.
-
-## Add It to an MCP Client
-
-Claude Code is Anthropic's command-line coding agent, and it is an MCP client. The scripts in the next sections start the server themselves and need no client set up, so skip this section if you use only them. Run this in the folder of your project to add odctl to the project:
-
-```bash
-# Writes .mcp.json in this folder.
-claude mcp add --scope project odctl -- odctl mcp
-```
-
-The command writes this entry to `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "odctl": {
-      "type": "stdio",
-      "command": "odctl",
-      "args": [
-        "mcp"
-      ],
-      "env": {}
-    }
-  }
-}
-```
-
-Any MCP client that starts a server over stdio needs the same two things, the command `odctl` and the argument `mcp`. odctl reads the `.odctl` workspace of the folder where the client starts it. When your client starts servers in another folder, put `"--workspace", "<absolute path to .odctl>"` before `"mcp"` in the highlighted `args`. The `--workspace` option sets the workspace for every tool, because it is read once, when the server starts.
-
-## List the Tools
-
-This script starts the server command from its arguments and prints the name and description of each tool. Save it as `mcp_client.py` and run it in the environment that has `mcp`:
-
-```python
-import sys
-
-import anyio
-from mcp import Client, StdioServerParameters
-
-
-async def main(command):
-    """Print the name and description of each tool the server offers.
-
-    Args:
-        command: The command that starts the server, as a list of words.
-    """
-    server = StdioServerParameters(command=command[0], args=command[1:])
-    async with Client(server) as client:
-        for tool in (await client.list_tools()).tools:
-            print(f"{tool.name}: {tool.description}")
-
-
-anyio.run(main, sys.argv[1:])
-```
-
-This lists the five tools that only read:
-
-```bash
-python mcp_client.py odctl mcp
-```
-
-```text
-list: List every profile with its services and ports, as `odctl list --json` does.
-explain: Describe one profile: its services, images, ports, volumes and usage, as `odctl explain --json` does.
-ps: Show the containers odctl manages and the active profiles, as `odctl ps --json` does. Without profiles it shows every container.
-info: Show the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's images, as `odctl info --json` does.
-logs: Fetch the logs of the containers of some profiles, as `odctl logs` prints them, the last 100 lines of each by default.
-```
-
-## Allow Up and Down
-
-The tools `up` and `down` start and stop profiles, so an agent that can call them changes what runs on your machine. They exist only when the server starts with the option `--allow-changes`. An option shows in the client's configuration, where an environment variable left set in a shell could allow changes without anyone seeing it. This lists the seven tools:
-
-```bash
-python mcp_client.py odctl mcp --allow-changes
-```
-
-```text
-list: List every profile with its services and ports, as `odctl list --json` does.
-explain: Describe one profile: its services, images, ports, volumes and usage, as `odctl explain --json` does.
-ps: Show the containers odctl manages and the active profiles, as `odctl ps --json` does. Without profiles it shows every container.
-info: Show the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's images, as `odctl info --json` does.
-logs: Fetch the logs of the containers of some profiles, as `odctl logs` prints them, the last 100 lines of each by default.
-up: Start profiles and their dependencies, as `odctl up` does.
-down: Stop the named profiles. With `volumes`, also remove their volumes, and the shared jar volume `odctl-shared-deps` once no other profile has a container, as `odctl down --volumes` does.
-```
-
-`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and a server cannot ask. So `down` with `volumes` refuses names that cover every profile `odctl down --all --volumes` would stop, and no tool removes everything in one call.
-
-## Runnable Example
-
-Save this file as `example.py` and run it with `python example.py` in the folder that holds your `.odctl` workspace, made by `odctl init` as [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) shows, in the environment that has `mcp`. It starts the server with `--allow-changes`, starts `kafka-lite`, reads `info`, the containers of `kafka-lite` and the last five lines of the `connect` service, then stops `kafka-lite`. A tool that fails returns its error as the result, so the script checks each result, stops at the first error and still stops `kafka-lite`:
-
-```python
-import os
-
-import anyio
-from mcp import Client, StdioServerParameters
-
-
-async def call(client, name, arguments):
-    """Call one tool, print its name and its text result, and stop on an error.
-
-    A tool that fails returns its error as the result, so the call checks for it.
-
-    Args:
-        client: The connected MCP client.
-        name: The tool to call.
-        arguments: The tool's parameters.
-
-    Raises:
-        RuntimeError: When the tool returns an error.
-    """
-    result = await client.call_tool(name, arguments)
-    print(f"--- {name}")
-    print(result.content[0].text)
-    if result.is_error:
-        raise RuntimeError(f"the tool {name} failed")
-
-
-async def main():
-    """Start kafka-lite, read it through four tools, then stop it."""
-    # Docker reads variables such as DOCKER_HOST, which a client passes to the
-    # server only when asked.
-    server = StdioServerParameters(
-        command="odctl", args=["mcp", "--allow-changes"], env=dict(os.environ)
-    )
-    async with Client(server) as client:
-        try:
-            await call(client, "up", {"profiles": ["kafka-lite"]})
-            await call(client, "info", {})
-            await call(client, "ps", {"profiles": ["kafka-lite"]})
-            await call(client, "logs", {"profiles": ["kafka-lite"], "service": "connect", "tail": 5})
-        finally:
-            # Stop kafka-lite even when a tool failed.
-            await call(client, "down", {"profiles": ["kafka-lite"]})
-
-
-anyio.run(main)
-```
-
-It prints the result of each tool under a line with the tool's name. The output below shortens the path of the `.odctl` folder to `/home/you/project/.odctl`:
-
-```text
---- up
-⚙️  Launching 🧱 Infrastructure (deps)...
-⚙️  Launching 🚀 Target (kafka-lite)...
-✓ All requested profiles successfully started!
---- info
-{
-  "cli_version": "<CLI version>",
-  "tag": "<CLI version>",
-  "workspace": {
-    "path": "/home/you/project/.odctl",
-    "exists": true,
-    "stale_tag": null
-  },
-  "docker": {
-    "reachable": true
-  },
-  "images": [
-    {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>",
-      "local": false
-    },
-    {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>",
-      "local": true
-    },
-    {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>",
-      "local": false
-    },
-    {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>",
-      "local": false
-    },
-    {
-      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>",
-      "local": false
-    }
-  ]
-}
---- ps
-{
-  "active_profiles": [
-    "kafka-lite"
-  ],
-  "containers": [
-    {
-      "name": "connect",
-      "service": "connect",
-      "state": "running",
-      "health": null,
-      "ports": [
-        {
-          "host": 8083,
-          "container": 8083,
-          "protocol": "tcp"
-        }
-      ]
-    },
-    {
-      "name": "kafka",
-      "service": "kafka",
-      "state": "running",
-      "health": null,
-      "ports": [
-        {
-          "host": 9092,
-          "container": 9092,
-          "protocol": "tcp"
-        }
-      ]
-    },
-    {
-      "name": "kafka-ui",
-      "service": "kafka-ui",
-      "state": "running",
-      "health": null,
-      "ports": [
-        {
-          "host": 8086,
-          "container": 8080,
-          "protocol": "tcp"
-        }
-      ]
-    },
-    {
-      "name": "karapace",
-      "service": "karapace",
-      "state": "running",
-      "health": "healthy",
-      "ports": [
-        {
-          "host": 8081,
-          "container": 8081,
-          "protocol": "tcp"
-        }
-      ]
-    }
-  ]
-}
---- logs
-connect  | [2026-10-30 21:50:24,917] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Cluster ID: 42RglGpZQwy9D5VzTVpCWA (org.apache.kafka.clients.Metadata:365)
-connect  | [2026-10-30 21:50:24,919] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Discovered group coordinator broker-1:19092 (id: 2147483646 rack: null isFenced: false) (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:943)
-connect  | [2026-10-30 21:50:24,920] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Rebalance started (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:239)
-connect  | [2026-10-30 21:50:24,920] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] (Re-)joining group (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:611)
-connect  | [2026-10-30 21:50:24,923] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] (Re-)joining group (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:611)
---- down
-🛑 Stopping kafka-lite...
-✓ Teardown complete.
-```
 
 # Tracing LLM Apps with Langfuse
 
@@ -6087,6 +5856,467 @@ echo
 ```
 
 It prints the collector's answer and then the query result, with `demo_total` and the value `"42"`.
+# AI Assistants
+
+# AI Assistants
+
+An AI coding assistant can start and use an odctl stack when it has three things: the rules for choosing profiles and reaching their services, odctl's commands as tools it can call, and odctl's documentation as text. This section describes each and how to install them.
+
+The parts relate as follows:
+
+| Part        | What it gives the assistant                                                                                                                                                                     | Page                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Agent skill | a folder, `skills/odctl/`, of rules in the Agent Skills format: which profile to start, how to reach each service from the host and from a container, and how to run odctl in a project's tests | [Agent Skill](https://jaehyeon.me/odctl/latest/ai/agent-skill/index.md)   |
+| MCP server  | `odctl mcp`, which offers odctl's commands to an MCP client as tools; MCP, the Model Context Protocol, is the standard an assistant uses to call a tool                                         | [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) |
+| Plugin      | one install for Claude Code, Codex or Antigravity that adds the skill and the MCP server together                                                                                               | [Plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md)             |
+| `llms.txt`  | the pages of this site as text, for an assistant that reads documentation                                                                                                                       | below                                                                     |
+
+The plugin is a package of the other two parts. It starts the MCP server read-only, so the assistant can list, explain, inspect and read logs, and cannot run `up` or `down`. Install the skill without the plugin when your tool has no plugin support, and set up the MCP server by hand to allow `up` and `down`. The plugin does not install odctl, and its MCP server needs the `mcp` extra: see [Before You Install](https://jaehyeon.me/odctl/latest/ai/plugin/#before-you-install).
+
+## Documentation as Text
+
+The site publishes two files built from the sidebar:
+
+- [`llms.txt`](https://jaehyeon.me/odctl/llms.txt) is an index of the pages with a link to each.
+- [`llms-full.txt`](https://jaehyeon.me/odctl/llms-full.txt) holds every page in one file.
+
+Give an assistant one of them when its tool cannot install a skill. The skill is shorter and tells the assistant what to do, while the pages describe every profile and command.
+
+# Plugin
+
+The odctl plugin adds the [agent skill](https://jaehyeon.me/odctl/latest/ai/agent-skill/index.md) and the [MCP server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md) to Claude Code, Codex or Antigravity with one install. The plugin starts the server as `odctl mcp`, without `--allow-changes`, so the assistant gets the five tools that only read and cannot start or stop profiles.
+
+The repository holds the plugin's files at its root: a manifest for each tool, a marketplace file for the tools that have one, and the MCP entry. Codex copies the plugin into its cache, `~/.codex/plugins/cache/odctl/odctl/<version>/`, and Antigravity copies it to `~/.gemini/config/plugins/odctl/`, where it failed on a symlink that points outside the folder, such as one in a local clone's `.venv`. Claude Code copies a GitHub marketplace into `~/.claude/plugins/` and reads a local-path marketplace in place.
+
+## Before You Install
+
+The plugin does not install odctl. The MCP server it starts runs the `odctl` command, which needs the `mcp` extra, so install odctl first:
+
+```bash
+uv tool install "odctl[mcp]"
+# or, if you installed odctl with pipx
+pipx install --force "odctl[mcp]"
+```
+
+Without the extra, `odctl mcp` exits with an error that names this command.
+
+## Install
+
+Run the lines of your tool. Each installs the plugin from the repository's `main` branch.
+
+Claude Code:
+
+```bash
+claude plugin marketplace add jaehyeon-kim/odctl
+claude plugin install odctl@odctl
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add jaehyeon-kim/odctl
+codex plugin add odctl@odctl
+```
+
+For Claude Code and Codex, `odctl@odctl` is the plugin's name, an `@`, and the marketplace's name, which are both `odctl`.
+
+Antigravity:
+
+```bash
+agy plugin install https://github.com/jaehyeon-kim/odctl
+```
+
+Start a new session after the install, so the tool loads the skill and the server.
+
+## Check the Install
+
+The skill is named `odctl:odctl` in Claude Code and Codex, which join the plugin's name and the skill's name with a colon. Antigravity uses the skill's own name, `odctl`.
+
+- **Claude Code:** `claude plugin list` shows `odctl@odctl` as enabled, and `claude plugin details odctl` lists the skill and the MCP server.
+- **Codex:** `codex plugin list` shows odctl with its status, and `/plugins` in `codex` shows it under its marketplace.
+- **Antigravity:** `agy plugin list` shows the plugin, its version and its skill count, and `agy plugin list --json` lists the skill's name.
+
+Then ask the assistant a request that needs a stack, such as "start Kafka and Flink on my machine with odctl". It loads the skill, and it can call the MCP tool `list` to read the profiles.
+
+In print mode (`claude -p`, `agy -p`), the tool cannot ask before the assistant's first call to an MCP tool, so allow the odctl tools for the run:
+
+- **Claude Code:** name each tool in `--allowedTools`, such as `--allowedTools mcp__plugin_odctl_odctl__list`.
+- **Antigravity:** pass `--settings '{"permissions":{"allow":["mcp(odctl_odctl/list)"]}}'`, which holds for that run only.
+
+`codex exec` called the tool without this.
+
+## Update
+
+A new odctl release changes the plugin's version. Update with the same tool:
+
+- **Claude Code:** `claude plugin update odctl@odctl`.
+- **Codex:** `codex plugin marketplace upgrade odctl`, which reinstalls the plugin.
+- **Antigravity:** run `agy plugin install https://github.com/jaehyeon-kim/odctl` again.
+
+## Allow Up and Down
+
+The plugin's server is read-only. To let an assistant start and stop profiles, add `odctl mcp --allow-changes` to your tool's MCP settings by hand, as [Allow Up and Down](https://jaehyeon.me/odctl/latest/guides/mcp-server/#allow-up-and-down) explains, and read what the tools can remove first.
+
+## Sources
+
+The install commands are those of each tool's own help (`claude plugin install --help`, `codex plugin add --help` and `agy plugin help`), [Create a marketplace](https://code.claude.com/docs/en/plugin-marketplaces) for Claude Code, and [Plugins](https://antigravity.google/docs/plugins?tab=cli) for Antigravity.
+
+# Agent Skill
+
+The odctl skill gives an AI coding assistant the rules for using odctl, so it starts the right profiles, reaches their services at the right address and stops only what it started, instead of guessing.
+
+A skill is a folder in the Agent Skills format that Claude Code, Codex and other assistants read. The assistant loads the skill when a request needs one of the technologies odctl runs locally, such as Kafka, Spark, Trino or MLflow, or code that connects to them.
+
+The folder is `skills/odctl/` in the repository:
+
+| File                     | What it covers                                                                                                                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SKILL.md`               | a checklist for the assistant to copy into its reply; the rules for starting, waiting for, stopping and reaching services, each with a wrong and a right example; and the commands, options and `.env` keys of odctl |
+| `references/profiles.md` | for each profile, its addresses from the host and from a container, its logins, what `odctl up` also starts, its services, ports and memory limits, which services `odctl up` waits for, and where its data lives    |
+| `references/testing.md`  | odctl in a project's tests and CI: pinning the version, starting and stopping the profiles a job needs, and what a teardown removes                                                                                  |
+
+The commands, options, keys and profile notes are generated from odctl's CLI, `registry.yml` and compose files, so the folder lists what the release has. The rules and `references/testing.md` are written by hand in `scripts/skill/`.
+
+The skill does not install odctl or Docker. The assistant runs the `odctl` commands, so install odctl first, as [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/#install) shows.
+
+## Install with the Plugin
+
+The [plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md) installs the skill for Claude Code, Codex and Antigravity, together with the MCP server.
+
+## Install without the Plugin
+
+Copy `skills/odctl/` into the skills folder of your assistant. Take it from the repository at the tag of the release you installed, which is `v` followed by the `cli_version` that `odctl info --json` prints. For Claude Code, `~/.claude/skills/odctl/` is for every project and `.claude/skills/odctl/` in a project is for that project. These lines copy it for every project:
+
+```bash
+# The source of the installed release, which holds the skill
+version=$(odctl info --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["cli_version"])')
+src=$(mktemp -d)
+git clone --depth 1 --branch "v$version" https://github.com/jaehyeon-kim/odctl "$src" &&
+  mkdir -p ~/.claude/skills &&
+  rm -rf ~/.claude/skills/odctl &&
+  cp -R "$src/skills/odctl" ~/.claude/skills/odctl
+rm -rf "$src"
+```
+
+The lines clone into a new private folder, replace an earlier copy of the skill only when the clone succeeds, and remove the clone, so they also update the skill to a newer release. If `CLAUDE_CONFIG_DIR` is set, use that folder in place of `~/.claude`.
+
+With the GitHub CLI 2.90.0 or later, one command does the copy. Without `--pin`, it takes the latest tagged release, which can be newer than the odctl you installed, so the lines pin the installed release:
+
+```bash
+# The release that is installed
+version=$(odctl info --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["cli_version"])')
+gh skill install jaehyeon-kim/odctl odctl --pin "v$version" --agent claude-code --scope user
+```
+
+`--scope user` installs for every project, in your home folder. `--scope project`, the default, installs for the current project, inside its git repository. Another assistant takes its own `--agent` value, listed in `gh skill install --help`.
+
+## Check the Install
+
+Check that the folder holds `SKILL.md`:
+
+```bash
+ls ~/.claude/skills/odctl/SKILL.md
+```
+
+In Claude Code, `/skills` lists the loaded skills, and `odctl` must be among them. After a project copy, check `.claude/skills/odctl/SKILL.md` in the project instead.
+
+Then ask the assistant for a stack, such as "run Kafka and Flink on my machine with odctl". It reads the skill when the request names one of the technologies.
+
+## Limits
+
+- The skill's rules cover odctl's container lifecycle: starting, waiting, stopping, addresses and logins.
+- `references/testing.md` covers how a test starts odctl's stack, not what the tests check.
+
+# Connect an AI Agent with MCP
+
+MCP, the Model Context Protocol, lets an AI agent discover and call the tools of a server. A tool is a function with a name and named parameters.
+
+`odctl mcp` starts an MCP server that offers odctl's commands as tools. An MCP client, such as an AI assistant, starts `odctl mcp` as a process. It exchanges messages with the process over its standard input and output, which MCP calls stdio. The agent calls a tool and odctl runs the command.
+
+The server offers five tools that only read, each running the command of the same name:
+
+- `list` returns every profile with its services and ports.
+- `explain` takes `profile` and returns that profile's services, images, ports, volumes and usage.
+- `ps` takes `profiles` and returns their containers and the active profiles, or every container odctl manages when `profiles` is left out.
+- `info` returns the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's own images.
+- `logs` takes `profiles`, `service`, `tail`, `timestamps`, `since` and `until`, and returns the logs of the containers of those profiles.
+
+`tail` defaults to 100 lines, so one call cannot fill the agent's context with a long log. `odctl logs` prints all lines, and a call can pass another number.
+
+Results and errors:
+
+- `list`, `explain`, `ps` and `info` return the documents on the [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md) page, and `list`'s array arrives under the key `result` because a tool's structured result is an object.
+- `info` reports Docker as not reachable with `reachable: false`, not as an error.
+- `logs` returns the lines that `odctl logs` prints.
+- A tool that fails returns the error message of the command.
+- Tools run one at a time.
+
+The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The [plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md) starts the server without that option, so an assistant that uses the plugin gets the five tools that only read. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) says.
+
+This guide builds on [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) and [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md).
+
+## Install
+
+The server needs the `mcp` extra of odctl. This installs odctl with it:
+
+```bash
+uv tool install "odctl[mcp]"
+```
+
+Without the extra, `odctl mcp` exits with an error that names this command. `uv tool install` keeps odctl in an environment of its own, so the client scripts below need the `mcp` package in an environment of their own. This makes one in the current folder: `python -m venv .venv`, then `source .venv/bin/activate` and `pip install "mcp>=2.3.0,<3"`. Keep it out of an environment that holds the client of the [Feast guide](https://jaehyeon.me/odctl/latest/guides/feast-iceberg/#connect-an-mcp-client), which needs `mcp` below 2.
+
+## Add It to an MCP Client
+
+Claude Code is Anthropic's command-line coding agent, and it is an MCP client. The scripts in the next sections start the server themselves and need no client set up, so skip this section if you use only them. Run this in the folder of your project to add odctl to the project:
+
+```bash
+# Writes .mcp.json in this folder.
+claude mcp add --scope project odctl -- odctl mcp
+```
+
+The command writes this entry to `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "odctl": {
+      "type": "stdio",
+      "command": "odctl",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+Any MCP client that starts a server over stdio needs the same two things, the command `odctl` and the argument `mcp`. odctl reads the `.odctl` workspace of the folder where the client starts it. When your client starts servers in another folder, put `"--workspace", "<absolute path to .odctl>"` before `"mcp"` in the highlighted `args`. The `--workspace` option sets the workspace for every tool, because it is read once, when the server starts.
+
+## List the Tools
+
+This script starts the server command from its arguments and prints the name and description of each tool. Save it as `mcp_client.py` and run it in the environment that has `mcp`:
+
+```python
+import sys
+
+import anyio
+from mcp import Client, StdioServerParameters
+
+
+async def main(command):
+    """Print the name and description of each tool the server offers.
+
+    Args:
+        command: The command that starts the server, as a list of words.
+    """
+    server = StdioServerParameters(command=command[0], args=command[1:])
+    async with Client(server) as client:
+        for tool in (await client.list_tools()).tools:
+            print(f"{tool.name}: {tool.description}")
+
+
+anyio.run(main, sys.argv[1:])
+```
+
+This lists the five tools that only read:
+
+```bash
+python mcp_client.py odctl mcp
+```
+
+```text
+list: List every profile with its services and ports, as `odctl list --json` does.
+explain: Describe one profile: its services, images, ports, volumes and usage, as `odctl explain --json` does.
+ps: Show the containers odctl manages and the active profiles, as `odctl ps --json` does. Without profiles it shows every container.
+info: Show the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's images, as `odctl info --json` does.
+logs: Fetch the logs of the containers of some profiles, as `odctl logs` prints them, the last 100 lines of each by default.
+```
+
+## Allow Up and Down
+
+The tools `up` and `down` start and stop profiles, so an agent that can call them changes what runs on your machine. They exist only when the server starts with the option `--allow-changes`. An option shows in the client's configuration, where an environment variable left set in a shell could allow changes without anyone seeing it. This lists the seven tools:
+
+```bash
+python mcp_client.py odctl mcp --allow-changes
+```
+
+```text
+list: List every profile with its services and ports, as `odctl list --json` does.
+explain: Describe one profile: its services, images, ports, volumes and usage, as `odctl explain --json` does.
+ps: Show the containers odctl manages and the active profiles, as `odctl ps --json` does. Without profiles it shows every container.
+info: Show the odctl version, the image tag, the workspace, whether Docker is reachable and odctl's images, as `odctl info --json` does.
+logs: Fetch the logs of the containers of some profiles, as `odctl logs` prints them, the last 100 lines of each by default.
+up: Start profiles and their dependencies, as `odctl up` does.
+down: Stop the named profiles. With `volumes`, also remove their volumes, and the shared jar volume `odctl-shared-deps` once no other profile has a container, as `odctl down --volumes` does.
+```
+
+`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and so does `odctl down --volumes` with names that cover every profile, but a server cannot ask. So `down` with `volumes` refuses names that cover every profile `odctl down --all --volumes` would stop. The names need not include `deps`, because a named teardown with `volumes` also removes it once no other profile has a container. The guard compares profile names, not volumes, so one call can still remove a volume another profile uses: `down` of `spark-lite` with `volumes` removes `spark-events-data`, which `spark-full` uses too.
+
+## Runnable Example
+
+Save this file as `example.py` and run it with `python example.py` in the folder that holds your `.odctl` workspace, made by `odctl init` as [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) shows, in the environment that has `mcp`. It starts the server with `--allow-changes`, starts `kafka-lite`, reads `info`, the containers of `kafka-lite` and the last five lines of the `connect` service, then stops `kafka-lite`. A tool that fails returns its error as the result, so the script checks each result, stops at the first error and still stops `kafka-lite`:
+
+```python
+import os
+
+import anyio
+from mcp import Client, StdioServerParameters
+
+
+async def call(client, name, arguments):
+    """Call one tool, print its name and its text result, and stop on an error.
+
+    A tool that fails returns its error as the result, so the call checks for it.
+
+    Args:
+        client: The connected MCP client.
+        name: The tool to call.
+        arguments: The tool's parameters.
+
+    Raises:
+        RuntimeError: When the tool returns an error.
+    """
+    result = await client.call_tool(name, arguments)
+    print(f"--- {name}")
+    print(result.content[0].text)
+    if result.is_error:
+        raise RuntimeError(f"the tool {name} failed")
+
+
+async def main():
+    """Start kafka-lite, read it through four tools, then stop it."""
+    # Docker reads variables such as DOCKER_HOST, which a client passes to the
+    # server only when asked.
+    server = StdioServerParameters(
+        command="odctl", args=["mcp", "--allow-changes"], env=dict(os.environ)
+    )
+    async with Client(server) as client:
+        try:
+            await call(client, "up", {"profiles": ["kafka-lite"]})
+            await call(client, "info", {})
+            await call(client, "ps", {"profiles": ["kafka-lite"]})
+            await call(client, "logs", {"profiles": ["kafka-lite"], "service": "connect", "tail": 5})
+        finally:
+            # Stop kafka-lite even when a tool failed.
+            await call(client, "down", {"profiles": ["kafka-lite"]})
+
+
+anyio.run(main)
+```
+
+It prints the result of each tool under a line with the tool's name. The output below shortens the path of the `.odctl` folder to `/home/you/project/.odctl`:
+
+```text
+--- up
+⚙️  Launching 🧱 Infrastructure (deps)...
+⚙️  Launching 🚀 Target (kafka-lite)...
+✓ All requested profiles successfully started!
+--- info
+{
+  "cli_version": "<CLI version>",
+  "tag": "<CLI version>",
+  "workspace": {
+    "path": "/home/you/project/.odctl",
+    "exists": true,
+    "stale_tag": null
+  },
+  "docker": {
+    "reachable": true
+  },
+  "images": [
+    {
+      "reference": "ghcr.io/jaehyeon-kim/odctl/airflow:<CLI version>",
+      "local": false
+    },
+    {
+      "reference": "ghcr.io/jaehyeon-kim/odctl/deps:<CLI version>",
+      "local": true
+    },
+    {
+      "reference": "ghcr.io/jaehyeon-kim/odctl/mlflow:<CLI version>",
+      "local": false
+    },
+    {
+      "reference": "ghcr.io/jaehyeon-kim/odctl/postgres:<CLI version>",
+      "local": false
+    },
+    {
+      "reference": "ghcr.io/jaehyeon-kim/odctl/spark:<CLI version>",
+      "local": false
+    }
+  ]
+}
+--- ps
+{
+  "active_profiles": [
+    "kafka-lite"
+  ],
+  "containers": [
+    {
+      "name": "connect",
+      "service": "connect",
+      "state": "running",
+      "health": null,
+      "ports": [
+        {
+          "host": 8083,
+          "container": 8083,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    {
+      "name": "kafka",
+      "service": "kafka",
+      "state": "running",
+      "health": null,
+      "ports": [
+        {
+          "host": 9092,
+          "container": 9092,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    {
+      "name": "kafka-ui",
+      "service": "kafka-ui",
+      "state": "running",
+      "health": null,
+      "ports": [
+        {
+          "host": 8086,
+          "container": 8080,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    {
+      "name": "karapace",
+      "service": "karapace",
+      "state": "running",
+      "health": "healthy",
+      "ports": [
+        {
+          "host": 8081,
+          "container": 8081,
+          "protocol": "tcp"
+        }
+      ]
+    }
+  ]
+}
+--- logs
+connect  | [2026-10-30 21:50:24,917] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Cluster ID: 42RglGpZQwy9D5VzTVpCWA (org.apache.kafka.clients.Metadata:365)
+connect  | [2026-10-30 21:50:24,919] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Discovered group coordinator broker-1:19092 (id: 2147483646 rack: null isFenced: false) (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:943)
+connect  | [2026-10-30 21:50:24,920] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] Rebalance started (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:239)
+connect  | [2026-10-30 21:50:24,920] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] (Re-)joining group (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:611)
+connect  | [2026-10-30 21:50:24,923] INFO [Worker clientId=connect-connect:8083, groupId=odctl-connect-cluster] (Re-)joining group (org.apache.kafka.connect.runtime.distributed.WorkerCoordinator:611)
+--- down
+🛑 Stopping kafka-lite...
+✓ Teardown complete.
+```
 # CLI Reference
 
 # CLI Reference
@@ -6122,10 +6352,6 @@ Usage: odctl [OPTIONS] COMMAND [ARGS]...
 │ ps        List Docker containers managed by the Open Data Stack.             │
 │ info      Show the odctl version, whether Docker is reachable and, with      │
 │           `--json`, the image tag, the workspace and odctl's own images.     │
-│                                                                              │
-│           Args:                                                              │
-│               json_output (bool): Print the report as JSON, with the tag,    │
-│           the workspace and the images.                                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Workspace ──────────────────────────────────────────────────────────────────╮
 │ init      Initialize a local .odctl workspace for custom configurations.     │
@@ -7263,6 +7489,70 @@ What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.10.0
+
+A plugin that installs the odctl skill and the MCP server in Claude Code, Codex and Antigravity, a rewritten skill, clearer errors, and fixes from a review of the CLI.
+
+- A plugin installs the odctl skill and the read-only MCP server in Claude Code, Codex and Antigravity ([Plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md)). Install odctl with `uv tool install 'odctl[mcp]'` first, then:
+  - Claude Code: `claude plugin marketplace add jaehyeon-kim/odctl`, then `claude plugin install odctl@odctl`.
+  - Codex: `codex plugin marketplace add jaehyeon-kim/odctl`, then `codex plugin add odctl@odctl`.
+  - Antigravity: `agy plugin install https://github.com/jaehyeon-kim/odctl`.
+- The docs have an AI Assistants section for the plugin, the skill, the MCP server and `llms.txt` ([AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md)). The MCP Server guide keeps its address.
+- The agent skill is rewritten around the container lifecycle: a checklist, rules that each show a wrong and a right example, and reference pages for each profile's addresses and logins and for odctl in a project's tests ([Agent Skill](https://jaehyeon.me/odctl/latest/ai/agent-skill/index.md), [Use It with an AI Assistant](https://jaehyeon.me/odctl/latest/getting-started/#use-it-with-an-ai-assistant)).
+- OpenMetadata is 2.0.8, Confluent's converters are 8.4.1 and Debezium is 3.7.1.
+- The Trino notes of `odctl explain trino` give `docker exec trino trino --execute '<query>'`, which works without a terminal ([Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md)).
+- The MLflow notes of `odctl explain mlflow` say to run `odctl recreate mlflow` after setting `MODEL_URI` in `.env`, the command the [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) guide runs. Before, they said `odctl up mlflow`.
+- A compose file in your workspace that is missing, is not UTF-8 text or is not valid YAML now stops every command that reads it with `Cannot read <file>: ...`, which says which of these it is. A dry run of `up` or `down` without `--volumes` still prints the plan. Before, `down --volumes --dry-run` ended in a traceback, `info --json` left that file's images out, and the tables listed `File Error` as that file's services.
+- A volume such as `${PG_VOLUME:-pgdata}:/var/lib/postgresql/data`, in the short or the long form, is expanded before it is read, and a volume without `name:` is named after the project Compose runs, so `down --volumes --dry-run` lists the volume the real run removes. A source starting with `~` counts as a folder on the host, as Compose reads it.
+- A service with no `profiles:` key, which Compose starts with every profile of its file, is now listed by `ps`, `explain`, `logs --service` and `down`.
+- odctl passes each compose file's project name to Compose, so a `COMPOSE_PROJECT_NAME` in the shell or in `.env` no longer puts every file into one project, where `odctl down kafka-lite` removed the containers of the other profiles. A container counts for a file only when both its project and its service are that file's, so `ps`, `down` and the idle check of the shared jar volume no longer mix two files' services of the same name.
+- `odctl up` no longer reads a missing credential helper, or any other registry error whose text holds `not found`, as an image that is not published.
+- The check that warns about an old TAG in the workspace `.env` reads the file as Compose reads it, so `export TAG=1.9.0` and `TAG = 1.9.0` give the same answer as the image tag odctl runs.
+- A workspace whose `.env` has an empty TAG, or no TAG line, now runs the images of the CLI's version. Before, Compose ran the `latest` images.
+- `odctl init` and `odctl init --force` refuse a folder that holds files and no `registry.yml`, and a path that is a file. Its question names the folder it removes. `odctl init` copies `registry.yml` first, so an `init` that fails part way can be run again.
+- A `registry.yml` that is missing, empty, not UTF-8 text, not valid YAML or not in the registry's form now stops each command with `Cannot read <path>: ...`. Before, `explain` and the dry runs of `up` and `down` ended in a traceback.
+- A registry whose profile is listed under two stacks or twice in one stack, whose stack lists dependencies for a profile of another stack, or whose dependency names no profile, now stops with a message that names the profile.
+- `odctl up` starts the file of a dependency before the file of the profile that depends on it, read from `depends_on` in the registry. Before, a workspace profile could start before a dependency in another file.
+- A failed pull in `odctl up --pull` prints `Failed to pull images for <file>` and exits 1. Before, it ended in a traceback.
+- `restart`, `recreate` and `logs` print `Failed to <verb> <file>` with Docker's message when a Compose call fails, and `restart` and `recreate` print each file before they act on it. Before, they ended in a traceback.
+- `odctl recreate deps` no longer waits on the container that copies the jars and exits. `odctl up` and `odctl recreate` stop with `Failed to <verb> compose-deps.yml` when that container exits with a code other than 0. Before, they went on as if the jars had been copied.
+- A followed log stream that fails, as in `odctl logs kafka-lite -f`, prints `Failed to fetch logs for <file>` and exits 1 as soon as it fails, while other streams still follow, and also when Ctrl+C comes after the failure. Before, it printed a thread traceback and exited 0.
+- `odctl logs <profile> --service <name>` with a service that none of the profiles defines prints an error that names the service and the profiles, and exits 1. Before, it printed nothing and exited 0.
+- The MCP tool `down` with `volumes` set refuses a call that names every profile except `deps`, because that call removes all data, which only `odctl down --all --volumes` in a terminal does after asking. A tool call that reaches a question of the command returns the command's text as its error, where before it returned only `Error executing tool down`.
+- `odctl down <every profile> --volumes` asks the same question as `odctl down --all --volumes`, unless `--yes` is given.
+- `odctl down deps --volumes` keeps the shared jar volume while other profiles still have containers that use it, and says so, as the help of `--volumes` describes. Its dry run without Docker shows that deps is stopped in every case and that only the volume depends on the other profiles. The dry run of `down <profile> --volumes` also lists, under `compose-deps.yml`, the unnamed volumes of the stopped containers, if any.
+- A registry description, role, file or profile name, a compose service, port or volume name, or an error from Docker, that holds square brackets is printed as written, in `list`, `explain`, the dry runs and the progress lines. Before, `list` and `explain` could end in a markup error, and text such as `[bold]` disappeared.
+- The Network Mapping of `odctl explain` prints the ports with variables expanded, as `explain --json` does, leaves out a port with no host part or a port range, and adds the protocol only when it is not tcp. Before, `${KAFKA_PORT:-19092}` printed as `Host -19092}`.
+- `odctl explain` lists a service built from source, with no image, as `built locally`. Before, it was left out when another service had an image.
+- `odctl ps` counts a profile as active only when its services are running, or, for a one-shot service that another service waits on, have exited with code 0. Before, a stopped container counted as running.
+- `odctl explain` names the role of the Langfuse server and worker, Feast's feature server, ZooKeeper, the ClickHouse shard 2 stand-in and Label Studio. Each role matches the image's repository rather than any text in the image name, with or without a tag or a digest.
+- The skill's description names Label Studio and Metabase, so an assistant loads it for a task that needs them.
+- odctl reads the workspace `.env` as Compose does: it drops a UTF-8 byte order mark, strips an inline comment after a space, removes quotes, applies escapes inside double quotes and expands `${OTHER}`, and `${OTHER}` in a value reads a variable set in the shell before one set earlier in the file. Before, `TAG=1.9.0 # pinned` made odctl check the registry for the tag `1.9.0 # pinned`.
+- `odctl down <profile> --volumes` for a profile your workspace adds to `compose-deps.yml`, such as `deps-extra`, now removes that profile's own volumes, as `docker compose down --volumes` does. Before, they stayed while any other profile had a container. A profile that mounts the shared jar volume still keeps it until no other profile has a container. The dry run lists the same volumes, with `--all` too.
+- odctl reads your compose files as Docker Compose reads them. A port written without quotes, such as `2222:22`, now shows in `list -d`, `explain` and `ps`, where it used to be read as a number and left out. `yes`, `on` and `off` stay text. A key tagged `!reset` under a `<<` merge key now takes the merged value, as Compose does.
+- A workspace profile name with square brackets no longer stops `odctl up --pull` or `odctl ps` with a markup error.
+- `odctl --help` no longer prints the internal `Args:` notes of the `info` command.
+
+### Upgrading
+
+- When a compose file in your workspace is missing, is not UTF-8 text or is not valid YAML, odctl now stops with exit code 1 and `Cannot read <file>: ...`, which says which of these it is. Before 1.10.0, the commands without `--json` listed `File Error` or `Err: <type>` as that file's service, port, image and volume, `info --json` left that file's images out, and `down --volumes --dry-run` ended in a traceback. A dry run of `up` or `down` without `--volumes` still prints the plan. Fix the file, or run `odctl init --force` to copy the packaged one; it replaces your edits, so keep a copy of them.
+- `odctl explain` names the role of the Langfuse server and worker, Feast's feature server, ZooKeeper, the ClickHouse shard 2 stand-in and Label Studio, which it showed as `Service Container`. A script that reads that line sees the new role. A workspace whose compose file uses the image `valkey/valkey`, which only 0.0.1 and 0.0.2 shipped, now shows `Service Container` for it; the packaged `valkey/valkey-bundle` keeps its role.
+- The Trino notes that `odctl explain trino` prints now give `docker exec trino trino --execute '<query>'`, which works without a terminal. A workspace made by `odctl init` before 1.10.0 keeps its old `registry.yml`, so run `odctl init --force` to copy the new text; it replaces your edits, so keep a copy of them.
+- OpenMetadata is 2.0.8, up from 2.0.7. A workspace made by `odctl init` before 1.10.0 keeps its old `compose-metadata.yml`, which runs 2.0.7: run `odctl init --force` to copy the new file; it replaces your edits, so keep a copy of them. On the next `odctl up` with the metadata profile, `openmetadata-migrate` applies 2.0.8's database migrations to an existing OpenMetadata database.
+- A workspace service with no `profiles:` now appears in the `services` of `list --json`, `explain --json` and `ps --json`, and `down` stops it with its profile.
+- odctl now ignores `COMPOSE_PROJECT_NAME`. Each compose file runs as the project its `name:` names. If you changed `name:` in a workspace file, odctl now manages the containers of that project. If you set `COMPOSE_PROJECT_NAME` for an earlier version, its containers stay in that project, which odctl no longer manages, and `odctl up` fails while their fixed container names are in use. Remove them with `docker compose -p <that name> down` before you run `odctl up`.
+- A workspace whose `.env` has an empty TAG, or no TAG line, now runs the images of the CLI's version, not `latest`. Set TAG in `.env` to run another version.
+- `odctl init` and `odctl init --force` now refuse a `--workspace` that names a file, or a folder that holds files and no `registry.yml`. Name a new or empty folder, or an existing workspace.
+- A workspace registry with a profile listed under two stacks or twice in one stack, a `depends_on` key that is a profile of another stack, or a dependency that no stack lists, loaded before and now stops every command with a message. Fix the entry it names.
+- `odctl up` and `odctl recreate` now exit 1 when the container that copies the jars into `odctl-shared-deps` exits with a code other than 0, where they went on and exited 0.
+- A failed `odctl logs -f` now exits 1, where it exited 0.
+- `odctl logs <profile> --service <name>` with a service that none of the profiles defines now exits 1, where it printed nothing and exited 0.
+- The MCP tool `down` now refuses a call with `volumes` set that names every profile except `deps`, which it accepted. To remove every profile's data, run `odctl down --all --volumes` in a terminal, which asks first, or name fewer profiles.
+- A script that runs `odctl down` with every profile and `--volumes` now needs `--yes`, because the command asks first.
+- `odctl down deps --volumes` now keeps the shared jar volume `odctl-shared-deps` while other profiles have containers. Stop them first, or run `odctl down --all --volumes`, to remove it.
+- `active_profiles` in `odctl ps --json` no longer lists a profile whose containers are stopped. A one-shot container that exited with code 0 still counts.
+- odctl now reads `.env` as Compose does. A value with an inline comment, quotes, escapes or `${OTHER}`, such as `TAG=1.9.0 # pinned`, now gives the value Compose uses, and `${OTHER}` in a value reads a variable set in the shell before one set earlier in the file, so `odctl info` and the check for a published image can show a different tag than before.
 
 ## Version 1.9.0
 
