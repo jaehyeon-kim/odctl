@@ -4,12 +4,7 @@ Now is the work being built, and Planned lists the rest in no order. Neither has
 
 ## Now
 
-::timeline::
-- title: 'Agent skill'
-  content: 'The odctl skill for AI agents gets a checklist, rules with examples, a check script that shows each service answers from the host and from a container, and reference pages, measured with agent runs before and after the change. [#177](https://github.com/jaehyeon-kim/odctl/issues/177)'
-  icon: ':material-play:'
-  key: now
-::/timeline::
+Nothing is being built now. The next item comes from Planned.
 
 ## Planned
 
@@ -78,6 +73,12 @@ Now is the work being built, and Planned lists the rest in no order. Neither has
 ## Released
 
 Newest first.
+
+??? note "1.10.0: Agent skill and plugin"
+
+    The odctl agent skill is rewritten around the container lifecycle, with a checklist, rules that each show a wrong and a right example, and reference pages, and a plugin installs it with the read-only MCP server in Claude Code, Codex and Antigravity ([AI Assistants](../ai/index.md)). [#177](https://github.com/jaehyeon-kim/odctl/issues/177)
+
+    A workspace compose file that cannot be read stops each command with an error that says why, `odctl explain` names the role of the Langfuse server and worker, Feast's feature server and Label Studio, and the Trino notes give a `docker exec` command that works without a terminal.
 
 ??? note "1.9.0: Label Studio"
 
