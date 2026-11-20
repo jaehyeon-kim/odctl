@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Change the default time zone of odctl's PostgreSQL from UTC to
+# Australia/Sydney in place: no restart, no container recreate, no data touched.
+set -euo pipefail
+
+TZ_NEW="Australia/Sydney"
+PSQL=(docker exec -i postgres psql -v ON_ERROR_STOP=1 -U user -d odctl -X -At)
+
+# 1. PostgreSQL must be running (the postgres profile).
+py/bin/odctl ps --json
+docker inspect -f '{{.State.Running}}' postgres | grep -qx true \
+  || { echo "postgres container is not running; start it with: py/bin/odctl up postgres" >&2; exit 1; }
+
+# 2. Current value, and whether the name is known to the server.
+echo "Before: $("${PSQL[@]}" -c 'SHOW timezone')"
+"${PSQL[@]}" -c "SELECT 1 FROM pg_timezone_names WHERE name = '${TZ_NEW}'" | grep -qx 1 \
+  || { echo "${TZ_NEW} is not a known time zone on this server" >&2; exit 1; }
+
+# 3. Per-database / per-role overrides, which would win over the server default.
+echo "Existing per-database/role timezone overrides (empty = none):"
+"${PSQL[@]}" -c "SELECT coalesce(d.datname,'*') || ' / ' || coalesce(r.rolname,'*') || ': ' || s
+                 FROM pg_db_role_setting x
+                 CROSS JOIN LATERAL unnest(x.setconfig) s
+                 LEFT JOIN pg_database d ON d.oid = x.setdatabase
+                 LEFT JOIN pg_roles r ON r.oid = x.setrole
+                 WHERE s ILIKE 'timezone=%'"
+
+# 4. Set the server default (written to postgresql.auto.conf in the data volume,
+#    which overrides the timezone = 'UTC' that initdb put in postgresql.conf)
+#    and reload the configuration. A reload is enough; timezone needs no restart.
+"${PSQL[@]}" -c "ALTER SYSTEM SET timezone = '${TZ_NEW}'"
+"${PSQL[@]}" -c "SELECT pg_reload_conf()"
+
+# 5. Verify in a new session.
+AFTER="$("${PSQL[@]}" -c 'SHOW timezone')"
+echo "After: ${AFTER}"
+[ "${AFTER}" = "${TZ_NEW}" ] || { echo "timezone is ${AFTER}, expected ${TZ_NEW}" >&2; exit 1; }
+"${PSQL[@]}" -c "SELECT now()"

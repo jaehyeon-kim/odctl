@@ -1,0 +1,17 @@
+{
+  "known": true,
+  "counts": {
+    "A1": 0,
+    "A2": 1,
+    "A3": 0,
+    "A4": 1,
+    "A6": 1,
+    "A7": 0,
+    "A8": 0,
+    "A9": 1,
+    "A10": 0,
+    "A11": 0,
+    "A12": 1
+  },
+  "reason": "Pilot run of setup-twice on sonnet (1.10.0). Reviewers differed; read by hand: the lock wait has no limit (A2), the reply says odctl up leaves running profiles alone, which no skill page shows (A4), dags state takes a run id from memory (A6), the DAG stays unpaused and its wait passes on a second run (A9)."
+}

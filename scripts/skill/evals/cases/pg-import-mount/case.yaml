@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pg-import-mount
+expected_outcome: >
+  The folder holds mount_exports.sh, reply.md.
+context:
+  scaffold_script: setup.sh

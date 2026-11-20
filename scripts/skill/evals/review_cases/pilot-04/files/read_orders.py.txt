@@ -1,0 +1,49 @@
+"""Read every message of the Kafka topic `orders` and print them.
+
+Batch read: from the earliest retained offset up to the latest offset at the
+moment the job starts. Runs on the odctl Spark standalone cluster (spark-lite).
+
+Run it with run.sh, which starts kafka-lite and spark-lite and submits this file
+to the spark-master container.
+"""
+
+from pyspark.sql import SparkSession
+
+BOOTSTRAP_SERVERS = "broker-1:19092"  # kafka-lite, internal listener on the odctl network
+TOPIC = "orders"
+
+
+def main() -> None:
+    spark = SparkSession.builder.appName("read-orders").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    messages = (
+        spark.read.format("kafka")
+        .option("kafka.bootstrap.servers", BOOTSTRAP_SERVERS)
+        .option("subscribe", TOPIC)
+        .option("startingOffsets", "earliest")
+        .option("endingOffsets", "latest")
+        # Retention deletes old segments while a batch runs; do not fail the job for that.
+        .option("failOnDataLoss", "false")
+        .load()
+        .selectExpr(
+            "partition",
+            "offset",
+            "timestamp",
+            "CAST(key AS STRING) AS key",
+            "CAST(value AS STRING) AS value",
+        )
+    )
+
+    count = messages.count()
+    print(f"Topic '{TOPIC}': {count} message(s)")
+
+    if count > 0:
+        # Show every row; truncate=False so long JSON payloads are printed whole.
+        messages.orderBy("partition", "offset").show(count, truncate=False)
+
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

@@ -31,7 +31,7 @@ It lists each compose file with its profiles, from `compose-deps.yml` with `deps
 
 Each profile lists the profiles it needs under `depends_on` in `registry.yml`. odctl follows those lists from the profiles you name, one level at a time, until no new profile appears. It then sorts the result: `deps` first, `postgres` and `storage` next, `catalog` and `valkey` after them, and every other profile last, in alphabetical order.
 
-The profiles are then grouped by compose file, in that order, and each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
+The profiles are then grouped by compose file, in that order, except that a file starts after the files that hold its profiles' dependencies. When the dependencies of two files point at each other, that order cannot hold, and the order above decides. Each file is started with one `docker compose up --wait`. That call returns once every service it started is running, and healthy where it has a health check, so a file starts only after the files before it are ready. `deps` is the exception: it starts attached, because its init container copies the jars and exits, and `--wait` treats an exiting container as a failure.
 
 ### Before Anything Starts
 
@@ -46,7 +46,7 @@ The profiles are then grouped by compose file, in that order, and each file is s
 
 ### Which Containers a Command Touches
 
-`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name, not on their dependencies. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project name starts with `odctl-`, and the service belongs to one of the named profiles.
+`down`, `ps`, `logs`, `restart` and `recreate` act only on the profiles you name, not on their dependencies. `odctl down flink-lite` stops Flink and leaves PostgreSQL, SeaweedFS and the catalog running for other profiles. odctl finds the containers by their compose labels: the project is the one the compose file names in its top-level `name:`, such as `odctl-flink`, and the service belongs to one of the named profiles. odctl runs each file as that project, so a `COMPOSE_PROJECT_NAME` set in the shell or in `.env` does not change it.
 
 There is one exception. When a profile depends on another profile in the same compose file, both are included, because compose refuses a command on a service whose dependency is left out. `odctl down --volumes` removes the shared `deps` volume and the `odctl` network only when no other profile has a container left.
 

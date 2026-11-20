@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: metabase-setup
+expected_outcome: >
+  The folder holds setup_metabase.sh, stop.sh, start.sh, reply.md.
+context:
+  scaffold_script: setup.sh

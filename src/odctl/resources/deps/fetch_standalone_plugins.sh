@@ -21,7 +21,7 @@ get_maven_version() {
 echo "▶️  Resolving Shared & Connector Versions..."
 
 # 🔒 HARDCODED: Lock core dependencies; Iceberg comes from versions.env
-DEB_V="3.7.0.Final"
+DEB_V="3.7.1.Final"
 POSTGRES_V="42.7.14"
 
 echo "▶️  Fetching Kafka Connectors..."

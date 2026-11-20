@@ -1,6 +1,7 @@
+import functools
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import typer
 from rich.markup import escape
@@ -8,9 +9,12 @@ from typer.core import TyperGroup
 
 from odctl import config, reports, ui
 from odctl.docker import (
+    compose_project,
+    compose_service,
     find_unpublished_images,
     get_declared_volumes,
     get_managed_containers,
+    get_project_name,
     get_stack_details,
     get_volume_names,
     is_docker_running,
@@ -19,7 +23,7 @@ from odctl.docker import (
     resolve_image_tag,
     stop_stack,
 )
-from odctl.logs import get_managed_logs
+from odctl.logs import LogsError, UnknownServiceError, get_managed_logs
 from odctl.projects import recreate_managed_containers, restart_managed_containers
 from odctl.planner import (
     build_execution_plan,
@@ -27,6 +31,7 @@ from odctl.planner import (
     warn_unreachable_profiles,
 )
 from odctl.workspace import (
+    check_workspace_path,
     get_cli_version,
     get_workspace_dir,
     init_workspace,
@@ -35,6 +40,33 @@ from odctl.workspace import (
 )
 
 _JSON_HELP = "Print the output as JSON, for scripts and AI assistants."
+
+
+def _stops_on_unreadable_files(command: Callable) -> Callable:
+    """
+    Make a command report a file it cannot read, and exit 1.
+
+    `load_registry` and `read_compose` raise UnreadableFileError with a message that
+    names the file and the reason, so the command prints that message instead of a
+    traceback. Any other exception raises as itself.
+    The MCP server calls the command functions directly, and gets the same exit.
+
+    Args:
+        command (Callable): The command function.
+
+    Returns:
+        Callable: The command, with the same signature for Typer.
+    """
+
+    @functools.wraps(command)
+    def run(*args, **kwargs):
+        try:
+            return command(*args, **kwargs)
+        except config.UnreadableFileError as e:
+            ui.print_error(str(e))
+            raise typer.Exit(1)
+
+    return run
 
 
 class _OdctlGroup(TyperGroup):
@@ -140,6 +172,18 @@ def main(
             )
 
 
+def _require_docker() -> None:
+    """
+    Stop the command when Docker is not reachable.
+
+    Raises:
+        typer.Exit: With code 1, after the error, when Docker does not answer.
+    """
+    if not is_docker_running():
+        ui.print_error("Docker is not reachable.")
+        raise typer.Exit(1)
+
+
 @app.command(
     name="list",
     rich_help_panel="Inspection & Info",
@@ -172,12 +216,13 @@ def list_profiles(
         json_output (bool): Print the profiles as JSON, always with their services and ports.
 
     Raises:
-        typer.Exit: With code 1 when the registry cannot be read, or, with `--json`, when
-            a compose file cannot be read or the registry lists an unknown dependency.
+        typer.Exit: With code 1 when the registry cannot be read, when a compose file
+            cannot be read with `--details` or `--json`, or, with `--json`, when the
+            registry lists an unknown dependency.
     """
     try:
         profiles = reports.build_profiles(
-            for_json=json_output, with_services=details or json_output
+            with_starts=json_output, with_services=details or json_output
         )
         if json_output:
             ui.print_json(sorted(profiles, key=lambda p: p.profile))
@@ -215,10 +260,10 @@ def explain(
 
     Raises:
         typer.Exit: With code 1 when the registry has no such profile or lists an unknown
-            dependency, or, with `--json`, when the compose file cannot be read.
+            dependency, or when the compose file cannot be read.
     """
     try:
-        details = reports.build_profile_details(profile, for_json=json_output)
+        details = reports.build_profile_details(profile)
     except reports.UnknownProfileError:
         ui.print_error(f"Profile '{profile}' not found in registry.")
         raise typer.Exit(1)
@@ -267,10 +312,21 @@ def init(
     Args:
         force (bool): Replace an existing workspace with a fresh copy, which resets local edits.
         yes (bool): Skip the confirmation prompt of `--force`.
+
+    Raises:
+        typer.Exit: With code 1 when the workspace path is a file, or a folder that
+            holds files and no `registry.yml`.
     """
-    if force and not yes and get_workspace_dir().exists():
+    workspace = get_workspace_dir()
+    try:
+        check_workspace_path(workspace)
+    except ValueError as e:
+        ui.print_error(str(e))
+        raise typer.Exit(1)
+    if force and not yes and workspace.exists():
         typer.confirm(
-            "⚠️  This will wipe out local modifications. Are you sure?", abort=True
+            f"⚠️  This will remove {workspace}/ and wipe out local modifications. Are you sure?",
+            abort=True,
         )
     init_workspace(force=force)
     ui.print_success(
@@ -288,6 +344,7 @@ def init(
   $ [bold cyan]odctl pull flink-lite kafka-lite[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def pull(
     profiles: Optional[List[str]] = typer.Argument(
         None, help="Specific profiles to pull images for."
@@ -312,15 +369,15 @@ def pull(
     Raises:
         typer.Exit: With code 1 when Docker is not reachable or a pull fails.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     execution_plan = build_execution_plan(profiles, all, resolve_deps=True)
     ui.print_info("📥 Pre-fetching Docker images...")
 
     for file, profs in execution_plan.items():
-        ui.print_info(f"Fetching images for [yellow]{file}[/yellow]...", style="white")
+        ui.print_info(
+            f"Fetching images for [yellow]{escape(file)}[/yellow]...", style="white"
+        )
         try:
             pull_stack_images(file, profs)
         except Exception as e:
@@ -344,6 +401,7 @@ def pull(
   $ [bold cyan]odctl up kafka-lite --pull[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def up(
     profiles: List[str] = typer.Argument(
         ...,
@@ -380,9 +438,8 @@ def up(
         typer.Exit: With code 1 when Docker is not reachable, an image for TAG is not
             published, or a compose file fails to start.
     """
-    if not dry_run and not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    if not dry_run:
+        _require_docker()
 
     plan = build_execution_plan(profiles, resolve_deps=True)
     # A profile resolves to one file. A service elsewhere declaring it is never
@@ -411,16 +468,25 @@ def up(
         raise typer.Exit(1)
 
     for file, profs in plan.items():
-        is_base = any(x in profs for x in ["deps", "postgres", "storage", "catalog"])
+        is_base = any(x in profs for x in ui.INFRASTRUCTURE_PROFILES)
         prefix = "🧱 Infrastructure" if is_base else "🚀 Target"
 
         if pull:
             ui.print_info(
-                f"📥 Pulling images for {prefix} ([cyan]{', '.join(profs)}[/cyan])..."
+                f"📥 Pulling images for {prefix} ([cyan]{escape(', '.join(profs))}[/cyan])..."
             )
-            pull_stack_images(file, profs)
+            try:
+                pull_stack_images(file, profs)
+            except Exception as e:
+                ui.print_error(
+                    f"Failed to pull images for {file}",
+                    details=ui.format_docker_error(e),
+                )
+                raise typer.Exit(1)
 
-        ui.print_info(f"⚙️  Launching {prefix} ([cyan]{', '.join(profs)}[/cyan])...")
+        ui.print_info(
+            f"⚙️  Launching {prefix} ([cyan]{escape(', '.join(profs))}[/cyan])..."
+        )
         try:
             launch_stack(file, profs)
         except Exception as e:
@@ -437,7 +503,9 @@ def up(
 _DEPS_FILE = "compose-deps.yml"
 
 
-def _shared_deps_are_idle(torn_down: dict) -> bool:
+def _shared_deps_are_idle(
+    torn_down: dict, deps_stopped: Optional[List[str]] = None
+) -> bool:
     """Report whether the shared deps project is safe to remove.
 
     The deps project owns the ``odctl`` network and the shared JAR volume, so it
@@ -446,32 +514,40 @@ def _shared_deps_are_idle(torn_down: dict) -> bool:
     use, and deps itself is excluded because its init container always exits.
 
     The services of ``torn_down`` do not count, so the answer is the same before
-    their containers are removed, as in a dry run, and after.
+    their containers are removed, as in a dry run, and after. A container of another
+    profile of the deps file, such as a deps-shared a workspace adds, counts unless
+    the teardown stops that profile too.
 
     Args:
         torn_down (dict): The plan being stopped, or just stopped. Its services are
             not counted, and its files are not consulted.
+        deps_stopped (Optional[List[str]]): The deps file's profiles other than deps
+            that the teardown stops; None is none.
 
     Returns:
-        bool: True when nothing outside deps and ``torn_down`` has a container.
+        bool: True when nothing outside deps, ``torn_down`` and ``deps_stopped``
+        has a container.
     """
     if _DEPS_FILE in torn_down:
         return False
 
+    # Why: a service is named within its project, and two files can share a name
     stopping = {
-        service
+        (get_project_name(file), service)
         for file, profs in torn_down.items()
-        for service in get_stack_details(file, profs)[0]
+        for service in get_stack_details(file, profs).names
     }
     declared = build_execution_plan(None, True, resolve_deps=False)
     others = {file: profs for file, profs in declared.items() if file != _DEPS_FILE}
+    deps_running = [
+        p
+        for p in declared.get(_DEPS_FILE, [])
+        if p != "deps" and p not in (deps_stopped or [])
+    ]
+    if deps_running:
+        others[_DEPS_FILE] = deps_running
     for container in get_managed_containers(others):
-        labels = (
-            container.config.labels
-            if container.config and container.config.labels
-            else {}
-        )
-        if labels.get("com.docker.compose.service", "") not in stopping:
+        if (compose_project(container), compose_service(container)) not in stopping:
             return False
     return True
 
@@ -488,12 +564,9 @@ def _teardown_of_all(plan: dict, volumes: bool) -> dict:
         dict: Compose file to the profiles that have a container, or named volumes
             when `volumes` is set.
     """
-    from odctl.docker import get_managed_containers, get_stack_details
-
     existing_services = set()
     for c in get_managed_containers(plan):
-        labels = c.config.labels if c.config and c.config.labels else {}
-        svc = labels.get("com.docker.compose.service", "")
+        svc = compose_service(c)
         if svc:
             existing_services.add(svc)
 
@@ -501,9 +574,9 @@ def _teardown_of_all(plan: dict, volumes: bool) -> dict:
     for file, profs in plan.items():
         active_profs = []
         for p in profs:
-            services, _, _, named_vols = get_stack_details(file, [p])
-            if any(s in existing_services for s in services) or (
-                volumes and named_vols
+            details = get_stack_details(file, [p])
+            if any(s in existing_services for s in details.names) or (
+                volumes and details.volumes
             ):
                 active_profs.append(p)
         if active_profs:
@@ -515,15 +588,22 @@ def removes_everything(profiles: List[str]) -> bool:
     """Tell whether a named teardown with `--volumes` removes all that `--all --volumes` does.
 
     `odctl down --all --volumes` asks before it removes the data of every profile.
-    A caller that cannot ask, such as the MCP server, refuses a named teardown that
-    reaches the same result.
+    `odctl down <profiles> --volumes` asks the same question when this holds, and a
+    caller that cannot ask, such as the MCP server, refuses the call.
+
+    The deps profile is left out of both sides. `--all` always keeps it, because it
+    declares the shared jar volume, while a named teardown with `--volumes` removes
+    it anyway once no other profile has a container. Another profile of the deps
+    file, such as a deps-extra a workspace adds, counts when it owns something of its
+    own: a container, or a named volume other than deps', by Docker name.
 
     Args:
         profiles (List[str]): The profiles the teardown names.
 
     Returns:
         bool: True when the named profiles, with their dependencies, include every
-            profile `--all --volumes` would stop, and that is at least one.
+            profile `--all --volumes` would stop, other than deps, and that is at
+            least one.
 
     Raises:
         typer.Exit: With code 1 when a profile is unknown.
@@ -532,64 +612,156 @@ def removes_everything(profiles: List[str]) -> bool:
     named = expand_plan_dependencies(
         build_execution_plan(profiles, False, resolve_deps=False)
     )
-    every_profile = {p for profs in every.values() for p in profs}
-    named_profiles = {p for profs in named.values() for p in profs}
+    left_out = {"deps"}
+    others = [p for p in every.get(_DEPS_FILE, []) if p != "deps"]
+    if others:
+        declared = get_declared_volumes(_DEPS_FILE)
+
+        def volume_names(profs: List[str]) -> set:
+            keys = get_stack_details(_DEPS_FILE, profs).volumes
+            return {declared.get(k, k) for k in keys}
+
+        shared = volume_names(["deps"])
+        left_out |= {
+            p
+            for p in others
+            if volume_names([p]) <= shared
+            and not get_managed_containers({_DEPS_FILE: [p]})
+        }
+    every_profile = {p for profs in every.values() for p in profs if p not in left_out}
+    named_profiles = {p for profs in named.values() for p in profs if p not in left_out}
     return bool(every_profile) and every_profile <= named_profiles
 
 
-def _dry_run_volumes(plan: dict, all: bool) -> dict:
+# A dry run without Docker cannot tell whether other profiles still use the shared jar
+# volume, so the deps file's line says so.
+_DEPS_UNCHECKED = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
+
+
+def _deps_join_note(
+    plan: dict, all: bool, reachable: bool, deps_stopped: Optional[List[str]] = None
+) -> Optional[str]:
+    """Decide whether a dry run of a teardown with `--volumes` adds the deps file.
+
+    A named teardown also removes the shared jar volume once no other profile has a
+    container. When Docker is not reachable the answer is not known, and since a
+    dry run of a named teardown needs no Docker, the deps file is added with that
+    said.
+
+    Args:
+        plan (dict): The teardown plan, without the deps file unless `all` is set.
+        all (bool): True for `--all`, whose plan already holds the deps file.
+        reachable (bool): Whether Docker answers.
+        deps_stopped (Optional[List[str]]): The deps file's profiles other than deps
+            that the teardown stops, as `_shared_deps_are_idle` takes them.
+
+    Returns:
+        Optional[str]: None when the deps file does not join, "" when it does, and
+            the note to print beside deps when it might.
+    """
+    if all or _DEPS_FILE in plan:
+        return None
+    if not reachable:
+        return _DEPS_UNCHECKED
+    return "" if _shared_deps_are_idle(plan, deps_stopped) else None
+
+
+def _own_volume_profiles(deps_others: List[str], rest: List[str]) -> List[str]:
+    """Pick the deps file's other profiles that are stopped with their volumes.
+
+    `down --volumes` removes only the volumes of the active profiles' services
+    (Compose v5, `WithoutUnnecessaryResources`), so for such profiles, such as a
+    deps-extra a workspace adds, it never removes the shared jar volume. They are
+    stopped by a call of their own, which Compose refuses when a profile in it
+    depends on one left out of it, or one left out depends on it.
+
+    Args:
+        deps_others (List[str]): Profiles of the deps file other than deps.
+        rest (List[str]): The profiles of the deps file the other call stops.
+
+    Returns:
+        List[str]: Those of `deps_others` that mount no volume, by Docker name, that
+        deps or a profile of the other call mounts, since Docker keeps a volume a
+        container still holds, and that no profile outside them depends on or is
+        needed by.
+    """
+
+    def needs(profiles: List[str]) -> set:
+        if not profiles:
+            return set()
+        return set(expand_plan_dependencies({_DEPS_FILE: profiles})[_DEPS_FILE])
+
+    declared = get_declared_volumes(_DEPS_FILE)
+
+    def names(profiles: List[str]) -> set:
+        keys = get_stack_details(_DEPS_FILE, profiles).volumes
+        return {declared.get(key, key) for key in keys}
+
+    shared = names(["deps"])
+    own = {p for p in deps_others if not names([p]) & shared}
+    while True:
+        others = rest + [p for p in deps_others if p not in own]
+        held = names(others) if others else set()
+        kept = {
+            p
+            for p in own
+            if needs([p]) <= own and p not in needs(others) and not names([p]) & held
+        }
+        if kept == own:
+            return [p for p in deps_others if p in own]
+        own = kept
+
+
+def _dry_run_volumes(
+    plan: dict,
+    reachable: bool,
+    deps_groups: Optional[List[Tuple[List[str], str]]] = None,
+) -> dict:
     """List the volumes a teardown with `--volumes` removes, for the dry run.
 
     These are the named volumes of the plan's services, which `stop_stack` removes
     for each file, and the unnamed volumes of the containers it stops, which
     `docker compose down --volumes` removes too. Docker names each container's
-    mounts, so a container with unnamed volumes gets one line with their number,
-    and the deps file never gets one. Only the named volumes that exist are listed.
-    A named teardown also removes the shared jar volume once no other profile has a
-    container, so the plan gains the deps file when that holds. When Docker is not
-    reachable the answer is not known, so the plan gains the deps file with that
-    said, since a dry run of a named teardown needs no Docker, and each other file
-    says its unnamed volumes were not checked.
+    mounts, so a container with unnamed volumes gets one line with their number; in
+    the deps file these are the containers of `deps_groups`. Only the named volumes
+    that exist are listed. When Docker is not reachable, each file with containers
+    to stop says its unnamed volumes were not checked.
 
     Args:
-        plan (dict): The teardown plan. It gains the deps file when the real run
-            would stop it, or might.
-        all (bool): True for `--all`, whose plan already holds the deps file.
+        plan (dict): The teardown plan, with the deps file when the teardown stops it.
+        reachable (bool): Whether Docker answers.
+        deps_groups (Optional[List[Tuple[List[str], str]]]): The deps file's profiles
+            whose volumes go, each group with the note printed after its volumes,
+            such as `_DEPS_UNCHECKED`; None lists none of the deps file's volumes.
 
     Returns:
         dict: Compose file to the volumes to remove, each as the text printed after
             `Remove Volume:`.
     """
-    note = ""
-    if not all and _DEPS_FILE not in plan:
-        if not is_docker_running():
-            note = ", only if no other profile has a container (Docker is not reachable, so this was not checked)"
-            plan[_DEPS_FILE] = [f"deps{note}"]
-        elif _shared_deps_are_idle(plan):
-            plan[_DEPS_FILE] = ["deps"]
-
-    reachable = is_docker_running()
     existing = get_volume_names() if reachable else None
     removed = {}
     for file, profs in plan.items():
-        # The unchecked deps entry names its profile with the note, so ask for deps.
-        suffix = note if file == _DEPS_FILE else ""
         # Services mount a volume by its key, and Docker lists it by its name.
         declared = get_declared_volumes(file)
-        keys = get_stack_details(file, ["deps"] if file == _DEPS_FILE else profs)[3]
-        names = [declared.get(key, key) for key in keys]
-        if existing is not None:
-            names = [name for name in names if name in existing]
-        lines = [f"{name}{suffix}" for name in names]
-        if not reachable:
-            if file != _DEPS_FILE:
-                lines.append(
-                    "the unnamed volumes of the stopped containers, if any "
-                    "(Docker is not reachable, so this was not checked)"
-                )
-        elif file != _DEPS_FILE:
+        groups = (deps_groups or []) if file == _DEPS_FILE else [(profs, "")]
+        lines: List[str] = []
+        for group, suffix in groups:
+            keys = get_stack_details(file, group).volumes
+            names = [declared.get(key, key) for key in keys]
+            if existing is not None:
+                names = [name for name in names if name in existing]
+            lines += [f"{n}{suffix}" for n in names if f"{n}{suffix}" not in lines]
+        # Why: Compose removes the unnamed volumes of every container it removes
+        # with `--volumes`, which in the deps file are those of the groups
+        stopped = list(dict.fromkeys(p for group, _ in groups for p in group))
+        if stopped and not reachable:
+            lines.append(
+                "the unnamed volumes of the stopped containers, if any "
+                "(Docker is not reachable, so this was not checked)"
+            )
+        elif stopped:
             for container in sorted(
-                get_managed_containers({file: profs}), key=lambda c: c.name
+                get_managed_containers({file: stopped}), key=lambda c: c.name
             ):
                 unnamed = [
                     m
@@ -618,6 +790,7 @@ def _dry_run_volumes(plan: dict, all: bool) -> dict:
   $ [bold cyan]odctl down --all -v --yes[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def down(
     profiles: Optional[List[str]] = typer.Argument(
         None, help="Specific profiles to stop."
@@ -654,7 +827,8 @@ def down(
         volumes (bool): Also remove the volumes of the stopped services.
         dry_run (bool): Print the teardown plan, with the volumes `--volumes`
             would remove, without stopping anything.
-        yes (bool): Skip the confirmation prompt of `--all --volumes`.
+        yes (bool): Skip the confirmation prompt of `--all --volumes`, and of
+            `--volumes` with profiles that cover every profile with data.
 
     Raises:
         typer.Exit: With code 1 when Docker is not reachable, except for a dry run of
@@ -663,11 +837,16 @@ def down(
     # `--all` needs Docker to know which profiles have containers, so its dry run
     # does too.
     needs_docker = not dry_run or all
-    if needs_docker and not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    if needs_docker:
+        _require_docker()
 
-    if all and volumes and not dry_run and not yes:
+    # Naming every profile with `--volumes` removes the same data as `--all --volumes`.
+    if (
+        volumes
+        and not dry_run
+        and not yes
+        and (all or removes_everything(profiles or []))
+    ):
         typer.confirm(
             "⚠️  This will destroy ALL profiles and WIPE ALL DATA. Are you sure?",
             abort=True,
@@ -686,13 +865,48 @@ def down(
 
     plan = dict(reversed(list(plan.items())))
 
+    # A named deps follows the rule of a named teardown below: its shared jar volume
+    # goes only once no other profile has a container. Another profile a workspace
+    # adds to the deps file, such as deps-extra, has its own volumes removed, because
+    # `down --volumes` removes only the volumes of the profiles it is given; it
+    # follows deps' rule only when it mounts one of deps' volumes.
+    deps_profiles: List[str] = [] if all else plan.pop(_DEPS_FILE, [])
+    deps_named = "deps" in deps_profiles
+    deps_others = [p for p in deps_profiles if p != "deps"]
+    own = (
+        _own_volume_profiles(deps_others, ["deps"] if deps_named else [])
+        if volumes and deps_others
+        else []
+    )
+    shared_others = [p for p in deps_others if p not in own]
+
     if dry_run:
-        removed = _dry_run_volumes(plan, all) if volumes else None
+        removed = None
+        if volumes:
+            reachable = is_docker_running()
+            note = _deps_join_note(plan, all, reachable, deps_others)
+            groups: List[Tuple[List[str], str]] = []
+            if all:
+                groups.append((plan.get(_DEPS_FILE, []), ""))
+            if note is not None:
+                # A named deps is stopped in every case, so only its volume carries
+                # the note.
+                plan[_DEPS_FILE] = ["deps"] if deps_named else [f"deps{note}"]
+                groups.append((["deps"] + shared_others, note))
+            if own:
+                groups.append((own, ""))
+            if own and _DEPS_FILE not in plan:
+                plan[_DEPS_FILE] = ["deps"] if deps_named else []
+            removed = _dry_run_volumes(plan, reachable, groups)
+        if deps_named and _DEPS_FILE not in plan:
+            plan[_DEPS_FILE] = ["deps"]
+        if deps_others:
+            plan[_DEPS_FILE] = plan.get(_DEPS_FILE, []) + deps_others
         ui.print_dry_run(plan, is_teardown=True, volumes=removed)
         return
 
     for file, profs in plan.items():
-        ui.print_info(f"🛑 Stopping [cyan]{', '.join(profs)}[/cyan]...")
+        ui.print_info(f"🛑 Stopping [cyan]{escape(', '.join(profs))}[/cyan]...")
         try:
             stop_stack(file, profs, remove_volumes=volumes)
         except Exception as e:
@@ -704,13 +918,29 @@ def down(
     # network and the shared JAR volume behind: a wipe that did not wipe. Remove
     # them here, but only once nothing else is running, since every other profile
     # attaches to that network and mounts that volume.
-    if volumes and not all and _shared_deps_are_idle(plan):
-        ui.print_info("🛑 Stopping [cyan]deps[/cyan]...")
-        try:
-            stop_stack(_DEPS_FILE, ["deps"], remove_volumes=True)
-        except Exception as e:
-            ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
-            raise typer.Exit(1)
+    idle = volumes and not all and _shared_deps_are_idle(plan, deps_others)
+    if idle or deps_profiles:
+        calls = []
+        if own and not idle:
+            calls.append((own, True))
+            rest = (["deps"] if deps_named else []) + shared_others
+        else:
+            rest = (["deps"] if idle or deps_named else []) + deps_others
+        if rest:
+            calls.append((rest, idle))
+        for stopped, remove in calls:
+            ui.print_info(f"🛑 Stopping [cyan]{escape(', '.join(stopped))}[/cyan]...")
+            try:
+                stop_stack(_DEPS_FILE, stopped, remove_volumes=remove)
+            except Exception as e:
+                ui.print_error("Failed to stop deps", details=ui.format_docker_error(e))
+                raise typer.Exit(1)
+        if volumes and not idle:
+            ui.print_info(
+                "The shared jar volume odctl-shared-deps stays, because other "
+                "profiles still have containers that use it.",
+                style="yellow",
+            )
 
     ui.print_success("Teardown complete.")
 
@@ -726,6 +956,7 @@ def down(
   $ [bold cyan]odctl ps kafka-lite spark-lite[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def ps(
     profiles: Optional[List[str]] = typer.Argument(
         None, help="Specific profiles to inspect."
@@ -748,9 +979,7 @@ def ps(
     Raises:
         typer.Exit: With code 1 when Docker is not reachable.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     report = reports.build_ps(profiles, all)
     if json_output:
@@ -766,15 +995,17 @@ def info(
     """
     Show the odctl version, whether Docker is reachable and, with `--json`, the image tag, the workspace and odctl's own images.
     \f
+
     Args:
         json_output (bool): Print the report as JSON, with the tag, the workspace and the images.
 
     Raises:
-        typer.Exit: With code 1 when `--json` is set and the workspace has no `registry.yml`.
+        typer.Exit: With code 1 when `--json` is set and the registry or a compose file
+            cannot be read.
     """
     try:
         report = reports.build_info(include_images=json_output)
-    except FileNotFoundError as e:
+    except config.UnreadableFileError as e:
         ui.print_error(str(e))
         raise typer.Exit(1)
     if json_output:
@@ -796,6 +1027,7 @@ def info(
   $ [bold cyan]odctl logs kafka-lite --since 10m -t[/bold cyan]
 """,
 )
+@_stops_on_unreadable_files
 def logs(
     profiles: List[str] = typer.Argument(..., help="Profiles to fetch logs for."),
     service: Optional[str] = typer.Option(
@@ -836,25 +1068,32 @@ def logs(
         until (Optional[str]): Show lines before this time, absolute or relative.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable.
+        typer.Exit: With code 1 when Docker is not reachable, no compose file of the
+            profiles defines `service`, or `docker compose logs` fails.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
-    get_managed_logs(
-        execution_plan=plan,
-        follow=follow,
-        tail=tail,
-        timestamps=timestamps,
-        since=since,
-        until=until,
-        service=service,
-    )
+    try:
+        get_managed_logs(
+            execution_plan=plan,
+            follow=follow,
+            tail=tail,
+            timestamps=timestamps,
+            since=since,
+            until=until,
+            service=service,
+        )
+    except UnknownServiceError as e:
+        ui.print_error(str(e))
+        raise typer.Exit(1)
+    except LogsError as e:
+        ui.print_error(str(e), details=ui.format_docker_error(e.error))
+        raise typer.Exit(1)
 
 
 @app.command(name="restart", rich_help_panel="Management")
+@_stops_on_unreadable_files
 def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.")):
     """
     Restart one or more specific profiles.
@@ -864,19 +1103,27 @@ def restart(profiles: List[str] = typer.Argument(..., help="Profiles to restart.
         profiles (List[str]): The profiles whose containers to restart.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable.
+        typer.Exit: With code 1 when Docker is not reachable or a compose file fails
+            to restart.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Restarting containers...")
-    restart_managed_containers(plan)
+    for file, profs in plan.items():
+        ui.print_info(f"Restarting [yellow]{escape(file)}[/yellow]...", style="white")
+        try:
+            restart_managed_containers({file: profs})
+        except Exception as e:
+            ui.print_error(
+                f"Failed to restart {file}", details=ui.format_docker_error(e)
+            )
+            raise typer.Exit(1)
     ui.print_success("Restart complete.")
 
 
 @app.command(name="recreate", rich_help_panel="Management")
+@_stops_on_unreadable_files
 def recreate(
     profiles: List[str] = typer.Argument(..., help="Profiles to recreate."),
     pull: bool = typer.Option(False, "--pull", help="Pull images before recreating."),
@@ -890,11 +1137,10 @@ def recreate(
         pull (bool): Pull the images again before replacing the containers.
 
     Raises:
-        typer.Exit: With code 1 when Docker is not reachable.
+        typer.Exit: With code 1 when Docker is not reachable or a compose file fails
+            to recreate. The files printed before it were already replaced.
     """
-    if not is_docker_running():
-        ui.print_error("Docker is not reachable.")
-        raise typer.Exit(1)
+    _require_docker()
 
     plan = expand_plan_dependencies(build_execution_plan(profiles, resolve_deps=False))
     ui.print_step("Recreating containers...")
@@ -902,7 +1148,15 @@ def recreate(
         "Recreating replaces the containers. Data inside them is lost; PostgreSQL, SeaweedFS, ClickHouse with its Keeper, and Fluss's ZooKeeper keep their volumes.",
         style="yellow",
     )
-    recreate_managed_containers(plan, pull=pull)
+    for file, profs in plan.items():
+        ui.print_info(f"Recreating [yellow]{escape(file)}[/yellow]...", style="white")
+        try:
+            recreate_managed_containers({file: profs}, pull=pull)
+        except Exception as e:
+            ui.print_error(
+                f"Failed to recreate {file}", details=ui.format_docker_error(e)
+            )
+            raise typer.Exit(1)
     ui.print_success("Recreate complete.")
 
 
@@ -933,7 +1187,7 @@ def mcp(
         from odctl.mcp_server import build_server
     except ImportError:
         ui.print_error(
-            escape('The MCP server needs the mcp extra: uv tool install "odctl[mcp]"')
+            'The MCP server needs the mcp extra: uv tool install "odctl[mcp]"'
         )
         raise typer.Exit(1)
 

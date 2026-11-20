@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import anyio
@@ -13,7 +14,8 @@ mcp = pytest.importorskip("mcp")
 
 from mcp import Client, StdioServerParameters  # noqa: E402
 
-from cli_workspace import fake_containers, write_workspace  # noqa: E402
+from cli_workspace import fake_container, fake_containers, write_workspace  # noqa: E402
+import odctl.main  # noqa: E402
 from odctl.main import app  # noqa: E402
 from odctl.mcp_server import build_server  # noqa: E402
 
@@ -240,8 +242,16 @@ def test_a_warning_stays_off_the_protocol_stream(tmp_path):
         (["kafka-lite"], True, True),
         (["kafka-lite"], False, False),
         (["kafka-lite", "valkey"], True, False),
+        ({"compose-deps.yml": ["deps"]}, True, True),
+        ({"compose-deps.yml": ["deps", "deps-extra"]}, True, False),
     ],
-    ids=["covers every profile with data", "without volumes", "leaves a profile"],
+    ids=[
+        "covers every profile with data",
+        "without volumes",
+        "leaves a profile",
+        "deps alone is left out",
+        "leaves a deps file profile with data",
+    ],
 )
 def test_down_refuses_names_that_remove_every_profiles_data(
     fixed_state, monkeypatch, with_data, volumes, refused
@@ -253,8 +263,27 @@ def test_down_refuses_names_that_remove_every_profiles_data(
     monkeypatch.setattr("odctl.main.get_managed_containers", lambda plan: [])
     monkeypatch.setattr(
         "odctl.main._teardown_of_all",
-        lambda plan, volumes: {"compose-x.yml": with_data},
+        lambda plan, volumes: (
+            {"compose-x.yml": ["kafka-lite"], **with_data}
+            if isinstance(with_data, dict)
+            else {"compose-x.yml": with_data}
+        ),
     )
+
+    if isinstance(with_data, dict):
+        # Why: the fixture workspace has no deps file, and deps-extra owns a volume
+        monkeypatch.setattr("odctl.main.get_declared_volumes", lambda file: {})
+        real = odctl.main.get_stack_details
+        monkeypatch.setattr(
+            "odctl.main.get_stack_details",
+            lambda f, p: (
+                SimpleNamespace(
+                    volumes=["extra-data"] if "deps-extra" in p else ["shared-deps"]
+                )
+                if f == "compose-deps.yml"
+                else real(f, p)
+            ),
+        )
 
     result = _call("down", {"profiles": ["kafka-lite"], "volumes": volumes}, True)
 
@@ -262,3 +291,105 @@ def test_down_refuses_names_that_remove_every_profiles_data(
     assert mock_stop.called is not refused
     if refused:
         assert "odctl down --all --volumes" in result.content[0].text
+
+
+def test_down_refuses_every_profile_but_deps(monkeypatch, tmp_path):
+    """`--all` keeps deps, because it declares the shared jar volume, and a named
+    teardown with `volumes` removes deps once the rest is idle. So naming every
+    profile but deps removes all of it, and the guard, run against the real
+    `_teardown_of_all`, refuses it."""
+    from odctl.docker import get_stack_details
+    from odctl.planner import build_execution_plan
+
+    monkeypatch.chdir(tmp_path)  # no workspace, so the bundled files are read
+    every = build_execution_plan(None, True, resolve_deps=False)
+
+    def services(plan):
+        return {s for f, p in plan.items() for s in get_stack_details(f, p).names}
+
+    containers = [
+        fake_container(s, s, "running", None, {}) for s in sorted(services(every))
+    ]
+
+    def managed(plan):
+        wanted = services(plan)
+        return [c for c in containers if c.name in wanted]
+
+    monkeypatch.setattr("odctl.main.is_docker_running", lambda: True)
+    monkeypatch.setattr("odctl.main.get_managed_containers", managed)
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    profiles = [p for profs in every.values() for p in profs if p != "deps"]
+
+    result = _call("down", {"profiles": profiles, "volumes": True}, True)
+
+    assert result.is_error
+    assert "odctl down --all --volumes" in result.content[0].text
+    mock_stop.assert_not_called()
+
+
+def test_down_stops_nothing_when_the_guard_holds_only_inside_the_command(
+    fixed_state, monkeypatch
+):
+    """The tool checks the guard, then `odctl down` checks it again and asks. The
+    server's stdin gives no answer, so the question aborts, and the tool returns the
+    command's text as an error instead of a bare Abort."""
+    import io
+
+    mock_stop = MagicMock()
+    monkeypatch.setattr("odctl.main.stop_stack", mock_stop)
+    answers = iter([False, True])
+    monkeypatch.setattr("odctl.main.removes_everything", lambda profiles: next(answers))
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+
+    result = _call("down", {"profiles": ["kafka-lite"], "volumes": True}, True)
+
+    assert result.is_error
+    assert "WIPE ALL DATA" in result.content[0].text, result.content[0].text
+    mock_stop.assert_not_called()
+
+
+def test_every_tool_passes_every_parameter_of_its_command():
+    """A tool calls a command function as a plain function, so a parameter it leaves
+    out gets the `typer.Option` object, which is true in a condition. A new option,
+    such as a `--force` on `down`, must reach each tool that calls the command."""
+    import ast
+    import inspect
+    from pathlib import Path
+
+    from typer.models import ParameterInfo
+
+    from odctl import main, mcp_server
+
+    tree = ast.parse(Path(mcp_server.__file__).read_text())
+    calls = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "_run" and node.args:
+            func = node.args[0]
+        if (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "main"
+        ):
+            calls.append((func.attr, {k.arg for k in node.keywords}))
+
+    checked = []
+    for name, sent in calls:
+        params = inspect.signature(getattr(main, name)).parameters.values()
+        typer_params = {p.name for p in params if isinstance(p.default, ParameterInfo)}
+        if not typer_params:
+            continue
+        checked.append(name)
+        assert sent == typer_params, (name, sorted(typer_params - sent))
+    assert sorted(set(checked)) == [
+        "down",
+        "explain",
+        "info",
+        "list_profiles",
+        "logs",
+        "ps",
+        "up",
+    ]

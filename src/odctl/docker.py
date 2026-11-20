@@ -1,35 +1,52 @@
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
-import yaml
 from python_on_whales import DockerClient
+from python_on_whales.client_config import ClientNotFoundError, ParsingError
+from python_on_whales.exceptions import DockerException
 
-from odctl.config import get_active_dir, get_compose_path
+from odctl.config import (
+    UnreadableFileError,
+    expand,
+    get_active_dir,
+    get_compose_path,
+    read_env_file,
+    read_yaml,
+)
 
 
 def create_client(
-    compose_files: List[str] | None = None, profiles: List[str] | None = None
+    compose_file: str | None = None, profiles: List[str] | None = None
 ) -> DockerClient:
     """
     Create a Docker client that naturally honors the system's Docker context.
 
+    A client for a compose file runs it as the project `get_project_name` names, so
+    a COMPOSE_PROJECT_NAME in the shell or in `.env` cannot merge every file into one
+    project: `--project-name` takes precedence over it (Docker docs, "Specify a
+    project name").
+
     Args:
-        compose_files (List[str], optional): A list of paths to docker-compose files. Defaults to None.
+        compose_file (str, optional): The name of the compose file, such as
+            'compose-kafka.yml'. Defaults to None, for a client with no project.
         profiles (List[str], optional): A list of compose profiles to activate. Defaults to None.
 
     Returns:
         DockerClient: An initialized python-on-whales Docker client.
+
+    Raises:
+        ValueError: If the compose file cannot be read.
     """
     kwargs: Dict[str, Any] = {}
 
     if "DOCKER_HOST" in os.environ:
         kwargs["host"] = os.environ["DOCKER_HOST"]
 
-    if compose_files:
-        kwargs["compose_files"] = compose_files
+    if compose_file:
+        kwargs["compose_files"] = [str(get_compose_path(compose_file))]
+        kwargs["compose_project_name"] = get_project_name(compose_file)
 
     if profiles:
         kwargs["compose_profiles"] = profiles
@@ -40,6 +57,19 @@ def create_client(
 # Global client used for basic checks
 client = create_client()
 
+# What a python-on-whales call raises when Docker cannot answer it (0.81.0): each runs
+# the docker binary and parses its JSON. DockerException is a non-zero exit,
+# ClientNotFoundError a missing binary and OSError one that cannot run (utils.run,
+# client_config.py); ValueError is JSON or a pydantic model that does not parse, and
+# ParsingError the same for an inspect result.
+_DOCKER_ERRORS = (
+    DockerException,
+    ClientNotFoundError,
+    OSError,
+    ValueError,
+    ParsingError,
+)
+
 
 def is_docker_running() -> bool:
     """
@@ -49,99 +79,187 @@ def is_docker_running() -> bool:
         bool: True if the Docker engine responds to system info requests, False otherwise.
     """
     try:
-        # Changed from client.ping() to client.system.info()
+        # Why: python-on-whales has no ping call; info needs a reply from the daemon
         client.system.info()
         return True
-    except Exception:
+    except _DOCKER_ERRORS:
         return False
 
 
-def get_stack_details(
-    compose_filename: str, profiles: List[str]
-) -> Tuple[List[str], List[str], List[str], List[str]]:
+def read_compose(compose_filename: str) -> Dict[str, Any]:
+    """
+    Read a compose file of the active directory.
+
+    Args:
+        compose_filename (str): The name of the compose file, such as 'compose-kafka.yml'.
+
+    Returns:
+        Dict[str, Any]: The file's content. Its `services` entry, when present, maps
+        each service name to a mapping.
+
+    Raises:
+        UnreadableFileError: As `Cannot read <file>: <reason>`, when the file is missing, is not
+            valid YAML, or its top level, its services or one of them is not a mapping.
+    """
+    compose = read_yaml(get_compose_path(compose_filename), compose_filename)
+    if not isinstance(compose, dict):
+        raise UnreadableFileError(
+            f"Cannot read {compose_filename}: its top level is not a mapping."
+        )
+    services = compose.get("services")
+    if services is None:
+        services = {}
+    if not isinstance(services, dict):
+        raise UnreadableFileError(
+            f"Cannot read {compose_filename}: its services are not a mapping."
+        )
+    for name, service in services.items():
+        if not isinstance(service, dict):
+            raise UnreadableFileError(
+                f"Cannot read {compose_filename}: the service '{name}' is not a mapping."
+            )
+    return compose
+
+
+def get_project_name(compose_filename: str) -> str:
+    """
+    Name the Compose project a compose file runs as, as Compose names it.
+
+    That is the file's top-level `name:`, interpolated, or without one the name of
+    the folder that holds the file. Compose then lower-cases it, keeps only a-z,
+    0-9, `_` and `-`, and trims `_` and `-` from the start (compose-go
+    loader/loader.go, `projectName` and `NormalizeProjectName`).
+
+    Args:
+        compose_filename (str): The name of the compose file.
+
+    Returns:
+        str: The project name.
+
+    Raises:
+        ValueError: If the compose file cannot be read.
+    """
+    compose = read_compose(compose_filename)
+    name = expand(str(compose.get("name") or ""), interpolation_env())
+    name = name or get_compose_path(compose_filename).parent.name
+    return re.sub(r"[^a-z0-9_-]", "", name.lower()).lstrip("_-")
+
+
+class ServiceDetails(NamedTuple):
+    """
+    One service of a compose file, as `get_stack_details` reads it.
+
+    Attributes:
+        name (str): The service name.
+        image (Optional[str]): The image with compose variables expanded, or None
+            when the service has no `image`.
+        ports (List[str]): Its host port mappings as the file writes them, sorted,
+            such as `${KAFKA_PORT:-9092}:9092`; a long-form entry is written as
+            `published:target[/protocol]`.
+    """
+
+    name: str
+    image: Optional[str]
+    ports: List[str]
+
+
+class StackDetails(NamedTuple):
+    """
+    The services and named volumes of some profiles of a compose file.
+
+    Attributes:
+        services (List[ServiceDetails]): The services, sorted by name.
+        volumes (List[str]): The named volumes they mount, sorted, without the
+            ones the file declares as external.
+    """
+
+    services: List[ServiceDetails]
+    volumes: List[str]
+
+    @property
+    def names(self) -> List[str]:
+        """The service names, sorted."""
+        return [service.name for service in self.services]
+
+
+def get_stack_details(compose_filename: str, profiles: List[str]) -> StackDetails:
     """
     Resolve services, host port mappings, images, and volumes via direct YAML parsing.
+
+    A service with no `profiles` belongs to every profile of its file, because
+    Compose starts it whatever profiles are active.
 
     Args:
         compose_filename (str): The name of the compose file to parse.
         profiles (List[str]): The active profiles to filter services by.
 
     Returns:
-        Tuple[List[str], List[str], List[str], List[str]]: A tuple containing four sorted lists:
-            services, exposed host ports, container images, and named volumes.
-            Returns lists containing "File Error" if the file cannot be parsed.
+        StackDetails: The services, each with its image and ports, and the named
+            volumes they mount.
+
+    Raises:
+        ValueError: If the compose file cannot be read.
     """
-    path = get_compose_path(compose_filename)
-    if not path.exists():
-        return ["File Error"], ["File Error"], ["File Error"], ["File Error"]
+    compose_dict = read_compose(compose_filename)
+    env = interpolation_env(compose_filename)
 
-    try:
-        with open(path, "r") as f:
-            compose_dict = yaml.safe_load(f)
+    services = []
+    volumes = []
 
-        services = []
+    # Parse the raw dictionary directly
+    for svc_name, svc_data in (compose_dict.get("services") or {}).items():
+        svc_profiles = svc_data.get("profiles")
+
+        # Check if this service belongs to the profiles we are querying
+        if svc_profiles and not any(p in profiles for p in svc_profiles):
+            continue
+
+        # Shown as it will run: `${TAG:-latest}` resolves the way compose
+        # resolves it, which is the CLI version without a workspace.
+        image = expand(svc_data["image"], env) if "image" in svc_data else None
+
         ports = []
-        images = []
-        volumes = []
+        if "ports" in svc_data:
+            for p in svc_data["ports"]:
+                if isinstance(p, str):
+                    ports.append(p)
+                elif isinstance(p, dict) and "published" in p:
+                    target = p.get("target", p["published"])
+                    protocol = f"/{p['protocol']}" if p.get("protocol") else ""
+                    ports.append(f"{p['published']}:{target}{protocol}")
 
-        # Parse the raw dictionary directly
-        for svc_name, svc_data in compose_dict.get("services", {}).items():
-            svc_profiles = svc_data.get("profiles", [])
+        if "volumes" in svc_data:
+            for v in svc_data["volumes"]:
+                if isinstance(v, str):
+                    # Compose interpolates the entry before it splits it, so
+                    # `${PG_VOLUME:-pgdata}:/data` mounts the volume `pgdata`.
+                    vol_name = expand(v, env).split(":")[0]
+                    # Only track named volumes, ignore local host bind mounts (./, / or ~)
+                    if not vol_name.startswith((".", "/", "~")):
+                        volumes.append(vol_name)
+                elif isinstance(v, dict) and v.get("type") == "volume":
+                    source = v.get("source")
+                    source = expand(source, env) if isinstance(source, str) else ""
+                    if source:
+                        volumes.append(source)
 
-            # Check if this service belongs to the profiles we are querying
-            if any(p in profiles for p in svc_profiles):
-                services.append(svc_name)
+        services.append(ServiceDetails(svc_name, image, sorted(set(ports))))
 
-                if "image" in svc_data:
-                    # Shown as it will run: `${TAG:-latest}` resolves the way compose
-                    # resolves it, which is the CLI version without a workspace.
-                    image = expand(svc_data["image"], interpolation_env())
-                    images.append(f"{svc_name} -> {image}")
+    # Drop volumes the file declares as external. Compose never removes
+    # those, so mounting one is not a reason to tear a profile down. Counting
+    # them made `odctl down --all --volumes` select `catalog` purely because
+    # it mounts the shared dependency volume, even when nothing of it ran.
+    declared = compose_dict.get("volumes") or {}
+    external = {
+        name
+        for name, spec in declared.items()
+        if isinstance(spec, dict) and spec.get("external")
+    }
+    volumes = [v for v in volumes if v not in external]
 
-                if "ports" in svc_data:
-                    for p in svc_data["ports"]:
-                        if isinstance(p, str):
-                            ports.append(f"{svc_name}:{p}")
-                        elif isinstance(p, dict) and "published" in p:
-                            target = p.get("target", p["published"])
-                            protocol = f"/{p['protocol']}" if p.get("protocol") else ""
-                            ports.append(
-                                f"{svc_name}:{p['published']}:{target}{protocol}"
-                            )
-
-                if "volumes" in svc_data:
-                    for v in svc_data["volumes"]:
-                        if isinstance(v, str):
-                            vol_name = v.split(":")[0]
-                            # Only track named volumes, ignore local host bind mounts (./ or /)
-                            if not vol_name.startswith((".", "/")):
-                                volumes.append(vol_name)
-                        elif isinstance(v, dict) and v.get("type") == "volume":
-                            source = v.get("source")
-                            if isinstance(source, str):
-                                volumes.append(source)
-
-        # Drop volumes the file declares as external. Compose never removes
-        # those, so mounting one is not a reason to tear a profile down. Counting
-        # them made `odctl down --all --volumes` select `catalog` purely because
-        # it mounts the shared dependency volume, even when nothing of it ran.
-        declared = compose_dict.get("volumes") or {}
-        external = {
-            name
-            for name, spec in declared.items()
-            if isinstance(spec, dict) and spec.get("external")
-        }
-        volumes = [v for v in volumes if v not in external]
-
-        return (
-            sorted(list(set(services))),
-            sorted(list(set(ports))),
-            sorted(list(set(images))),
-            sorted(list(set(volumes))),
-        )
-    except Exception as e:
-        err = f"Err: {type(e).__name__}"
-        return [err], [err], [err], [err]
+    return StackDetails(
+        sorted(services, key=lambda service: service.name), sorted(set(volumes))
+    )
 
 
 # Images this project builds and publishes itself. They carry the CLI version as
@@ -150,150 +268,38 @@ def get_stack_details(
 # upstream version, and those are never checked here.
 ODCTL_IMAGE_PREFIX = "ghcr.io/jaehyeon-kim/odctl/"
 
-# Compose interpolation, in every form the Compose specification and Docker's docs
-# list, because a workspace file may use any of them: $VAR, ${VAR}, the operators
-# :- - :? ? :+ +, a word that holds another reference, and $$ for a literal $.
-_VARIABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_BRACED_REFERENCE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?+])(.*))?", re.S)
-
 # Registry replies that mean the tag is genuinely absent. Anything else, a DNS
-# failure or a refused connection for instance, leaves the answer unknown, and
-# an unknown answer must not stop a launch.
-_ABSENT_MARKERS = ("manifest unknown", "no such manifest", "not found")
+# failure, a refused connection or a missing credential helper for instance,
+# leaves the answer unknown, and an unknown answer must not stop a launch.
+_ABSENT_MARKERS = ("manifest unknown", "no such manifest")
 
 
-def _read_env_file(path: Path) -> Dict[str, str]:
-    """
-    Parse a compose `.env` file into a plain dictionary.
-
-    Args:
-        path (Path): Path to the `.env` file. A missing file yields an empty mapping.
-
-    Returns:
-        Dict[str, str]: The declared variables, with surrounding quotes removed.
-    """
-    values: Dict[str, str] = {}
-    if not path.exists():
-        return values
-
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        if line.startswith("export "):
-            line = line[len("export ") :].lstrip()
-        key, _, value = line.partition("=")
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[key.strip()] = value
-    return values
-
-
-def interpolation_env() -> Dict[str, str]:
+def interpolation_env(compose_filename: Optional[str] = None) -> Dict[str, str]:
     """
     Build the variable mapping compose uses to interpolate the compose files.
 
     Compose reads `.env` from the project directory, which is the directory
-    holding the compose file, and lets the shell environment override it.
+    holding the compose file, and lets the shell environment override it. For
+    the values of a file, it also sets `COMPOSE_PROJECT_NAME` to the project the
+    file runs as, over any value in the shell (compose-go loader/loader.go,
+    `projectName`).
+
+    Args:
+        compose_filename (str, optional): The compose file whose values are
+            expanded. Defaults to None, for a value that belongs to no file.
 
     Returns:
         Dict[str, str]: Variables from the active directory's `.env`, overridden
         by the current process environment.
+
+    Raises:
+        UnreadableFileError: If the compose file cannot be read.
     """
-    env = _read_env_file(get_active_dir() / ".env")
+    env = read_env_file(get_active_dir() / ".env")
     env.update(os.environ)
+    if compose_filename:
+        env["COMPOSE_PROJECT_NAME"] = get_project_name(compose_filename)
     return env
-
-
-def expand(value: str, env: Dict[str, str]) -> str:
-    """
-    Substitute compose variables in a string.
-
-    Args:
-        value (str): A raw value from a compose file, such as an image reference.
-        env (Dict[str, str]): The variables to substitute.
-
-    Returns:
-        str: The value with every variable reference replaced. A reference that is
-            not valid Compose syntax is kept as written.
-    """
-    parts = []
-    i = 0
-    while i < len(value):
-        if value[i] != "$":
-            parts.append(value[i])
-            i += 1
-        elif value.startswith("$$", i):
-            parts.append("$")
-            i += 2
-        elif value.startswith("${", i):
-            end = _closing_brace(value, i + 2)
-            if end is None:
-                parts.append(value[i:])
-                break
-            parts.append(_substitute(value[i + 2 : end], env))
-            i = end + 1
-        elif name := _VARIABLE_NAME.match(value, i + 1):
-            parts.append(env.get(name.group(0)) or "")
-            i = name.end()
-        else:
-            parts.append("$")
-            i += 1
-    return "".join(parts)
-
-
-def _closing_brace(value: str, start: int) -> Optional[int]:
-    """
-    Find the brace that closes a `${` reference, past any reference nested in it.
-
-    Args:
-        value (str): The string being expanded.
-        start (int): The index just after the opening `${`.
-
-    Returns:
-        Optional[int]: The index of the closing brace, or None when there is none.
-    """
-    depth = 1
-    for index in range(start, len(value)):
-        if value[index] == "{":
-            depth += 1
-        elif value[index] == "}":
-            depth -= 1
-            if depth == 0:
-                return index
-    return None
-
-
-def _substitute(reference: str, env: Dict[str, str]) -> str:
-    """
-    Return the value of one braced reference, the text between `${` and `}`.
-
-    The `:?` and `?` forms make Compose stop with an error when they do not hold.
-    odctl only shows the value, so it shows an empty one instead.
-
-    Args:
-        reference (str): The name, then optionally an operator and its word.
-        env (Dict[str, str]): The variables to substitute.
-
-    Returns:
-        str: The value the operator selects. The word is expanded too, so it can
-            hold another reference.
-    """
-    match = _BRACED_REFERENCE.fullmatch(reference)
-    if not match:
-        return "${" + reference + "}"
-    name, operator, word = match.groups()
-    current = env.get(name)
-    # The operators with a colon test for a non-empty value, the others for a set one.
-    holds = (
-        bool(current) if operator is None or ":" in operator else current is not None
-    )
-    if operator in (None, ":?", "?"):
-        return (current or "") if holds else ""
-    if operator in (":-", "-"):
-        return (current or "") if holds else expand(word, env)
-    return expand(word, env) if holds else ""
 
 
 def resolve_image_tag() -> str:
@@ -317,16 +323,12 @@ def get_versioned_images(execution_plan: Dict[str, List[str]]) -> List[str]:
         List[str]: Sorted, deduplicated references to images built by this
         project, with their variables already substituted.
     """
-    env = interpolation_env()
     references = set()
 
     for file, profiles in execution_plan.items():
-        _, _, images, _ = get_stack_details(file, profiles)
-        for entry in images:
-            _, _, raw = entry.partition(" -> ")
-            reference = expand(raw, env)
-            if reference.startswith(ODCTL_IMAGE_PREFIX):
-                references.add(reference)
+        for service in get_stack_details(file, profiles).services:
+            if service.image and service.image.startswith(ODCTL_IMAGE_PREFIX):
+                references.add(service.image)
 
     return sorted(references)
 
@@ -343,7 +345,7 @@ def image_is_local(reference: str) -> bool:
     """
     try:
         return bool(client.image.exists(reference))
-    except Exception:
+    except _DOCKER_ERRORS:
         return False
 
 
@@ -362,7 +364,7 @@ def _registry_has_image(reference: str) -> Optional[bool]:
     try:
         client.manifest.inspect(reference)
         return True
-    except Exception as exc:
+    except _DOCKER_ERRORS as exc:
         text = f"{getattr(exc, 'stderr', '') or ''} {exc}".lower()
         if any(marker in text for marker in _ABSENT_MARKERS):
             return False
@@ -411,8 +413,7 @@ def pull_stack_images(compose_filename: str, profiles: List[str]):
         compose_filename (str): The compose file defining the target stack.
         profiles (List[str]): The profiles indicating which services to pull.
     """
-    path = get_compose_path(compose_filename)
-    stack_client = create_client(compose_files=[str(path)], profiles=profiles)
+    stack_client = create_client(compose_filename, profiles)
     stack_client.compose.pull()
 
 
@@ -433,6 +434,29 @@ def wait_for_one_shot_containers():
             client.container.wait(name)
 
 
+def check_exit_codes(stack_client: DockerClient) -> None:
+    """
+    Fail when a container of an attached `compose up` exited with a code other than 0.
+
+    Attached, Compose returns 0 whatever code a container exits with, unless it is
+    told to abort on an exit (docker/compose v5.8.0 pkg/compose/up.go: the exit code
+    is set only by the listeners of `--abort-on-container-exit`,
+    `--abort-on-container-failure` and `--exit-code-from`). Those flags stop every
+    other container of the file when the first one exits, so the exit codes are read
+    from the containers instead.
+
+    Args:
+        stack_client (DockerClient): The client of the compose file just started.
+
+    Raises:
+        RuntimeError: Naming the container and its exit code.
+    """
+    for container in stack_client.compose.ps(all=True):
+        state = container.state
+        if not state.running and state.exit_code:
+            raise RuntimeError(f"{container.name} exited with code {state.exit_code}.")
+
+
 def launch_stack(compose_filename: str, profiles: List[str]):
     """
     Start the stack via docker compose up.
@@ -444,14 +468,14 @@ def launch_stack(compose_filename: str, profiles: List[str]):
         compose_filename (str): The compose file defining the target stack.
         profiles (List[str]): The profiles to launch.
     """
-    path = get_compose_path(compose_filename)
-    stack_client = create_client(compose_files=[str(path)], profiles=profiles)
+    stack_client = create_client(compose_filename, profiles)
 
     # The 'deps' profile contains an ephemeral container that exits after copying files.
     # Docker Compose's --wait flag fails if it sees a container exit (even with code 0).
     if "deps" in profiles:
         # detach=False blocks until the init container gracefully finishes its job
         stack_client.compose.up(detach=False)
+        check_exit_codes(stack_client)
     else:
         # For all other long-running services, we detach and wait for healthchecks
         wait_for_one_shot_containers()
@@ -471,8 +495,7 @@ def stop_stack(
                                          stack and the unnamed volumes of its
                                          containers. Defaults to False.
     """
-    path = get_compose_path(compose_filename)
-    stack_client = create_client(compose_files=[str(path)], profiles=profiles)
+    stack_client = create_client(compose_filename, profiles)
     # volumes=True removes the named volumes defined in the compose file and the
     # unnamed volumes of the containers it stops.
     # remove_orphans catches containers whose service no longer exists in the
@@ -492,19 +515,21 @@ def get_declared_volumes(compose_filename: str) -> Dict[str, str]:
 
     The name is the entry's `name:`, interpolated as Compose does, because a
     workspace file can build it from variables. Without `name:`, Compose names the
-    volume `<project>_<key>`, from the file's top-level `name:`, or `<key>` when
-    the volume is external.
+    volume `<project>_<key>`, from the project name `get_project_name` gives, or
+    `<key>` when the volume is external.
 
     Args:
         compose_filename (str): The name of the compose file to parse.
 
     Returns:
         Dict[str, str]: Each volume's key to its Docker name.
+
+    Raises:
+        ValueError: If the compose file cannot be read.
     """
-    with open(get_compose_path(compose_filename), "r") as f:
-        compose = yaml.safe_load(f) or {}
-    env = interpolation_env()
-    project = expand(str(compose.get("name") or ""), env)
+    compose = read_compose(compose_filename)
+    env = interpolation_env(compose_filename)
+    project = get_project_name(compose_filename)
     names = {}
     for key, spec in (compose.get("volumes") or {}).items():
         name = spec.get("name") if isinstance(spec, dict) else None
@@ -528,6 +553,38 @@ def get_volume_names() -> set:
     return {volume.name for volume in client.volume.list()}
 
 
+def _labels(container: Any) -> Dict[str, str]:
+    """A container's labels; python-on-whales gives `config` or `labels` as None when absent."""
+    config = container.config
+    return config.labels if config and config.labels else {}
+
+
+def compose_service(container: Any) -> str:
+    """
+    Name the Compose service a container runs.
+
+    Args:
+        container (Any): A python-on-whales container.
+
+    Returns:
+        str: Its `com.docker.compose.service` label, or "" when it has none.
+    """
+    return _labels(container).get("com.docker.compose.service", "")
+
+
+def compose_project(container: Any) -> str:
+    """
+    Name the Compose project a container belongs to.
+
+    Args:
+        container (Any): A python-on-whales container.
+
+    Returns:
+        str: Its `com.docker.compose.project` label, or "" when it has none.
+    """
+    return _labels(container).get("com.docker.compose.project", "")
+
+
 def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     """
     Fetch Docker containers matching the requested execution plan.
@@ -535,27 +592,30 @@ def get_managed_containers(execution_plan: Dict[str, List[str]]) -> List[Any]:
     Args:
         execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
 
+    A container counts when its Compose project is the project of one of the plan's
+    files, as `get_project_name` names it, and its service is one of that file's. A
+    workspace file can set its own `name:`, so the project need not start with
+    `odctl-`.
+
     Returns:
         List[Any]: A list of python-on-whales Container objects managed by the ODCTL stack.
+
+    Raises:
+        ValueError: If a compose file of the plan cannot be read.
     """
-    target_services = set()
+    targets: Set[Tuple[str, str]] = set()
     for file, profs in execution_plan.items():
+        project = get_project_name(file)
         # Re-using your existing parser to know exactly which services to look for
-        services, _, _, _ = get_stack_details(file, profs)
-        target_services.update(services)
+        services = get_stack_details(file, profs).names
+        targets.update((project, service) for service in services)
 
     all_containers = client.container.list(all=True)
     managed_containers = []
 
     for c in all_containers:
-        # Safely access labels via the Container's Config block
-        labels = c.config.labels if c.config and c.config.labels else {}
-
-        project = labels.get("com.docker.compose.project", "")
-        service = labels.get("com.docker.compose.service", "")
-
-        # Strictly enforce that the container belongs to a ODCTL stack AND the requested profile
-        if project.startswith("odctl-") and service in target_services:
+        # The project and the service must both be those of one file of the plan.
+        if (compose_project(c), compose_service(c)) in targets:
             managed_containers.append(c)
 
     return managed_containers

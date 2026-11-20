@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Set PostgreSQL's time zone to Australia/Sydney in place, without recreating
+# the container (odctl keeps Postgres data inside the container, so a
+# `recreate`/`down` would delete your databases).
+set -euo pipefail
+
+PSQL=(docker exec -i postgres psql -U user -d odctl -v ON_ERROR_STOP=1 -At)
+
+# 1. The postgres profile must already be running.
+docker exec postgres pg_isready -U user -d odctl
+
+# 2. Show the current value and any per-database / per-role overrides,
+#    which would take precedence over the server setting.
+"${PSQL[@]}" -c "SHOW timezone;"
+"${PSQL[@]}" -c "SELECT coalesce(datname,'(all)'), coalesce(rolname,'(all)'), setconfig FROM pg_db_role_setting s LEFT JOIN pg_database d ON d.oid=s.setdatabase LEFT JOIN pg_roles r ON r.oid=s.setrole;"
+
+# 3. Set the server-wide time zone (written to postgresql.auto.conf) and reload.
+"${PSQL[@]}" -c "ALTER SYSTEM SET timezone = 'Australia/Sydney';"
+"${PSQL[@]}" -c "SELECT pg_reload_conf();"
+sleep 2
+
+# 4. Verify from a new connection.
+"${PSQL[@]}" -c "SHOW timezone;"

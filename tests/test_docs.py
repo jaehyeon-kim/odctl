@@ -26,7 +26,7 @@ def _techs(gen_pages):
 
 
 def test_every_profile_is_on_exactly_one_page(gen_pages):
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR / "registry.yml")
     placed = [p for _, profiles in _techs(gen_pages) for p in profiles]
     for stack in registry.stacks.values():
         for profile in stack.profiles:
@@ -181,6 +181,37 @@ def test_local_addresses_become_nofollow_links():
     assert "<pre><code>http://127.0.0.1:8123</code></pre>" in out
 
 
+def test_an_address_with_a_placeholder_stays_code():
+    """Markdown renders `<port>` as `&lt;port&gt;`, so `http://127.0.0.1:<port>` in
+    How It Works was published as a link that no browser can open."""
+    import markdown
+
+    hook = load("local_links", REPO / "scripts" / "local_links.py")
+    line = next(
+        line
+        for line in (REPO / "docs" / "how-it-works.md").read_text().splitlines()
+        if "`http://127.0.0.1:<port>`" in line
+    )
+    out = hook.link_local_addresses(markdown.markdown(line))
+    assert "<code>http://127.0.0.1:&lt;port&gt;</code>" in out
+    assert "<a " not in out
+
+
+def test_an_address_with_a_query_string_becomes_a_link():
+    """Markdown renders `&` as `&amp;`, so stopping at every `&` left an address
+    with two query parameters unlinked."""
+    import markdown
+
+    hook = load("local_links", REPO / "scripts" / "local_links.py")
+    out = hook.link_local_addresses(
+        markdown.markdown("`http://127.0.0.1:8123/?a=1&b=2`")
+    )
+    assert (
+        '<a href="http://127.0.0.1:8123/?a=1&amp;b=2" rel="nofollow">'
+        "<code>http://127.0.0.1:8123/?a=1&amp;b=2</code></a>" in out
+    )
+
+
 def test_home_page_table_comes_from_the_area_list(gen_pages):
     """The home page holds the marker, and the table built for it has one row per
     area linking that area's profile page, so the two can never disagree."""
@@ -297,15 +328,45 @@ def test_no_heading_starts_with_a_number():
     assert not numbered, numbered
 
 
-def test_skill_is_generated_from_the_registry(gen_pages):
-    committed = (REPO / "skills" / "odctl" / "SKILL.md").read_text()
-    assert committed == gen_pages.skill(INTERNAL_RESOURCES_DIR), (
-        "skills/odctl/SKILL.md is out of date; run uv run python scripts/gen_pages.py"
+# Technologies of TECH_GROUPS that the skill's description names in another form,
+# and the one entry that is not a technology.
+_DESCRIBED_AS = {
+    "Telemetry (grafana/otel-lgtm)": "Grafana",
+    "Iceberg REST Catalog": "Iceberg",
+    "Shared Dependencies": None,
+}
+
+
+def test_the_skill_description_names_every_technology(gen_pages):
+    """An assistant reads the description to decide whether to load the skill, and
+    it left out Label Studio and Metabase."""
+    frontmatter = gen_pages.skill().split("---")[1]
+    description = next(
+        line for line in frontmatter.splitlines() if line.startswith("description:")
     )
-    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR)
+    missing = []
+    for _, _, techs in gen_pages.TECH_GROUPS:
+        for title, _ in techs:
+            name = _DESCRIBED_AS.get(title, title.removeprefix("Apache "))
+            if name is not None and name not in description:
+                missing.append(name)
+    assert missing == []
+
+
+def test_skill_is_generated_from_the_registry(gen_pages):
+    folder = REPO / "skills" / "odctl"
+    committed = {
+        path.relative_to(folder).as_posix(): path.read_text()
+        for path in folder.rglob("*")
+        if path.is_file()
+    }
+    assert committed == gen_pages.skill_files(INTERNAL_RESOURCES_DIR), (
+        "skills/odctl/ is out of date; run uv run python scripts/gen_pages.py"
+    )
+    registry = gen_pages.load_registry(INTERNAL_RESOURCES_DIR / "registry.yml")
     for stack in registry.stacks.values():
         for profile in stack.profiles:
-            assert f"\n### {profile}\n" in committed, (
+            assert f"\n### {profile}\n" in committed["references/profiles.md"], (
                 f"{profile} missing from the skill"
             )
 

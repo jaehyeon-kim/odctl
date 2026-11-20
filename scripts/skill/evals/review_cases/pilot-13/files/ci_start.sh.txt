@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# CI step: start odctl's kafka-lite and postgres profiles and block until
+#   1. Postgres accepts a query on the odctl database, and
+#   2. a Kafka consumer group can read a message that was just produced.
+# Exits non-zero (and prints container logs) if either is not ready in time.
+#
+# Env overrides:
+#   ODCTL             odctl command (default: ./py/bin/odctl if present, else odctl on PATH)
+#   READY_TIMEOUT     seconds to wait for readiness after `odctl up` (default 180)
+#   ATTEMPT_TIMEOUT_MS  how long one consume attempt waits for the message (default 10000)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -z "${ODCTL:-}" ]]; then
+  if [[ -x "$SCRIPT_DIR/py/bin/odctl" ]]; then
+    ODCTL="$SCRIPT_DIR/py/bin/odctl"
+  else
+    ODCTL="odctl"
+  fi
+fi
+READY_TIMEOUT="${READY_TIMEOUT:-180}"
+ATTEMPT_TIMEOUT_MS="${ATTEMPT_TIMEOUT_MS:-10000}"
+
+KAFKA_CONTAINER="kafka"           # kafka-lite's broker container
+PG_CONTAINER="postgres"
+BOOTSTRAP="broker-1:19092"        # internal listener, used from inside the broker container
+KBIN="/opt/kafka/bin"
+
+# Unique per run, so a leftover topic/group from an earlier run can never satisfy the check.
+RUN_ID="${GITHUB_RUN_ID:-${CI_PIPELINE_ID:-local}}-$$-$(date +%s)"
+TOPIC="ci-readiness-${RUN_ID}"
+MARKER="ready-${RUN_ID}"
+
+log() { printf '[ci_start %s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
+
+dump_logs() {
+  log "readiness failed; recent container logs follow"
+  "$ODCTL" ps --json >&2 || true
+  "$ODCTL" logs kafka-lite --tail 100 >&2 || true
+  "$ODCTL" logs postgres --tail 50 >&2 || true
+}
+
+# ---------------------------------------------------------------------------
+# 1. Start the profiles. `odctl up` returns when containers are running and,
+#    where a healthcheck exists, healthy. Postgres has one; the Kafka broker
+#    does not, so it returns before Kafka can serve consumer groups.
+# ---------------------------------------------------------------------------
+log "starting profiles: kafka-lite postgres"
+"$ODCTL" up kafka-lite postgres
+
+deadline=$(( SECONDS + READY_TIMEOUT ))
+
+# ---------------------------------------------------------------------------
+# 2. Postgres: a real query against the odctl database, not just pg_isready.
+# ---------------------------------------------------------------------------
+log "waiting for postgres to answer queries"
+until docker exec "$PG_CONTAINER" psql -U user -d odctl -tAc 'SELECT 1' >/dev/null 2>&1; do
+  if (( SECONDS >= deadline )); then dump_logs; log "postgres not ready after ${READY_TIMEOUT}s"; exit 1; fi
+  sleep 2
+done
+log "postgres is ready"
+
+# ---------------------------------------------------------------------------
+# 3. Kafka: create a topic, produce a marker, read it back through a consumer
+#    group. A group read needs the group coordinator and __consumer_offsets,
+#    which come up after the broker port opens, so this is the real signal.
+# ---------------------------------------------------------------------------
+kexec() { docker exec "$KAFKA_CONTAINER" "$@"; }
+
+kafka_round_trip() {
+  local group="ci-readiness-group-${RUN_ID}-$1"
+
+  kexec "$KBIN/kafka-topics.sh" --bootstrap-server "$BOOTSTRAP" \
+    --create --if-not-exists --topic "$TOPIC" --partitions 1 --replication-factor 1 \
+    >/dev/null 2>&1 || return 1
+
+  printf '%s\n' "$MARKER" | docker exec -i "$KAFKA_CONTAINER" "$KBIN/kafka-console-producer.sh" \
+    --bootstrap-server "$BOOTSTRAP" --topic "$TOPIC" \
+    --producer-property acks=all \
+    --producer-property max.block.ms=10000 \
+    --producer-property delivery.timeout.ms=15000 \
+    --producer-property request.timeout.ms=10000 \
+    >/dev/null 2>&1 || return 1
+
+  local out
+  out="$(kexec "$KBIN/kafka-console-consumer.sh" --bootstrap-server "$BOOTSTRAP" \
+    --topic "$TOPIC" --group "$group" --from-beginning \
+    --max-messages 1 --timeout-ms "$ATTEMPT_TIMEOUT_MS" 2>/dev/null)" || return 1
+  [[ "$out" == *"$MARKER"* ]] || return 1
+
+  # The group must also exist on the coordinator with a committed offset.
+  kexec "$KBIN/kafka-consumer-groups.sh" --bootstrap-server "$BOOTSTRAP" \
+    --describe --group "$group" 2>/dev/null | grep -q "$TOPIC" || return 1
+}
+
+log "waiting for a Kafka consumer group to read a message (topic ${TOPIC})"
+attempt=0
+until kafka_round_trip "$attempt"; do
+  attempt=$(( attempt + 1 ))
+  if (( SECONDS >= deadline )); then dump_logs; log "kafka not ready after ${READY_TIMEOUT}s (${attempt} attempts)"; exit 1; fi
+  log "kafka not ready yet (attempt ${attempt}); retrying"
+  sleep 3
+done
+log "kafka consumer group read the message"
+
+# Clean up the probe topic so it does not show up in the tests' topic listings.
+kexec "$KBIN/kafka-topics.sh" --bootstrap-server "$BOOTSTRAP" --delete --topic "$TOPIC" >/dev/null 2>&1 \
+  || log "warning: could not delete probe topic ${TOPIC}"
+
+log "kafka-lite and postgres are ready"
+log "  Kafka bootstrap (host): 127.0.0.1:9092"
+log "  Postgres (host):        postgresql://user:password@127.0.0.1:5432/odctl"

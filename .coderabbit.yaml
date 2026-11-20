@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Why: CodeRabbit reviews only pull requests into the default branch unless a base
+# branch is listed here, so a release branch is listed for a pull request into it.
+reviews:
+  auto_review:
+    # Why: reviews run locally with the CodeRabbit CLI when the owner asks, so a
+    # round of fixes does not wait for a review of each push
+    enabled: false
+    base_branches:
+      - "release-.*"

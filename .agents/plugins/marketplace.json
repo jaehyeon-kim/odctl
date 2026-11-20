@@ -1,0 +1,9 @@
+{
+  "name": "odctl",
+  "plugins": [
+    {
+      "name": "odctl",
+      "source": "./"
+    }
+  ]
+}

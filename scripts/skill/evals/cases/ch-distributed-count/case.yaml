@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: ch-distributed-count
+expected_outcome: >
+  The folder holds load_and_check.sh, reply.md.
+context:
+  scaffold_script: setup.sh

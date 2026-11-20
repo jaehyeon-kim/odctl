@@ -1,0 +1,90 @@
+# Rubric of the blind reviewer
+
+An Opus reviewer reads the folder of one run and lists each mistake of the kinds below with its file and line. The kinds are the six of the plan's Kinds table that are about odctl's container lifecycle and the dependencies between containers: A1, A2, A3, A4, A7 and A9. A mistake of any other kind, such as how a service behaves or a number with no reason, is not listed. `facts.py` measures nothing; it writes the facts below, and the reviewer judges every kind from them, the run's files and its full transcript. The reviewer is not told which version of the skill, which model or which run number made the run. It reads, runs nothing, and changes no file.
+
+## What the reviewer gets
+
+One folder, which `facts.py` writes from the run that `claude plugin eval --keep-temp` kept (`run_task.md`, Steps, step 5). In every file of it, the path of the skill copy reads `<skill>`, the suite folder `<suite>`, the run's kept folder `<run>` and the odctl version under test `<version>`, so that no text tells the version.
+
+- `files/`: each file the prompt asks for, as the agent left it. A `.py` or `.sh` file has `.txt` added and is otherwise unchanged.
+- `trace.jsonl`: the run's full transcript, one JSON object per line as `claude -p --output-format stream-json` writes it. A line of `"type": "assistant"` holds the agent's text and its tool calls (`"type": "tool_use"`, with `name`, `input` and `id`); a line of `"type": "user"` holds the result of each call (`"type": "tool_result"`, with the call's id as `tool_use_id`), that is, what the command printed or the file the agent read. The reviewer reads it in full. Docker was not available in the run, so a command that needs it failed there; that failure is not a mistake.
+- `task/prompt.md`: the request as the agent got it, after a settings block.
+- `task/answer.md`: the case's answer sheet, written from odctl's sources before any run: the records the case comes from, its kinds, the right answer with its sources, and wrong answers seen or expected. It guides the judgement; a run that meets the request another way that works is not a mistake.
+- `facts.json`: `missing`, the files the prompt asks for that the run did not write; and under `odctl`, what odctl itself says about the profiles the right answer starts: `list` (`odctl list --json`), `explain` (`odctl explain <profile> --json`, with each service's container name, host ports, usage text and role), `dry_run` (the start order of `odctl up <profiles> --dry-run`), `down_dry_run` (the teardown plan of `odctl down <profiles> --volumes --dry-run`, with the volumes it removes), and `compose`, each service of their compose files with its container name, network aliases, ports (host side first), `expose`, whether it has a health check and its test (`healthcheck`, `healthcheck_test`, null when it has none).
+- `skill/`: the `SKILL.md` and `references/` pages of the skill copy the run had, so that a claim about odctl can be checked against what the agent could read. A run without the skill has no `skill/` folder.
+
+## Output
+
+One JSON line per mistake, and nothing else:
+
+```json
+{"task": "spark-kafka", "kind": "A3", "count": 1, "file": "read_orders.py", "line": 7, "evidence": "uses localhost:9092 inside spark-master; from a container the broker is broker-1:19092 (facts.json, compose, kafka aliases)"}
+```
+
+`count` is always 1, and `file` names the agent's file without the `.txt`, or `trace.jsonl` for a mistake that is only in a command the agent ran. A run with no mistake of a kind has no line for it. After the last mistake, the reviewer writes one line that says it read the run, whatever it found:
+
+```json
+{"task": "spark-kafka", "kind": "REVIEWED", "count": 0}
+```
+
+`summarise.py` exits with an error for a run that has no `REVIEWED` line or two of them, so a run the reviewer skipped is not read as a run with no mistake, and a run read twice is not counted twice. The main session sets `task`, `version`, `model` and `run` from its own list before it gives the lines to `summarise.py`. A mistake is counted once per place: the same wrong address in a script and in `reply.md` is two places. `summarise.py` counts each kind once per run.
+
+What counts is what the user would run or rely on: the files the prompt asks for, and the statements in `reply.md`. A command the agent tried in the transcript and then corrected is not a mistake. A statement or command in a file is judged against `facts.json`, `answer.md`, the pages of `skill/` and the tool results in `trace.jsonl`.
+
+## A1: a step needs an earlier step
+
+A file runs a step before a step it needs, or leaves out a profile or a step that the next one needs.
+
+- Wrong: `odctl up trino` alone before a query on the Iceberg catalog. `facts.json` `explain.trino.starts` lists no `catalog` or `storage`, and the Iceberg catalog fails at query time without them.
+- Wrong: the push to Feast before the push source is applied in the server.
+- Right: `odctl up catalog trino`, or the agent ran `odctl up trino --dry-run` and added what it did not start.
+
+## A2: a service called before it is ready
+
+A call to a service right after `odctl up`, `restart` or `recreate`, or after a step that the service finishes later, with no wait on a check of what the task needs, or a wait with no limit.
+
+- Wrong: `odctl up kafka-lite` and then a consumer, with no wait. `facts.json` `compose` shows `kafka` has no health check, so `up` returns when it runs, not when it answers.
+- Wrong: `until <check>; do sleep 2; done` with no count or deadline, or a fixed `sleep 30` in place of a check.
+- Wrong: a healthy Langfuse container, or a 200 on the send, taken to mean the trace is stored.
+- Not a mistake: no extra wait, after `odctl up` or `odctl recreate`, for what a service's `healthcheck_test` in `facts.json` checks, because both wait for it. An extra wait for that is A4, unless the request asks for it.
+- Wrong: no wait after `odctl restart` before the service is used. `restart` runs `docker compose restart`, which does not wait for health, so a wait such as `pg_isready` there is needed and is not A4.
+- Wrong: no wait for a capability the `healthcheck_test` does not check, such as S3 on port 8333 right after `odctl up storage`, whose test reads the filer on 8888. odctl's own test waits for S3 before it uses it (`smoke.sh:550`).
+
+## A3: an address or a name from the wrong side, or guessed
+
+An address used from the side that cannot reach it, or a host name, port or login that `facts.json`, the skill or a tool result does not give.
+
+- Wrong: `localhost:9092` in code that runs in a container; `broker-1:19092` or `catalog:8181` in code that runs on the host.
+- Not A3: `localhost:9092` inside the `kafka` container of `kafka-lite` while `DOCKER_HOST_IP` is unset, because that broker listens on `0.0.0.0:9092` and advertises `127.0.0.1:9092`, which is itself (`compose-kafka.yml:48-49`). It is A3 inside `kafka-1` of `kafka-full`, because the other brokers are advertised as `127.0.0.1:9093` and `127.0.0.1:9094`, which that container does not serve (`compose-kafka.yml:102`, 123).
+- Wrong: `iceberg-rest:8181`, `storage:8333` (a profile name used as a host name), `admin/admin`.
+- Right: from a container, a name from `compose` `container_name` or `aliases` with the container port; from the host, `127.0.0.1` with the host side of `ports`.
+
+## A4: odctl CLI behaviour assumed or invented
+
+A command, option or behaviour of odctl that does not exist or is not as used: a command not in the skill's Commands table or `odctl --help`, an option the command does not take, or a claim about what it does that its help, the skill or a run does not show.
+
+- Wrong: `odctl ps` or `odctl ps --json` with no profile and no `--all`, which exits 1.
+- Wrong: `odctl trino`, `odctl exec`, `odctl up spark` (the profiles are `spark-lite` and `spark-full`).
+- Wrong: an extra readiness probe after `up` or `recreate` that checks what the service's `healthcheck_test` in `facts.json` checks, such as `pg_isready` for `postgres`, because `up` already waits for it (the skill's How to Use It), whether the reply says why or not.
+- Not A4: a probe the request itself asks for, such as a bounded `pg_isready` after `odctl recreate postgres`.
+- Not A4: a probe of another port or endpoint than the `healthcheck_test`, such as SeaweedFS's S3 port 8333 when its test reads the filer on 8888. `up` does not wait for that.
+
+## A7: what a command keeps or removes
+
+A teardown, recreate or reset that removes more than the task started, or keeps less than the request needs, or a statement about what it keeps that is wrong.
+
+- Wrong: `odctl down --all`, or `--all --volumes`, when the task started one profile.
+- Wrong: `odctl down postgres` and `up` again when the request says the data must stay, or a claim that PostgreSQL's data is in a named volume that survives it.
+- Wrong: `down <profile> --volumes` with no `--dry-run` before it, or a claim that the command will ask first.
+- Wrong: a statement that PostgreSQL's data, or a setting stored in it, is lost only by `down --volumes` or by deleting its volume, or that `recreate` loses it. A plain `down` loses it and `recreate` keeps it. `recreate` keeps the data of PostgreSQL, SeaweedFS, ClickHouse with its Keeper and Fluss's ZooKeeper only; every other service, Airflow and Kafka's topics included, loses its data on a recreate, so a statement that a recreate loses those services' data is right (`docs/how-it-works.md`, Where Data Lives).
+- Right: `odctl down kafka-lite --volumes --dry-run`, then `odctl down kafka-lite --volumes`.
+- Not a mistake: a true description of what a wider command stops, such as "`odctl down --all` stops everything", given beside the scoped command. It is A7 when the run uses it, or gives it as the teardown to run.
+
+## A9: state from an earlier run breaks the next
+
+A setup or test that fails, or passes on old values, when it runs a second time on the same stack.
+
+- Wrong: `CREATE TABLE t` with no `IF NOT EXISTS` and no drop first; rows appended again on every run.
+- Wrong: `feast teardown` as the cleanup, or a DAG left unpaused in the bucket.
+- Wrong: a check that rows from an earlier run pass, such as a count above 0 of a table the script keeps.
+- Right: each step is safe to run twice, and what the script registered is removed or reused. A check reads only what this run wrote or what arrived after it started, such as a count that must rise above the count read at the check's start.

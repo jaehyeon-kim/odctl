@@ -1,0 +1,6 @@
+{
+  "name": "odctl",
+  "version": "1.9.0",
+  "description": "Adds the odctl agent skill and a read-only MCP server, which need odctl installed: uv tool install 'odctl[mcp]'.",
+  "logo": "docs/assets/logo.png"
+}

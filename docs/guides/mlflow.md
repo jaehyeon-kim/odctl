@@ -98,7 +98,7 @@ curl -X POST http://127.0.0.1:5003/invocations \
   -H 'Content-Type: application/json' -d '{"inputs": [[0.0], [3.0]]}'
 ```
 
-The response is `{"predictions": [0, 0]}`, one prediction per input row. Check the body rather than the status code, because the server answers 200 with an error payload when scoring fails. `http://127.0.0.1:5003/ping` answers once the model is loaded.
+The response is `{"predictions": [0, 0]}`, one prediction per input row. Check that the body holds `predictions`: a scoring failure answers 400 with the error in the body, and `curl` without `--fail` still exits 0. `http://127.0.0.1:5003/ping` answers once the model is loaded.
 
 ## Move the Alias to a New Version
 

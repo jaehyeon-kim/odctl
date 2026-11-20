@@ -28,14 +28,19 @@ def mock_registry_data():
 def mock_workspace(tmp_path, monkeypatch):
     """Mocks workspace directories to use an isolated temporary path."""
     monkeypatch.setattr("odctl.config.get_workspace_dir", lambda: tmp_path / ".odctl")
-    monkeypatch.setattr(
-        "odctl.config.get_internal_resources_dir", lambda: tmp_path / "resources"
-    )
 
     # Create the fake directories
     (tmp_path / ".odctl").mkdir(parents=True, exist_ok=True)
     (tmp_path / "resources").mkdir(parents=True, exist_ok=True)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def _run_in_an_empty_folder(tmp_path, monkeypatch):
+    """odctl reads `./.odctl` when no `--workspace` is given, so a test run from a
+    folder that holds a workspace would read it. Each test runs in its own empty
+    folder; a test that wants a workspace writes one there with `write_workspace`."""
+    monkeypatch.chdir(tmp_path)
 
 
 @pytest.fixture(autouse=True)

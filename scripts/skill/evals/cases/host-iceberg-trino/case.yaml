@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: host-iceberg-trino
+expected_outcome: >
+  The folder holds start.sh, query.py, reply.md.
+context:
+  scaffold_script: setup.sh

@@ -153,13 +153,18 @@
       "groupName": "ClickHouse Ecosystem"
     },
     {
-      "description": "Group OpenMetadata Server and Ingestion with Elasticsearch. OpenMetadata only runs against the Elasticsearch version it was built for, so the three move as one set.",
+      "description": "Group the OpenMetadata server and ingestion images, which must run the same release.",
       "matchPackageNames": [
         "docker.getcollate.io/openmetadata/server",
-        "docker.getcollate.io/openmetadata/ingestion",
-        "docker.elastic.co/elasticsearch/elasticsearch"
+        "docker.getcollate.io/openmetadata/ingestion"
       ],
-      "groupName": "OpenMetadata Ecosystem"
+      "groupName": "OpenMetadata Ecosystem",
+      "minimumGroupSize": 2
+    },
+    {
+      "description": "Elasticsearch moves only by hand, with OpenMetadata, to the version OpenMetadata's own docker/docker-compose-quickstart/docker-compose.yml uses at the new release tag. OpenMetadata runs only against the Elasticsearch version it was built for, so Renovate opens no pull request for it alone.",
+      "matchPackageNames": ["docker.elastic.co/elasticsearch/elasticsearch"],
+      "enabled": false
     },
     {
       "description": "Group Marquez API and Web UI together",
@@ -168,6 +173,12 @@
         "marquezproject/marquez-web"
       ],
       "groupName": "Lineage Ecosystem"
+    },
+    {
+      "description": "Update images from registries other than Docker Hub, such as docker.getcollate.io, quay.io and ghcr.io, with no release-age wait. Renovate reads a release date only from Docker Hub, so under minimumReleaseAge with the default timestamp-required, these images would never count as stable and would get no pull request.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["/^[^/]+\\.[^/]+/"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
     }
   ]
 }

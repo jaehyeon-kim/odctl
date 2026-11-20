@@ -10,8 +10,11 @@ from typing import Dict, List
 
 from python_on_whales import DockerClient
 
-from odctl.config import get_compose_path
-from odctl.docker import create_client, wait_for_one_shot_containers
+from odctl.docker import (
+    check_exit_codes,
+    create_client,
+    wait_for_one_shot_containers,
+)
 
 
 def build_compose_clients(execution_plan: Dict[str, List[str]]) -> List[DockerClient]:
@@ -32,10 +35,7 @@ def build_compose_clients(execution_plan: Dict[str, List[str]]) -> List[DockerCl
     Returns:
         List[DockerClient]: One client for each file, set to that file's profiles.
     """
-    return [
-        create_client(compose_files=[str(get_compose_path(file))], profiles=profiles)
-        for file, profiles in execution_plan.items()
-    ]
+    return [create_client(file, profiles) for file, profiles in execution_plan.items()]
 
 
 def restart_managed_containers(execution_plan: Dict[str, List[str]]):
@@ -60,19 +60,29 @@ def recreate_managed_containers(
     applies a new memory limit, port, image tag or environment variable. Profiles
     outside the plan are untouched, unlike `up`, which stops what it is not asked
     for. Files are recreated in the plan's order, which puts the infrastructure
-    first, as `up` does.
+    first, as `up` does. The deps file starts attached and without `wait`, as
+    `launch_stack` starts it, because its init container exits once it has copied
+    the jars and `--wait` fails on a container that exits, even with code 0. A
+    container of the deps file that exits with another code stops the command
+    before the next file.
 
     Args:
         execution_plan (Dict[str, List[str]]): A mapping of compose files to target profiles.
         pull (bool, optional): Pull images before recreating. Defaults to False.
     """
-    for compose_client in build_compose_clients(execution_plan):
+    policy = "always" if pull else "missing"
+    clients = build_compose_clients(execution_plan)
+    for profiles, compose_client in zip(execution_plan.values(), clients):
+        if "deps" in profiles:
+            compose_client.compose.up(detach=False, force_recreate=True, pull=policy)
+            check_exit_codes(compose_client)
+            continue
         wait_for_one_shot_containers()
         compose_client.compose.up(
             detach=True,
             wait=True,
             force_recreate=True,
-            pull="always" if pull else "missing",
+            pull=policy,
         )
     # The wait above passes while a one-shot container is still at work, so the
     # next command could find it running; wait here until it has finished.

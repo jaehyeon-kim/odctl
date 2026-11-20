@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: feast-venv
+expected_outcome: >
+  The folder holds setup_env.sh, reply.md.
+context:
+  scaffold_script: setup.sh

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Teardown for the finished kafka-lite test.
+#
+# Stops and removes only the kafka-lite profile (its containers, its
+# unnamed volumes and its network attachments). PostgreSQL and its data
+# are left alone. Dependencies are not named, so `odctl down` does not
+# stop them, except the ephemeral `deps` init container, which odctl
+# stops only when no other profile has a container (PostgreSQL does).
+#
+# Run from anywhere: the script works in the folder it lives in.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ODCTL="$HERE/py/bin/odctl"
+WORKSPACE="$HERE/.odctl"
+
+if [ ! -x "$ODCTL" ]; then
+  echo "odctl not found or not executable: $ODCTL" >&2
+  exit 1
+fi
+if [ ! -d "$WORKSPACE" ]; then
+  echo "odctl workspace not found: $WORKSPACE" >&2
+  exit 1
+fi
+
+echo "== Plan: stop kafka-lite and remove its volumes =="
+"$ODCTL" --workspace "$WORKSPACE" down kafka-lite --volumes --dry-run
+
+echo "== Stopping kafka-lite =="
+"$ODCTL" --workspace "$WORKSPACE" down kafka-lite --volumes --yes
+
+echo "== Containers still managed by odctl (PostgreSQL should remain) =="
+"$ODCTL" --workspace "$WORKSPACE" ps

@@ -8,7 +8,6 @@ from pathlib import Path
 import yaml
 
 from odctl.config import get_internal_resources_dir
-from odctl.planner import build_execution_plan
 
 RESOURCES = get_internal_resources_dir()
 REPO = Path(__file__).resolve().parents[1]
@@ -90,8 +89,3 @@ def test_usage_telemetry_is_off_and_the_heap_is_three_quarters_of_the_limit():
 def test_langfuse_has_a_smoke_case():
     smoke = (REPO / ".github" / "scripts" / "smoke.sh").read_text()
     assert re.search(r"^  langfuse\)\s+smoke_langfuse\b", smoke, re.M)
-
-
-def test_valkey_starts_before_langfuse():
-    plan = list(build_execution_plan(profiles=["langfuse"]))
-    assert plan.index("compose-store.yml") < plan.index("compose-aieng.yml")

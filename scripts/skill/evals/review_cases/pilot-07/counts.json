@@ -1,0 +1,17 @@
+{
+  "known": true,
+  "counts": {
+    "A1": 1,
+    "A2": 0,
+    "A3": 1,
+    "A4": 0,
+    "A6": 0,
+    "A7": 0,
+    "A8": 0,
+    "A9": 1,
+    "A10": 0,
+    "A11": 0,
+    "A12": 1
+  },
+  "reason": "Pilot run of setup-twice on haiku (1.10.0). Reviewers differed (A3 and A9 each found by one); both are in the run: reply.md tells the user to put 127.0.0.1 in feature_store.yaml, which setup.sh syncs to s3://feast/repo for the containers, and the DAG wait passes at once on a second run because the first run registered the DAG."
+}

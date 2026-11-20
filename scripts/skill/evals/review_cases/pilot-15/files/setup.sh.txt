@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+# Test-suite setup on a long-lived odctl stack (profiles: catalog, feast, airflow).
+#
+#   1. Creates the Iceberg table demo.driver_stats and replaces its rows with a
+#      small fixed set (timestamps relative to now, so materialization finds them).
+#   2. Runs `feast apply` on feature_repo/ and syncs it to s3://feast/repo.
+#   3. Uploads dags/materialize_driver_stats.py to s3://airflow/dags, waits until
+#      Airflow has parsed that version, triggers one run and waits for it.
+#
+# Safe to run again and again on the same stack: every step converges to the same
+# state, and runs from parallel CI jobs are serialized by a lock inside the
+# airflow container. It never starts, recreates or stops containers.
+#
+# Needs on the host: docker, odctl, tar, python3.
+# Environment overrides:
+#   ODCTL               odctl command        (default: py/bin/odctl if present, else odctl)
+#   ODCTL_WORKSPACE     odctl workspace      (default: <script dir>/.odctl)
+#   AIRFLOW_CONTAINER   container to work in (default: airflow)
+#   DAG_PARSE_TIMEOUT   seconds to wait for Airflow to parse the DAG   (default: 300)
+#   DAG_RUN_TIMEOUT     seconds to wait for the DAG run to finish      (default: 1200)
+#   LOCK_TIMEOUT        seconds to wait for another job's setup        (default: 1800)
+#   CI_RUN_ID           used in the Airflow dag_run_id (default: GITHUB_RUN_ID/CI_JOB_ID/random)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -z "${ODCTL:-}" ]]; then
+  if [[ -x "$ROOT/py/bin/odctl" ]]; then ODCTL="$ROOT/py/bin/odctl"; else ODCTL="odctl"; fi
+fi
+WORKSPACE="${ODCTL_WORKSPACE:-$ROOT/.odctl}"
+CONTAINER="${AIRFLOW_CONTAINER:-airflow}"
+DAG_FILE="$ROOT/dags/materialize_driver_stats.py"
+FEATURE_REPO="$ROOT/feature_repo"
+
+log() { printf '[setup] %s\n' "$*" >&2; }
+die() { printf '[setup] ERROR: %s\n' "$*" >&2; exit 1; }
+
+[[ -f "$DAG_FILE" ]] || die "missing $DAG_FILE"
+[[ -d "$FEATURE_REPO" ]] || die "missing $FEATURE_REPO"
+command -v docker >/dev/null || die "docker is not on PATH"
+command -v python3 >/dev/null || die "python3 is not on PATH"
+
+# --- 1. The stack must already be up. Do NOT run `odctl up` here: on a shared,
+# long-lived stack a compose/.env difference in this checkout would recreate
+# containers and wipe their data under other CI jobs.
+log "Checking the odctl stack (catalog, feast, airflow)"
+ps_json="$("$ODCTL" --workspace "$WORKSPACE" ps --all --json)" \
+  || die "odctl ps failed; is Docker reachable and the workspace at $WORKSPACE?"
+PS_JSON="$ps_json" python3 - <<'PY' || die "the stack is not ready; start it once with: odctl up catalog feast airflow"
+import json, os, sys
+report = json.loads(os.environ["PS_JSON"])
+by_name = {c["name"]: c for c in report["containers"]}
+needed = ["postgres", "seaweed", "iceberg-catalog", "valkey", "feast-serve", "airflow"]
+bad = []
+for name in needed:
+    c = by_name.get(name)
+    if c is None:
+        bad.append(f"{name}: not found")
+    elif c["state"] != "running" or c.get("health") not in (None, "healthy"):
+        bad.append(f"{name}: state={c['state']} health={c.get('health')}")
+for line in bad:
+    print("[setup]   " + line, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY
+
+# --- 2. Stage the inputs and the helper, and copy them into the airflow container.
+LOCAL_STAGE="$(mktemp -d "${TMPDIR:-/tmp}/odctl-setup.XXXXXX")"
+REMOTE_STAGE=""
+cleanup() {
+  rm -rf "$LOCAL_STAGE"
+  if [[ -n "$REMOTE_STAGE" ]]; then
+    docker exec "$CONTAINER" rm -rf "$REMOTE_STAGE" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+mkdir -p "$LOCAL_STAGE/feature_repo" "$LOCAL_STAGE/dags"
+# Copy the feature repository without caches or local state.
+(cd "$FEATURE_REPO" && tar --exclude='__pycache__' --exclude='*.pyc' --exclude='.ipynb_checkpoints' -cf - .) \
+  | (cd "$LOCAL_STAGE/feature_repo" && tar -xf -)
+if [[ ! -f "$LOCAL_STAGE/feature_repo/feature_store.yaml" ]]; then
+  log "feature_repo/ has no feature_store.yaml; using odctl's ($WORKSPACE/feast/feature_store.yaml)"
+  cp "$WORKSPACE/feast/feature_store.yaml" "$LOCAL_STAGE/feature_repo/feature_store.yaml"
+fi
+cp "$DAG_FILE" "$LOCAL_STAGE/dags/"
+
+cat > "$LOCAL_STAGE/setup_stack.py" <<'PY'
+"""Runs inside the airflow container, which is on the odctl network and has
+pyiceberg, boto3 and feast[duckdb,iceberg,postgres,redis]==0.68.0 installed."""
+import fcntl, hashlib, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+STAGE = Path(sys.argv[1])
+RUN_ID = sys.argv[2]
+DAG_ID = "materialize_driver_stats"
+DAG_KEY = f"dags/{DAG_ID}.py"
+PARSE_TIMEOUT = int(os.environ.get("DAG_PARSE_TIMEOUT", "300"))
+RUN_TIMEOUT = int(os.environ.get("DAG_RUN_TIMEOUT", "1200"))
+LOCK_TIMEOUT = int(os.environ.get("LOCK_TIMEOUT", "1800"))
+AIRFLOW = "http://localhost:8080"
+
+
+def log(msg):
+    print(f"[setup] {msg}", file=sys.stderr, flush=True)
+
+
+def s3():
+    import boto3
+    return boto3.client("s3", endpoint_url="http://seaweed:8333")
+
+
+def md5(path):
+    return hashlib.md5(Path(path).read_bytes()).hexdigest()
+
+
+def put_if_changed(client, bucket, key, path):
+    """Upload only when the content differs, so unchanged files do not make
+    Feast restart or Airflow re-parse. Returns True when it uploaded."""
+    try:
+        etag = client.head_object(Bucket=bucket, Key=key)["ETag"].strip('"')
+    except client.exceptions.ClientError:
+        etag = None
+    if etag == md5(path):
+        return False
+    client.upload_file(str(path), bucket, key)
+    return True
+
+
+# ---------------------------------------------------------------- Iceberg
+def setup_iceberg():
+    import pyarrow as pa
+    from pyiceberg.catalog import load_catalog
+    from pyiceberg.exceptions import NoSuchTableError
+    from pyiceberg.schema import Schema
+    from pyiceberg.types import DoubleType, LongType, NestedField, TimestamptzType
+
+    schema = Schema(
+        NestedField(1, "driver_id", LongType(), required=False),
+        NestedField(2, "event_timestamp", TimestamptzType(), required=False),
+        NestedField(3, "conv_rate", DoubleType(), required=False),
+        NestedField(4, "acc_rate", DoubleType(), required=False),
+        NestedField(5, "avg_daily_trips", LongType(), required=False),
+        NestedField(6, "created", TimestamptzType(), required=False),
+    )
+    shape = [(f.name, str(f.field_type)) for f in schema.fields]
+
+    catalog = load_catalog("odctl")  # PYICEBERG_CATALOG__ODCTL__* are set in this container
+    catalog.create_namespace_if_not_exists("demo")
+    ident = "demo.driver_stats"
+    try:
+        table = catalog.load_table(ident)
+        if [(f.name, str(f.field_type)) for f in table.schema().fields] != shape:
+            log(f"{ident} has a different schema; dropping and recreating it")
+            catalog.drop_table(ident)
+            table = catalog.create_table(ident, schema=schema)
+    except NoSuchTableError:
+        log(f"Creating {ident}")
+        table = catalog.create_table(ident, schema=schema)
+
+    # Timestamps relative to now (on the hour), so an incremental materialization
+    # and the feature view's TTL both find the rows on every run.
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    rows = {k: [] for k in ("driver_id", "event_timestamp", "conv_rate", "acc_rate", "avg_daily_trips", "created")}
+    for i, driver_id in enumerate(range(1001, 1006)):
+        for hours_ago in (2, 1):
+            rows["driver_id"].append(driver_id)
+            rows["event_timestamp"].append(now - timedelta(hours=hours_ago))
+            rows["conv_rate"].append(round(0.10 * (i + 1) + 0.01 * hours_ago, 4))
+            rows["acc_rate"].append(round(0.50 + 0.05 * i + 0.01 * hours_ago, 4))
+            rows["avg_daily_trips"].append(100 * (i + 1) + hours_ago)
+            rows["created"].append(now)
+    data = pa.Table.from_pydict(rows, schema=table.schema().as_arrow())
+    # overwrite = one atomic snapshot holding exactly these rows: no duplicates
+    # however many CI jobs have run before.
+    table.overwrite(data)
+    log(f"{ident}: {data.num_rows} rows written")
+
+
+# ---------------------------------------------------------------- Feast
+def setup_feast():
+    src = STAGE / "feature_repo"
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "feature_repo"
+        shutil.copytree(src, repo)
+        log("feast apply")
+        subprocess.run(["feast", "-c", str(repo), "apply"], check=True)
+
+    # Only after a successful apply: publish the same repository to feast-serve
+    # and feast-ui, uploading changed files and deleting stale ones.
+    client = s3()
+    local = {p.relative_to(src).as_posix(): p for p in src.rglob("*") if p.is_file()}
+    remote = set()
+    for page in client.get_paginator("list_objects_v2").paginate(Bucket="feast", Prefix="repo/"):
+        remote.update(o["Key"] for o in page.get("Contents", []))
+    changed = [rel for rel, p in sorted(local.items()) if put_if_changed(client, "feast", f"repo/{rel}", p)]
+    stale = sorted(k for k in remote if not k.endswith("/") and k.removeprefix("repo/") not in local)
+    for key in stale:
+        client.delete_object(Bucket="feast", Key=key)
+    log(f"s3://feast/repo: {len(changed)} uploaded, {len(stale)} deleted")
+
+
+# ---------------------------------------------------------------- Airflow
+class Api:
+    def __init__(self):
+        self.token = self._call("POST", "/auth/token", {"username": "user", "password": "password"}, auth=False)["access_token"]
+
+    def _call(self, method, path, body=None, auth=True):
+        req = urllib.request.Request(AIRFLOW + path, method=method,
+                                     data=None if body is None else json.dumps(body).encode())
+        req.add_header("Content-Type", "application/json")
+        if auth:
+            req.add_header("Authorization", f"Bearer {self.token}")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+                return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            raise RuntimeError(f"{method} {path}: HTTP {e.code} {e.read().decode(errors='replace')}") from e
+
+    def get(self, path):
+        return self._call("GET", path)
+
+    def patch(self, path, body):
+        return self._call("PATCH", path, body)
+
+    def post(self, path, body):
+        return self._call("POST", path, body)
+
+
+def parsed_at(dag):
+    value = (dag or {}).get("last_parsed_time")
+    return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+
+
+def import_error(api):
+    errors = api.get("/api/v2/importErrors?limit=1000") or {}
+    for err in errors.get("import_errors", []):
+        if (err.get("filename") or "").endswith(f"{DAG_ID}.py"):
+            return err.get("stack_trace") or "import error"
+    return None
+
+
+def setup_airflow():
+    uploaded_at = datetime.now(timezone.utc)
+    uploaded = put_if_changed(s3(), "airflow", DAG_KEY, STAGE / DAG_KEY)
+    log(f"s3://airflow/{DAG_KEY}: {'uploaded' if uploaded else 'unchanged'}")
+
+    api = Api()
+    # Wait until Airflow knows the DAG, and when the file changed, until it has
+    # parsed this version, so the run below cannot use the previous one.
+    started = time.monotonic()
+    deadline = started + PARSE_TIMEOUT
+    while True:
+        dag = api.get(f"/api/v2/dags/{DAG_ID}/details")
+        last = parsed_at(dag)
+        if dag and (not uploaded or (last and last >= uploaded_at)):
+            break
+        err = import_error(api)
+        # Right after an upload, a recorded error may still be the old file's, so
+        # trust it only once the parser has had 45 s to see the new one.
+        if err and (not uploaded or time.monotonic() - started > 45):
+            raise SystemExit(f"[setup] {DAG_ID}.py failed to import:\n{err}")
+        if time.monotonic() > deadline:
+            raise SystemExit(f"[setup] Airflow did not parse {DAG_ID} within {PARSE_TIMEOUT}s"
+                             + (f":\n{err}" if err else ""))
+        time.sleep(5)
+    log(f"DAG {DAG_ID} parsed at {parsed_at(dag)}")
+
+    # Paused DAGs do not run triggered runs. Unpause for the run, then restore the
+    # previous state, so a DAG with a schedule does not keep running on the stack.
+    was_paused = bool(dag.get("is_paused"))
+    if was_paused:
+        api.patch(f"/api/v2/dags/{DAG_ID}?update_mask=is_paused", {"is_paused": False})
+    try:
+        run_id = f"ci__{RUN_ID}__{uploaded_at.strftime('%Y%m%dT%H%M%S')}"
+        api.post(f"/api/v2/dags/{DAG_ID}/dagRuns", {"dag_run_id": run_id, "logical_date": None})
+        log(f"Triggered {DAG_ID} run {run_id}; waiting up to {RUN_TIMEOUT}s")
+        deadline = time.monotonic() + RUN_TIMEOUT
+        state = None
+        while time.monotonic() < deadline:
+            state = (api.get(f"/api/v2/dags/{DAG_ID}/dagRuns/{run_id}") or {}).get("state")
+            if state in ("success", "failed"):
+                break
+            time.sleep(5)
+        if state != "success":
+            tis = api.get(f"/api/v2/dags/{DAG_ID}/dagRuns/{run_id}/taskInstances") or {}
+            for ti in tis.get("task_instances", []):
+                log(f"  task {ti.get('task_id')}: {ti.get('state')}")
+            raise SystemExit(f"[setup] DAG run {run_id} ended in state {state!r} "
+                             f"(logs: http://127.0.0.1:8085/dags/{DAG_ID}/runs/{run_id})")
+        log(f"DAG run {run_id}: success")
+    finally:
+        if was_paused:
+            api.patch(f"/api/v2/dags/{DAG_ID}?update_mask=is_paused", {"is_paused": True})
+
+
+def main():
+    # Every CI job execs into the same airflow container, so a lock file here
+    # serializes setups from parallel jobs on this stack.
+    with open("/tmp/odctl-ci-setup.lock", "w") as lock:
+        deadline = time.monotonic() + LOCK_TIMEOUT
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise SystemExit("[setup] timed out waiting for another job's setup")
+                log("another setup is running on this stack; waiting")
+                time.sleep(10)
+        setup_iceberg()
+        setup_feast()
+        setup_airflow()
+
+
+if __name__ == "__main__":
+    main()
+PY
+
+REMOTE_STAGE="$(docker exec "$CONTAINER" mktemp -d /tmp/odctl-setup.XXXXXX)"
+tar -C "$LOCAL_STAGE" -cf - . | docker exec -i "$CONTAINER" tar -xf - -C "$REMOTE_STAGE"
+
+# --- 3. Run it in the container.
+RUN_ID="${CI_RUN_ID:-${GITHUB_RUN_ID:-${CI_JOB_ID:-${BUILD_ID:-$(date +%s)-$$}}}}"
+log "Running setup in container '$CONTAINER'"
+docker exec \
+  -e DAG_PARSE_TIMEOUT="${DAG_PARSE_TIMEOUT:-300}" \
+  -e DAG_RUN_TIMEOUT="${DAG_RUN_TIMEOUT:-1200}" \
+  -e LOCK_TIMEOUT="${LOCK_TIMEOUT:-1800}" \
+  "$CONTAINER" python "$REMOTE_STAGE/setup_stack.py" "$REMOTE_STAGE" "$RUN_ID"
+log "Done"

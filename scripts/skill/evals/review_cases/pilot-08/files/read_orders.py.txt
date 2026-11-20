@@ -1,0 +1,39 @@
+"""Read every message currently in the Kafka topic `orders` and print them.
+
+Batch read: from the earliest to the latest offset at the moment the job starts.
+The Kafka connector jars are already on the stack's Spark classpath, so no
+--packages is needed. Run inside the stack's Spark container (see run.sh):
+the broker is broker-1:19092 on the `odctl` Docker network.
+"""
+import os
+
+from pyspark.sql import SparkSession
+
+BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "broker-1:19092")
+TOPIC = os.environ.get("KAFKA_TOPIC", "orders")
+
+spark = SparkSession.builder.appName("read_orders").getOrCreate()
+
+df = (
+    spark.read.format("kafka")
+    .option("kafka.bootstrap.servers", BOOTSTRAP)
+    .option("subscribe", TOPIC)
+    .option("startingOffsets", "earliest")
+    .option("endingOffsets", "latest")
+    .load()
+    .selectExpr(
+        "partition",
+        "offset",
+        "timestamp",
+        "CAST(key AS STRING) AS key",
+        "CAST(value AS STRING) AS value",
+    )
+    .orderBy("partition", "offset")
+)
+
+total = df.count()
+print(f"Topic '{TOPIC}': {total} message(s)")
+if total:
+    df.show(total, truncate=False)
+
+spark.stop()

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: ch-free-disk
+expected_outcome: >
+  The folder holds cleanup.sh, reply.md.
+context:
+  scaffold_script: setup.sh

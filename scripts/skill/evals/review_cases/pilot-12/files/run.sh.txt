@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Start Kafka and Spark with odctl, then run read_orders.py in the Spark
+# master container against the stack's Spark cluster.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+# odctl on PATH by default; set ODCTL=/path/to/odctl to use another one.
+ODCTL="${ODCTL:-odctl}"
+# kafka-lite (1 broker) and spark-lite (1 worker) by default. Set
+# KAFKA_PROFILE=kafka-full or SPARK_PROFILE=spark-full for the clusters, but do
+# not run a -lite and a -full profile of the same tool at once.
+KAFKA_PROFILE="${KAFKA_PROFILE:-kafka-lite}"
+SPARK_PROFILE="${SPARK_PROFILE:-spark-lite}"
+
+# Returns once every service is running and healthy. spark-lite also starts
+# deps (the Kafka connector jars Spark loads), postgres, storage and catalog.
+"$ODCTL" up "$KAFKA_PROFILE" "$SPARK_PROFILE"
+
+# The Spark containers do not mount this folder, so copy the job in.
+docker cp read_orders.py spark-master:/tmp/read_orders.py
+
+# The driver runs in spark-master; the executors on the workers connect back
+# to it by the container name, which resolves on the odctl network.
+docker exec spark-master /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --conf spark.driver.host=spark-master \
+  --conf spark.driver.bindAddress=0.0.0.0 \
+  /tmp/read_orders.py

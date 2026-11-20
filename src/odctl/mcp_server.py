@@ -54,7 +54,8 @@ def _run(command: Callable[..., None], **options) -> Tuple[str, str]:
             command(**options)
         except typer.Exit as exit_:
             failed = bool(exit_.exit_code)
-        except click.exceptions.Abort:
+        except (click.exceptions.Abort, typer.Abort):
+            # typer 0.18.0's Abort is click's; typer 0.27.3 raises its own.
             failed = True
     if failed:
         raise ToolError(_text(out.getvalue(), err.getvalue()) or "The command failed.")

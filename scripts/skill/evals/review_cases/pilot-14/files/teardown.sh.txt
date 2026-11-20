@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Tear down what the Kafka test started: the kafka-lite profile only.
+# PostgreSQL (and the shared `deps` profile it relies on) keeps running, and its data stays.
+set -euo pipefail
+
+cd "$(dirname "$0")"            # the folder that holds the .odctl/ workspace
+ODCTL="py/bin/odctl"
+
+# Show the plan first: kafka-lite's containers and their own volumes.
+# deps and the shared jar volume odctl-shared-deps are kept while postgres has a container.
+"$ODCTL" down kafka-lite --volumes --dry-run
+
+# Stop kafka-lite (kafka, connect, karapace, kafka-ui) and remove its volumes.
+# Only kafka-lite is named, so postgres and deps are not stopped.
+"$ODCTL" down kafka-lite --volumes --yes
+
+# Show what is still running; postgres should be listed.
+"$ODCTL" ps

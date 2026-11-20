@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pg-load-container
+expected_outcome: >
+  The folder holds load_orders.py, run_load.sh, reply.md.
+context:
+  scaffold_script: setup.sh

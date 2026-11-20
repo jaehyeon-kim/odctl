@@ -1,0 +1,300 @@
+{
+  "missing": [],
+  "odctl": {
+    "compose": {
+      "compose-mlops.yml": {
+        "evidently": {
+          "aliases": [],
+          "container_name": "evidently",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:8089:8000"
+          ],
+          "profiles": [
+            "evidently"
+          ],
+          "healthcheck_test": [
+            "CMD",
+            "python",
+            "-c",
+            "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/projects', timeout=5)"
+          ]
+        },
+        "feast-serve": {
+          "aliases": [],
+          "container_name": "feast-serve",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:6566:6566"
+          ],
+          "profiles": [
+            "feast"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:6566/health || exit 1"
+          ]
+        },
+        "feast-ui": {
+          "aliases": [],
+          "container_name": "feast-ui",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:8890:8888"
+          ],
+          "profiles": [
+            "feast"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8888/api/v1/projects || exit 1"
+          ]
+        },
+        "label-studio": {
+          "aliases": [],
+          "container_name": "label-studio",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:8088:8080"
+          ],
+          "profiles": [
+            "label-studio"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8080/health/ || exit 1"
+          ]
+        },
+        "mlflow": {
+          "aliases": [],
+          "container_name": "mlflow",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:5004:5000"
+          ],
+          "profiles": [
+            "mlflow"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:5000/health || exit 1"
+          ]
+        },
+        "mlflow-serve": {
+          "aliases": [],
+          "container_name": "mlflow-serve",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:5003:5003"
+          ],
+          "profiles": [
+            "mlflow"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "[ -z \"$${MODEL_URI}\" ] || curl -f http://localhost:5003/ping || exit 1"
+          ]
+        }
+      },
+      "compose-orch.yml": {
+        "airflow": {
+          "aliases": [],
+          "container_name": "airflow",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:8085:8080"
+          ],
+          "profiles": [
+            "airflow"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -fs http://localhost:8080/api/v2/monitor/health || exit 1"
+          ]
+        },
+        "temporal": {
+          "aliases": [],
+          "container_name": "temporal",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:7233:7233",
+            "127.0.0.1:8233:8233"
+          ],
+          "profiles": [
+            "temporal"
+          ],
+          "healthcheck_test": [
+            "CMD",
+            "temporal",
+            "operator",
+            "cluster",
+            "health",
+            "--address",
+            "127.0.0.1:7233"
+          ]
+        }
+      }
+    },
+    "dry_run": "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 Dry Run Execution Plan                                                                                                                                                                               \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n\ud83d\udce6 compose-deps.yml (Infrastructure Layer)\n  \u2514\u2500 \ud83d\ude80 Profile: deps\n\ud83d\udce6 compose-infra.yml (Infrastructure Layer)\n  \u2514\u2500 \ud83d\ude80 Profile: postgres\n  \u2514\u2500 \ud83d\ude80 Profile: storage\n  \u2514\u2500 \ud83d\ude80 Profile: catalog\n\ud83d\udce6 compose-store.yml (Target Stack)\n  \u2514\u2500 \ud83d\ude80 Profile: valkey\n\ud83d\udce6 compose-orch.yml (Target Stack)\n  \u2514\u2500 \ud83d\ude80 Profile: airflow\n\ud83d\udce6 compose-mlops.yml (Target Stack)\n  \u2514\u2500 \ud83d\ude80 Profile: feast\n",
+    "explain": {
+      "airflow": {
+        "compose_file": "compose-orch.yml",
+        "depends_on": [
+          "postgres",
+          "storage"
+        ],
+        "description": "Workflow orchestration and pipeline scheduling (Airflow), and durable workflows written in code (Temporal).",
+        "profile": "airflow",
+        "role": "Airflow schedules data pipelines, ETL and ML training runs. Temporal runs long-lived workflows with retries, workflows that wait days for a signal such as a person approving an agent's action, and resumes them after a crash.",
+        "services": [
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/airflow:<version>",
+            "name": "airflow",
+            "ports": [
+              {
+                "container": 8080,
+                "host": 8085,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "orch",
+        "starts": [
+          "airflow",
+          "deps",
+          "postgres",
+          "storage"
+        ],
+        "usage": "\u2022 Airflow Web UI (Credentials: user / password):\n  * External (host): http://127.0.0.1:8085\n  * Internal (Docker): http://airflow:8080\n\u2022 DAGs: read from s3://airflow/dags every 15 seconds.\n\u2022 Plugins: copied from s3://airflow/plugins at start. Airflow loads\n  plugins only once, so run `odctl restart airflow` after changing one.\n",
+        "volumes": []
+      },
+      "feast": {
+        "compose_file": "compose-mlops.yml",
+        "depends_on": [
+          "catalog",
+          "valkey"
+        ],
+        "description": "Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio).",
+        "profile": "feast",
+        "role": "Manages the ML lifecycle. MLflow tracks experiments, keeps the model registry and scores a registered model over HTTP. Feast holds feature definitions in a SQL registry on Postgres, reads offline values from the Iceberg tables behind catalog and storage, and serves online values from Valkey; it stores no feature values of its own. Evidently keeps data drift, prediction drift, data quality and model quality reports over time, with projects, reports and datasets on Postgres. Label Studio is where people label data, with projects, tasks and annotations on Postgres.",
+        "services": [
+          {
+            "image": "quay.io/feastdev/feature-server:0.68.0",
+            "name": "feast-serve",
+            "ports": [
+              {
+                "container": 6566,
+                "host": 6566,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "quay.io/feastdev/feature-server:0.68.0",
+            "name": "feast-ui",
+            "ports": [
+              {
+                "container": 8888,
+                "host": 8890,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "mlops",
+        "starts": [
+          "catalog",
+          "deps",
+          "feast",
+          "postgres",
+          "storage",
+          "valkey"
+        ],
+        "usage": "\u2022 Feast UI (registry browser, not data):\n  * External (host): http://127.0.0.1:8890\n  * Internal (Docker): http://feast-ui:8888\n\u2022 Upload your feature repository to s3://feast/repo. The services check\n  it every 15 seconds and restart Feast when it changes. Run\n  `feast apply` from your own environment. odctl ships no definitions.\n\u2022 Your environment needs: feast[duckdb,iceberg,redis,postgres]\n\u2022 On an IcebergSource against catalog, pass warehouse=\"\" and\n  catalog_name=\"odctl\". The REST client puts warehouse in the URL path,\n  and Iceberg's REST fixture server serves the spec with no prefix.\n\u2022 Online feature server for get_online_features:\n  * External (host): http://127.0.0.1:6566\n  * Internal (Docker): http://feast-serve:6566\n\u2022 MCP endpoint, for agents that list Feast's tools and read features:\n  http://127.0.0.1:6566/mcp\n\u2022 Liveness: http://127.0.0.1:6566/health\n",
+        "volumes": []
+      }
+    },
+    "list": [
+      {
+        "compose_file": "compose-orch.yml",
+        "depends_on": [
+          "postgres",
+          "storage"
+        ],
+        "description": "Workflow orchestration and pipeline scheduling (Airflow), and durable workflows written in code (Temporal).",
+        "profile": "airflow",
+        "services": [
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/airflow:<version>",
+            "name": "airflow",
+            "ports": [
+              {
+                "container": 8080,
+                "host": 8085,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "orch",
+        "starts": [
+          "airflow",
+          "deps",
+          "postgres",
+          "storage"
+        ]
+      },
+      {
+        "compose_file": "compose-mlops.yml",
+        "depends_on": [
+          "catalog",
+          "valkey"
+        ],
+        "description": "Experiment tracking, model registry and model serving (MLflow), the feature store (Feast), ML monitoring (Evidently), and data labelling (Label Studio).",
+        "profile": "feast",
+        "services": [
+          {
+            "image": "quay.io/feastdev/feature-server:0.68.0",
+            "name": "feast-serve",
+            "ports": [
+              {
+                "container": 6566,
+                "host": 6566,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "quay.io/feastdev/feature-server:0.68.0",
+            "name": "feast-ui",
+            "ports": [
+              {
+                "container": 8888,
+                "host": 8890,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "mlops",
+        "starts": [
+          "catalog",
+          "deps",
+          "feast",
+          "postgres",
+          "storage",
+          "valkey"
+        ]
+      }
+    ]
+  }
+}

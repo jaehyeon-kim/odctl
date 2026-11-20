@@ -657,8 +657,8 @@ mb_session() {
   [ -n "$sid" ] && printf '%s' "$sid"
 }
 
-# Create a database and run a query through it. Creating one returns 200 even
-# when the target is unreachable, so only a completed query proves the path.
+# Create a database and run a query through it. Creating one tests the
+# connection first, and the query proves the path end to end.
 mb_query() {
   local sid="$1" name="$2" engine="$3" details="$4" sql="$5" id res
   # Reuse a database of this name if one exists, so a retry does not pile up
@@ -767,8 +767,8 @@ smoke_model_server() {
   sed -i'' -e '/^MODEL_URI=/d' .odctl/.env
   cat "$SNIPPETS/mlflow/model-uri.env" >> .odctl/.env
 
-  # Assert on the response body. The endpoint answers 200 with an error payload
-  # when scoring fails, so a status code alone proves nothing was served. The
+  # Assert on the response body. A scoring failure answers 400 with the error
+  # in the body, and curl without --fail still exits 0 on it. The
   # model can still be loading when `odctl up` returns, so wait and run again.
   local got
   got=$(run_snippet mlflow/commands.sh serve 2>/dev/null)

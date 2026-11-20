@@ -20,6 +20,17 @@ def _ingestion():
     return _compose("compose-metadata.yml")["services"]["openmetadata-ingestion"]
 
 
+def test_the_server_and_ingestion_images_run_the_same_release():
+    """OpenMetadata's server and ingestion run only as the same release. Renovate's
+    group can still move them to different versions when one is published first."""
+    services = _compose("compose-metadata.yml")["services"]
+    tags = {
+        services[name]["image"].rsplit(":", 1)[1]
+        for name in ("openmetadata-server", "openmetadata-ingestion")
+    }
+    assert len(tags) == 1, tags
+
+
 def _command():
     return _ingestion()["command"][-1]
 

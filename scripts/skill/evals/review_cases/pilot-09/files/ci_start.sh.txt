@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# CI step: start odctl kafka-lite + postgres and block until a Kafka consumer
+# group can actually read a message. Exits non-zero on any failure/timeout.
+set -euo pipefail
+
+ODCTL="${ODCTL:-py/bin/odctl}"
+WAIT_SECS="${WAIT_SECS:-180}"          # budget for the Kafka read check
+KAFKA_CONTAINER="kafka"                # container_name in odctl's compose-kafka.yml
+BOOTSTRAP="localhost:9092"             # broker's listener as seen from inside its container
+KBIN="/opt/kafka/bin"
+
+# Unique names so reruns on a reused runner never see old messages/offsets.
+RUN_ID="ci-$(date +%s)-$$"
+TOPIC="${RUN_ID}-ready"
+GROUP="${RUN_ID}-group"
+MSG="ready-${RUN_ID}"
+
+dump_logs() {
+  echo "--- diagnostics ---" >&2
+  "$ODCTL" ps >&2 || true
+  "$ODCTL" logs kafka-lite --service kafka --tail 50 >&2 || true
+}
+cleanup() {
+  docker exec "$KAFKA_CONTAINER" "$KBIN/kafka-topics.sh" --bootstrap-server "$BOOTSTRAP" \
+    --delete --topic "$TOPIC" >/dev/null 2>&1 || true
+}
+trap 'rc=$?; [ $rc -ne 0 ] && dump_logs; cleanup; exit $rc' EXIT
+
+kexec() { docker exec "$KAFKA_CONTAINER" "$@"; }
+
+echo "Starting kafka-lite and postgres..."
+# odctl up returns once services are running (and healthy where a health check exists).
+"$ODCTL" up kafka-lite postgres
+
+deadline=$(( $(date +%s) + WAIT_SECS ))
+left() { echo $(( deadline - $(date +%s) )); }
+
+echo "Waiting for the broker to answer..."
+until kexec "$KBIN/kafka-topics.sh" --bootstrap-server "$BOOTSTRAP" \
+        --create --if-not-exists --topic "$TOPIC" --partitions 1 --replication-factor 1 >/dev/null 2>&1; do
+  [ "$(left)" -gt 0 ] || { echo "ERROR: could not create topic within ${WAIT_SECS}s" >&2; exit 1; }
+  sleep 3
+done
+
+echo "Producing a test message..."
+until printf '%s\n' "$MSG" | kexec "$KBIN/kafka-console-producer.sh" \
+        --bootstrap-server "$BOOTSTRAP" --topic "$TOPIC" >/dev/null 2>&1; do
+  [ "$(left)" -gt 0 ] || { echo "ERROR: could not produce within ${WAIT_SECS}s" >&2; exit 1; }
+  sleep 3
+done
+
+echo "Reading it back through consumer group $GROUP..."
+while :; do
+  # Consumer-group join can be slow on a fresh broker; retry the whole read.
+  got="$(kexec "$KBIN/kafka-console-consumer.sh" --bootstrap-server "$BOOTSTRAP" \
+          --topic "$TOPIC" --group "$GROUP" --from-beginning \
+          --max-messages 1 --timeout-ms 15000 2>/dev/null || true)"
+  if [ "$got" = "$MSG" ]; then
+    echo "Kafka consumer group read OK."
+    break
+  fi
+  [ "$(left)" -gt 0 ] || { echo "ERROR: consumer group could not read a message within ${WAIT_SECS}s" >&2; exit 1; }
+  sleep 3
+done
+
+echo "kafka-lite and postgres are ready."

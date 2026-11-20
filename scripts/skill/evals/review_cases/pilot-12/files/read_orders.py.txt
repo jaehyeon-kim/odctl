@@ -1,0 +1,57 @@
+"""Read every message of the Kafka topic `orders` and print it.
+
+A batch read from the earliest to the latest offset of every partition, so the
+job prints what the topic holds when it starts and then exits. It runs inside
+odctl's Spark containers, where the Kafka connector jars are already on the
+classpath (from the shared deps volume), so no --packages is needed.
+"""
+
+import os
+
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
+# Inside the odctl Docker network every broker is reachable as broker-1:19092,
+# with kafka-lite and with kafka-full.
+BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "broker-1:19092")
+TOPIC = os.environ.get("KAFKA_TOPIC", "orders")
+
+
+def main() -> None:
+    spark = SparkSession.builder.appName("read-orders").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    messages = (
+        spark.read.format("kafka")
+        .option("kafka.bootstrap.servers", BOOTSTRAP)
+        .option("subscribe", TOPIC)
+        .option("startingOffsets", "earliest")
+        .option("endingOffsets", "latest")
+        .load()
+        .select(
+            "partition",
+            "offset",
+            "timestamp",
+            F.col("key").cast("string").alias("key"),
+            F.col("value").cast("string").alias("value"),
+        )
+        .orderBy("partition", "offset")
+    )
+
+    count = 0
+    # toLocalIterator streams the rows to the driver one partition at a time,
+    # so every message is printed without collecting the whole topic at once.
+    for row in messages.toLocalIterator():
+        print(
+            f"partition={row.partition} offset={row.offset} "
+            f"timestamp={row.timestamp} key={row.key} value={row.value}",
+            flush=True,
+        )
+        count += 1
+
+    print(f"Read {count} message(s) from topic '{TOPIC}'.", flush=True)
+    spark.stop()
+
+
+if __name__ == "__main__":
+    main()

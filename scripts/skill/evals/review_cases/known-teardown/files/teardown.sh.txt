@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Remove everything the test left, with its volumes, so the next test starts clean.
+py/bin/odctl down --all --volumes --yes

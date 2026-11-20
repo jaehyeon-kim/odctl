@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Test-suite setup on the shared, long-lived odctl stack.
+# Safe to run repeatedly and by several CI jobs at once: it never runs
+# `odctl down`, creates things only if missing, and serializes runs with a lock.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+ODCTL="${ODCTL:-py/bin/odctl}"
+S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:8333}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-user}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-password}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+DAG_ID=materialize_driver_stats
+DAG_TIMEOUT="${DAG_TIMEOUT:-600}"
+
+# --- one setup at a time on the shared stack ---------------------------------
+LOCK="${SETUP_LOCK:-${TMPDIR:-/tmp}/odctl-setup.lock}"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK"
+  flock 9
+else
+  until mkdir "$LOCK.d" 2>/dev/null; do sleep 2; done
+  trap 'rmdir "$LOCK.d"' EXIT
+fi
+
+# --- stack (idempotent: already-running profiles are left alone) -------------
+"$ODCTL" up airflow feast trino
+
+trino() { docker exec -i trino trino --user user "$@"; }
+
+# --- Iceberg table demo.driver_stats ------------------------------------------
+trino --execute "CREATE SCHEMA IF NOT EXISTS iceberg.demo"
+trino --execute "CREATE TABLE IF NOT EXISTS iceberg.demo.driver_stats (
+  driver_id BIGINT,
+  event_timestamp TIMESTAMP(6),
+  conv_rate DOUBLE,
+  acc_rate DOUBLE,
+  avg_daily_trips INTEGER)"
+# MERGE keeps reruns from duplicating rows.
+trino --execute "MERGE INTO iceberg.demo.driver_stats t
+USING (VALUES
+  (1001, TIMESTAMP '2025-01-01 00:00:00', 0.85, 0.90, 12),
+  (1002, TIMESTAMP '2025-01-01 00:00:00', 0.70, 0.80, 8),
+  (1003, TIMESTAMP '2025-01-01 00:00:00', 0.60, 0.95, 15)
+) AS s (driver_id, event_timestamp, conv_rate, acc_rate, avg_daily_trips)
+ON t.driver_id = s.driver_id AND t.event_timestamp = s.event_timestamp
+WHEN NOT MATCHED THEN INSERT VALUES
+  (s.driver_id, s.event_timestamp, s.conv_rate, s.acc_rate, s.avg_daily_trips)"
+
+# --- Feast repository ---------------------------------------------------------
+# Needs feast[duckdb,iceberg,redis,postgres] in this environment and a
+# feature_store.yaml in feature_repo/.
+( cd feature_repo && feast apply )
+aws --endpoint-url "$S3_ENDPOINT" s3 sync feature_repo/ s3://feast/repo \
+  --exclude "__pycache__/*" --exclude "*.pyc" --exclude "data/*"
+
+# --- Airflow DAG --------------------------------------------------------------
+aws --endpoint-url "$S3_ENDPOINT" s3 cp "dags/$DAG_ID.py" "s3://airflow/dags/$DAG_ID.py"
+
+af() { docker exec airflow airflow "$@"; }
+
+# Airflow re-reads s3://airflow/dags every 15 s; wait until the DAG is registered.
+deadline=$((SECONDS + 180))
+until af dags list 2>/dev/null | grep -qw "$DAG_ID"; do
+  [ "$SECONDS" -lt "$deadline" ] || { echo "DAG $DAG_ID not parsed in time" >&2; exit 1; }
+  sleep 5
+done
+
+af dags unpause "$DAG_ID"   # DAGs are created paused
+RUN_ID="ci_$(date -u +%Y%m%dT%H%M%S)_$$"
+af dags trigger "$DAG_ID" --run-id "$RUN_ID"
+
+deadline=$((SECONDS + DAG_TIMEOUT))
+while :; do
+  state="$(af dags state "$DAG_ID" "$RUN_ID" 2>/dev/null | tail -n1 | tr -d '[:space:]')"
+  case "$state" in
+    success) echo "DAG run $RUN_ID succeeded"; break ;;
+    failed)  echo "DAG run $RUN_ID failed" >&2; exit 1 ;;
+  esac
+  [ "$SECONDS" -lt "$deadline" ] || { echo "DAG run $RUN_ID timed out (state: $state)" >&2; exit 1; }
+  sleep 5
+done

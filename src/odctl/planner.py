@@ -1,14 +1,11 @@
 from typing import Dict, List, Optional, Set, Tuple
 
 import typer
-import yaml
-from rich.console import Console
 
 from odctl import ui
-from odctl.config import get_compose_path
-from odctl.registry import load_registry
-
-console = Console()
+from odctl.config import UnreadableFileError
+from odctl.docker import read_compose
+from odctl.registry import Registry, load_registry
 
 
 def find_unreachable_profiles() -> List[Tuple[str, str, str]]:
@@ -32,18 +29,13 @@ def find_unreachable_profiles() -> List[Tuple[str, str, str]]:
 
     unreachable = []
     for config in registry.stacks.values():
-        path = get_compose_path(config.file)
-        if not path.exists():
-            continue
+        # A file that cannot be read is reported by the command that reads it.
         try:
-            with open(path, "r") as f:
-                compose = yaml.safe_load(f) or {}
-        except yaml.YAMLError:
+            compose = read_compose(config.file)
+        except UnreadableFileError:
             continue
 
         for svc_name, svc_data in (compose.get("services") or {}).items():
-            if not isinstance(svc_data, dict):
-                continue
             for profile in svc_data.get("profiles") or []:
                 # An unknown profile is a different problem, caught by
                 # validate_profiles when someone asks for it by name.
@@ -58,21 +50,27 @@ def warn_unreachable_profiles() -> None:
     Print a warning for every service whose declared profile is unreachable.
     """
     for file, service, profile in find_unreachable_profiles():
-        console.print(
-            f"[yellow]Warning:[/yellow] {file} service '{service}' declares profile "
-            f"'{profile}', which the registry maps to another file. It will never start."
+        # Through `ui`, so the warning goes to stderr under `--json` and `odctl mcp`.
+        ui.print_info(
+            f"Warning: {file} service '{service}' declares profile "
+            f"'{profile}', which the registry maps to another file. It will never start.",
+            style="yellow",
         )
 
 
-def get_profile_map() -> Dict[str, dict]:
+def get_profile_map(registry: Optional[Registry] = None) -> Dict[str, dict]:
     """
     Create a reverse lookup mapping a profile back to its stack configuration.
+
+    Args:
+        registry (Optional[Registry]): A registry already loaded; None loads it.
 
     Returns:
         Dict[str, dict]: A dictionary where keys are profile names and values contain
         the associated 'stack_id' and 'file'.
     """
-    registry = load_registry()
+    if registry is None:
+        registry = load_registry()
     profile_map = {}
     for stack_id, config in registry.stacks.items():
         for profile in config.profiles:
@@ -98,7 +96,10 @@ def validate_profiles(profiles: List[str], profile_map: Dict[str, dict]):
 
 
 def resolve_dependencies(
-    requested_profiles: List[str], profile_map: Dict[str, dict], registry
+    requested_profiles: List[str],
+    profile_map: Dict[str, dict],
+    registry,
+    allowed: Optional[Set[str]] = None,
 ) -> Set[str]:
     """
     Traverse the dependency graph to ensure all required profiles are included.
@@ -107,9 +108,14 @@ def resolve_dependencies(
         requested_profiles (List[str]): The initial set of profiles requested by the user.
         profile_map (Dict[str, dict]): The reverse lookup map of profiles.
         registry: The loaded stack registry.
+        allowed (Optional[Set[str]]): Only these dependencies are followed, such as
+            the profiles of one file; None follows every one.
 
     Returns:
         Set[str]: A complete set of profile names, including all upstream dependencies.
+
+    Raises:
+        KeyError: When a profile walked is not in `profile_map`.
     """
     resolved = set(requested_profiles)
     queue = list(requested_profiles)
@@ -119,7 +125,7 @@ def resolve_dependencies(
         stack_id = profile_map[current]["stack_id"]
         stack = registry.stacks[stack_id]
         for dep in stack.depends_on.get(current, []):
-            if dep not in resolved:
+            if (allowed is None or dep in allowed) and dep not in resolved:
                 resolved.add(dep)
                 queue.append(dep)
     return resolved
@@ -148,7 +154,7 @@ def build_execution_plan(
         typer.Exit: If no profiles are provided and `all_profiles` is False, or if validation fails.
     """
     registry = load_registry()
-    profile_map = get_profile_map()
+    profile_map = get_profile_map(registry)
     execution_plan: Dict[str, List[str]] = {}
 
     if all_profiles:
@@ -178,17 +184,38 @@ def build_execution_plan(
         list(final_profiles), key=lambda p: (order_weights.get(p, 99), p)
     )
 
+    by_file: Dict[str, List[str]] = {}
     for p in sorted_profiles:
-        file = profile_map[p]["file"]
-        if file not in execution_plan:
-            execution_plan[file] = []
-        execution_plan[file].append(p)
+        by_file.setdefault(profile_map[p]["file"], []).append(p)
+
+    # Each file starts after the files of the profiles its profiles depend on. Of
+    # the files free to start, the one first in weight order goes next, so when the
+    # weight order already respects every dependency the plan keeps that order. A
+    # cycle across files leaves none free, and then weight order decides.
+    needs = {
+        file: {
+            profile_map[dep]["file"]
+            for p in profs
+            for dep in registry.stacks[profile_map[p]["stack_id"]].depends_on.get(p, [])
+            if dep in final_profiles and profile_map[dep]["file"] != file
+        }
+        for file, profs in by_file.items()
+    }
+    waiting = list(by_file)
+    while waiting:
+        free = [file for file in waiting if not needs[file] & set(waiting)]
+        file = (free or waiting)[0]
+        waiting.remove(file)
+        execution_plan[file] = by_file[file]
 
     return execution_plan
 
 
 def expand_same_file_dependencies(
-    file_profiles: List[str], active: List[str]
+    file_profiles: List[str],
+    active: List[str],
+    registry: Optional[Registry] = None,
+    profile_map: Optional[Dict[str, dict]] = None,
 ) -> List[str]:
     """Widen a set of active profiles to include their same-file dependencies.
 
@@ -206,27 +233,23 @@ def expand_same_file_dependencies(
     Args:
         file_profiles (List[str]): Every profile the compose file declares.
         active (List[str]): The profiles selected for this file.
+        registry (Optional[Registry]): A registry already loaded; None loads it.
+        profile_map (Optional[Dict[str, dict]]): Its profile map; None builds it.
 
     Returns:
         List[str]: The selected profiles plus their same-file dependencies, in
             the order the file declares them.
-    """
-    registry = load_registry()
-    profile_map = get_profile_map()
 
-    in_file = set(file_profiles)
-    selected = set(active)
-    queue = list(active)
-    while queue:
-        current = queue.pop(0)
-        entry = profile_map.get(current)
-        if not entry:
-            continue
-        stack = registry.stacks[entry["stack_id"]]
-        for dep in stack.depends_on.get(current, []):
-            if dep in in_file and dep not in selected:
-                selected.add(dep)
-                queue.append(dep)
+    Raises:
+        KeyError: When a selected profile is not in the registry.
+    """
+    if registry is None:
+        registry = load_registry()
+    if profile_map is None:
+        profile_map = get_profile_map(registry)
+    selected = resolve_dependencies(
+        active, profile_map, registry, allowed=set(file_profiles)
+    )
     return [p for p in file_profiles if p in selected]
 
 
@@ -250,8 +273,14 @@ def expand_plan_dependencies(plan: Dict[str, List[str]]) -> Dict[str, List[str]]
         Dict[str, List[str]]: Same mapping, each selection widened to a set
             compose will accept, in the order each file declares.
     """
-    declared = build_execution_plan(None, all_profiles=True, resolve_deps=False)
+    registry = load_registry()
+    profile_map = get_profile_map(registry)
+    declared: Dict[str, List[str]] = {}
+    for stack in registry.stacks.values():
+        declared.setdefault(stack.file, []).extend(stack.profiles)
     return {
-        file: expand_same_file_dependencies(declared.get(file, profiles), profiles)
+        file: expand_same_file_dependencies(
+            declared.get(file, profiles), profiles, registry, profile_map
+        )
         for file, profiles in plan.items()
     }

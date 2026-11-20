@@ -43,11 +43,12 @@ def test_registry_validation_missing_fields():
 
 
 def test_load_registry_file_not_found(mock_workspace, monkeypatch):
-    """Should raise standard FileNotFoundError if registry file is missing entirely."""
-    monkeypatch.setattr(
-        "odctl.config.get_registry_path", lambda: mock_workspace / "ghost_registry.yml"
-    )
-    with pytest.raises(FileNotFoundError):
+    """A missing registry file gives the one error every command reports."""
+    path = mock_workspace / "ghost_registry.yml"
+    monkeypatch.setattr("odctl.registry.get_registry_path", lambda: path)
+    with pytest.raises(
+        ValueError, match=f"^Cannot read {path}: the file does not exist"
+    ):
         load_registry()
 
 
@@ -68,14 +69,22 @@ class TestUsageTextMatchesCompose:
         return Path(config.__file__).parent / "resources"
 
     def _load(self):
-        import yaml
+        from odctl.config import read_yaml
 
         root = self._resources()
-        registry = yaml.safe_load((root / "registry.yml").read_text())
-        composes = {
-            p.name: yaml.safe_load(p.read_text()) for p in root.glob("compose-*.yml")
-        }
+        registry = read_yaml(root / "registry.yml", "registry.yml")
+        composes = {p.name: read_yaml(p, p.name) for p in root.glob("compose-*.yml")}
         return root, registry, composes
+
+    @staticmethod
+    def _usage_entries(stack: dict) -> list:
+        """Each usage text with the profiles it is for; a string is for every profile."""
+        usage = stack.get("usage")
+        if isinstance(usage, str):
+            return [(list(stack.get("profiles") or []), usage)]
+        if isinstance(usage, dict):
+            return [([profile], text) for profile, text in usage.items()]
+        return []
 
     @staticmethod
     def _published_ports(compose: dict, profile: str) -> set:
@@ -86,7 +95,9 @@ class TestUsageTextMatchesCompose:
                 continue
             for entry in svc.get("ports") or []:
                 if isinstance(entry, str):
-                    host = entry.split(":")[-2]
+                    # Why: a port with no host part is published on a random port
+                    parts = entry.split(":")
+                    host = parts[-2] if len(parts) > 1 else ""
                 elif isinstance(entry, dict):
                     host = str(entry.get("published", ""))
                 else:
@@ -101,17 +112,17 @@ class TestUsageTextMatchesCompose:
         _, registry, composes = self._load()
         wrong = []
         for stack in registry["stacks"].values():
-            usage = stack.get("usage")
-            if not isinstance(usage, dict):
-                continue
             compose = composes.get(stack["file"])
             if compose is None:
                 continue
-            for profile, text in usage.items():
-                published = self._published_ports(compose, profile)
-                for port in re.findall(r"127\.0\.0\.1:(\d+)", text or ""):
-                    if int(port) not in published:
-                        wrong.append(f"{profile}: usage says 127.0.0.1:{port}")
+            # Why: `odctl explain` prints a string usage for every profile of its
+            # stack, so each profile must publish every port it names
+            for profiles, text in self._usage_entries(stack):
+                for profile in profiles:
+                    published = self._published_ports(compose, profile)
+                    for port in re.findall(r"127\.0\.0\.1:(\d+)", text or ""):
+                        if int(port) not in published:
+                            wrong.append(f"{profile}: usage says 127.0.0.1:{port}")
         assert not wrong, (
             "usage text names ports the profile does not publish: " + "; ".join(wrong)
         )
@@ -136,10 +147,8 @@ class TestUsageTextMatchesCompose:
 
         unknown = []
         for stack in registry["stacks"].values():
-            usage = stack.get("usage")
-            if not isinstance(usage, dict):
-                continue
-            for profile, text in usage.items():
+            for profiles, text in self._usage_entries(stack):
+                profile = ", ".join(profiles)
                 for host in re.findall(
                     r"(?:https?://)?([a-z][a-z0-9.-]*):\d+", text or ""
                 ):

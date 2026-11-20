@@ -33,7 +33,7 @@ services:
   # [PROFILE: metadata] OpenMetadata DB Migration
   # ==========================================
   openmetadata-migrate:
-    image: &om-server-image docker.getcollate.io/openmetadata/server:2.0.7
+    image: &om-server-image docker.getcollate.io/openmetadata/server:2.0.8
     container_name: openmetadata-migrate
     command: "./bootstrap/openmetadata-ops.sh migrate"
     profiles:
@@ -133,7 +133,7 @@ services:
   # [PROFILE: metadata] OpenMetadata Ingestion (Standard Image)
   # ==========================================
   openmetadata-ingestion:
-    image: &om-ingestion-image docker.getcollate.io/openmetadata/ingestion:2.0.7
+    image: &om-ingestion-image docker.getcollate.io/openmetadata/ingestion:2.0.8
     container_name: openmetadata-ingestion
     # The image's own entrypoint runs first: it installs _PIP_ADDITIONAL_REQUIREMENTS,
     # then runs this bash command unchanged. The 2.0 image sets no default CMD, so

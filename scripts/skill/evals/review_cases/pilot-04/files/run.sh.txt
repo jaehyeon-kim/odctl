@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Start what read_orders.py needs with odctl, then run it in the Spark container.
+#
+#   kafka-lite  - the Kafka broker that holds the `orders` topic
+#   spark-lite  - the Spark standalone cluster (master, worker, history server);
+#                 it also starts catalog, deps, postgres and storage
+#
+# Usage: ./run.sh
+# Override the odctl binary with ODCTL=/path/to/odctl.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ODCTL="${ODCTL:-$HERE/py/bin/odctl}"
+JOB="$HERE/read_orders.py"
+SPARK_CONTAINER="spark-master"
+SPARK_MASTER_URL="spark://spark-master:7077"  # inside the odctl network
+
+cd "$HERE"
+
+# Starts the profiles and their dependencies, and returns once they are running (healthy where checked).
+"$ODCTL" up kafka-lite spark-lite
+
+# The container has no copy of the job, so copy it in.
+docker cp "$JOB" "$SPARK_CONTAINER:/tmp/read_orders.py"
+
+# Client mode: the driver runs in spark-master, the executors on spark-worker-1.
+# The driver gets 512m because spark-master has a 1g container limit.
+docker exec "$SPARK_CONTAINER" /opt/spark/bin/spark-submit \
+  --master "$SPARK_MASTER_URL" \
+  --driver-memory 512m \
+  --executor-memory 1g \
+  /tmp/read_orders.py

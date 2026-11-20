@@ -1,0 +1,356 @@
+{
+  "missing": [],
+  "odctl": {
+    "compose": {
+      "compose-infra.yml": {
+        "catalog": {
+          "aliases": [],
+          "container_name": "iceberg-catalog",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8181:8181"
+          ],
+          "profiles": [
+            "catalog"
+          ],
+          "healthcheck_test": null
+        },
+        "postgres": {
+          "aliases": [],
+          "container_name": "postgres",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:5432:5432"
+          ],
+          "profiles": [
+            "postgres"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "pg_isready -U ${POSTGRES_USER:-user} -d metabase"
+          ]
+        },
+        "seaweed": {
+          "aliases": [
+            "warehouse.seaweed"
+          ],
+          "container_name": "seaweed",
+          "expose": [],
+          "healthcheck": true,
+          "ports": [
+            "127.0.0.1:8333:8333",
+            "127.0.0.1:8889:8888",
+            "127.0.0.1:9333:9333"
+          ],
+          "profiles": [
+            "storage"
+          ],
+          "healthcheck_test": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8888/ || exit 1"
+          ]
+        },
+        "seaweed-init": {
+          "aliases": [],
+          "container_name": "seaweed-init",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [],
+          "profiles": [
+            "storage"
+          ],
+          "healthcheck_test": null
+        }
+      },
+      "compose-kafka.yml": {
+        "connect": {
+          "aliases": [],
+          "container_name": "connect",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8083:8083"
+          ],
+          "profiles": [
+            "kafka-lite",
+            "kafka-full"
+          ],
+          "healthcheck_test": null
+        },
+        "kafka": {
+          "aliases": [
+            "broker-1",
+            "broker-2",
+            "broker-3"
+          ],
+          "container_name": "kafka",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9092:9092"
+          ],
+          "profiles": [
+            "kafka-lite"
+          ],
+          "healthcheck_test": null
+        },
+        "kafka-1": {
+          "aliases": [
+            "broker-1"
+          ],
+          "container_name": "kafka-1",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9092:9092"
+          ],
+          "profiles": [
+            "kafka-full"
+          ],
+          "healthcheck_test": null
+        },
+        "kafka-2": {
+          "aliases": [
+            "broker-2"
+          ],
+          "container_name": "kafka-2",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9093:9093"
+          ],
+          "profiles": [
+            "kafka-full"
+          ],
+          "healthcheck_test": null
+        },
+        "kafka-3": {
+          "aliases": [
+            "broker-3"
+          ],
+          "container_name": "kafka-3",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:9094:9094"
+          ],
+          "profiles": [
+            "kafka-full"
+          ],
+          "healthcheck_test": null
+        },
+        "kafka-ui": {
+          "aliases": [],
+          "container_name": "kafka-ui",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8086:8080"
+          ],
+          "profiles": [
+            "kafka-lite",
+            "kafka-full"
+          ],
+          "healthcheck_test": null
+        },
+        "karapace": {
+          "aliases": [],
+          "container_name": "karapace",
+          "expose": [],
+          "healthcheck": false,
+          "ports": [
+            "127.0.0.1:8081:8081"
+          ],
+          "profiles": [
+            "kafka-lite",
+            "kafka-full"
+          ],
+          "healthcheck_test": null
+        }
+      }
+    },
+    "dry_run": "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 Dry Run Execution Plan                                                                                                                                                                               \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n\ud83d\udce6 compose-deps.yml (Infrastructure Layer)\n  \u2514\u2500 \ud83d\ude80 Profile: deps\n\ud83d\udce6 compose-infra.yml (Infrastructure Layer)\n  \u2514\u2500 \ud83d\ude80 Profile: postgres\n\ud83d\udce6 compose-kafka.yml (Target Stack)\n  \u2514\u2500 \ud83d\ude80 Profile: kafka-lite\n",
+    "explain": {
+      "kafka-lite": {
+        "compose_file": "compose-kafka.yml",
+        "depends_on": [
+          "deps"
+        ],
+        "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+        "profile": "kafka-lite",
+        "role": "KRaft broker(s) with Aiven Karapace for Avro/JSON schema validation and Connect for data ingestion.",
+        "services": [
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "connect",
+            "ports": [
+              {
+                "container": 8083,
+                "host": 8083,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "kafka",
+            "ports": [
+              {
+                "container": 9092,
+                "host": 9092,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "name": "kafka-ui",
+            "ports": [
+              {
+                "container": 8080,
+                "host": 8086,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "name": "karapace",
+            "ports": [
+              {
+                "container": 8081,
+                "host": 8081,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "kafka",
+        "starts": [
+          "deps",
+          "kafka-lite"
+        ],
+        "usage": "\u2022 Kafka UI:\n  - External (host): http://127.0.0.1:8086\n  - Internal (Docker): http://kafka-ui:8080\n\u2022 Schema Registry & Connect:\n  - External (host): http://127.0.0.1:8081 / http://127.0.0.1:8083\n\u2022 Bootstrap Servers (1-Node Lite):\n  - External (host): 127.0.0.1:9092\n  - Internal (Docker): broker-1:19092\n",
+        "volumes": []
+      },
+      "postgres": {
+        "compose_file": "compose-infra.yml",
+        "depends_on": [
+          "deps"
+        ],
+        "description": "PostgreSQL metadata backend.",
+        "profile": "postgres",
+        "role": "The foundational state-store. Holds metadata for Iceberg, Airflow, MLflow, and OpenMetadata, and serves vector, BM25 keyword and geospatial queries.",
+        "services": [
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/postgres:<version>",
+            "name": "postgres",
+            "ports": [
+              {
+                "container": 5432,
+                "host": 5432,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "infra",
+        "starts": [
+          "deps",
+          "postgres"
+        ],
+        "usage": "\u2022 Postgres JDBC:\n  - External (host): jdbc:postgresql://127.0.0.1:5432/odctl\n  - Internal (Docker): jdbc:postgresql://postgres:5432/odctl\n  - Credentials: user / password\n\u2022 Extensions, created in the `vector` database:\n  - vector (pgvector): vector columns and HNSW or IVFFlat indexes\n  - pg_textsearch: BM25 keyword ranking, for hybrid search with pgvector\n  - postgis: geometry and geography types and spatial queries\n  Run CREATE EXTENSION in another database to use them there.\n",
+        "volumes": []
+      }
+    },
+    "list": [
+      {
+        "compose_file": "compose-kafka.yml",
+        "depends_on": [
+          "deps"
+        ],
+        "description": "Distributed event streaming and schema registry. Lite uses 1 Broker; Full uses 3 Brokers.",
+        "profile": "kafka-lite",
+        "services": [
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "connect",
+            "ports": [
+              {
+                "container": 8083,
+                "host": 8083,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "apache/kafka:4.3.2",
+            "name": "kafka",
+            "ports": [
+              {
+                "container": 9092,
+                "host": 9092,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "name": "kafka-ui",
+            "ports": [
+              {
+                "container": 8080,
+                "host": 8086,
+                "protocol": "tcp"
+              }
+            ]
+          },
+          {
+            "image": "ghcr.io/aiven-open/karapace:6.2.4",
+            "name": "karapace",
+            "ports": [
+              {
+                "container": 8081,
+                "host": 8081,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "kafka",
+        "starts": [
+          "deps",
+          "kafka-lite"
+        ]
+      },
+      {
+        "compose_file": "compose-infra.yml",
+        "depends_on": [
+          "deps"
+        ],
+        "description": "PostgreSQL metadata backend.",
+        "profile": "postgres",
+        "services": [
+          {
+            "image": "ghcr.io/jaehyeon-kim/odctl/postgres:<version>",
+            "name": "postgres",
+            "ports": [
+              {
+                "container": 5432,
+                "host": 5432,
+                "protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "stack": "infra",
+        "starts": [
+          "deps",
+          "postgres"
+        ]
+      }
+    ]
+  }
+}
