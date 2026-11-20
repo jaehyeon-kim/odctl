@@ -52,10 +52,10 @@ Depends on: `postgres`. `odctl up trino` also starts: `deps`, `postgres`.
   configured, so any username is accepted):
   * External (host): http://127.0.0.1:8080
   * Internal (Docker): http://trino:8080
-• Identities: `docker exec -it trino trino` connects as `trino`, the
-  CLI default. Pass `--user user` for the stack-wide convention, or
-  `--user analyst`, which trino/rules.json denies schema ownership
-  while leaving every table privilege in place.
+• Identities: `docker exec trino trino --execute '<query>'` runs the
+  query as `trino`, the CLI default. Pass `--user user` for the
+  stack-wide convention, or `--user analyst`, which trino/rules.json
+  denies schema ownership while leaving every table privilege in place.
 • Catalogs: postgres works with the trino profile alone. iceberg,
   kafka, clickhouse and valkey load without their backing services,
   so they appear in SHOW CATALOGS and then fail at query time unless

@@ -22,7 +22,7 @@ Results and errors:
 - A tool that fails returns the error message of the command.
 - Tools run one at a time.
 
-The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) says.
+The server offers the tools `up` and `down` only when you start it with `--allow-changes`, as [Allow Up and Down](#allow-up-and-down) explains. The [plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md) starts the server without that option, so an assistant that uses the plugin gets the five tools that only read. The tool names and their parameter names stay the same in every 1.x release, as [What Stays Stable in 1.x](https://jaehyeon.me/odctl/latest/how-it-works/#what-stays-stable-in-1x) says.
 
 This guide builds on [Getting Started](https://jaehyeon.me/odctl/latest/getting-started/index.md) and [JSON Output](https://jaehyeon.me/odctl/latest/json-output/index.md).
 
@@ -122,7 +122,7 @@ up: Start profiles and their dependencies, as `odctl up` does.
 down: Stop the named profiles. With `volumes`, also remove their volumes, and the shared jar volume `odctl-shared-deps` once no other profile has a container, as `odctl down --volumes` does.
 ```
 
-`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and a server cannot ask. So `down` with `volumes` refuses names that cover every profile `odctl down --all --volumes` would stop, and no tool removes everything in one call.
+`up` takes `profiles` and `pull`, and `down` takes `profiles` and `volumes`. Each returns what the command prints. The server marks both as destructive, so a client can ask before it runs them. `up` replaces a container whose definition changed, and the data inside it goes with it. `down` takes named profiles only. `odctl down --all --volumes` asks before it removes the data of every profile, and so does `odctl down --volumes` with names that cover every profile, but a server cannot ask. So `down` with `volumes` refuses names that cover every profile `odctl down --all --volumes` would stop. The names need not include `deps`, because a named teardown with `volumes` also removes it once no other profile has a container. The guard compares profile names, not volumes, so one call can still remove a volume another profile uses: `down` of `spark-lite` with `volumes` removes `spark-events-data`, which `spark-full` uses too.
 
 ## Runnable Example
 

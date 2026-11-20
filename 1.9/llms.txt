@@ -29,6 +29,7 @@
 
 ## Guides
 
+- [Guides](https://jaehyeon.me/odctl/latest/guides/index.md)
 - [Kafka](https://jaehyeon.me/odctl/latest/guides/kafka/index.md)
 - [Kafka Connect](https://jaehyeon.me/odctl/latest/guides/kafka-connect/index.md)
 - [Flink SQL](https://jaehyeon.me/odctl/latest/guides/flink-sql/index.md)
@@ -47,11 +48,17 @@
 - [Label Studio](https://jaehyeon.me/odctl/latest/guides/label-studio/index.md)
 - [Hybrid Search](https://jaehyeon.me/odctl/latest/guides/hybrid-search/index.md)
 - [Valkey](https://jaehyeon.me/odctl/latest/guides/valkey/index.md)
-- [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md)
 - [Langfuse](https://jaehyeon.me/odctl/latest/guides/langfuse/index.md)
 - [OpenLineage and Marquez](https://jaehyeon.me/odctl/latest/guides/lineage/index.md)
 - [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md)
 - [Telemetry](https://jaehyeon.me/odctl/latest/guides/telemetry/index.md)
+
+## AI Assistants
+
+- [AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md)
+- [Plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md)
+- [Agent Skill](https://jaehyeon.me/odctl/latest/ai/agent-skill/index.md)
+- [MCP Server](https://jaehyeon.me/odctl/latest/guides/mcp-server/index.md)
 
 ## CLI Reference
 

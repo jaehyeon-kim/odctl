@@ -13,7 +13,7 @@ Depends on: `postgres`, `storage`. `odctl up mlflow` also starts: `deps`, `postg
   * External (host): http://127.0.0.1:5004
   * Internal (Docker): http://mlflow:5000
 • MLflow Model Scoring Server, idle until MODEL_URI in .env names a model;
-  run `odctl up mlflow` again after setting it. It loads the model once,
+  run `odctl recreate mlflow` after setting it. It loads the model once,
   when it starts, so a new version behind the same alias needs
   `odctl restart mlflow`, and the server answers nothing for about 16 seconds:
   * External (host): http://127.0.0.1:5003/invocations

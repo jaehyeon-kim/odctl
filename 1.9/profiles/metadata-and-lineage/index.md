@@ -28,10 +28,10 @@ Depends on: `postgres`, `storage`. `odctl up metadata` also starts: `deps`, `pos
 | Service                  | Image                                                 | Host:container ports     | Memory limit |
 | ------------------------ | ----------------------------------------------------- | ------------------------ | ------------ |
 | `openmetadata-es`        | `docker.elastic.co/elasticsearch/elasticsearch:9.3.0` | `9200:9200`, `9300:9300` | `2g`         |
-| `openmetadata-migrate`   | `docker.getcollate.io/openmetadata/server:2.0.7`      | none                     | `1g`         |
-| `openmetadata-server`    | `docker.getcollate.io/openmetadata/server:2.0.7`      | `8585:8585`, `8586:8586` | `2g`         |
-| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.7`   | `8087:8080`              | `1500m`      |
-| `openmetadata-init`      | `docker.getcollate.io/openmetadata/ingestion:2.0.7`   | none                     | `64m`        |
+| `openmetadata-migrate`   | `docker.getcollate.io/openmetadata/server:2.0.8`      | none                     | `1g`         |
+| `openmetadata-server`    | `docker.getcollate.io/openmetadata/server:2.0.8`      | `8585:8585`, `8586:8586` | `2g`         |
+| `openmetadata-ingestion` | `docker.getcollate.io/openmetadata/ingestion:2.0.8`   | `8087:8080`              | `1500m`      |
+| `openmetadata-init`      | `docker.getcollate.io/openmetadata/ingestion:2.0.8`   | none                     | `64m`        |
 
 ## Marquez
 

@@ -2,6 +2,70 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.10.0
+
+A plugin that installs the odctl skill and the MCP server in Claude Code, Codex and Antigravity, a rewritten skill, clearer errors, and fixes from a review of the CLI.
+
+- A plugin installs the odctl skill and the read-only MCP server in Claude Code, Codex and Antigravity ([Plugin](https://jaehyeon.me/odctl/latest/ai/plugin/index.md)). Install odctl with `uv tool install 'odctl[mcp]'` first, then:
+  - Claude Code: `claude plugin marketplace add jaehyeon-kim/odctl`, then `claude plugin install odctl@odctl`.
+  - Codex: `codex plugin marketplace add jaehyeon-kim/odctl`, then `codex plugin add odctl@odctl`.
+  - Antigravity: `agy plugin install https://github.com/jaehyeon-kim/odctl`.
+- The docs have an AI Assistants section for the plugin, the skill, the MCP server and `llms.txt` ([AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md)). The MCP Server guide keeps its address.
+- The agent skill is rewritten around the container lifecycle: a checklist, rules that each show a wrong and a right example, and reference pages for each profile's addresses and logins and for odctl in a project's tests ([Agent Skill](https://jaehyeon.me/odctl/latest/ai/agent-skill/index.md), [Use It with an AI Assistant](https://jaehyeon.me/odctl/latest/getting-started/#use-it-with-an-ai-assistant)).
+- OpenMetadata is 2.0.8, Confluent's converters are 8.4.1 and Debezium is 3.7.1.
+- The Trino notes of `odctl explain trino` give `docker exec trino trino --execute '<query>'`, which works without a terminal ([Trino and Metabase](https://jaehyeon.me/odctl/latest/guides/trino-metabase/index.md)).
+- The MLflow notes of `odctl explain mlflow` say to run `odctl recreate mlflow` after setting `MODEL_URI` in `.env`, the command the [MLflow](https://jaehyeon.me/odctl/latest/guides/mlflow/index.md) guide runs. Before, they said `odctl up mlflow`.
+- A compose file in your workspace that is missing, is not UTF-8 text or is not valid YAML now stops every command that reads it with `Cannot read <file>: ...`, which says which of these it is. A dry run of `up` or `down` without `--volumes` still prints the plan. Before, `down --volumes --dry-run` ended in a traceback, `info --json` left that file's images out, and the tables listed `File Error` as that file's services.
+- A volume such as `${PG_VOLUME:-pgdata}:/var/lib/postgresql/data`, in the short or the long form, is expanded before it is read, and a volume without `name:` is named after the project Compose runs, so `down --volumes --dry-run` lists the volume the real run removes. A source starting with `~` counts as a folder on the host, as Compose reads it.
+- A service with no `profiles:` key, which Compose starts with every profile of its file, is now listed by `ps`, `explain`, `logs --service` and `down`.
+- odctl passes each compose file's project name to Compose, so a `COMPOSE_PROJECT_NAME` in the shell or in `.env` no longer puts every file into one project, where `odctl down kafka-lite` removed the containers of the other profiles. A container counts for a file only when both its project and its service are that file's, so `ps`, `down` and the idle check of the shared jar volume no longer mix two files' services of the same name.
+- `odctl up` no longer reads a missing credential helper, or any other registry error whose text holds `not found`, as an image that is not published.
+- The check that warns about an old TAG in the workspace `.env` reads the file as Compose reads it, so `export TAG=1.9.0` and `TAG = 1.9.0` give the same answer as the image tag odctl runs.
+- A workspace whose `.env` has an empty TAG, or no TAG line, now runs the images of the CLI's version. Before, Compose ran the `latest` images.
+- `odctl init` and `odctl init --force` refuse a folder that holds files and no `registry.yml`, and a path that is a file. Its question names the folder it removes. `odctl init` copies `registry.yml` first, so an `init` that fails part way can be run again.
+- A `registry.yml` that is missing, empty, not UTF-8 text, not valid YAML or not in the registry's form now stops each command with `Cannot read <path>: ...`. Before, `explain` and the dry runs of `up` and `down` ended in a traceback.
+- A registry whose profile is listed under two stacks or twice in one stack, whose stack lists dependencies for a profile of another stack, or whose dependency names no profile, now stops with a message that names the profile.
+- `odctl up` starts the file of a dependency before the file of the profile that depends on it, read from `depends_on` in the registry. Before, a workspace profile could start before a dependency in another file.
+- A failed pull in `odctl up --pull` prints `Failed to pull images for <file>` and exits 1. Before, it ended in a traceback.
+- `restart`, `recreate` and `logs` print `Failed to <verb> <file>` with Docker's message when a Compose call fails, and `restart` and `recreate` print each file before they act on it. Before, they ended in a traceback.
+- `odctl recreate deps` no longer waits on the container that copies the jars and exits. `odctl up` and `odctl recreate` stop with `Failed to <verb> compose-deps.yml` when that container exits with a code other than 0. Before, they went on as if the jars had been copied.
+- A followed log stream that fails, as in `odctl logs kafka-lite -f`, prints `Failed to fetch logs for <file>` and exits 1 as soon as it fails, while other streams still follow, and also when Ctrl+C comes after the failure. Before, it printed a thread traceback and exited 0.
+- `odctl logs <profile> --service <name>` with a service that none of the profiles defines prints an error that names the service and the profiles, and exits 1. Before, it printed nothing and exited 0.
+- The MCP tool `down` with `volumes` set refuses a call that names every profile except `deps`, because that call removes all data, which only `odctl down --all --volumes` in a terminal does after asking. A tool call that reaches a question of the command returns the command's text as its error, where before it returned only `Error executing tool down`.
+- `odctl down <every profile> --volumes` asks the same question as `odctl down --all --volumes`, unless `--yes` is given.
+- `odctl down deps --volumes` keeps the shared jar volume while other profiles still have containers that use it, and says so, as the help of `--volumes` describes. Its dry run without Docker shows that deps is stopped in every case and that only the volume depends on the other profiles. The dry run of `down <profile> --volumes` also lists, under `compose-deps.yml`, the unnamed volumes of the stopped containers, if any.
+- A registry description, role, file or profile name, a compose service, port or volume name, or an error from Docker, that holds square brackets is printed as written, in `list`, `explain`, the dry runs and the progress lines. Before, `list` and `explain` could end in a markup error, and text such as `[bold]` disappeared.
+- The Network Mapping of `odctl explain` prints the ports with variables expanded, as `explain --json` does, leaves out a port with no host part or a port range, and adds the protocol only when it is not tcp. Before, `${KAFKA_PORT:-19092}` printed as `Host -19092}`.
+- `odctl explain` lists a service built from source, with no image, as `built locally`. Before, it was left out when another service had an image.
+- `odctl ps` counts a profile as active only when its services are running, or, for a one-shot service that another service waits on, have exited with code 0. Before, a stopped container counted as running.
+- `odctl explain` names the role of the Langfuse server and worker, Feast's feature server, ZooKeeper, the ClickHouse shard 2 stand-in and Label Studio. Each role matches the image's repository rather than any text in the image name, with or without a tag or a digest.
+- The skill's description names Label Studio and Metabase, so an assistant loads it for a task that needs them.
+- odctl reads the workspace `.env` as Compose does: it drops a UTF-8 byte order mark, strips an inline comment after a space, removes quotes, applies escapes inside double quotes and expands `${OTHER}`, and `${OTHER}` in a value reads a variable set in the shell before one set earlier in the file. Before, `TAG=1.9.0 # pinned` made odctl check the registry for the tag `1.9.0 # pinned`.
+- `odctl down <profile> --volumes` for a profile your workspace adds to `compose-deps.yml`, such as `deps-extra`, now removes that profile's own volumes, as `docker compose down --volumes` does. Before, they stayed while any other profile had a container. A profile that mounts the shared jar volume still keeps it until no other profile has a container. The dry run lists the same volumes, with `--all` too.
+- odctl reads your compose files as Docker Compose reads them. A port written without quotes, such as `2222:22`, now shows in `list -d`, `explain` and `ps`, where it used to be read as a number and left out. `yes`, `on` and `off` stay text. A key tagged `!reset` under a `<<` merge key now takes the merged value, as Compose does.
+- A workspace profile name with square brackets no longer stops `odctl up --pull` or `odctl ps` with a markup error.
+- `odctl --help` no longer prints the internal `Args:` notes of the `info` command.
+
+### Upgrading
+
+- When a compose file in your workspace is missing, is not UTF-8 text or is not valid YAML, odctl now stops with exit code 1 and `Cannot read <file>: ...`, which says which of these it is. Before 1.10.0, the commands without `--json` listed `File Error` or `Err: <type>` as that file's service, port, image and volume, `info --json` left that file's images out, and `down --volumes --dry-run` ended in a traceback. A dry run of `up` or `down` without `--volumes` still prints the plan. Fix the file, or run `odctl init --force` to copy the packaged one; it replaces your edits, so keep a copy of them.
+- `odctl explain` names the role of the Langfuse server and worker, Feast's feature server, ZooKeeper, the ClickHouse shard 2 stand-in and Label Studio, which it showed as `Service Container`. A script that reads that line sees the new role. A workspace whose compose file uses the image `valkey/valkey`, which only 0.0.1 and 0.0.2 shipped, now shows `Service Container` for it; the packaged `valkey/valkey-bundle` keeps its role.
+- The Trino notes that `odctl explain trino` prints now give `docker exec trino trino --execute '<query>'`, which works without a terminal. A workspace made by `odctl init` before 1.10.0 keeps its old `registry.yml`, so run `odctl init --force` to copy the new text; it replaces your edits, so keep a copy of them.
+- OpenMetadata is 2.0.8, up from 2.0.7. A workspace made by `odctl init` before 1.10.0 keeps its old `compose-metadata.yml`, which runs 2.0.7: run `odctl init --force` to copy the new file; it replaces your edits, so keep a copy of them. On the next `odctl up` with the metadata profile, `openmetadata-migrate` applies 2.0.8's database migrations to an existing OpenMetadata database.
+- A workspace service with no `profiles:` now appears in the `services` of `list --json`, `explain --json` and `ps --json`, and `down` stops it with its profile.
+- odctl now ignores `COMPOSE_PROJECT_NAME`. Each compose file runs as the project its `name:` names. If you changed `name:` in a workspace file, odctl now manages the containers of that project. If you set `COMPOSE_PROJECT_NAME` for an earlier version, its containers stay in that project, which odctl no longer manages, and `odctl up` fails while their fixed container names are in use. Remove them with `docker compose -p <that name> down` before you run `odctl up`.
+- A workspace whose `.env` has an empty TAG, or no TAG line, now runs the images of the CLI's version, not `latest`. Set TAG in `.env` to run another version.
+- `odctl init` and `odctl init --force` now refuse a `--workspace` that names a file, or a folder that holds files and no `registry.yml`. Name a new or empty folder, or an existing workspace.
+- A workspace registry with a profile listed under two stacks or twice in one stack, a `depends_on` key that is a profile of another stack, or a dependency that no stack lists, loaded before and now stops every command with a message. Fix the entry it names.
+- `odctl up` and `odctl recreate` now exit 1 when the container that copies the jars into `odctl-shared-deps` exits with a code other than 0, where they went on and exited 0.
+- A failed `odctl logs -f` now exits 1, where it exited 0.
+- `odctl logs <profile> --service <name>` with a service that none of the profiles defines now exits 1, where it printed nothing and exited 0.
+- The MCP tool `down` now refuses a call with `volumes` set that names every profile except `deps`, which it accepted. To remove every profile's data, run `odctl down --all --volumes` in a terminal, which asks first, or name fewer profiles.
+- A script that runs `odctl down` with every profile and `--volumes` now needs `--yes`, because the command asks first.
+- `odctl down deps --volumes` now keeps the shared jar volume `odctl-shared-deps` while other profiles have containers. Stop them first, or run `odctl down --all --volumes`, to remove it.
+- `active_profiles` in `odctl ps --json` no longer lists a profile whose containers are stopped. A one-shot container that exited with code 0 still counts.
+- odctl now reads `.env` as Compose does. A value with an inline comment, quotes, escapes or `${OTHER}`, such as `TAG=1.9.0 # pinned`, now gives the value Compose uses, and `${OTHER}` in a value reads a variable set in the shell before one set earlier in the file, so `odctl info` and the check for a published image can show a different tag than before.
+
 ## Version 1.9.0
 
 Label Studio, and MLflow 3.18.0 and Feast 0.68.0.

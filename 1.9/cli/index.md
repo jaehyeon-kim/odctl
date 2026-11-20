@@ -31,10 +31,6 @@ Usage: odctl [OPTIONS] COMMAND [ARGS]...
 │ ps        List Docker containers managed by the Open Data Stack.             │
 │ info      Show the odctl version, whether Docker is reachable and, with      │
 │           `--json`, the image tag, the workspace and odctl's own images.     │
-│                                                                              │
-│           Args:                                                              │
-│               json_output (bool): Print the report as JSON, with the tag,    │
-│           the workspace and the images.                                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Workspace ──────────────────────────────────────────────────────────────────╮
 │ init      Initialize a local .odctl workspace for custom configurations.     │
