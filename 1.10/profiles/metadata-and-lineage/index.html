@@ -1182,20 +1182,26 @@
 <span class="normal"><a href="#__codelineno-0-11">11</a></span>
 <span class="normal"><a href="#__codelineno-0-12">12</a></span>
 <span class="normal"><a href="#__codelineno-0-13">13</a></span>
-<span class="normal"><a href="#__codelineno-0-14">14</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>• OpenMetadata UI &amp; REST API (Credentials: admin@odctl.io / password,
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>  or user@odctl.io / password, on a new database; a database from
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3"></a>  1.3.0 to 1.6.0 keeps admin@odctl.io / admin, and one from an earlier
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4"></a>  release keeps admin@open-data.local and user@open-data.local, both
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5"></a>  with the password admin):
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a>  - External (host): http://127.0.0.1:8585
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7"></a>  - Internal (Docker): http://openmetadata-server:8585
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8"></a>• Ingestion Pipeline UI (Credentials: user / password):
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9"></a>  - External (host): http://127.0.0.1:8087
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10"></a>  - Internal (Docker): http://openmetadata-ingestion:8080
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11"></a>• Custom connectors: files in s3://openmetadata/connectors, checked every
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a>  15 seconds and copied into the ingestion container when they change.
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13"></a>• AutoPilot (default agents for a service added in the UI) is off unless
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a>  METADATA_AUTOPILOT="true" is set in .odctl/.env.
+<span class="normal"><a href="#__codelineno-0-14">14</a></span>
+<span class="normal"><a href="#__codelineno-0-15">15</a></span>
+<span class="normal"><a href="#__codelineno-0-16">16</a></span>
+<span class="normal"><a href="#__codelineno-0-17">17</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>• OpenMetadata UI &amp; REST API:
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>  - External (host): http://127.0.0.1:8585
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3"></a>  - Internal (Docker): http://openmetadata-server:8585
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4"></a>• OpenMetadata users, each with the password password:
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5"></a>  - Admins: admin@odctl.io and user@odctl.io
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a>  - Steward, who edits metadata such as descriptions, owners and tags:
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7"></a>    steward@odctl.io
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8"></a>  - Viewer, who can only read: viewer@odctl.io
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9"></a>  A database from an earlier release keeps its own logins, as the
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10"></a>  OpenMetadata guide lists.
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11"></a>• Ingestion Pipeline UI (Credentials: user / password):
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a>  - External (host): http://127.0.0.1:8087
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13"></a>  - Internal (Docker): http://openmetadata-ingestion:8080
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a>• Custom connectors: files in s3://openmetadata/connectors, checked every
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15"></a>  15 seconds and copied into the ingestion container when they change.
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16"></a>• AutoPilot (default agents for a service added in the UI) is off unless
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17"></a>  METADATA_AUTOPILOT="true" is set in .odctl/.env.
 </span></code></pre></div></td></tr></table></div>
 <table>
 <thead>

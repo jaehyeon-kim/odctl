@@ -997,6 +997,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#sign-in-as-the-viewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign In as the Viewer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#add-a-custom-connector" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1360,6 +1371,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#sign-in-as-the-viewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign In as the Viewer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#add-a-custom-connector" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1451,7 +1473,30 @@
 </tr>
 </tbody>
 </table>
-<p>Log in as <code>admin@odctl.io</code> or <code>user@odctl.io</code>, both with the password <code>password</code>. A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. From 1.3.0 to 1.6.0, <code>admin@odctl.io</code> has the password <code>admin</code>. Before 1.3.0, the users are <code>admin@open-data.local</code> and <code>user@open-data.local</code>, both with the password <code>admin</code>. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes <code>user</code> and <code>password</code>.</p>
+<p>Four users can log in, each with the password <code>password</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Login</th>
+<th>What it may do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>admin@odctl.io</code>, <code>user@odctl.io</code></td>
+<td>Everything, as admins</td>
+</tr>
+<tr>
+<td><code>steward@odctl.io</code></td>
+<td>View everything; edit descriptions, display names, owners, tags, tier, lineage, glossary terms and certification; and trigger agents (OpenMetadata's DataSteward role)</td>
+</tr>
+<tr>
+<td><code>viewer@odctl.io</code></td>
+<td>View everything and change nothing (a Viewer role that odctl creates)</td>
+</tr>
+</tbody>
+</table>
+<p>A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. A database from before 1.11.0 gets <code>steward@odctl.io</code> and <code>viewer@odctl.io</code> at its next start with the 1.11.0 compose files. From 1.3.0 to 1.6.0, <code>admin@odctl.io</code> has the password <code>admin</code>. Before 1.3.0, the users are <code>admin@open-data.local</code> and <code>user@open-data.local</code>, both with the password <code>admin</code>. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes <code>user</code> and <code>password</code>.</p>
 <h2 id="get-a-token">Get a Token</h2>
 <p>The login API takes the password base64-encoded and returns a JWT, a signed token that later requests send in the <code>Authorization</code> header. This sets <code>TOKEN</code> and <code>AUTH</code> for the next steps, and prints nothing:</p>
 <div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/commands.sh:login</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
@@ -1483,7 +1528,7 @@
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["appConfiguration"]["active"])'</span>
 </span></code></pre></div></td></tr></table></div>
 <p>It prints <code>False</code>. To turn AutoPilot on, set <code>METADATA_AUTOPILOT="true"</code> in <code>.odctl/.env</code> and run <code>odctl recreate metadata</code>. The command then prints <code>True</code>.</p>
-<p><code>openmetadata-init</code> tries the admin login of a new database first, then the admin logins of earlier releases; when all of them fail, <code>docker logs openmetadata-init</code> ends with <code>AutoPilot could not be set</code>.</p>
+<p><code>openmetadata-init</code> also gives <code>steward@odctl.io</code> and <code>viewer@odctl.io</code> their roles, as <a href="#sign-in-as-the-viewer">Sign In as the Viewer</a> shows. It tries the admin login of a new database first, then the admin logins of earlier releases. When all of them fail, <code>docker logs openmetadata-init</code> shows <code>AutoPilot could not be set</code> and <code>The users' roles could not be set</code>.</p>
 <h2 id="run-a-metadata-ingestion">Run a Metadata Ingestion</h2>
 <p>Create an agent, deploy it as a DAG into the ingestion Airflow, and trigger it:</p>
 <div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/commands.sh:pipeline</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span>
@@ -1514,10 +1559,9 @@
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"http://127.0.0.1:8585/api/v1/search/query?q=*&amp;index=table_search_index&amp;size=1"</span>
 </span></code></pre></div></td></tr></table></div>
 <p>The search reply is JSON, and <code>hits.total.value</code> counts the searchable tables. The index fills over a few minutes after the rebuild, and then holds more than 100 tables: OpenMetadata's own tables in the <code>omt</code> database.</p>
-<h2 id="add-a-custom-connector">Add a Custom Connector</h2>
-<p>A custom connector is a Python class that reports databases, schemas and tables from a system OpenMetadata has no connector for. The ingestion container copies every file under <code>s3://openmetadata/connectors</code> into <code>/opt/airflow/connectors</code>, which is on its <code>PYTHONPATH</code>, so an agent can import a module or a package from there. <a href="../../how-it-works/#where-data-lives">How It Works</a> compares the three profiles that read code from a bucket. A connector module must not have the name of an installed package such as <code>metadata</code> or <code>airflow</code>, because the connectors folder comes before the installed packages on the Python path.</p>
-<p>This connector reports one database, one schema and one table, written in the code. Save it as <code>demo_connector.py</code>:</p>
-<div class="language-python highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/demo_connector.py</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-7-1"> 1</a></span>
+<h2 id="sign-in-as-the-viewer">Sign In as the Viewer</h2>
+<p><code>viewer@odctl.io</code> can read every table but change none. This signs in as the viewer, reads one table of the <code>omt</code> database, and tries to change its description:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/commands.sh:viewer</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-7-1"> 1</a></span>
 <span class="normal"><a href="#__codelineno-7-2"> 2</a></span>
 <span class="normal"><a href="#__codelineno-7-3"> 3</a></span>
 <span class="normal"><a href="#__codelineno-7-4"> 4</a></span>
@@ -1527,361 +1571,388 @@
 <span class="normal"><a href="#__codelineno-7-8"> 8</a></span>
 <span class="normal"><a href="#__codelineno-7-9"> 9</a></span>
 <span class="normal"><a href="#__codelineno-7-10">10</a></span>
-<span class="normal"><a href="#__codelineno-7-11">11</a></span>
-<span class="normal"><a href="#__codelineno-7-12">12</a></span>
-<span class="normal"><a href="#__codelineno-7-13">13</a></span>
-<span class="normal"><a href="#__codelineno-7-14">14</a></span>
-<span class="normal"><a href="#__codelineno-7-15">15</a></span>
-<span class="normal"><a href="#__codelineno-7-16">16</a></span>
-<span class="normal"><a href="#__codelineno-7-17">17</a></span>
-<span class="normal"><a href="#__codelineno-7-18">18</a></span>
-<span class="normal"><a href="#__codelineno-7-19">19</a></span>
-<span class="normal"><a href="#__codelineno-7-20">20</a></span>
-<span class="normal"><a href="#__codelineno-7-21">21</a></span>
-<span class="normal"><a href="#__codelineno-7-22">22</a></span>
-<span class="normal"><a href="#__codelineno-7-23">23</a></span>
-<span class="normal"><a href="#__codelineno-7-24">24</a></span>
-<span class="normal"><a href="#__codelineno-7-25">25</a></span>
-<span class="normal"><a href="#__codelineno-7-26">26</a></span>
-<span class="normal"><a href="#__codelineno-7-27">27</a></span>
-<span class="normal"><a href="#__codelineno-7-28">28</a></span>
-<span class="normal"><a href="#__codelineno-7-29">29</a></span>
-<span class="normal"><a href="#__codelineno-7-30">30</a></span>
-<span class="normal"><a href="#__codelineno-7-31">31</a></span>
-<span class="normal"><a href="#__codelineno-7-32">32</a></span>
-<span class="normal"><a href="#__codelineno-7-33">33</a></span>
-<span class="normal"><a href="#__codelineno-7-34">34</a></span>
-<span class="normal"><a href="#__codelineno-7-35">35</a></span>
-<span class="normal"><a href="#__codelineno-7-36">36</a></span>
-<span class="normal"><a href="#__codelineno-7-37">37</a></span>
-<span class="normal"><a href="#__codelineno-7-38">38</a></span>
-<span class="normal"><a href="#__codelineno-7-39">39</a></span>
-<span class="normal"><a href="#__codelineno-7-40">40</a></span>
-<span class="normal"><a href="#__codelineno-7-41">41</a></span>
-<span class="normal"><a href="#__codelineno-7-42">42</a></span>
-<span class="normal"><a href="#__codelineno-7-43">43</a></span>
-<span class="normal"><a href="#__codelineno-7-44">44</a></span>
-<span class="normal"><a href="#__codelineno-7-45">45</a></span>
-<span class="normal"><a href="#__codelineno-7-46">46</a></span>
-<span class="normal"><a href="#__codelineno-7-47">47</a></span>
-<span class="normal"><a href="#__codelineno-7-48">48</a></span>
-<span class="normal"><a href="#__codelineno-7-49">49</a></span>
-<span class="normal"><a href="#__codelineno-7-50">50</a></span>
-<span class="normal"><a href="#__codelineno-7-51">51</a></span>
-<span class="normal"><a href="#__codelineno-7-52">52</a></span>
-<span class="normal"><a href="#__codelineno-7-53">53</a></span>
-<span class="normal"><a href="#__codelineno-7-54">54</a></span>
-<span class="normal"><a href="#__codelineno-7-55">55</a></span>
-<span class="normal"><a href="#__codelineno-7-56">56</a></span>
-<span class="normal"><a href="#__codelineno-7-57">57</a></span>
-<span class="normal"><a href="#__codelineno-7-58">58</a></span>
-<span class="normal"><a href="#__codelineno-7-59">59</a></span>
-<span class="normal"><a href="#__codelineno-7-60">60</a></span>
-<span class="normal"><a href="#__codelineno-7-61">61</a></span>
-<span class="normal"><a href="#__codelineno-7-62">62</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="sd">"""A custom database connector that reports one database, one schema and one table."""</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Optional</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4"></a>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.api.data.createDatabase</span><span class="w"> </span><span class="kn">import</span> <span class="n">CreateDatabaseRequest</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.api.data.createDatabaseSchema</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7"></a>    <span class="n">CreateDatabaseSchemaRequest</span><span class="p">,</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8"></a><span class="p">)</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.api.data.createTable</span><span class="w"> </span><span class="kn">import</span> <span class="n">CreateTableRequest</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.entity.data.table</span><span class="w"> </span><span class="kn">import</span> <span class="n">Column</span><span class="p">,</span> <span class="n">DataType</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.metadataIngestion.workflow</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12"></a>    <span class="n">Source</span> <span class="k">as</span> <span class="n">WorkflowSource</span><span class="p">,</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13"></a><span class="p">)</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.ingestion.api.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Either</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.ingestion.api.steps</span><span class="w"> </span><span class="kn">import</span> <span class="n">Source</span>
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.ingestion.ometa.ometa_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenMetadata</span>
-</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17"></a>
-</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18"></a>
-</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19"></a><span class="k">class</span><span class="w"> </span><span class="nc">DemoSource</span><span class="p">(</span><span class="n">Source</span><span class="p">):</span>
-</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20"></a><span class="w">    </span><span class="sd">"""Reads no external system: the table it reports is written in the code."""</span>
-</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21"></a>
-</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">WorkflowSource</span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">OpenMetadata</span><span class="p">):</span>
-</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
-</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span>
-</span><span id="__span-7-26"><a id="__codelineno-7-26" name="__codelineno-7-26"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">service</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">serviceName</span>
-</span><span id="__span-7-27"><a id="__codelineno-7-27" name="__codelineno-7-27"></a>
-</span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28"></a>    <span class="nd">@classmethod</span>
-</span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span>
-</span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30"></a>        <span class="bp">cls</span><span class="p">,</span>
-</span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31"></a>        <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
-</span><span id="__span-7-32"><a id="__codelineno-7-32" name="__codelineno-7-32"></a>        <span class="n">metadata</span><span class="p">:</span> <span class="n">OpenMetadata</span><span class="p">,</span>
-</span><span id="__span-7-33"><a id="__codelineno-7-33" name="__codelineno-7-33"></a>        <span class="n">pipeline_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-7-34"><a id="__codelineno-7-34" name="__codelineno-7-34"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"DemoSource"</span><span class="p">:</span>
-</span><span id="__span-7-35"><a id="__codelineno-7-35" name="__codelineno-7-35"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">WorkflowSource</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">config_dict</span><span class="p">),</span> <span class="n">metadata</span><span class="p">)</span>
-</span><span id="__span-7-36"><a id="__codelineno-7-36" name="__codelineno-7-36"></a>
-</span><span id="__span-7-37"><a id="__codelineno-7-37" name="__codelineno-7-37"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-7-38"><a id="__codelineno-7-38" name="__codelineno-7-38"></a>        <span class="k">pass</span>
-</span><span id="__span-7-39"><a id="__codelineno-7-39" name="__codelineno-7-39"></a>
-</span><span id="__span-7-40"><a id="__codelineno-7-40" name="__codelineno-7-40"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">test_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-7-41"><a id="__codelineno-7-41" name="__codelineno-7-41"></a>        <span class="k">pass</span>
-</span><span id="__span-7-42"><a id="__codelineno-7-42" name="__codelineno-7-42"></a>
-</span><span id="__span-7-43"><a id="__codelineno-7-43" name="__codelineno-7-43"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_iter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">,</span> <span class="o">**</span><span class="n">__</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Either</span><span class="p">]:</span>
-</span><span id="__span-7-44"><a id="__codelineno-7-44" name="__codelineno-7-44"></a>        <span class="k">yield</span> <span class="n">Either</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="n">CreateDatabaseRequest</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"demo_db"</span><span class="p">,</span> <span class="n">service</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">service</span><span class="p">))</span>
-</span><span id="__span-7-45"><a id="__codelineno-7-45" name="__codelineno-7-45"></a>        <span class="k">yield</span> <span class="n">Either</span><span class="p">(</span>
-</span><span id="__span-7-46"><a id="__codelineno-7-46" name="__codelineno-7-46"></a>            <span class="n">right</span><span class="o">=</span><span class="n">CreateDatabaseSchemaRequest</span><span class="p">(</span>
-</span><span id="__span-7-47"><a id="__codelineno-7-47" name="__codelineno-7-47"></a>                <span class="n">name</span><span class="o">=</span><span class="s2">"public"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">service</span><span class="si">}</span><span class="s2">.demo_db"</span>
-</span><span id="__span-7-48"><a id="__codelineno-7-48" name="__codelineno-7-48"></a>            <span class="p">)</span>
-</span><span id="__span-7-49"><a id="__codelineno-7-49" name="__codelineno-7-49"></a>        <span class="p">)</span>
-</span><span id="__span-7-50"><a id="__codelineno-7-50" name="__codelineno-7-50"></a>        <span class="k">yield</span> <span class="n">Either</span><span class="p">(</span>
-</span><span id="__span-7-51"><a id="__codelineno-7-51" name="__codelineno-7-51"></a>            <span class="n">right</span><span class="o">=</span><span class="n">CreateTableRequest</span><span class="p">(</span>
-</span><span id="__span-7-52"><a id="__codelineno-7-52" name="__codelineno-7-52"></a>                <span class="n">name</span><span class="o">=</span><span class="s2">"orders"</span><span class="p">,</span>
-</span><span id="__span-7-53"><a id="__codelineno-7-53" name="__codelineno-7-53"></a>                <span class="n">databaseSchema</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">service</span><span class="si">}</span><span class="s2">.demo_db.public"</span><span class="p">,</span>
-</span><span id="__span-7-54"><a id="__codelineno-7-54" name="__codelineno-7-54"></a>                <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-7-55"><a id="__codelineno-7-55" name="__codelineno-7-55"></a>                    <span class="n">Column</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"id"</span><span class="p">,</span> <span class="n">dataType</span><span class="o">=</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT</span><span class="p">),</span>
-</span><span id="__span-7-56"><a id="__codelineno-7-56" name="__codelineno-7-56"></a>                    <span class="n">Column</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"amount"</span><span class="p">,</span> <span class="n">dataType</span><span class="o">=</span><span class="n">DataType</span><span class="o">.</span><span class="n">DOUBLE</span><span class="p">),</span>
-</span><span id="__span-7-57"><a id="__codelineno-7-57" name="__codelineno-7-57"></a>                <span class="p">],</span>
-</span><span id="__span-7-58"><a id="__codelineno-7-58" name="__codelineno-7-58"></a>            <span class="p">)</span>
-</span><span id="__span-7-59"><a id="__codelineno-7-59" name="__codelineno-7-59"></a>        <span class="p">)</span>
-</span><span id="__span-7-60"><a id="__codelineno-7-60" name="__codelineno-7-60"></a>
-</span><span id="__span-7-61"><a id="__codelineno-7-61" name="__codelineno-7-61"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-7-62"><a id="__codelineno-7-62" name="__codelineno-7-62"></a>        <span class="k">pass</span>
+<span class="normal"><a href="#__codelineno-7-11">11</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="nv">VIEWER</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"{\"email\":\"viewer@odctl.io\",\"password\":\"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span>password<span class="w"> </span><span class="p">|</span><span class="w"> </span>base64<span class="k">)</span><span class="s2">\"}"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3"></a><span class="w">  </span>http://127.0.0.1:8585/api/v1/users/login<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["accessToken"])'</span><span class="k">)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="nv">TABLE</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$VIEWER</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/tables?database=demo_pg.omt&amp;limit=1"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])'</span><span class="k">)</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-w<span class="w"> </span><span class="s1">'%{http_code}\n'</span><span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$VIEWER</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json-patch+json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'[{"op":"add","path":"/description","value":"Edited by the viewer"}]'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/tables/</span><span class="nv">$TABLE</span><span class="s2">"</span>
+</span></code></pre></div></td></tr></table></div>
+<p>It prints <code>403</code>: the server refuses the change. The same change with a token of <code>steward@odctl.io</code> is accepted. <code>openmetadata-init</code> sets the two users' roles again at every start, so a role given to them in the UI is replaced at the next start. OpenMetadata lets the reviewer of an entity, such as a glossary term, change it before any role is checked, so <code>viewer@odctl.io</code> stays read only as long as nobody names it as a reviewer.</p>
+<p>The server creates both users at start-up, and <code>openmetadata-init</code> gives them their roles once the server answers. On a database where <code>openmetadata-init</code> has not yet set the roles, <code>viewer@odctl.io</code> has the rights every user has, which include editing descriptions and tags. This lasts until <code>openmetadata-init</code> finishes on the first start. When <code>openmetadata-init</code> cannot log in as an admin, it lasts until a start where it can, and <code>docker logs openmetadata-init</code> shows <code>The users' roles could not be set</code>.</p>
+<h2 id="add-a-custom-connector">Add a Custom Connector</h2>
+<p>A custom connector is a Python class that reports databases, schemas and tables from a system OpenMetadata has no connector for. The ingestion container copies every file under <code>s3://openmetadata/connectors</code> into <code>/opt/airflow/connectors</code>, which is on its <code>PYTHONPATH</code>, so an agent can import a module or a package from there. <a href="../../how-it-works/#where-data-lives">How It Works</a> compares the three profiles that read code from a bucket. A connector module must not have the name of an installed package such as <code>metadata</code> or <code>airflow</code>, because the connectors folder comes before the installed packages on the Python path.</p>
+<p>This connector reports one database, one schema and one table, written in the code. Save it as <code>demo_connector.py</code>:</p>
+<div class="language-python highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/demo_connector.py</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-8-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-8-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-8-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-8-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-8-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-8-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-8-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-8-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-8-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-8-10">10</a></span>
+<span class="normal"><a href="#__codelineno-8-11">11</a></span>
+<span class="normal"><a href="#__codelineno-8-12">12</a></span>
+<span class="normal"><a href="#__codelineno-8-13">13</a></span>
+<span class="normal"><a href="#__codelineno-8-14">14</a></span>
+<span class="normal"><a href="#__codelineno-8-15">15</a></span>
+<span class="normal"><a href="#__codelineno-8-16">16</a></span>
+<span class="normal"><a href="#__codelineno-8-17">17</a></span>
+<span class="normal"><a href="#__codelineno-8-18">18</a></span>
+<span class="normal"><a href="#__codelineno-8-19">19</a></span>
+<span class="normal"><a href="#__codelineno-8-20">20</a></span>
+<span class="normal"><a href="#__codelineno-8-21">21</a></span>
+<span class="normal"><a href="#__codelineno-8-22">22</a></span>
+<span class="normal"><a href="#__codelineno-8-23">23</a></span>
+<span class="normal"><a href="#__codelineno-8-24">24</a></span>
+<span class="normal"><a href="#__codelineno-8-25">25</a></span>
+<span class="normal"><a href="#__codelineno-8-26">26</a></span>
+<span class="normal"><a href="#__codelineno-8-27">27</a></span>
+<span class="normal"><a href="#__codelineno-8-28">28</a></span>
+<span class="normal"><a href="#__codelineno-8-29">29</a></span>
+<span class="normal"><a href="#__codelineno-8-30">30</a></span>
+<span class="normal"><a href="#__codelineno-8-31">31</a></span>
+<span class="normal"><a href="#__codelineno-8-32">32</a></span>
+<span class="normal"><a href="#__codelineno-8-33">33</a></span>
+<span class="normal"><a href="#__codelineno-8-34">34</a></span>
+<span class="normal"><a href="#__codelineno-8-35">35</a></span>
+<span class="normal"><a href="#__codelineno-8-36">36</a></span>
+<span class="normal"><a href="#__codelineno-8-37">37</a></span>
+<span class="normal"><a href="#__codelineno-8-38">38</a></span>
+<span class="normal"><a href="#__codelineno-8-39">39</a></span>
+<span class="normal"><a href="#__codelineno-8-40">40</a></span>
+<span class="normal"><a href="#__codelineno-8-41">41</a></span>
+<span class="normal"><a href="#__codelineno-8-42">42</a></span>
+<span class="normal"><a href="#__codelineno-8-43">43</a></span>
+<span class="normal"><a href="#__codelineno-8-44">44</a></span>
+<span class="normal"><a href="#__codelineno-8-45">45</a></span>
+<span class="normal"><a href="#__codelineno-8-46">46</a></span>
+<span class="normal"><a href="#__codelineno-8-47">47</a></span>
+<span class="normal"><a href="#__codelineno-8-48">48</a></span>
+<span class="normal"><a href="#__codelineno-8-49">49</a></span>
+<span class="normal"><a href="#__codelineno-8-50">50</a></span>
+<span class="normal"><a href="#__codelineno-8-51">51</a></span>
+<span class="normal"><a href="#__codelineno-8-52">52</a></span>
+<span class="normal"><a href="#__codelineno-8-53">53</a></span>
+<span class="normal"><a href="#__codelineno-8-54">54</a></span>
+<span class="normal"><a href="#__codelineno-8-55">55</a></span>
+<span class="normal"><a href="#__codelineno-8-56">56</a></span>
+<span class="normal"><a href="#__codelineno-8-57">57</a></span>
+<span class="normal"><a href="#__codelineno-8-58">58</a></span>
+<span class="normal"><a href="#__codelineno-8-59">59</a></span>
+<span class="normal"><a href="#__codelineno-8-60">60</a></span>
+<span class="normal"><a href="#__codelineno-8-61">61</a></span>
+<span class="normal"><a href="#__codelineno-8-62">62</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="sd">"""A custom database connector that reports one database, one schema and one table."""</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Optional</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.api.data.createDatabase</span><span class="w"> </span><span class="kn">import</span> <span class="n">CreateDatabaseRequest</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.api.data.createDatabaseSchema</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7"></a>    <span class="n">CreateDatabaseSchemaRequest</span><span class="p">,</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8"></a><span class="p">)</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.api.data.createTable</span><span class="w"> </span><span class="kn">import</span> <span class="n">CreateTableRequest</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.entity.data.table</span><span class="w"> </span><span class="kn">import</span> <span class="n">Column</span><span class="p">,</span> <span class="n">DataType</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.generated.schema.metadataIngestion.workflow</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12"></a>    <span class="n">Source</span> <span class="k">as</span> <span class="n">WorkflowSource</span><span class="p">,</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13"></a><span class="p">)</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.ingestion.api.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Either</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.ingestion.api.steps</span><span class="w"> </span><span class="kn">import</span> <span class="n">Source</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16"></a><span class="kn">from</span><span class="w"> </span><span class="nn">metadata.ingestion.ometa.ometa_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenMetadata</span>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17"></a>
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18"></a>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19"></a><span class="k">class</span><span class="w"> </span><span class="nc">DemoSource</span><span class="p">(</span><span class="n">Source</span><span class="p">):</span>
+</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20"></a><span class="w">    </span><span class="sd">"""Reads no external system: the table it reports is written in the code."""</span>
+</span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21"></a>
+</span><span id="__span-8-22"><a id="__codelineno-8-22" name="__codelineno-8-22"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">WorkflowSource</span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">OpenMetadata</span><span class="p">):</span>
+</span><span id="__span-8-23"><a id="__codelineno-8-23" name="__codelineno-8-23"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+</span><span id="__span-8-24"><a id="__codelineno-8-24" name="__codelineno-8-24"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+</span><span id="__span-8-25"><a id="__codelineno-8-25" name="__codelineno-8-25"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span>
+</span><span id="__span-8-26"><a id="__codelineno-8-26" name="__codelineno-8-26"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">service</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">serviceName</span>
+</span><span id="__span-8-27"><a id="__codelineno-8-27" name="__codelineno-8-27"></a>
+</span><span id="__span-8-28"><a id="__codelineno-8-28" name="__codelineno-8-28"></a>    <span class="nd">@classmethod</span>
+</span><span id="__span-8-29"><a id="__codelineno-8-29" name="__codelineno-8-29"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span>
+</span><span id="__span-8-30"><a id="__codelineno-8-30" name="__codelineno-8-30"></a>        <span class="bp">cls</span><span class="p">,</span>
+</span><span id="__span-8-31"><a id="__codelineno-8-31" name="__codelineno-8-31"></a>        <span class="n">config_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+</span><span id="__span-8-32"><a id="__codelineno-8-32" name="__codelineno-8-32"></a>        <span class="n">metadata</span><span class="p">:</span> <span class="n">OpenMetadata</span><span class="p">,</span>
+</span><span id="__span-8-33"><a id="__codelineno-8-33" name="__codelineno-8-33"></a>        <span class="n">pipeline_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-8-34"><a id="__codelineno-8-34" name="__codelineno-8-34"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"DemoSource"</span><span class="p">:</span>
+</span><span id="__span-8-35"><a id="__codelineno-8-35" name="__codelineno-8-35"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">WorkflowSource</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">config_dict</span><span class="p">),</span> <span class="n">metadata</span><span class="p">)</span>
+</span><span id="__span-8-36"><a id="__codelineno-8-36" name="__codelineno-8-36"></a>
+</span><span id="__span-8-37"><a id="__codelineno-8-37" name="__codelineno-8-37"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-8-38"><a id="__codelineno-8-38" name="__codelineno-8-38"></a>        <span class="k">pass</span>
+</span><span id="__span-8-39"><a id="__codelineno-8-39" name="__codelineno-8-39"></a>
+</span><span id="__span-8-40"><a id="__codelineno-8-40" name="__codelineno-8-40"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">test_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-8-41"><a id="__codelineno-8-41" name="__codelineno-8-41"></a>        <span class="k">pass</span>
+</span><span id="__span-8-42"><a id="__codelineno-8-42" name="__codelineno-8-42"></a>
+</span><span id="__span-8-43"><a id="__codelineno-8-43" name="__codelineno-8-43"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_iter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">,</span> <span class="o">**</span><span class="n">__</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Either</span><span class="p">]:</span>
+</span><span id="__span-8-44"><a id="__codelineno-8-44" name="__codelineno-8-44"></a>        <span class="k">yield</span> <span class="n">Either</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="n">CreateDatabaseRequest</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"demo_db"</span><span class="p">,</span> <span class="n">service</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">service</span><span class="p">))</span>
+</span><span id="__span-8-45"><a id="__codelineno-8-45" name="__codelineno-8-45"></a>        <span class="k">yield</span> <span class="n">Either</span><span class="p">(</span>
+</span><span id="__span-8-46"><a id="__codelineno-8-46" name="__codelineno-8-46"></a>            <span class="n">right</span><span class="o">=</span><span class="n">CreateDatabaseSchemaRequest</span><span class="p">(</span>
+</span><span id="__span-8-47"><a id="__codelineno-8-47" name="__codelineno-8-47"></a>                <span class="n">name</span><span class="o">=</span><span class="s2">"public"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">service</span><span class="si">}</span><span class="s2">.demo_db"</span>
+</span><span id="__span-8-48"><a id="__codelineno-8-48" name="__codelineno-8-48"></a>            <span class="p">)</span>
+</span><span id="__span-8-49"><a id="__codelineno-8-49" name="__codelineno-8-49"></a>        <span class="p">)</span>
+</span><span id="__span-8-50"><a id="__codelineno-8-50" name="__codelineno-8-50"></a>        <span class="k">yield</span> <span class="n">Either</span><span class="p">(</span>
+</span><span id="__span-8-51"><a id="__codelineno-8-51" name="__codelineno-8-51"></a>            <span class="n">right</span><span class="o">=</span><span class="n">CreateTableRequest</span><span class="p">(</span>
+</span><span id="__span-8-52"><a id="__codelineno-8-52" name="__codelineno-8-52"></a>                <span class="n">name</span><span class="o">=</span><span class="s2">"orders"</span><span class="p">,</span>
+</span><span id="__span-8-53"><a id="__codelineno-8-53" name="__codelineno-8-53"></a>                <span class="n">databaseSchema</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">service</span><span class="si">}</span><span class="s2">.demo_db.public"</span><span class="p">,</span>
+</span><span id="__span-8-54"><a id="__codelineno-8-54" name="__codelineno-8-54"></a>                <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-8-55"><a id="__codelineno-8-55" name="__codelineno-8-55"></a>                    <span class="n">Column</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"id"</span><span class="p">,</span> <span class="n">dataType</span><span class="o">=</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT</span><span class="p">),</span>
+</span><span id="__span-8-56"><a id="__codelineno-8-56" name="__codelineno-8-56"></a>                    <span class="n">Column</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"amount"</span><span class="p">,</span> <span class="n">dataType</span><span class="o">=</span><span class="n">DataType</span><span class="o">.</span><span class="n">DOUBLE</span><span class="p">),</span>
+</span><span id="__span-8-57"><a id="__codelineno-8-57" name="__codelineno-8-57"></a>                <span class="p">],</span>
+</span><span id="__span-8-58"><a id="__codelineno-8-58" name="__codelineno-8-58"></a>            <span class="p">)</span>
+</span><span id="__span-8-59"><a id="__codelineno-8-59" name="__codelineno-8-59"></a>        <span class="p">)</span>
+</span><span id="__span-8-60"><a id="__codelineno-8-60" name="__codelineno-8-60"></a>
+</span><span id="__span-8-61"><a id="__codelineno-8-61" name="__codelineno-8-61"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-8-62"><a id="__codelineno-8-62" name="__codelineno-8-62"></a>        <span class="k">pass</span>
 </span></code></pre></div></td></tr></table></div>
 <p>Upload it from the folder that holds the file. The command runs boto3 inside the ingestion container, which has the S3 settings, and reaches SeaweedFS at <code>http://seaweed:8333</code>, its S3 address inside the <code>odctl</code> network. It prints nothing:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:upload</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-8-1">1</a></span>
-<span class="normal"><a href="#__codelineno-8-2">2</a></span>
-<span class="normal"><a href="#__codelineno-8-3">3</a></span>
-<span class="normal"><a href="#__codelineno-8-4">4</a></span>
-<span class="normal"><a href="#__codelineno-8-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="s1">import boto3, sys</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py", Body=sys.stdin.buffer.read())</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="s1">'</span><span class="w"> </span>&lt;<span class="w"> </span>demo_connector.py
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:upload</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-9-1">1</a></span>
+<span class="normal"><a href="#__codelineno-9-2">2</a></span>
+<span class="normal"><a href="#__codelineno-9-3">3</a></span>
+<span class="normal"><a href="#__codelineno-9-4">4</a></span>
+<span class="normal"><a href="#__codelineno-9-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2"></a><span class="s1">import boto3, sys</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py", Body=sys.stdin.buffer.read())</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5"></a><span class="s1">'</span><span class="w"> </span>&lt;<span class="w"> </span>demo_connector.py
 </span></code></pre></div></td></tr></table></div>
 <p>The container checks S3 every 15 seconds and copies the file within about 15 seconds of the upload. The interval is set today by <code>INTERVAL_SECONDS</code> in <code>.odctl/openmetadata/connector_sync.py</code>, where an edit can change it. List the connectors folder until <code>demo_connector.py</code> is there:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:copied</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-9-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>ls<span class="w"> </span>/opt/airflow/connectors
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:copied</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-10-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>ls<span class="w"> </span>/opt/airflow/connectors
 </span></code></pre></div></td></tr></table></div>
 <p>Create the service and its agent through the API, as in the PostgreSQL steps above, with the same <code>AUTH</code>. The service is of type <code>CustomDatabase</code>, and <code>sourcePythonClass</code> names the module and the class. This sets <code>SVC</code> to the id of the new service:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:service</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-10-1">1</a></span>
-<span class="normal"><a href="#__codelineno-10-2">2</a></span>
-<span class="normal"><a href="#__codelineno-10-3">3</a></span>
-<span class="normal"><a href="#__codelineno-10-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="nv">SVC</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"name":"demo_connector","serviceType":"CustomDatabase","connection":{"config":{"type":"CustomDatabase","sourcePythonClass":"demo_connector.DemoSource"}}}'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3"></a><span class="w">  </span>http://127.0.0.1:8585/api/v1/services/databaseServices<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["id"])'</span><span class="k">)</span>
-</span></code></pre></div></td></tr></table></div>
-<p>Create the agent, deploy it as a DAG into the ingestion Airflow, and trigger it. As in the PostgreSQL steps, repeat the trigger every few seconds until it answers that the workflow has been triggered:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:agent</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-11-1">1</a></span>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:service</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-11-1">1</a></span>
 <span class="normal"><a href="#__codelineno-11-2">2</a></span>
 <span class="normal"><a href="#__codelineno-11-3">3</a></span>
-<span class="normal"><a href="#__codelineno-11-4">4</a></span>
-<span class="normal"><a href="#__codelineno-11-5">5</a></span>
-<span class="normal"><a href="#__codelineno-11-6">6</a></span>
-<span class="normal"><a href="#__codelineno-11-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="nv">PIPE</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"{\"name\":\"demo_connector_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"</span><span class="nv">$SVC</span><span class="s2">\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3"></a><span class="w">  </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines<span class="w"> </span><span class="se">\</span>
+<span class="normal"><a href="#__codelineno-11-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="nv">SVC</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"name":"demo_connector","serviceType":"CustomDatabase","connection":{"config":{"type":"CustomDatabase","sourcePythonClass":"demo_connector.DemoSource"}}}'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3"></a><span class="w">  </span>http://127.0.0.1:8585/api/v1/services/databaseServices<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["id"])'</span><span class="k">)</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5"></a>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/<span class="s2">"</span><span class="nv">$PIPE</span><span class="s2">"</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/<span class="s2">"</span><span class="nv">$PIPE</span><span class="s2">"</span>
+</span></code></pre></div></td></tr></table></div>
+<p>Create the agent, deploy it as a DAG into the ingestion Airflow, and trigger it. As in the PostgreSQL steps, repeat the trigger every few seconds until it answers that the workflow has been triggered:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:agent</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-12-1">1</a></span>
+<span class="normal"><a href="#__codelineno-12-2">2</a></span>
+<span class="normal"><a href="#__codelineno-12-3">3</a></span>
+<span class="normal"><a href="#__codelineno-12-4">4</a></span>
+<span class="normal"><a href="#__codelineno-12-5">5</a></span>
+<span class="normal"><a href="#__codelineno-12-6">6</a></span>
+<span class="normal"><a href="#__codelineno-12-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1"></a><span class="nv">PIPE</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"{\"name\":\"demo_connector_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"</span><span class="nv">$SVC</span><span class="s2">\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3"></a><span class="w">  </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["id"])'</span><span class="k">)</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5"></a>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines/deploy/<span class="s2">"</span><span class="nv">$PIPE</span><span class="s2">"</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/<span class="s2">"</span><span class="nv">$PIPE</span><span class="s2">"</span>
 </span></code></pre></div></td></tr></table></div>
 <p>Read the run's state until the <code>pipelineState</code> of the first entry of <code>pipelineStatuses</code> reaches <code>success</code>:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:status</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-12-1">1</a></span>
-<span class="normal"><a href="#__codelineno-12-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/demo_connector.demo_connector_metadata?fields=pipelineStatuses"</span>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:status</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-13-1">1</a></span>
+<span class="normal"><a href="#__codelineno-13-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/services/ingestionPipelines/name/demo_connector.demo_connector_metadata?fields=pipelineStatuses"</span>
 </span></code></pre></div></td></tr></table></div>
 <p>The table is then in the catalogue:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:table</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-13-1">1</a></span>
-<span class="normal"><a href="#__codelineno-13-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/tables/name/demo_connector.demo_db.public.orders?fields=columns"</span>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:table</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-14-1">1</a></span>
+<span class="normal"><a href="#__codelineno-14-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/tables/name/demo_connector.demo_db.public.orders?fields=columns"</span>
 </span></code></pre></div></td></tr></table></div>
 <p>The reply is the table <code>orders</code> with its columns <code>id</code> and <code>amount</code>. The UI shows the same table under the service <code>demo_connector</code>, with its columns and the agent run that created it:</p>
 <p><img alt="OpenMetadata showing the orders table of the demo_connector service" class="screenshot" src="../../images/openmetadata-custom.png" /></p>
 <p>A change to the connector needs no restart. Rename the table in the file:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:change</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-14-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/name="orders"/name="orders_v2"/'</span><span class="w"> </span>demo_connector.py
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:change</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-15-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/name="orders"/name="orders_v2"/'</span><span class="w"> </span>demo_connector.py
 </span></code></pre></div></td></tr></table></div>
 <p>Upload it again with the upload command above. The container has copied it when this prints <code>1</code>:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:copied-change</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-15-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>grep<span class="w"> </span>-c<span class="w"> </span>orders_v2<span class="w"> </span>/opt/airflow/connectors/demo_connector.py
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:copied-change</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-16-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>grep<span class="w"> </span>-c<span class="w"> </span>orders_v2<span class="w"> </span>/opt/airflow/connectors/demo_connector.py
 </span></code></pre></div></td></tr></table></div>
 <p>Trigger the agent again:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:retrigger</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-16-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/<span class="s2">"</span><span class="nv">$PIPE</span><span class="s2">"</span>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:retrigger</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-17-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>http://127.0.0.1:8585/api/v1/services/ingestionPipelines/trigger/<span class="s2">"</span><span class="nv">$PIPE</span><span class="s2">"</span>
 </span></code></pre></div></td></tr></table></div>
 <p>A run that starts after the copy reports <code>orders_v2</code>. Read the run's state as above, then the changed table:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:changed-table</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-17-1">1</a></span>
-<span class="normal"><a href="#__codelineno-17-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/tables/name/demo_connector.demo_db.public.orders_v2"</span>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/connector/commands.sh:changed-table</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-18-1">1</a></span>
+<span class="normal"><a href="#__codelineno-18-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2"></a><span class="w">  </span><span class="s2">"http://127.0.0.1:8585/api/v1/tables/name/demo_connector.demo_db.public.orders_v2"</span>
 </span></code></pre></div></td></tr></table></div>
 <h2 id="from-another-container">From Another Container</h2>
 <p>Inside the <a href="../../how-it-works/#how-you-reach-a-service"><code>odctl</code> network</a>, call the API at <code>http://openmetadata-server:8585</code>. The server also answers the Model Context Protocol at <a href="http://127.0.0.1:8585/mcp" rel="nofollow"><code>http://127.0.0.1:8585/mcp</code></a> with the same token.</p>
 <h2 id="remove-the-example">Remove the Example</h2>
 <p>This deletes the services with their agents and the tables they catalogued, and the uploaded connector. The container removes the file from <code>/opt/airflow/connectors</code> within about 15 seconds:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/commands.sh:remove</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-18-1">1</a></span>
-<span class="normal"><a href="#__codelineno-18-2">2</a></span>
-<span class="normal"><a href="#__codelineno-18-3">3</a></span>
-<span class="normal"><a href="#__codelineno-18-4">4</a></span>
-<span class="normal"><a href="#__codelineno-18-5">5</a></span>
-<span class="normal"><a href="#__codelineno-18-6">6</a></span>
-<span class="normal"><a href="#__codelineno-18-7">7</a></span>
-<span class="normal"><a href="#__codelineno-18-8">8</a></span>
-<span class="normal"><a href="#__codelineno-18-9">9</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1"></a><span class="k">for</span><span class="w"> </span>service<span class="w"> </span><span class="k">in</span><span class="w"> </span>demo_pg<span class="w"> </span>demo_connector<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2"></a><span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3"></a><span class="w">    </span><span class="s2">"http://127.0.0.1:8585/api/v1/services/databaseServices/name/</span><span class="nv">$service</span><span class="s2">?hardDelete=true&amp;recursive=true"</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4"></a><span class="k">done</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6"></a><span class="s1">import boto3</span>
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(</span>
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py")</span>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9"></a><span class="s1">'</span>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/commands.sh:remove</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-19-1">1</a></span>
+<span class="normal"><a href="#__codelineno-19-2">2</a></span>
+<span class="normal"><a href="#__codelineno-19-3">3</a></span>
+<span class="normal"><a href="#__codelineno-19-4">4</a></span>
+<span class="normal"><a href="#__codelineno-19-5">5</a></span>
+<span class="normal"><a href="#__codelineno-19-6">6</a></span>
+<span class="normal"><a href="#__codelineno-19-7">7</a></span>
+<span class="normal"><a href="#__codelineno-19-8">8</a></span>
+<span class="normal"><a href="#__codelineno-19-9">9</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1"></a><span class="k">for</span><span class="w"> </span>service<span class="w"> </span><span class="k">in</span><span class="w"> </span>demo_pg<span class="w"> </span>demo_connector<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2"></a><span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3"></a><span class="w">    </span><span class="s2">"http://127.0.0.1:8585/api/v1/services/databaseServices/name/</span><span class="nv">$service</span><span class="s2">?hardDelete=true&amp;recursive=true"</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4"></a><span class="k">done</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6"></a><span class="s1">import boto3</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py")</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9"></a><span class="s1">'</span>
 </span></code></pre></div></td></tr></table></div>
 <h2 id="runnable-example">Runnable Example</h2>
-<p>Save this file as <code>example.sh</code> and run it with <code>bash example.sh</code> in the folder that holds your <code>.odctl</code> workspace and <code>demo_connector.py</code>. It runs every step above except changing the connector, waits where a step needs time, and removes both services and the uploaded connector at the end. It prints <code>autopilot active: False</code>, the state of each ingestion, <code>custom table: orders</code>, the number of searchable tables, and <code>removed demo_pg and demo_connector</code>:</p>
-<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/example.sh</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-19-1"> 1</a></span>
-<span class="normal"><a href="#__codelineno-19-2"> 2</a></span>
-<span class="normal"><a href="#__codelineno-19-3"> 3</a></span>
-<span class="normal"><a href="#__codelineno-19-4"> 4</a></span>
-<span class="normal"><a href="#__codelineno-19-5"> 5</a></span>
-<span class="normal"><a href="#__codelineno-19-6"> 6</a></span>
-<span class="normal"><a href="#__codelineno-19-7"> 7</a></span>
-<span class="normal"><a href="#__codelineno-19-8"> 8</a></span>
-<span class="normal"><a href="#__codelineno-19-9"> 9</a></span>
-<span class="normal"><a href="#__codelineno-19-10">10</a></span>
-<span class="normal"><a href="#__codelineno-19-11">11</a></span>
-<span class="normal"><a href="#__codelineno-19-12">12</a></span>
-<span class="normal"><a href="#__codelineno-19-13">13</a></span>
-<span class="normal"><a href="#__codelineno-19-14">14</a></span>
-<span class="normal"><a href="#__codelineno-19-15">15</a></span>
-<span class="normal"><a href="#__codelineno-19-16">16</a></span>
-<span class="normal"><a href="#__codelineno-19-17">17</a></span>
-<span class="normal"><a href="#__codelineno-19-18">18</a></span>
-<span class="normal"><a href="#__codelineno-19-19">19</a></span>
-<span class="normal"><a href="#__codelineno-19-20">20</a></span>
-<span class="normal"><a href="#__codelineno-19-21">21</a></span>
-<span class="normal"><a href="#__codelineno-19-22">22</a></span>
-<span class="normal"><a href="#__codelineno-19-23">23</a></span>
-<span class="normal"><a href="#__codelineno-19-24">24</a></span>
-<span class="normal"><a href="#__codelineno-19-25">25</a></span>
-<span class="normal"><a href="#__codelineno-19-26">26</a></span>
-<span class="normal"><a href="#__codelineno-19-27">27</a></span>
-<span class="normal"><a href="#__codelineno-19-28">28</a></span>
-<span class="normal"><a href="#__codelineno-19-29">29</a></span>
-<span class="normal"><a href="#__codelineno-19-30">30</a></span>
-<span class="normal"><a href="#__codelineno-19-31">31</a></span>
-<span class="normal"><a href="#__codelineno-19-32">32</a></span>
-<span class="normal"><a href="#__codelineno-19-33">33</a></span>
-<span class="normal"><a href="#__codelineno-19-34">34</a></span>
-<span class="normal"><a href="#__codelineno-19-35">35</a></span>
-<span class="normal"><a href="#__codelineno-19-36">36</a></span>
-<span class="normal"><a href="#__codelineno-19-37">37</a></span>
-<span class="normal"><a href="#__codelineno-19-38">38</a></span>
-<span class="normal"><a href="#__codelineno-19-39">39</a></span>
-<span class="normal"><a href="#__codelineno-19-40">40</a></span>
-<span class="normal"><a href="#__codelineno-19-41">41</a></span>
-<span class="normal"><a href="#__codelineno-19-42">42</a></span>
-<span class="normal"><a href="#__codelineno-19-43">43</a></span>
-<span class="normal"><a href="#__codelineno-19-44">44</a></span>
-<span class="normal"><a href="#__codelineno-19-45">45</a></span>
-<span class="normal"><a href="#__codelineno-19-46">46</a></span>
-<span class="normal"><a href="#__codelineno-19-47">47</a></span>
-<span class="normal"><a href="#__codelineno-19-48">48</a></span>
-<span class="normal"><a href="#__codelineno-19-49">49</a></span>
-<span class="normal"><a href="#__codelineno-19-50">50</a></span>
-<span class="normal"><a href="#__codelineno-19-51">51</a></span>
-<span class="normal"><a href="#__codelineno-19-52">52</a></span>
-<span class="normal"><a href="#__codelineno-19-53">53</a></span>
-<span class="normal"><a href="#__codelineno-19-54">54</a></span>
-<span class="normal"><a href="#__codelineno-19-55">55</a></span>
-<span class="normal"><a href="#__codelineno-19-56">56</a></span>
-<span class="normal"><a href="#__codelineno-19-57">57</a></span>
-<span class="normal"><a href="#__codelineno-19-58">58</a></span>
-<span class="normal"><a href="#__codelineno-19-59">59</a></span>
-<span class="normal"><a href="#__codelineno-19-60">60</a></span>
-<span class="normal"><a href="#__codelineno-19-61">61</a></span>
-<span class="normal"><a href="#__codelineno-19-62">62</a></span>
-<span class="normal"><a href="#__codelineno-19-63">63</a></span>
-<span class="normal"><a href="#__codelineno-19-64">64</a></span>
-<span class="normal"><a href="#__codelineno-19-65">65</a></span>
-<span class="normal"><a href="#__codelineno-19-66">66</a></span>
-<span class="normal"><a href="#__codelineno-19-67">67</a></span>
-<span class="normal"><a href="#__codelineno-19-68">68</a></span>
-<span class="normal"><a href="#__codelineno-19-69">69</a></span>
-<span class="normal"><a href="#__codelineno-19-70">70</a></span>
-<span class="normal"><a href="#__codelineno-19-71">71</a></span>
-<span class="normal"><a href="#__codelineno-19-72">72</a></span>
-<span class="normal"><a href="#__codelineno-19-73">73</a></span>
-<span class="normal"><a href="#__codelineno-19-74">74</a></span>
-<span class="normal"><a href="#__codelineno-19-75">75</a></span>
-<span class="normal"><a href="#__codelineno-19-76">76</a></span>
-<span class="normal"><a href="#__codelineno-19-77">77</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1"></a><span class="ch">#!/usr/bin/env bash</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2"></a><span class="c1"># Starts metadata, shows AutoPilot's state, registers PostgreSQL as a database</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3"></a><span class="c1"># service and runs a metadata ingestion of the omt database. Then it uploads a</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4"></a><span class="c1"># custom connector, runs its agent, reads its table, counts the searchable</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5"></a><span class="c1"># tables and removes both services and the connector again. Run it in the folder</span>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6"></a><span class="c1"># that holds .odctl and demo_connector.py, the file of the Add a Custom</span>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7"></a><span class="c1"># Connector section.</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8"></a><span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail
-</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9"></a>
-</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10"></a>odctl<span class="w"> </span>up<span class="w"> </span>metadata
-</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11"></a><span class="nv">om</span><span class="o">=</span>http://127.0.0.1:8585/api/v1
-</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12"></a>json<span class="o">()</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import json, sys; print(</span><span class="nv">$1</span><span class="s2">)"</span><span class="p">;</span><span class="w"> </span><span class="o">}</span>
-</span><span id="__span-19-13"><a id="__codelineno-19-13" name="__codelineno-19-13"></a>
-</span><span id="__span-19-14"><a id="__codelineno-19-14" name="__codelineno-19-14"></a><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-15"><a id="__codelineno-19-15" name="__codelineno-19-15"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"{\"email\":\"admin@odctl.io\",\"password\":\"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span>password<span class="w"> </span><span class="p">|</span><span class="w"> </span>base64<span class="k">)</span><span class="s2">\"}"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-16"><a id="__codelineno-19-16" name="__codelineno-19-16"></a><span class="w">  </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/users/login"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["accessToken"]'</span><span class="k">)</span>
-</span><span id="__span-19-17"><a id="__codelineno-19-17" name="__codelineno-19-17"></a><span class="nv">AUTH</span><span class="o">=</span><span class="s2">"Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">"</span>
-</span><span id="__span-19-18"><a id="__codelineno-19-18" name="__codelineno-19-18"></a>
-</span><span id="__span-19-19"><a id="__codelineno-19-19" name="__codelineno-19-19"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"autopilot active: </span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/apps/name/AutoPilotApplication?fields=appConfiguration"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-20"><a id="__codelineno-19-20" name="__codelineno-19-20"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["appConfiguration"]["active"]'</span><span class="k">)</span><span class="s2">"</span>
-</span><span id="__span-19-21"><a id="__codelineno-19-21" name="__codelineno-19-21"></a>
-</span><span id="__span-19-22"><a id="__codelineno-19-22" name="__codelineno-19-22"></a><span class="c1"># Registers a database service, creates its agent, deploys and triggers it, and</span>
-</span><span id="__span-19-23"><a id="__codelineno-19-23" name="__codelineno-19-23"></a><span class="c1"># waits for the run. Usage: ingest &lt;service name&gt; &lt;service JSON&gt;</span>
-</span><span id="__span-19-24"><a id="__codelineno-19-24" name="__codelineno-19-24"></a>ingest<span class="o">()</span><span class="w"> </span><span class="o">{</span>
-</span><span id="__span-19-25"><a id="__codelineno-19-25" name="__codelineno-19-25"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span>svc<span class="w"> </span>pipe<span class="w"> </span><span class="nv">state</span><span class="o">=</span><span class="s2">""</span>
-</span><span id="__span-19-26"><a id="__codelineno-19-26" name="__codelineno-19-26"></a><span class="w">  </span><span class="nv">svc</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s2">"</span><span class="nv">$2</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-27"><a id="__codelineno-19-27" name="__codelineno-19-27"></a><span class="w">    </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/databaseServices"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["id"]'</span><span class="k">)</span>
-</span><span id="__span-19-28"><a id="__codelineno-19-28" name="__codelineno-19-28"></a><span class="w">  </span><span class="nv">pipe</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-29"><a id="__codelineno-19-29" name="__codelineno-19-29"></a><span class="w">    </span>-d<span class="w"> </span><span class="s2">"{\"name\":\"</span><span class="nv">$1</span><span class="s2">_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"</span><span class="nv">$svc</span><span class="s2">\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-30"><a id="__codelineno-19-30" name="__codelineno-19-30"></a><span class="w">    </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["id"]'</span><span class="k">)</span>
-</span><span id="__span-19-31"><a id="__codelineno-19-31" name="__codelineno-19-31"></a><span class="w">  </span><span class="k">until</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines/deploy/</span><span class="nv">$pipe</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-32"><a id="__codelineno-19-32" name="__codelineno-19-32"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'has been created'</span><span class="w"> </span>&gt;/dev/null<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
-</span><span id="__span-19-33"><a id="__codelineno-19-33" name="__codelineno-19-33"></a><span class="w">  </span><span class="c1"># Airflow parses a new DAG file before the trigger works, so the trigger is repeated.</span>
-</span><span id="__span-19-34"><a id="__codelineno-19-34" name="__codelineno-19-34"></a><span class="w">  </span><span class="k">until</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines/trigger/</span><span class="nv">$pipe</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-35"><a id="__codelineno-19-35" name="__codelineno-19-35"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'has been triggered'</span><span class="w"> </span>&gt;/dev/null<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
-</span><span id="__span-19-36"><a id="__codelineno-19-36" name="__codelineno-19-36"></a><span class="w">  </span><span class="k">until</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$state</span><span class="s2">"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>success<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$state</span><span class="s2">"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>failed<span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
-</span><span id="__span-19-37"><a id="__codelineno-19-37" name="__codelineno-19-37"></a><span class="w">    </span>sleep<span class="w"> </span><span class="m">10</span>
-</span><span id="__span-19-38"><a id="__codelineno-19-38" name="__codelineno-19-38"></a><span class="w">    </span><span class="nv">state</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-39"><a id="__codelineno-19-39" name="__codelineno-19-39"></a><span class="w">      </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines/name/</span><span class="nv">$1</span><span class="s2">.</span><span class="nv">$1</span><span class="s2">_metadata?fields=pipelineStatuses"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-40"><a id="__codelineno-19-40" name="__codelineno-19-40"></a><span class="w">      </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'(json.load(sys.stdin).get("pipelineStatuses") or [{}])[0].get("pipelineState", "")'</span><span class="k">)</span>
-</span><span id="__span-19-41"><a id="__codelineno-19-41" name="__codelineno-19-41"></a><span class="w">  </span><span class="k">done</span>
-</span><span id="__span-19-42"><a id="__codelineno-19-42" name="__codelineno-19-42"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"</span><span class="nv">$1</span><span class="s2"> ingestion: </span><span class="nv">$state</span><span class="s2">"</span>
-</span><span id="__span-19-43"><a id="__codelineno-19-43" name="__codelineno-19-43"></a><span class="o">}</span>
-</span><span id="__span-19-44"><a id="__codelineno-19-44" name="__codelineno-19-44"></a>
-</span><span id="__span-19-45"><a id="__codelineno-19-45" name="__codelineno-19-45"></a>ingest<span class="w"> </span>demo_pg<span class="w"> </span><span class="s1">'{"name":"demo_pg","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}'</span>
-</span><span id="__span-19-46"><a id="__codelineno-19-46" name="__codelineno-19-46"></a>
-</span><span id="__span-19-47"><a id="__codelineno-19-47" name="__codelineno-19-47"></a><span class="c1"># The container copies the connector from SeaweedFS within about 15 seconds.</span>
-</span><span id="__span-19-48"><a id="__codelineno-19-48" name="__codelineno-19-48"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
-</span><span id="__span-19-49"><a id="__codelineno-19-49" name="__codelineno-19-49"></a><span class="s1">import boto3, sys</span>
-</span><span id="__span-19-50"><a id="__codelineno-19-50" name="__codelineno-19-50"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(</span>
-</span><span id="__span-19-51"><a id="__codelineno-19-51" name="__codelineno-19-51"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py", Body=sys.stdin.buffer.read())</span>
-</span><span id="__span-19-52"><a id="__codelineno-19-52" name="__codelineno-19-52"></a><span class="s1">'</span><span class="w"> </span>&lt;<span class="w"> </span>demo_connector.py
-</span><span id="__span-19-53"><a id="__codelineno-19-53" name="__codelineno-19-53"></a><span class="k">until</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-f<span class="w"> </span>/opt/airflow/connectors/demo_connector.py<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
-</span><span id="__span-19-54"><a id="__codelineno-19-54" name="__codelineno-19-54"></a>ingest<span class="w"> </span>demo_connector<span class="w"> </span><span class="s1">'{"name":"demo_connector","serviceType":"CustomDatabase","connection":{"config":{"type":"CustomDatabase","sourcePythonClass":"demo_connector.DemoSource"}}}'</span>
-</span><span id="__span-19-55"><a id="__codelineno-19-55" name="__codelineno-19-55"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"custom table: </span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/tables/name/demo_connector.demo_db.public.orders"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-56"><a id="__codelineno-19-56" name="__codelineno-19-56"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["name"]'</span><span class="k">)</span><span class="s2">"</span>
-</span><span id="__span-19-57"><a id="__codelineno-19-57" name="__codelineno-19-57"></a>
-</span><span id="__span-19-58"><a id="__codelineno-19-58" name="__codelineno-19-58"></a><span class="c1"># The search index fills over a few minutes after it is rebuilt.</span>
-</span><span id="__span-19-59"><a id="__codelineno-19-59" name="__codelineno-19-59"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/apps/trigger/SearchIndexingApplication"</span><span class="w"> </span>&gt;/dev/null
-</span><span id="__span-19-60"><a id="__codelineno-19-60" name="__codelineno-19-60"></a><span class="nv">hits</span><span class="o">=</span><span class="m">0</span>
-</span><span id="__span-19-61"><a id="__codelineno-19-61" name="__codelineno-19-61"></a><span class="k">until</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$hits</span><span class="s2">"</span><span class="w"> </span>-gt<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
-</span><span id="__span-19-62"><a id="__codelineno-19-62" name="__codelineno-19-62"></a><span class="w">  </span>sleep<span class="w"> </span><span class="m">5</span>
-</span><span id="__span-19-63"><a id="__codelineno-19-63" name="__codelineno-19-63"></a><span class="w">  </span><span class="nv">hits</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/search/query?q=*&amp;index=table_search_index&amp;size=1"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-64"><a id="__codelineno-19-64" name="__codelineno-19-64"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["hits"]["total"]["value"]'</span><span class="k">)</span>
-</span><span id="__span-19-65"><a id="__codelineno-19-65" name="__codelineno-19-65"></a><span class="k">done</span>
-</span><span id="__span-19-66"><a id="__codelineno-19-66" name="__codelineno-19-66"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"searchable tables: </span><span class="nv">$hits</span><span class="s2">"</span>
-</span><span id="__span-19-67"><a id="__codelineno-19-67" name="__codelineno-19-67"></a>
-</span><span id="__span-19-68"><a id="__codelineno-19-68" name="__codelineno-19-68"></a><span class="k">for</span><span class="w"> </span>service<span class="w"> </span><span class="k">in</span><span class="w"> </span>demo_pg<span class="w"> </span>demo_connector<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-</span><span id="__span-19-69"><a id="__codelineno-19-69" name="__codelineno-19-69"></a><span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-70"><a id="__codelineno-19-70" name="__codelineno-19-70"></a><span class="w">    </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/databaseServices/name/</span><span class="nv">$service</span><span class="s2">?hardDelete=true&amp;recursive=true"</span><span class="w"> </span>&gt;/dev/null
-</span><span id="__span-19-71"><a id="__codelineno-19-71" name="__codelineno-19-71"></a><span class="k">done</span>
-</span><span id="__span-19-72"><a id="__codelineno-19-72" name="__codelineno-19-72"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
-</span><span id="__span-19-73"><a id="__codelineno-19-73" name="__codelineno-19-73"></a><span class="s1">import boto3</span>
-</span><span id="__span-19-74"><a id="__codelineno-19-74" name="__codelineno-19-74"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(</span>
-</span><span id="__span-19-75"><a id="__codelineno-19-75" name="__codelineno-19-75"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py")</span>
-</span><span id="__span-19-76"><a id="__codelineno-19-76" name="__codelineno-19-76"></a><span class="s1">'</span>
-</span><span id="__span-19-77"><a id="__codelineno-19-77" name="__codelineno-19-77"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"removed demo_pg and demo_connector"</span>
+<p>Save this file as <code>example.sh</code> and run it with <code>bash example.sh</code> in the folder that holds your <code>.odctl</code> workspace and <code>demo_connector.py</code>. It runs every step above except signing in as the viewer and changing the connector, waits where a step needs time, and removes both services and the uploaded connector at the end. It prints <code>autopilot active: False</code>, the state of each ingestion, <code>custom table: orders</code>, the number of searchable tables, and <code>removed demo_pg and demo_connector</code>:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">docs/snippets/openmetadata/example.sh</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-20-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-20-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-20-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-20-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-20-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-20-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-20-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-20-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-20-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-20-10">10</a></span>
+<span class="normal"><a href="#__codelineno-20-11">11</a></span>
+<span class="normal"><a href="#__codelineno-20-12">12</a></span>
+<span class="normal"><a href="#__codelineno-20-13">13</a></span>
+<span class="normal"><a href="#__codelineno-20-14">14</a></span>
+<span class="normal"><a href="#__codelineno-20-15">15</a></span>
+<span class="normal"><a href="#__codelineno-20-16">16</a></span>
+<span class="normal"><a href="#__codelineno-20-17">17</a></span>
+<span class="normal"><a href="#__codelineno-20-18">18</a></span>
+<span class="normal"><a href="#__codelineno-20-19">19</a></span>
+<span class="normal"><a href="#__codelineno-20-20">20</a></span>
+<span class="normal"><a href="#__codelineno-20-21">21</a></span>
+<span class="normal"><a href="#__codelineno-20-22">22</a></span>
+<span class="normal"><a href="#__codelineno-20-23">23</a></span>
+<span class="normal"><a href="#__codelineno-20-24">24</a></span>
+<span class="normal"><a href="#__codelineno-20-25">25</a></span>
+<span class="normal"><a href="#__codelineno-20-26">26</a></span>
+<span class="normal"><a href="#__codelineno-20-27">27</a></span>
+<span class="normal"><a href="#__codelineno-20-28">28</a></span>
+<span class="normal"><a href="#__codelineno-20-29">29</a></span>
+<span class="normal"><a href="#__codelineno-20-30">30</a></span>
+<span class="normal"><a href="#__codelineno-20-31">31</a></span>
+<span class="normal"><a href="#__codelineno-20-32">32</a></span>
+<span class="normal"><a href="#__codelineno-20-33">33</a></span>
+<span class="normal"><a href="#__codelineno-20-34">34</a></span>
+<span class="normal"><a href="#__codelineno-20-35">35</a></span>
+<span class="normal"><a href="#__codelineno-20-36">36</a></span>
+<span class="normal"><a href="#__codelineno-20-37">37</a></span>
+<span class="normal"><a href="#__codelineno-20-38">38</a></span>
+<span class="normal"><a href="#__codelineno-20-39">39</a></span>
+<span class="normal"><a href="#__codelineno-20-40">40</a></span>
+<span class="normal"><a href="#__codelineno-20-41">41</a></span>
+<span class="normal"><a href="#__codelineno-20-42">42</a></span>
+<span class="normal"><a href="#__codelineno-20-43">43</a></span>
+<span class="normal"><a href="#__codelineno-20-44">44</a></span>
+<span class="normal"><a href="#__codelineno-20-45">45</a></span>
+<span class="normal"><a href="#__codelineno-20-46">46</a></span>
+<span class="normal"><a href="#__codelineno-20-47">47</a></span>
+<span class="normal"><a href="#__codelineno-20-48">48</a></span>
+<span class="normal"><a href="#__codelineno-20-49">49</a></span>
+<span class="normal"><a href="#__codelineno-20-50">50</a></span>
+<span class="normal"><a href="#__codelineno-20-51">51</a></span>
+<span class="normal"><a href="#__codelineno-20-52">52</a></span>
+<span class="normal"><a href="#__codelineno-20-53">53</a></span>
+<span class="normal"><a href="#__codelineno-20-54">54</a></span>
+<span class="normal"><a href="#__codelineno-20-55">55</a></span>
+<span class="normal"><a href="#__codelineno-20-56">56</a></span>
+<span class="normal"><a href="#__codelineno-20-57">57</a></span>
+<span class="normal"><a href="#__codelineno-20-58">58</a></span>
+<span class="normal"><a href="#__codelineno-20-59">59</a></span>
+<span class="normal"><a href="#__codelineno-20-60">60</a></span>
+<span class="normal"><a href="#__codelineno-20-61">61</a></span>
+<span class="normal"><a href="#__codelineno-20-62">62</a></span>
+<span class="normal"><a href="#__codelineno-20-63">63</a></span>
+<span class="normal"><a href="#__codelineno-20-64">64</a></span>
+<span class="normal"><a href="#__codelineno-20-65">65</a></span>
+<span class="normal"><a href="#__codelineno-20-66">66</a></span>
+<span class="normal"><a href="#__codelineno-20-67">67</a></span>
+<span class="normal"><a href="#__codelineno-20-68">68</a></span>
+<span class="normal"><a href="#__codelineno-20-69">69</a></span>
+<span class="normal"><a href="#__codelineno-20-70">70</a></span>
+<span class="normal"><a href="#__codelineno-20-71">71</a></span>
+<span class="normal"><a href="#__codelineno-20-72">72</a></span>
+<span class="normal"><a href="#__codelineno-20-73">73</a></span>
+<span class="normal"><a href="#__codelineno-20-74">74</a></span>
+<span class="normal"><a href="#__codelineno-20-75">75</a></span>
+<span class="normal"><a href="#__codelineno-20-76">76</a></span>
+<span class="normal"><a href="#__codelineno-20-77">77</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1"></a><span class="ch">#!/usr/bin/env bash</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2"></a><span class="c1"># Starts metadata, shows AutoPilot's state, registers PostgreSQL as a database</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3"></a><span class="c1"># service and runs a metadata ingestion of the omt database. Then it uploads a</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4"></a><span class="c1"># custom connector, runs its agent, reads its table, counts the searchable</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5"></a><span class="c1"># tables and removes both services and the connector again. Run it in the folder</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6"></a><span class="c1"># that holds .odctl and demo_connector.py, the file of the Add a Custom</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7"></a><span class="c1"># Connector section.</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8"></a><span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9"></a>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10"></a>odctl<span class="w"> </span>up<span class="w"> </span>metadata
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11"></a><span class="nv">om</span><span class="o">=</span>http://127.0.0.1:8585/api/v1
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12"></a>json<span class="o">()</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import json, sys; print(</span><span class="nv">$1</span><span class="s2">)"</span><span class="p">;</span><span class="w"> </span><span class="o">}</span>
+</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13"></a>
+</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14"></a><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15"></a><span class="w">  </span>-d<span class="w"> </span><span class="s2">"{\"email\":\"admin@odctl.io\",\"password\":\"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span>password<span class="w"> </span><span class="p">|</span><span class="w"> </span>base64<span class="k">)</span><span class="s2">\"}"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-16"><a id="__codelineno-20-16" name="__codelineno-20-16"></a><span class="w">  </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/users/login"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["accessToken"]'</span><span class="k">)</span>
+</span><span id="__span-20-17"><a id="__codelineno-20-17" name="__codelineno-20-17"></a><span class="nv">AUTH</span><span class="o">=</span><span class="s2">"Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">"</span>
+</span><span id="__span-20-18"><a id="__codelineno-20-18" name="__codelineno-20-18"></a>
+</span><span id="__span-20-19"><a id="__codelineno-20-19" name="__codelineno-20-19"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"autopilot active: </span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/apps/name/AutoPilotApplication?fields=appConfiguration"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-20"><a id="__codelineno-20-20" name="__codelineno-20-20"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["appConfiguration"]["active"]'</span><span class="k">)</span><span class="s2">"</span>
+</span><span id="__span-20-21"><a id="__codelineno-20-21" name="__codelineno-20-21"></a>
+</span><span id="__span-20-22"><a id="__codelineno-20-22" name="__codelineno-20-22"></a><span class="c1"># Registers a database service, creates its agent, deploys and triggers it, and</span>
+</span><span id="__span-20-23"><a id="__codelineno-20-23" name="__codelineno-20-23"></a><span class="c1"># waits for the run. Usage: ingest &lt;service name&gt; &lt;service JSON&gt;</span>
+</span><span id="__span-20-24"><a id="__codelineno-20-24" name="__codelineno-20-24"></a>ingest<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+</span><span id="__span-20-25"><a id="__codelineno-20-25" name="__codelineno-20-25"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span>svc<span class="w"> </span>pipe<span class="w"> </span><span class="nv">state</span><span class="o">=</span><span class="s2">""</span>
+</span><span id="__span-20-26"><a id="__codelineno-20-26" name="__codelineno-20-26"></a><span class="w">  </span><span class="nv">svc</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s2">"</span><span class="nv">$2</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-27"><a id="__codelineno-20-27" name="__codelineno-20-27"></a><span class="w">    </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/databaseServices"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["id"]'</span><span class="k">)</span>
+</span><span id="__span-20-28"><a id="__codelineno-20-28" name="__codelineno-20-28"></a><span class="w">  </span><span class="nv">pipe</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-29"><a id="__codelineno-20-29" name="__codelineno-20-29"></a><span class="w">    </span>-d<span class="w"> </span><span class="s2">"{\"name\":\"</span><span class="nv">$1</span><span class="s2">_metadata\",\"pipelineType\":\"metadata\",\"service\":{\"id\":\"</span><span class="nv">$svc</span><span class="s2">\",\"type\":\"databaseService\"},\"sourceConfig\":{\"config\":{\"type\":\"DatabaseMetadata\"}},\"airflowConfig\":{\"startDate\":\"2026-01-01T00:00:00.000Z\"}}"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-30"><a id="__codelineno-20-30" name="__codelineno-20-30"></a><span class="w">    </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["id"]'</span><span class="k">)</span>
+</span><span id="__span-20-31"><a id="__codelineno-20-31" name="__codelineno-20-31"></a><span class="w">  </span><span class="k">until</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines/deploy/</span><span class="nv">$pipe</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-32"><a id="__codelineno-20-32" name="__codelineno-20-32"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'has been created'</span><span class="w"> </span>&gt;/dev/null<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+</span><span id="__span-20-33"><a id="__codelineno-20-33" name="__codelineno-20-33"></a><span class="w">  </span><span class="c1"># Airflow parses a new DAG file before the trigger works, so the trigger is repeated.</span>
+</span><span id="__span-20-34"><a id="__codelineno-20-34" name="__codelineno-20-34"></a><span class="w">  </span><span class="k">until</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines/trigger/</span><span class="nv">$pipe</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-35"><a id="__codelineno-20-35" name="__codelineno-20-35"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'has been triggered'</span><span class="w"> </span>&gt;/dev/null<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+</span><span id="__span-20-36"><a id="__codelineno-20-36" name="__codelineno-20-36"></a><span class="w">  </span><span class="k">until</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$state</span><span class="s2">"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>success<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$state</span><span class="s2">"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>failed<span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-20-37"><a id="__codelineno-20-37" name="__codelineno-20-37"></a><span class="w">    </span>sleep<span class="w"> </span><span class="m">10</span>
+</span><span id="__span-20-38"><a id="__codelineno-20-38" name="__codelineno-20-38"></a><span class="w">    </span><span class="nv">state</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-39"><a id="__codelineno-20-39" name="__codelineno-20-39"></a><span class="w">      </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/ingestionPipelines/name/</span><span class="nv">$1</span><span class="s2">.</span><span class="nv">$1</span><span class="s2">_metadata?fields=pipelineStatuses"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-40"><a id="__codelineno-20-40" name="__codelineno-20-40"></a><span class="w">      </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'(json.load(sys.stdin).get("pipelineStatuses") or [{}])[0].get("pipelineState", "")'</span><span class="k">)</span>
+</span><span id="__span-20-41"><a id="__codelineno-20-41" name="__codelineno-20-41"></a><span class="w">  </span><span class="k">done</span>
+</span><span id="__span-20-42"><a id="__codelineno-20-42" name="__codelineno-20-42"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"</span><span class="nv">$1</span><span class="s2"> ingestion: </span><span class="nv">$state</span><span class="s2">"</span>
+</span><span id="__span-20-43"><a id="__codelineno-20-43" name="__codelineno-20-43"></a><span class="o">}</span>
+</span><span id="__span-20-44"><a id="__codelineno-20-44" name="__codelineno-20-44"></a>
+</span><span id="__span-20-45"><a id="__codelineno-20-45" name="__codelineno-20-45"></a>ingest<span class="w"> </span>demo_pg<span class="w"> </span><span class="s1">'{"name":"demo_pg","serviceType":"Postgres","connection":{"config":{"type":"Postgres","scheme":"postgresql+psycopg2","username":"user","authType":{"password":"password"},"hostPort":"postgres:5432","database":"omt"}}}'</span>
+</span><span id="__span-20-46"><a id="__codelineno-20-46" name="__codelineno-20-46"></a>
+</span><span id="__span-20-47"><a id="__codelineno-20-47" name="__codelineno-20-47"></a><span class="c1"># The container copies the connector from SeaweedFS within about 15 seconds.</span>
+</span><span id="__span-20-48"><a id="__codelineno-20-48" name="__codelineno-20-48"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
+</span><span id="__span-20-49"><a id="__codelineno-20-49" name="__codelineno-20-49"></a><span class="s1">import boto3, sys</span>
+</span><span id="__span-20-50"><a id="__codelineno-20-50" name="__codelineno-20-50"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").put_object(</span>
+</span><span id="__span-20-51"><a id="__codelineno-20-51" name="__codelineno-20-51"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py", Body=sys.stdin.buffer.read())</span>
+</span><span id="__span-20-52"><a id="__codelineno-20-52" name="__codelineno-20-52"></a><span class="s1">'</span><span class="w"> </span>&lt;<span class="w"> </span>demo_connector.py
+</span><span id="__span-20-53"><a id="__codelineno-20-53" name="__codelineno-20-53"></a><span class="k">until</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-f<span class="w"> </span>/opt/airflow/connectors/demo_connector.py<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+</span><span id="__span-20-54"><a id="__codelineno-20-54" name="__codelineno-20-54"></a>ingest<span class="w"> </span>demo_connector<span class="w"> </span><span class="s1">'{"name":"demo_connector","serviceType":"CustomDatabase","connection":{"config":{"type":"CustomDatabase","sourcePythonClass":"demo_connector.DemoSource"}}}'</span>
+</span><span id="__span-20-55"><a id="__codelineno-20-55" name="__codelineno-20-55"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"custom table: </span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/tables/name/demo_connector.demo_db.public.orders"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-56"><a id="__codelineno-20-56" name="__codelineno-20-56"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["name"]'</span><span class="k">)</span><span class="s2">"</span>
+</span><span id="__span-20-57"><a id="__codelineno-20-57" name="__codelineno-20-57"></a>
+</span><span id="__span-20-58"><a id="__codelineno-20-58" name="__codelineno-20-58"></a><span class="c1"># The search index fills over a few minutes after it is rebuilt.</span>
+</span><span id="__span-20-59"><a id="__codelineno-20-59" name="__codelineno-20-59"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/apps/trigger/SearchIndexingApplication"</span><span class="w"> </span>&gt;/dev/null
+</span><span id="__span-20-60"><a id="__codelineno-20-60" name="__codelineno-20-60"></a><span class="nv">hits</span><span class="o">=</span><span class="m">0</span>
+</span><span id="__span-20-61"><a id="__codelineno-20-61" name="__codelineno-20-61"></a><span class="k">until</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$hits</span><span class="s2">"</span><span class="w"> </span>-gt<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-20-62"><a id="__codelineno-20-62" name="__codelineno-20-62"></a><span class="w">  </span>sleep<span class="w"> </span><span class="m">5</span>
+</span><span id="__span-20-63"><a id="__codelineno-20-63" name="__codelineno-20-63"></a><span class="w">  </span><span class="nv">hits</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/search/query?q=*&amp;index=table_search_index&amp;size=1"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-64"><a id="__codelineno-20-64" name="__codelineno-20-64"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>json<span class="w"> </span><span class="s1">'json.load(sys.stdin)["hits"]["total"]["value"]'</span><span class="k">)</span>
+</span><span id="__span-20-65"><a id="__codelineno-20-65" name="__codelineno-20-65"></a><span class="k">done</span>
+</span><span id="__span-20-66"><a id="__codelineno-20-66" name="__codelineno-20-66"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"searchable tables: </span><span class="nv">$hits</span><span class="s2">"</span>
+</span><span id="__span-20-67"><a id="__codelineno-20-67" name="__codelineno-20-67"></a>
+</span><span id="__span-20-68"><a id="__codelineno-20-68" name="__codelineno-20-68"></a><span class="k">for</span><span class="w"> </span>service<span class="w"> </span><span class="k">in</span><span class="w"> </span>demo_pg<span class="w"> </span>demo_connector<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-20-69"><a id="__codelineno-20-69" name="__codelineno-20-69"></a><span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span>-H<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTH</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-70"><a id="__codelineno-20-70" name="__codelineno-20-70"></a><span class="w">    </span><span class="s2">"</span><span class="nv">$om</span><span class="s2">/services/databaseServices/name/</span><span class="nv">$service</span><span class="s2">?hardDelete=true&amp;recursive=true"</span><span class="w"> </span>&gt;/dev/null
+</span><span id="__span-20-71"><a id="__codelineno-20-71" name="__codelineno-20-71"></a><span class="k">done</span>
+</span><span id="__span-20-72"><a id="__codelineno-20-72" name="__codelineno-20-72"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>openmetadata-ingestion<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
+</span><span id="__span-20-73"><a id="__codelineno-20-73" name="__codelineno-20-73"></a><span class="s1">import boto3</span>
+</span><span id="__span-20-74"><a id="__codelineno-20-74" name="__codelineno-20-74"></a><span class="s1">boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(</span>
+</span><span id="__span-20-75"><a id="__codelineno-20-75" name="__codelineno-20-75"></a><span class="s1">    Bucket="openmetadata", Key="connectors/demo_connector.py")</span>
+</span><span id="__span-20-76"><a id="__codelineno-20-76" name="__codelineno-20-76"></a><span class="s1">'</span>
+</span><span id="__span-20-77"><a id="__codelineno-20-77" name="__codelineno-20-77"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"removed demo_pg and demo_connector"</span>
 </span></code></pre></div></td></tr></table></div>
 <p>The searchable tables number more than 100, and the whole run takes several minutes.</p>
 

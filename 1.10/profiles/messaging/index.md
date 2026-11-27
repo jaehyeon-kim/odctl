@@ -24,7 +24,7 @@ Depends on: `deps`. `odctl up kafka-lite` also starts: `deps`.
 | `kafka`    | `apache/kafka:4.3.2`                | `9092:9092`          | `1500m`      |
 | `connect`  | `apache/kafka:4.3.2`                | `8083:8083`          | `2g`         |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
-| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
+| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.1`    | `8086:8080`          | `512m`       |
 
 ### kafka-full
 
@@ -48,4 +48,4 @@ Depends on: `deps`. `odctl up kafka-full` also starts: `deps`.
 | `kafka-3`  | `apache/kafka:4.3.2`                | `9094:9094`          | `1500m`      |
 | `connect`  | `apache/kafka:4.3.2`                | `8083:8083`          | `2g`         |
 | `karapace` | `ghcr.io/aiven-open/karapace:6.2.4` | `8081:8081`          | `512m`       |
-| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0`    | `8086:8080`          | `512m`       |
+| `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.1`    | `8086:8080`          | `512m`       |

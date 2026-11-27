@@ -44,8 +44,8 @@ Depends on: `deps`. `odctl up storage` also starts: `deps`.
 
 | Service        | Image                      | Host:container ports                  | Memory limit |
 | -------------- | -------------------------- | ------------------------------------- | ------------ |
-| `seaweed`      | `chrislusf/seaweedfs:4.52` | `8333:8333`, `8889:8888`, `9333:9333` | `1024m`      |
-| `seaweed-init` | `chrislusf/seaweedfs:4.52` | none                                  | not set      |
+| `seaweed`      | `chrislusf/seaweedfs:4.55` | `8333:8333`, `8889:8888`, `9333:9333` | `1024m`      |
+| `seaweed-init` | `chrislusf/seaweedfs:4.55` | none                                  | not set      |
 
 ## Iceberg REST Catalog
 
