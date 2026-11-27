@@ -49,6 +49,20 @@ curl -s -X POST -H "$AUTH" http://127.0.0.1:8585/api/v1/apps/trigger/SearchIndex
 curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_search_index&size=1"
 # --8<-- [end:search]
 
+# --8<-- [start:viewer]
+VIEWER=$(curl -s -H 'Content-Type: application/json' \
+  -d "{\"email\":\"viewer@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
+  http://127.0.0.1:8585/api/v1/users/login \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
+TABLE=$(curl -s -H "Authorization: Bearer $VIEWER" \
+  "http://127.0.0.1:8585/api/v1/tables?database=demo_pg.omt&limit=1" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])')
+curl -s -o /dev/null -w '%{http_code}\n' -X PATCH -H "Authorization: Bearer $VIEWER" \
+  -H 'Content-Type: application/json-patch+json' \
+  -d '[{"op":"add","path":"/description","value":"Edited by the viewer"}]' \
+  "http://127.0.0.1:8585/api/v1/tables/$TABLE"
+# --8<-- [end:viewer]
+
 # --8<-- [start:remove]
 for service in demo_pg demo_connector; do
   curl -s -X DELETE -H "$AUTH" \

@@ -61,7 +61,7 @@ curl -s -H "$AUTH" \
 
 It prints `False`. To turn AutoPilot on, set `METADATA_AUTOPILOT="true"` in `.odctl/.env` and run `odctl recreate metadata`. The command then prints `True`.
 
-`openmetadata-init` also gives `steward@odctl.io` and `viewer@odctl.io` their roles. It tries the admin login of a new database first, then the admin logins of earlier releases. When all of them fail, `docker logs openmetadata-init` shows `AutoPilot could not be set` and `The users' roles could not be set`.
+`openmetadata-init` also gives `steward@odctl.io` and `viewer@odctl.io` their roles, as [Sign In as the Viewer](#sign-in-as-the-viewer) shows. It tries the admin login of a new database first, then the admin logins of earlier releases. When all of them fail, `docker logs openmetadata-init` shows `AutoPilot could not be set` and `The users' roles could not be set`.
 
 ## Run a Metadata Ingestion
 
@@ -98,6 +98,26 @@ curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_se
 ```
 
 The search reply is JSON, and `hits.total.value` counts the searchable tables. The index fills over a few minutes after the rebuild, and then holds more than 100 tables: OpenMetadata's own tables in the `omt` database.
+
+## Sign In as the Viewer
+
+`viewer@odctl.io` can read every table but change none. This signs in as the viewer, reads one table of the `omt` database, and tries to change its description:
+
+```bash title="docs/snippets/openmetadata/commands.sh:viewer"
+VIEWER=$(curl -s -H 'Content-Type: application/json' \
+  -d "{\"email\":\"viewer@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
+  http://127.0.0.1:8585/api/v1/users/login \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
+TABLE=$(curl -s -H "Authorization: Bearer $VIEWER" \
+  "http://127.0.0.1:8585/api/v1/tables?database=demo_pg.omt&limit=1" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])')
+curl -s -o /dev/null -w '%{http_code}\n' -X PATCH -H "Authorization: Bearer $VIEWER" \
+  -H 'Content-Type: application/json-patch+json' \
+  -d '[{"op":"add","path":"/description","value":"Edited by the viewer"}]' \
+  "http://127.0.0.1:8585/api/v1/tables/$TABLE"
+```
+
+It prints `403`: the server refuses the change. The same change with a token of `steward@odctl.io` is accepted. `openmetadata-init` sets the two users' roles again at every start, so a role given to them in the UI is replaced at the next start.
 
 ## Add a Custom Connector
 

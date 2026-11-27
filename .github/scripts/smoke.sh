@@ -1653,39 +1653,33 @@ om_set_description() {
 }
 
 # steward and viewer are not admins. openmetadata-init gives steward DataSteward,
-# which may edit a description, and viewer the read-only Viewer role. The table is
-# one the guide's ingestion of demo_pg created in its database omt.
+# which may edit a description, and viewer the read-only Viewer role. The guide's
+# viewer step reads the first table of demo_pg's database omt and is refused an
+# edit of it; steward edits the same table and puts its description back.
 smoke_metadata_users() {
-  local steward viewer table id code original undo
+  local steward out id code original undo
   steward=$(om_login steward@odctl.io) || fail "steward@odctl.io could not log in with the password password"
-  viewer=$(om_login viewer@odctl.io) || fail "viewer@odctl.io could not log in with the password password"
-  pass "steward@odctl.io and viewer@odctl.io logged in with the password password"
+  # shellcheck disable=SC2016 # om_step expands it after the guide's viewer step
+  out=$(om_step viewer 'echo "$TABLE"' 2>/dev/null) || fail "the guide's viewer step failed"
+  id=$(tail -1 <<<"$out")
+  [ -n "$id" ] || fail "viewer@odctl.io could not log in or read a table of demo_pg.omt"
+  code=$(head -1 <<<"$out")
+  [ "$code" = "403" ] || fail "the viewer's edit of a description answered HTTP $code, not 403"
+  pass "viewer@odctl.io read a table and was refused an edit of its description"
 
-  table=$(curl -fsS -H "Authorization: Bearer $1" \
-    'http://127.0.0.1:8585/api/v1/tables?database=demo_pg.omt&limit=1' \
-    | python3 -c 'import json,sys; t=json.load(sys.stdin)["data"][0]; print(t["id"], t["fullyQualifiedName"])') \
-    || fail "the ingestion of demo_pg left no table to edit"
-  id=${table%% *}
   original=$(curl -fsS -H "Authorization: Bearer $1" "http://127.0.0.1:8585/api/v1/tables/$id" \
-    | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("description")))')
-  local edit='[{"op":"add","path":"/description","value":"Edited by the steward"}]'
-
-  code=$(om_set_description "$steward" "$id" "$edit")
-  [ "$code" = "200" ] || fail "steward could not edit the description of ${table#* } (HTTP $code)"
-  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $viewer" \
-    "http://127.0.0.1:8585/api/v1/tables/$id")
-  [ "$code" = "200" ] || fail "viewer could not read ${table#* } (HTTP $code)"
-  code=$(om_set_description "$viewer" "$id" "$edit")
-  [ "$code" = "403" ] || fail "viewer's edit of ${table#* } answered HTTP $code, not 403"
-
+    | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("description")))') \
+    || fail "could not read the description of table $id"
+  code=$(om_set_description "$steward" "$id" '[{"op":"add","path":"/description","value":"Edited by the steward"}]')
+  [ "$code" = "200" ] || fail "steward could not edit the description of table $id (HTTP $code)"
   if [ "$original" = "null" ]; then
     undo='[{"op":"remove","path":"/description"}]'
   else
     undo="[{\"op\":\"add\",\"path\":\"/description\",\"value\":$original}]"
   fi
   code=$(om_set_description "$steward" "$id" "$undo")
-  [ "$code" = "200" ] || fail "steward could not put back the description of ${table#* } (HTTP $code)"
-  pass "steward edited a table's description, and viewer read it and was refused the edit"
+  [ "$code" = "200" ] || fail "steward could not put back the description of table $id (HTTP $code)"
+  pass "steward@odctl.io edited a table's description and put it back"
 }
 
 # The same two calls with AutoPilot on create at least one agent. It proves
