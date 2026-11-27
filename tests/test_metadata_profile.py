@@ -121,10 +121,10 @@ def test_a_one_shot_service_sets_autopilot_from_the_env_key():
     assert service["image"] == _ingestion()["image"]
     assert "restart" not in service
     assert service["volumes"] == [
-        "./openmetadata/autopilot_init.py:/opt/odctl/autopilot_init.py:ro"
+        "./openmetadata/openmetadata_init.py:/opt/odctl/openmetadata_init.py:ro"
     ]
     assert (
-        get_internal_resources_dir() / "openmetadata" / "autopilot_init.py"
+        get_internal_resources_dir() / "openmetadata" / "openmetadata_init.py"
     ).is_file()
 
 
@@ -132,3 +132,19 @@ def test_ingestion_waits_for_the_one_shot_service_to_complete():
     """Without a service that depends on it, `up --wait` fails when it exits."""
     depends = _ingestion()["depends_on"]
     assert depends["openmetadata-init"]["condition"] == "service_completed_successfully"
+
+
+def test_the_server_adds_the_users_who_are_not_admins_once_then_starts():
+    server = _compose("compose-metadata.yml")["services"]["openmetadata-server"]
+    flag, script = server["command"]
+    assert flag == "-c"
+    # The image's entrypoint is /bin/bash and its command /openmetadata-start.sh.
+    assert script.endswith("exec /openmetadata-start.sh")
+    check, add = script.split(";")[0].split(" || ")
+    assert check == "grep -q '^  testPrincipals:' conf/openmetadata.yaml"
+    # $$ is a literal $ for Compose, so the server reads the variable itself.
+    assert "a\\  testPrincipals: $${AUTHORIZER_TEST_PRINCIPALS:-[]}'" in add
+    assert add.startswith("sed -i '/^  adminPrincipals:/")
+    assert server["environment"]["AUTHORIZER_TEST_PRINCIPALS"] == (
+        "[steward:password,viewer:password]"
+    )

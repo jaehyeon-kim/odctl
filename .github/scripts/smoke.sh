@@ -1481,6 +1481,11 @@ smoke_metadata() {
     || fail "openmetadata-init did not exit with code 0"
   pass "AutoPilot reports active: false and openmetadata-init exited 0"
 
+  # Added now and checked after the connector checks, which take longer than the
+  # wait the off-case needs, so the wait costs no time of its own.
+  om_add_service_like_the_ui "$token" demo_ui
+  local ui_added=$SECONDS
+
   # A real ingestion, with the guide's steps. Postgres is already running, so it
   # is its own source.
   local svc
@@ -1536,8 +1541,9 @@ smoke_metadata() {
   done
   pass "Context Center pages and memories both answer"
 
+  smoke_metadata_users "$token"
   smoke_metadata_connector "$token"
-  smoke_metadata_autopilot "$token"
+  smoke_metadata_autopilot "$token" "$ui_added"
 
   TOKEN="$token" om_step remove >/dev/null 2>&1 || fail "the guide's remove step failed"
   code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth" \
@@ -1617,15 +1623,69 @@ om_delete_service() {
 }
 
 # With AutoPilot off, a service added the way the UI adds one gets no agent. The
-# check waits 60 seconds, as long as the on-case below allows AutoPilot to create its agent.
+# check counts at least 60 seconds after the service was added, as long as the
+# on-case below allows AutoPilot to create its agent.
+# Usage: smoke_metadata_autopilot <token> <SECONDS when demo_ui was added>
 smoke_metadata_autopilot() {
-  local agents
-  om_add_service_like_the_ui "$1" demo_ui
-  sleep 60
+  local agents waited=$((SECONDS - $2))
+  [ "$waited" -ge 60 ] || sleep $((60 - waited))
   agents=$(om_agent_count "$1" demo_ui)
   om_delete_service "$1" demo_ui
   [ "$agents" = "0" ] || fail "a service added the way the UI adds one got $agents agents with AutoPilot off"
   pass "a service added the way the UI adds one, with its AutoPilot trigger, got no agent"
+}
+
+# Log in as a user with the password password and print its JWT.
+# Usage: om_login <email>
+om_login() {
+  curl -fsS -H 'Content-Type: application/json' \
+    -d "{\"email\":\"$1\",\"password\":\"$(printf password | base64)\"}" \
+    http://127.0.0.1:8585/api/v1/users/login \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])'
+}
+
+# Send a JSON patch that sets a table's description and print the HTTP code.
+# Usage: om_set_description <token> <table id> <JSON patch>
+om_set_description() {
+  curl -s -o /dev/null -w '%{http_code}' -X PATCH -H "Authorization: Bearer $1" \
+    -H 'Content-Type: application/json-patch+json' -d "$3" \
+    "http://127.0.0.1:8585/api/v1/tables/$2"
+}
+
+# steward and viewer are not admins. openmetadata-init gives steward DataSteward,
+# which may edit a description, and viewer the read-only Viewer role. The table is
+# one the guide's ingestion of demo_pg created in its database omt.
+smoke_metadata_users() {
+  local steward viewer table id code original undo
+  steward=$(om_login steward@odctl.io) || fail "steward@odctl.io could not log in with the password password"
+  viewer=$(om_login viewer@odctl.io) || fail "viewer@odctl.io could not log in with the password password"
+  pass "steward@odctl.io and viewer@odctl.io logged in with the password password"
+
+  table=$(curl -fsS -H "Authorization: Bearer $1" \
+    'http://127.0.0.1:8585/api/v1/tables?database=demo_pg.omt&limit=1' \
+    | python3 -c 'import json,sys; t=json.load(sys.stdin)["data"][0]; print(t["id"], t["fullyQualifiedName"])') \
+    || fail "the ingestion of demo_pg left no table to edit"
+  id=${table%% *}
+  original=$(curl -fsS -H "Authorization: Bearer $1" "http://127.0.0.1:8585/api/v1/tables/$id" \
+    | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("description")))')
+  local edit='[{"op":"add","path":"/description","value":"Edited by the steward"}]'
+
+  code=$(om_set_description "$steward" "$id" "$edit")
+  [ "$code" = "200" ] || fail "steward could not edit the description of ${table#* } (HTTP $code)"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $viewer" \
+    "http://127.0.0.1:8585/api/v1/tables/$id")
+  [ "$code" = "200" ] || fail "viewer could not read ${table#* } (HTTP $code)"
+  code=$(om_set_description "$viewer" "$id" "$edit")
+  [ "$code" = "403" ] || fail "viewer's edit of ${table#* } answered HTTP $code, not 403"
+
+  if [ "$original" = "null" ]; then
+    undo='[{"op":"remove","path":"/description"}]'
+  else
+    undo="[{\"op\":\"add\",\"path\":\"/description\",\"value\":$original}]"
+  fi
+  code=$(om_set_description "$steward" "$id" "$undo")
+  [ "$code" = "200" ] || fail "steward could not put back the description of ${table#* } (HTTP $code)"
+  pass "steward edited a table's description, and viewer read it and was refused the edit"
 }
 
 # The same two calls with AutoPilot on create at least one agent. It proves

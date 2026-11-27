@@ -445,6 +445,10 @@ OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metada
   with the password admin):
   - External (host): http://127.0.0.1:8585
   - Internal (Docker): http://openmetadata-server:8585
+• Users who are not admins, each with the password password:
+  steward@odctl.io (DataSteward role: views everything and edits
+  descriptions, owners, tags, tier, lineage and glossary terms) and
+  viewer@odctl.io (Viewer role: read only).
 • Ingestion Pipeline UI (Credentials: user / password):
   - External (host): http://127.0.0.1:8087
   - Internal (Docker): http://openmetadata-ingestion:8080

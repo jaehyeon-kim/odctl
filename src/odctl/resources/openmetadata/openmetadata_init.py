@@ -1,12 +1,18 @@
-"""Turns OpenMetadata's AutoPilot on or off, as METADATA_AUTOPILOT says.
+"""Sets OpenMetadata's AutoPilot and the roles of the two users who are not admins.
 
 The `openmetadata-init` service runs this once on every start of the `metadata`
 profile. AutoPilot is the app that creates and runs default agents for a service
 added in the UI. It does nothing while its `appConfiguration.active` is false, and
 the UI does not change that value. The script logs in as `admin`, writes the
-value, asks the server to apply it, reads it back and prints it. A database from
-an earlier release keeps the admin it was created with, so the script tries each
-login in LOGINS in turn until the server accepts one.
+value from METADATA_AUTOPILOT, asks the server to apply it, reads it back and
+prints it. A database from an earlier release keeps the admin it was created
+with, so the script tries each login in LOGINS in turn until the server accepts
+one.
+
+The server creates `steward` and `viewer` at start from AUTHORIZER_TEST_PRINCIPALS,
+with no role of their own. The script then creates the read-only Viewer role,
+gives `steward` the built-in DataSteward role and `viewer` the Viewer role, reads
+the roles back and prints them.
 """
 
 import base64
@@ -33,6 +39,51 @@ LOGINS = (
     Login("admin@odctl.io", "admin"),
     Login("admin@open-data.local", "admin"),
 )
+# Each user that is not an admin, and the role it gets.
+ROLES = {"steward": "DataSteward", "viewer": "Viewer"}
+VIEWER_POLICY = {
+    "name": "ViewerPolicy",
+    "description": "Read only: view everything, change nothing.",
+    "rules": [
+        {
+            "name": "ViewerPolicy-ViewRule",
+            "resources": ["all"],
+            "operations": ["ViewAll"],
+            "effect": "allow",
+        },
+        # Every user also takes DataConsumer from the Organization team, which may
+        # edit descriptions and tags and create tasks. Deny rules are checked first,
+        # and EditAll matches every Edit operation.
+        {
+            "name": "ViewerPolicy-DenyRule",
+            "resources": ["all"],
+            "operations": [
+                "EditAll",
+                "Create",
+                "BulkCreate",
+                "BulkUpdate",
+                "Delete",
+                "CreateTests",
+                "CreateIngestionPipelineAutomator",
+                "CreateTask",
+                "ResolveTask",
+                "CloseTask",
+                "ReassignTask",
+                "DeleteTestCaseFailedRowsSample",
+                "Deploy",
+                "Trigger",
+                "Kill",
+                "GenerateToken",
+            ],
+            "effect": "deny",
+        },
+    ],
+}
+VIEWER_ROLE = {
+    "name": "Viewer",
+    "description": "Read only, for the viewer login.",
+    "policies": ["ViewerPolicy"],
+}
 TRIES = 12
 RETRY_SECONDS = 5
 # 2.0.8: an unknown email gives 400 (BasicAuthenticator.lookUserInProvider); a wrong
@@ -158,18 +209,79 @@ def apply(
     return None
 
 
-def main() -> None:
-    """Apply METADATA_AUTOPILOT and print the result.
+def _set_roles(call: Callable[..., Any], token: str) -> dict[str, list[str]]:
+    """Create the Viewer role and give each user in ROLES its role.
 
-    It exits 0 even when the value could not be set, because the ingestion container
+    PUT creates the policy and the role or updates them to the same value, and the
+    patch replaces the user's roles, so a rerun changes nothing.
+
+    Args:
+        call (Callable[..., Any]): Sends one API request.
+        token (str): An admin's JWT.
+
+    Returns:
+        dict[str, list[str]]: Each user's role names, read back from the server.
+    """
+    call("PUT", "/policies", VIEWER_POLICY, token)
+    call("PUT", "/roles", VIEWER_ROLE, token)
+    result = {}
+    for user, role in ROLES.items():
+        role_id = call("GET", f"/roles/name/{role}", None, token)["id"]
+        user_id = call("GET", f"/users/name/{user}", None, token)["id"]
+        patch = [
+            {"op": "add", "path": "/roles", "value": [{"id": role_id, "type": "role"}]}
+        ]
+        call("PATCH", f"/users/{user_id}", patch, token, "application/json-patch+json")
+        reply = call("GET", f"/users/name/{user}?fields=roles", None, token)
+        result[user] = [r["name"] for r in reply.get("roles") or []]
+    return result
+
+
+def set_roles(
+    call: Callable[..., Any] = _call,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Optional[dict[str, list[str]]]:
+    """Set the users' roles, trying again while the server is not ready.
+
+    Args:
+        call (Callable[..., Any]): Sends one API request.
+        sleep (Callable[[float], None]): Waits between tries.
+
+    Returns:
+        Optional[dict[str, list[str]]]: Each user's role names, or None when no try
+        worked or the server refused every admin address.
+    """
+    for attempt in range(TRIES):
+        try:
+            token = _login(call)
+            if token is None:
+                return None
+            return _set_roles(call, token)
+        except Exception as error:
+            print("Setting the roles failed:", error, flush=True)
+            if attempt < TRIES - 1:
+                sleep(RETRY_SECONDS)
+    return None
+
+
+def main() -> None:
+    """Apply METADATA_AUTOPILOT, set the users' roles and print the results.
+
+    It exits 0 even when a value could not be set, because the ingestion container
     waits for this service to complete, and a wrong admin password must not stop it.
     """
     active = wanted(os.environ.get("METADATA_AUTOPILOT", "false"))
     result = apply(active)
     if result is None:
         print("AutoPilot could not be set", flush=True)
+    else:
+        print(f"AutoPilot active: {str(result).lower()}", flush=True)
+    roles = set_roles()
+    if roles is None:
+        print("The users' roles could not be set", flush=True)
         return
-    print(f"AutoPilot active: {str(result).lower()}", flush=True)
+    for user, names in roles.items():
+        print(f"{user} roles: {', '.join(names) or 'none'}", flush=True)
 
 
 if __name__ == "__main__":

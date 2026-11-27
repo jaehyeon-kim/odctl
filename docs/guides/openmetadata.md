@@ -16,7 +16,15 @@ odctl up metadata
 | UI and REST API inside the `odctl` network | `http://openmetadata-server:8585` |
 | Ingestion Airflow from the host | `http://127.0.0.1:8087` |
 
-Log in as `admin@odctl.io` or `user@odctl.io`, both with the password `password`. A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. From 1.3.0 to 1.6.0, `admin@odctl.io` has the password `admin`. Before 1.3.0, the users are `admin@open-data.local` and `user@open-data.local`, both with the password `admin`. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
+Four users can log in, each with the password `password`:
+
+| Login | What it may do |
+| --- | --- |
+| `admin@odctl.io`, `user@odctl.io` | Everything, as admins |
+| `steward@odctl.io` | View everything; edit descriptions, display names, owners, tags, tier, lineage, glossary terms and certification; and trigger agents (OpenMetadata's DataSteward role) |
+| `viewer@odctl.io` | View everything and change nothing (a Viewer role that odctl creates) |
+
+A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. A database from before 1.11.0 gets `steward@odctl.io` and `viewer@odctl.io` at its next start with the 1.11.0 compose files. From 1.3.0 to 1.6.0, `admin@odctl.io` has the password `admin`. Before 1.3.0, the users are `admin@open-data.local` and `user@open-data.local`, both with the password `admin`. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
 
 ## Get a Token
 
@@ -53,7 +61,7 @@ curl -s -H "$AUTH" \
 
 It prints `False`. To turn AutoPilot on, set `METADATA_AUTOPILOT="true"` in `.odctl/.env` and run `odctl recreate metadata`. The command then prints `True`.
 
-`openmetadata-init` tries the admin login of a new database first, then the admin logins of earlier releases; when all of them fail, `docker logs openmetadata-init` ends with `AutoPilot could not be set`.
+`openmetadata-init` also gives `steward@odctl.io` and `viewer@odctl.io` their roles. It tries the admin login of a new database first, then the admin logins of earlier releases. When all of them fail, `docker logs openmetadata-init` shows `AutoPilot could not be set` and `The users' roles could not be set`.
 
 ## Run a Metadata Ingestion
 
