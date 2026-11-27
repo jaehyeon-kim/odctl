@@ -216,7 +216,7 @@ Turn on OpenMetadata's AutoPilot, which creates and runs default agents for a se
 ```bash title="docs/snippets/how-it-works/commands.sh:metadata-autopilot"
 sed -i.bak 's/^METADATA_AUTOPILOT=.*/METADATA_AUTOPILOT="true"/' .odctl/.env
 odctl recreate metadata
-docker logs openmetadata-init 2>&1 | tail -1
+docker logs openmetadata-init 2>&1 | grep 'AutoPilot active'
 ```
 
 The last command prints `AutoPilot active: true`.
