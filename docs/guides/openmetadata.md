@@ -119,7 +119,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X PATCH -H "Authorization: Bearer $VIE
 
 It prints `403`: the server refuses the change. The same change with a token of `steward@odctl.io` is accepted. `openmetadata-init` sets the two users' roles again at every start, so a role given to them in the UI is replaced at the next start.
 
-The server creates both users before `openmetadata-init` gives them their roles. Until then, and whenever `openmetadata-init` cannot log in as an admin, `viewer@odctl.io` has the rights every user has, which include editing descriptions and tags. In that case `docker logs openmetadata-init` shows `The users' roles could not be set`.
+The server creates both users at start-up, and `openmetadata-init` gives them their roles once the server answers. On a database where `openmetadata-init` has not yet set the roles, `viewer@odctl.io` has the rights every user has, which include editing descriptions and tags. This lasts until `openmetadata-init` finishes on the first start. When `openmetadata-init` cannot log in as an admin, it lasts until a start where it can, and `docker logs openmetadata-init` shows `The users' roles could not be set`.
 
 ## Add a Custom Connector
 
