@@ -497,7 +497,7 @@ odctl down --all --volumes --yes
 
 ## Code in the Guides
 
-Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.10.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
+Every command and file in these pages is kept in the repository under [`docs/snippets`](https://github.com/jaehyeon-kim/odctl/tree/v1.11.0/docs/snippets), one folder per page, and the end-to-end tests run it on every release. A code block whose title names a file is a copy of that file, or of the section after the colon. The links on the published site point at the release that the docs describe.
 
 ## Use It with an AI Assistant
 
@@ -5607,7 +5607,7 @@ The collector answers `{"partialSuccess":{}}`. The collector passes metrics on i
 
 An alert rule is a query that Grafana runs against Prometheus every minute, and a limit it compares the result with. The rule fires when the result passes the limit. Grafana then shows one alert for each DAG, or other label set, that the query returns. odctl ships one rule, which fires when an Airflow DAG run fails. This section builds on [Airflow DAGs from S3](https://jaehyeon.me/odctl/latest/guides/airflow-dags/index.md), which explains how to upload and run a DAG, and on [Evidently Reports](https://jaehyeon.me/odctl/latest/guides/evidently-reports/index.md), which explains drift.
 
-The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/v1.10.0/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
+The shipped rule is [`airflow.yaml`](https://github.com/jaehyeon-kim/odctl/blob/v1.11.0/src/odctl/resources/grafana/alerting/airflow.yaml) in `.odctl/grafana/alerting/`. Grafana loads every file in that folder when it starts, so restart `telemetry` after you add or edit a file. Grafana marks these rules Provisioned and does not let you edit them in its UI. This lists the rules that Grafana loaded:
 
 ```bash
 # Title of each alert rule that Grafana loaded.
@@ -7451,6 +7451,10 @@ Nothing is being built now. The next item comes from Planned.
 
 Newest first.
 
+1.11.0: OpenMetadata steward and viewer logins
+
+OpenMetadata has a steward login that edits metadata and a viewer login that can only read, beside the two admins ([Sign In as the Viewer](https://jaehyeon.me/odctl/latest/guides/openmetadata/#sign-in-as-the-viewer)). Airflow is 3.4.0, kafka-ui is 1.5.1 and SeaweedFS is 4.55. [#199](https://github.com/jaehyeon-kim/odctl/pull/199)
+
 1.10.0: Agent skill and plugin
 
 The odctl agent skill is rewritten around the container lifecycle, with a checklist, rules that each show a wrong and a right example, and reference pages, and a plugin installs it with the read-only MCP server in Claude Code, Codex and Antigravity ([AI Assistants](https://jaehyeon.me/odctl/latest/ai/index.md)). [#177](https://github.com/jaehyeon-kim/odctl/issues/177)
@@ -7518,6 +7522,22 @@ What each release changed is in the [Changelog](https://jaehyeon.me/odctl/latest
 # Changelog
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
+
+## Version 1.11.0
+
+A steward login and a read-only viewer login in OpenMetadata, Airflow 3.4.0, and updated kafka-ui, PostgreSQL and SeaweedFS images.
+
+- OpenMetadata has two more logins beside the two admins, both with the password `password`. `steward@odctl.io` has OpenMetadata's DataSteward role, so it edits metadata such as descriptions, owners and tags. `viewer@odctl.io` has a Viewer role that odctl creates, so it can only read ([Sign In as the Viewer](https://jaehyeon.me/odctl/latest/guides/openmetadata/#sign-in-as-the-viewer)).
+- `openmetadata-init` sets the two users' roles on every start, after it sets AutoPilot, and its log prints each user's roles. The script is now `openmetadata/openmetadata_init.py`, renamed from `autopilot_init.py`.
+- Airflow is 3.4.0.
+- kafka-ui is 1.5.1 and SeaweedFS is 4.55.
+- The PostgreSQL image is built on the current `postgres:18-trixie` image.
+
+### Upgrading
+
+- A workspace made by `odctl init` before 1.11.0 keeps its old compose files, so it runs the earlier images and has no steward or viewer login. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them.
+- An OpenMetadata database from an earlier release gets `steward@odctl.io` and `viewer@odctl.io` at its next start with the 1.11.0 compose files, and keeps its own admin logins, as the [OpenMetadata](https://jaehyeon.me/odctl/latest/guides/openmetadata/index.md) guide lists. `openmetadata-init` sets their roles only when it can log in with an admin login that an odctl release has set. If it cannot, its log shows `The users' roles could not be set`, and both users have the rights that every OpenMetadata user has, which include editing descriptions and tags.
+- Airflow is 3.4.0, up from 3.3.2. On its next start, `airflow` upgrades the schema of your existing `airflow` database with `airflow db migrate`.
 
 ## Version 1.10.0
 
