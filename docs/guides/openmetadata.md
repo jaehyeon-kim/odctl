@@ -16,7 +16,15 @@ odctl up metadata
 | UI and REST API inside the `odctl` network | `http://openmetadata-server:8585` |
 | Ingestion Airflow from the host | `http://127.0.0.1:8087` |
 
-Log in as `admin@odctl.io` or `user@odctl.io`, both with the password `password`. A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. From 1.3.0 to 1.6.0, `admin@odctl.io` has the password `admin`. Before 1.3.0, the users are `admin@open-data.local` and `user@open-data.local`, both with the password `admin`. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
+Four users can log in, each with the password `password`:
+
+| Login | What it may do |
+| --- | --- |
+| `admin@odctl.io`, `user@odctl.io` | Everything, as admins |
+| `steward@odctl.io` | View everything; edit descriptions, display names, owners, tags, tier, lineage, glossary terms and certification; and trigger agents (OpenMetadata's DataSteward role) |
+| `viewer@odctl.io` | View everything and change nothing (a Viewer role that odctl creates) |
+
+A user's password is set when the database creates the user, so a database from an earlier release keeps its own logins. A database from before 1.11.0 gets `steward@odctl.io` and `viewer@odctl.io` at its next start with the 1.11.0 compose files. From 1.3.0 to 1.6.0, `admin@odctl.io` has the password `admin`. Before 1.3.0, the users are `admin@open-data.local` and `user@open-data.local`, both with the password `admin`. A wrong domain fails with an invalid username or password error. The ingestion Airflow takes `user` and `password`.
 
 ## Get a Token
 
@@ -53,7 +61,7 @@ curl -s -H "$AUTH" \
 
 It prints `False`. To turn AutoPilot on, set `METADATA_AUTOPILOT="true"` in `.odctl/.env` and run `odctl recreate metadata`. The command then prints `True`.
 
-`openmetadata-init` tries the admin login of a new database first, then the admin logins of earlier releases; when all of them fail, `docker logs openmetadata-init` ends with `AutoPilot could not be set`.
+`openmetadata-init` also gives `steward@odctl.io` and `viewer@odctl.io` their roles, as [Sign In as the Viewer](#sign-in-as-the-viewer) shows. It tries the admin login of a new database first, then the admin logins of earlier releases. When all of them fail, `docker logs openmetadata-init` shows `AutoPilot could not be set` and `The users' roles could not be set`.
 
 ## Run a Metadata Ingestion
 
@@ -90,6 +98,28 @@ curl -s -H "$AUTH" "http://127.0.0.1:8585/api/v1/search/query?q=*&index=table_se
 ```
 
 The search reply is JSON, and `hits.total.value` counts the searchable tables. The index fills over a few minutes after the rebuild, and then holds more than 100 tables: OpenMetadata's own tables in the `omt` database.
+
+## Sign In as the Viewer
+
+`viewer@odctl.io` can read every table but change none. This signs in as the viewer, reads one table of the `omt` database, and tries to change its description:
+
+```bash title="docs/snippets/openmetadata/commands.sh:viewer"
+VIEWER=$(curl -s -H 'Content-Type: application/json' \
+  -d "{\"email\":\"viewer@odctl.io\",\"password\":\"$(printf password | base64)\"}" \
+  http://127.0.0.1:8585/api/v1/users/login \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["accessToken"])')
+TABLE=$(curl -s -H "Authorization: Bearer $VIEWER" \
+  "http://127.0.0.1:8585/api/v1/tables?database=demo_pg.omt&limit=1" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][0]["id"])')
+curl -s -o /dev/null -w '%{http_code}\n' -X PATCH -H "Authorization: Bearer $VIEWER" \
+  -H 'Content-Type: application/json-patch+json' \
+  -d '[{"op":"add","path":"/description","value":"Edited by the viewer"}]' \
+  "http://127.0.0.1:8585/api/v1/tables/$TABLE"
+```
+
+It prints `403`: the server refuses the change. The same change with a token of `steward@odctl.io` is accepted. `openmetadata-init` sets the two users' roles again at every start, so a role given to them in the UI is replaced at the next start. OpenMetadata lets the reviewer of an entity, such as a glossary term, change it before any role is checked, so `viewer@odctl.io` stays read only as long as nobody names it as a reviewer.
+
+The server creates both users at start-up, and `openmetadata-init` gives them their roles once the server answers. On a database where `openmetadata-init` has not yet set the roles, `viewer@odctl.io` has the rights every user has, which include editing descriptions and tags. This lasts until `openmetadata-init` finishes on the first start. When `openmetadata-init` cannot log in as an admin, it lasts until a start where it can, and `docker logs openmetadata-init` shows `The users' roles could not be set`.
 
 ## Add a Custom Connector
 
@@ -264,7 +294,7 @@ boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(
 
 ## Runnable Example
 
-Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace and `demo_connector.py`. It runs every step above except changing the connector, waits where a step needs time, and removes both services and the uploaded connector at the end. It prints `autopilot active: False`, the state of each ingestion, `custom table: orders`, the number of searchable tables, and `removed demo_pg and demo_connector`:
+Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace and `demo_connector.py`. It runs every step above except signing in as the viewer and changing the connector, waits where a step needs time, and removes both services and the uploaded connector at the end. It prints `autopilot active: False`, the state of each ingestion, `custom table: orders`, the number of searchable tables, and `removed demo_pg and demo_connector`:
 
 ```bash title="docs/snippets/openmetadata/example.sh"
 #!/usr/bin/env bash

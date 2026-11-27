@@ -52,14 +52,6 @@ Nothing is being built now. The next item comes from Planned.
 
     [#143](https://github.com/jaehyeon-kim/odctl/issues/143)
 
--   __Memory check and models on the host__
-
-    ---
-
-    `odctl up` warns when Docker has less memory than the profiles it starts need. One setting lets containers reach a model server on the host with an OpenAI-compatible API, such as Ollama or LM Studio.
-
-    [#155](https://github.com/jaehyeon-kim/odctl/issues/155), [#109](https://github.com/jaehyeon-kim/odctl/issues/109)
-
 -   __desflow server__
 
     ---

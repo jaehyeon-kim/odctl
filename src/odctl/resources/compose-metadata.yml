@@ -74,6 +74,16 @@ services:
       - "127.0.0.1:8585:8585"
       - "127.0.0.1:8586:8586"
     mem_limit: 2g
+    # conf/openmetadata.yaml has no environment variable for testPrincipals, the
+    # start-up users who are not admins, so this adds one after adminPrincipals and
+    # then runs the image's own start script. A restarted container keeps the edited
+    # file, so the line is added only when it is missing.
+    command:
+      - -c
+      - >-
+        grep -q '^  testPrincipals:' conf/openmetadata.yaml
+        || sed -i '/^  adminPrincipals:/a\  testPrincipals: $${AUTHORIZER_TEST_PRINCIPALS:-[]}' conf/openmetadata.yaml;
+        exec /openmetadata-start.sh
     environment:
       # bin/openmetadata-server-start.sh reads OPENMETADATA_HEAP_OPTS and
       # ignores JAVA_OPTS, so the old key left the image default of -Xmx1G in place.
@@ -102,6 +112,9 @@ services:
       # name:password sets that admin's first password; a bare name gets "admin".
       # It applies when the user is created, so an existing database keeps its password.
       AUTHORIZER_ADMIN_PRINCIPALS: "[admin:password,user:password]"
+      # Users who are not admins, created the same way. openmetadata-init gives
+      # steward the DataSteward role and viewer a read-only Viewer role.
+      AUTHORIZER_TEST_PRINCIPALS: "[steward:password,viewer:password]"
       AUTHORIZER_PRINCIPAL_DOMAIN: "odctl.io"
       AUTHORIZER_INGESTION_PRINCIPALS: "[ingestion-bot]"
       AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
@@ -216,13 +229,13 @@ services:
   openmetadata-init:
     image: *om-ingestion-image
     container_name: openmetadata-init
-    command: ["python", "/opt/odctl/autopilot_init.py"]
+    command: ["python", "/opt/odctl/openmetadata_init.py"]
     profiles:
       - metadata
     networks:
       - odctl
     volumes:
-      - ./openmetadata/autopilot_init.py:/opt/odctl/autopilot_init.py:ro
+      - ./openmetadata/openmetadata_init.py:/opt/odctl/openmetadata_init.py:ro
     environment:
       METADATA_AUTOPILOT: ${METADATA_AUTOPILOT:-false}
     # The script uses about 12 MB of anonymous memory. memory.peak, which also counts

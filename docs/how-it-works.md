@@ -152,7 +152,7 @@ odctl --workspace ./.odctl ps catalog
 | `trino/rules.json` | Trino's file-based access control |
 | `evidently/config.yaml` | The Evidently server's settings |
 | `openmetadata/connector_sync.py` | How the ingestion container copies custom connectors from S3 |
-| `openmetadata/autopilot_init.py` | How the `openmetadata-init` service sets AutoPilot from `METADATA_AUTOPILOT` |
+| `openmetadata/openmetadata_init.py` | How the `openmetadata-init` service sets AutoPilot from `METADATA_AUTOPILOT` and gives the steward and viewer logins their roles |
 
 ### Apply a Change
 

@@ -90,7 +90,7 @@ odctl list --json | python3 -c 'import json, sys; profiles = {p["profile"]: p fo
         },
         {
             "name": "kafka-ui",
-            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.1",
             "ports": [
                 {
                     "host": 8086,
@@ -168,7 +168,7 @@ odctl explain kafka-lite --json | python3 -m json.tool
         },
         {
             "name": "kafka-ui",
-            "image": "ghcr.io/kafbat/kafka-ui:v1.5.0",
+            "image": "ghcr.io/kafbat/kafka-ui:v1.5.1",
             "ports": [
                 {
                     "host": 8086,

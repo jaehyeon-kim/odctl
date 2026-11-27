@@ -438,13 +438,16 @@ Data: `label-studio` keeps its data in the `labelstudio` database of the `postgr
 OpenMetadata: Data catalog, discovery, and governance platform. `odctl up metadata` also starts: `deps`, `postgres`, `storage`.
 
 ```text
-• OpenMetadata UI & REST API (Credentials: admin@odctl.io / password,
-  or user@odctl.io / password, on a new database; a database from
-  1.3.0 to 1.6.0 keeps admin@odctl.io / admin, and one from an earlier
-  release keeps admin@open-data.local and user@open-data.local, both
-  with the password admin):
+• OpenMetadata UI & REST API:
   - External (host): http://127.0.0.1:8585
   - Internal (Docker): http://openmetadata-server:8585
+• OpenMetadata users, each with the password password:
+  - Admins: admin@odctl.io and user@odctl.io
+  - Steward, who edits metadata such as descriptions, owners and tags:
+    steward@odctl.io
+  - Viewer, who can only read: viewer@odctl.io
+  A database from an earlier release keeps its own logins, as the
+  OpenMetadata guide lists.
 • Ingestion Pipeline UI (Credentials: user / password):
   - External (host): http://127.0.0.1:8087
   - Internal (Docker): http://openmetadata-ingestion:8080
