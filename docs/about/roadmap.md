@@ -66,6 +66,10 @@ Nothing is being built now. The next item comes from Planned.
 
 Newest first.
 
+??? note "1.11.0: OpenMetadata steward and viewer logins"
+
+    OpenMetadata has a steward login that edits metadata and a viewer login that can only read, beside the two admins ([Sign In as the Viewer](../guides/openmetadata.md#sign-in-as-the-viewer)). Airflow is 3.4.0, kafka-ui is 1.5.1 and SeaweedFS is 4.55. [#199](https://github.com/jaehyeon-kim/odctl/pull/199)
+
 ??? note "1.10.0: Agent skill and plugin"
 
     The odctl agent skill is rewritten around the container lifecycle, with a checklist, rules that each show a wrong and a right example, and reference pages, and a plugin installs it with the read-only MCP server in Claude Code, Codex and Antigravity ([AI Assistants](../ai/index.md)). [#177](https://github.com/jaehyeon-kim/odctl/issues/177)

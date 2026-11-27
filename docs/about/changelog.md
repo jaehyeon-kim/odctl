@@ -2,6 +2,22 @@
 
 Each release, newest first: what changed, then under Upgrading what to change in commands, workspaces or clients that use the previous release. Releases up to 1.0.2 are described on [GitHub Releases](https://github.com/jaehyeon-kim/odctl/releases).
 
+## Version 1.11.0
+
+A steward login and a read-only viewer login in OpenMetadata, Airflow 3.4.0, and updated kafka-ui, PostgreSQL and SeaweedFS images.
+
+- OpenMetadata has two more logins beside the two admins, both with the password `password`. `steward@odctl.io` has OpenMetadata's DataSteward role, so it edits metadata such as descriptions, owners and tags. `viewer@odctl.io` has a Viewer role that odctl creates, so it can only read ([Sign In as the Viewer](../guides/openmetadata.md#sign-in-as-the-viewer)).
+- `openmetadata-init` sets the two users' roles on every start, after it sets AutoPilot, and its log prints each user's roles. The script is now `openmetadata/openmetadata_init.py`, renamed from `autopilot_init.py`.
+- Airflow is 3.4.0.
+- kafka-ui is 1.5.1 and SeaweedFS is 4.55.
+- The PostgreSQL image is built on the current `postgres:18-trixie` image.
+
+### Upgrading
+
+- A workspace made by `odctl init` before 1.11.0 keeps its old compose files, so it runs the earlier images and has no steward or viewer login. Run `odctl init --force` to copy the new files; it replaces your edits, so keep a copy of them.
+- An OpenMetadata database from an earlier release gets `steward@odctl.io` and `viewer@odctl.io` at its next start with the 1.11.0 compose files, and keeps its own admin logins, as the [OpenMetadata](../guides/openmetadata.md) guide lists. `openmetadata-init` sets their roles only when it can log in with an admin login that an odctl release has set. If it cannot, its log shows `The users' roles could not be set`, and both users have the rights that every OpenMetadata user has, which include editing descriptions and tags.
+- Airflow is 3.4.0, up from 3.3.2. On its next start, `airflow` upgrades the schema of your existing `airflow` database with `airflow db migrate`.
+
 ## Version 1.10.0
 
 A plugin that installs the odctl skill and the MCP server in Claude Code, Codex and Antigravity, a rewritten skill, clearer errors, and fixes from a review of the CLI.
