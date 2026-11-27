@@ -61,7 +61,7 @@ docker exec openmetadata-ingestion python -c "import dateparser; print(dateparse
 # --8<-- [start:metadata-autopilot]
 sed -i.bak 's/^METADATA_AUTOPILOT=.*/METADATA_AUTOPILOT="true"/' .odctl/.env
 odctl recreate metadata
-docker logs openmetadata-init 2>&1 | tail -1
+docker logs openmetadata-init 2>&1 | grep 'AutoPilot active'
 # --8<-- [end:metadata-autopilot]
 
 # --8<-- [start:mlops-deps]

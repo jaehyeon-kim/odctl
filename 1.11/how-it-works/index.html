@@ -1418,7 +1418,7 @@
 <span class="normal"><a href="#__codelineno-11-2">2</a></span>
 <span class="normal"><a href="#__codelineno-11-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1"></a>sed<span class="w"> </span>-i.bak<span class="w"> </span><span class="s1">'s/^METADATA_AUTOPILOT=.*/METADATA_AUTOPILOT="true"/'</span><span class="w"> </span>.odctl/.env
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2"></a>odctl<span class="w"> </span>recreate<span class="w"> </span>metadata
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3"></a>docker<span class="w"> </span>logs<span class="w"> </span>openmetadata-init<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-1
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3"></a>docker<span class="w"> </span>logs<span class="w"> </span>openmetadata-init<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'AutoPilot active'</span>
 </span></code></pre></div></td></tr></table></div>
 <p>The last command prints <code>AutoPilot active: true</code>.</p>
 <p>Install an extra Python package in the MLflow containers, for a model that imports it:</p>
