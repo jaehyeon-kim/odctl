@@ -119,6 +119,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -X PATCH -H "Authorization: Bearer $VIE
 
 It prints `403`: the server refuses the change. The same change with a token of `steward@odctl.io` is accepted. `openmetadata-init` sets the two users' roles again at every start, so a role given to them in the UI is replaced at the next start.
 
+The server creates both users before `openmetadata-init` gives them their roles. Until then, and whenever `openmetadata-init` cannot log in as an admin, `viewer@odctl.io` has the rights every user has, which include editing descriptions and tags. In that case `docker logs openmetadata-init` shows `The users' roles could not be set`.
+
 ## Add a Custom Connector
 
 A custom connector is a Python class that reports databases, schemas and tables from a system OpenMetadata has no connector for. The ingestion container copies every file under `s3://openmetadata/connectors` into `/opt/airflow/connectors`, which is on its `PYTHONPATH`, so an agent can import a module or a package from there. [How It Works](../how-it-works.md#where-data-lives) compares the three profiles that read code from a bucket. A connector module must not have the name of an installed package such as `metadata` or `airflow`, because the connectors folder comes before the installed packages on the Python path.
@@ -292,7 +294,7 @@ boto3.client("s3", endpoint_url="http://seaweed:8333").delete_object(
 
 ## Runnable Example
 
-Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace and `demo_connector.py`. It runs every step above except changing the connector, waits where a step needs time, and removes both services and the uploaded connector at the end. It prints `autopilot active: False`, the state of each ingestion, `custom table: orders`, the number of searchable tables, and `removed demo_pg and demo_connector`:
+Save this file as `example.sh` and run it with `bash example.sh` in the folder that holds your `.odctl` workspace and `demo_connector.py`. It runs every step above except signing in as the viewer and changing the connector, waits where a step needs time, and removes both services and the uploaded connector at the end. It prints `autopilot active: False`, the state of each ingestion, `custom table: orders`, the number of searchable tables, and `removed demo_pg and demo_connector`:
 
 ```bash title="docs/snippets/openmetadata/example.sh"
 #!/usr/bin/env bash

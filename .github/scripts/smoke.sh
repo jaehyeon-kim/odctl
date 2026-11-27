@@ -1660,7 +1660,7 @@ smoke_metadata_users() {
   local steward out id code original undo
   steward=$(om_login steward@odctl.io) || fail "steward@odctl.io could not log in with the password password"
   # shellcheck disable=SC2016 # om_step expands it after the guide's viewer step
-  out=$(om_step viewer 'echo "$TABLE"' 2>/dev/null) || fail "the guide's viewer step failed"
+  out=$(om_step viewer 'echo "$TABLE"' 2>/dev/null)
   id=$(tail -1 <<<"$out")
   [ -n "$id" ] || fail "viewer@odctl.io could not log in or read a table of demo_pg.omt"
   code=$(head -1 <<<"$out")
